@@ -88,7 +88,7 @@ function Savings() {
       currency: defaultCurrency,
     })
     openSheet()
-  }, [defaultCurrency, openSheet])
+  }, [defaultCurrency, openSheet, setSwipedId])
 
   const openEdit = (goal) => {
     setSheetError('')

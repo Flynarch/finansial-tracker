@@ -333,7 +333,7 @@ function ProgressDots({ total, active }) {
 
 /* ── Format currency for display ─────────────────────────────────── */
 function formatBalancePreview(val) {
-  const num = Number(val) || 0
+  const num = Number(String(val).replace(/\D/g, '')) || 0
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num)
 }
 

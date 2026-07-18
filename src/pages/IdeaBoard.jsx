@@ -201,9 +201,12 @@ export default function IdeaBoard({ onClose }) {
         setCurrentStroke([{ x: boardX, y: boardY }])
         setSelectedIds(new Set())
       } else if (mode === 'select') {
+        const rect = containerRef.current?.getBoundingClientRect()
         setSelectionBox({
           startX: e.clientX, startY: e.clientY,
-          currentX: e.clientX, currentY: e.clientY
+          currentX: e.clientX, currentY: e.clientY,
+          containerLeft: rect?.left || 0,
+          containerTop: rect?.top || 0
         })
         setSelectedIds(new Set())
       } else {
@@ -788,8 +791,8 @@ export default function IdeaBoard({ onClose }) {
             <div
               className="absolute border-2 border-blue-500 bg-blue-500/15 pointer-events-none z-[120] rounded-sm"
               style={{
-                left: (Math.min(selectionBox.startX, selectionBox.currentX) - (containerRef.current?.getBoundingClientRect()?.left || 0) - pan.x) / zoom,
-                top: (Math.min(selectionBox.startY, selectionBox.currentY) - (containerRef.current?.getBoundingClientRect()?.top || 0) - pan.y) / zoom,
+                left: (Math.min(selectionBox.startX, selectionBox.currentX) - (selectionBox.containerLeft || 0) - pan.x) / zoom,
+                top: (Math.min(selectionBox.startY, selectionBox.currentY) - (selectionBox.containerTop || 0) - pan.y) / zoom,
                 width: Math.abs(selectionBox.currentX - selectionBox.startX) / zoom,
                 height: Math.abs(selectionBox.currentY - selectionBox.startY) / zoom,
               }}

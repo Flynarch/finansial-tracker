@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -252,17 +251,17 @@ function Reports() {
       if (tx.type === 'expense') row.expense += val
     })
     return [...monthMap.values()]
-  }, [rangeMonths, transactions])
+  }, [rangeMonths, transactions, defaultCurrency, rates])
 
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map()
     transactions.forEach((tx) => {
       if (tx.type !== 'expense') return
       const parsed = parseExpenseCategoryPath(tx.category)
-      let key = ''
-      let label = ''
-      let isParent = false
-      let parentId = null
+      let key
+      let label
+      let isParent
+      let parentId
 
       if (!selectedDrilldownParent) {
         parentId = parsed?.parentId || tx.category || 'lainnya'

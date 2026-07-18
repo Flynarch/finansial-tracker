@@ -1191,16 +1191,12 @@ function Dashboard() {
           isEntering ? '' : 'opacity-0'
         }`}
       >
-      <section className="flex items-center justify-between">
-        <h2 className="ft-page-title">{t('dashboard.title')}</h2>
-      </section>
-
       {/* Hero Card: Net Worth (Flat, Uniform Monochrome - Distinction via Size & Spacing) */}
       <section className="mb-4">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm sm:p-6">
+        <div className="rounded-[1.75rem] border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-sm sm:p-8">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--muted)] sm:text-xs">{t('dashboard.netWorth')}</p>
-            <p className="ft-display mt-1 break-all text-4xl font-black tracking-tight tabular-nums text-[var(--fg)] sm:text-6xl">
+            <p className="text-[12px] font-bold uppercase tracking-widest text-[var(--muted)] sm:text-sm">{t('dashboard.netWorth')}</p>
+            <p className="ft-display mt-1.5 break-all text-[2.75rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)] sm:text-7xl">
               {formatCurrency(netWorth, defaultCurrency)}
             </p>
           </div>
@@ -1269,6 +1265,120 @@ function Dashboard() {
             {formatCurrency(monthExpense || 0, defaultCurrency)}
           </p>
         </div>
+      </section>
+
+      {/* Transaksi Terakhir Card */}
+      <section>
+        <button
+          type="button"
+          onClick={() => navigate('/transactions')}
+          className="w-full text-left rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-sm hover:border-[var(--border-strong)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          style={{ boxShadow: 'var(--shadow-card)' }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">Transaksi Terakhir</h3>
+            <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+          </div>
+          
+          {groupedRecentEntries.length > 0 ? (() => {
+            const [latestDateKey, items] = groupedRecentEntries[0];
+            const latestTx = items[0];
+            const dateObj = new Date(`${latestDateKey}T12:00:00`);
+            const dateLabel = Number.isNaN(dateObj.getTime()) ? latestDateKey : format(dateObj, 'EEEE d MMMM yyyy', { locale: locale === 'en' ? enUS : idLocale }).toUpperCase();
+            
+            const iconKey = resolveTransactionIconKey(latestTx?.category, latestTx?.type);
+            const colorClass = getCategoryColorClass(iconKey, latestTx?.type, latestTx?.category);
+            const labels = getTransactionCategoryLabels(latestTx?.category, latestTx?.type, locale);
+            
+            let createdTime = null;
+            const createdAtMs = Number(latestTx?.createdAt);
+            if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
+              createdTime = format(new Date(createdAtMs), 'HH:mm');
+            }
+            
+            const sub = labels.sub || null;
+            const noteStr = latestTx?.notes ? String(latestTx.notes).trim() : '';
+            const isExpense = latestTx?.type === 'expense';
+            
+            return (
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold tracking-wider text-[var(--muted)]">{dateLabel}</p>
+                  <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[var(--bg)]">BARU</span>
+                </div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2">
+                  <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[10px] font-semibold ${colorClass}`}>
+                        <CategoryIcon icon={iconKey} className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {createdTime ? (
+                          <p className="text-[9px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
+                        ) : null}
+                        <p className="truncate text-[13px] font-bold text-[var(--fg)]">{labels.main}</p>
+                        {sub ? (
+                          <>
+                            <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
+                            {noteStr ? (
+                              <p className="mt-0.5 truncate text-[9px] italic leading-tight text-[var(--muted-2)]">{noteStr}</p>
+                            ) : null}
+                          </>
+                        ) : noteStr ? (
+                          <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{noteStr}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="shrink-0 max-w-[50%] pl-2 text-right">
+                      <p className={`break-all text-[13px] font-bold tabular-nums ${isExpense ? 'ft-expense-text' : 'ft-income-text'}`}>
+                        {isExpense ? '-' : '+'}
+                        {formatCurrency(Math.abs(Number(latestTx?.amount || 0)), latestTx?.currency || defaultCurrency)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })() : (
+            <p className="text-xs text-[var(--muted)]">{t('dashboard.history.empty')}</p>
+          )}
+        </button>
+      </section>
+
+<section className="grid grid-cols-1 gap-3">
+        <MiniChartCard
+          t={t}
+          title={t('dashboard.netWorthHistory')}
+          value={formatCurrency(computeRevenueValue(miniRevenueRange), defaultCurrency)}
+          data={miniRevenueSeries}
+          stroke="var(--accent)"
+          fill="var(--accent)"
+          animate={!reduceMotion}
+          premium
+          animationDuration={isCoarsePointer ? 700 : 900}
+          animationEasing="ease"
+          onOpen={() => {
+            setMiniRevenueSnapshot([])
+            setZoomRevenueRange(miniRevenueRange)
+            setZoomedChart('revenue')
+          }}
+          formatValue={(v) => formatCurrency(v, defaultCurrency)}
+          xKey="time"
+          yDomain={miniRevenueChartDomain}
+          showRightAxis
+          rightAxisTickFormatter={(v) => formatCurrency(v, defaultCurrency)}
+          rightAxisWidth={defaultCurrency === 'IDR' ? 84 : 64}
+          rightAxisTicks={miniRevenueAxisTicks}
+          rangeLabel={
+            miniRevenueRange === 'yearly'
+              ? t('dashboard.range.yearly')
+              : miniRevenueRange === 'monthly'
+                ? t('dashboard.range.monthly')
+                : miniRevenueRange === 'today'
+                  ? t('dashboard.range.today')
+                  : t('dashboard.range.weekly')
+          }
+        />
       </section>
 
       <div
@@ -1430,41 +1540,7 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3">
-        <MiniChartCard
-          t={t}
-          title={t('dashboard.netWorthHistory')}
-          value={formatCurrency(computeRevenueValue(miniRevenueRange), defaultCurrency)}
-          data={miniRevenueSeries}
-          stroke="var(--accent)"
-          fill="var(--accent)"
-          animate={!reduceMotion}
-          premium
-          animationDuration={isCoarsePointer ? 700 : 900}
-          animationEasing="ease"
-          onOpen={() => {
-            setMiniRevenueSnapshot([])
-            setZoomRevenueRange(miniRevenueRange)
-            setZoomedChart('revenue')
-          }}
-          formatValue={(v) => formatCurrency(v, defaultCurrency)}
-          xKey="time"
-          yDomain={miniRevenueChartDomain}
-          showRightAxis
-          rightAxisTickFormatter={(v) => formatCurrency(v, defaultCurrency)}
-          rightAxisWidth={defaultCurrency === 'IDR' ? 84 : 64}
-          rightAxisTicks={miniRevenueAxisTicks}
-          rangeLabel={
-            miniRevenueRange === 'yearly'
-              ? t('dashboard.range.yearly')
-              : miniRevenueRange === 'monthly'
-                ? t('dashboard.range.monthly')
-                : miniRevenueRange === 'today'
-                  ? t('dashboard.range.today')
-                  : t('dashboard.range.weekly')
-          }
-        />
-      </section>
+      
 
       {zoomedChart && typeof document !== 'undefined'
         ? createPortal(

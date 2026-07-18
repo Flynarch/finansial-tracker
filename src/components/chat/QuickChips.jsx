@@ -2,10 +2,10 @@ import React, { useMemo } from 'react'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 
-export default function QuickChips({ onSelect }) {
+export default function QuickChips({ chips: aiChips, onSelect }) {
   const locale = useSettingsStore((s) => s.locale)
 
-  const chips = useMemo(() => {
+  const defaultChips = useMemo(() => {
     const hour = new Date().getHours()
     
     // Time-aware suggestions
@@ -27,15 +27,27 @@ export default function QuickChips({ onSelect }) {
 
   return (
     <div className="ft-chat-chips">
-      {chips.map(key => (
-        <button
-          key={key}
-          className="ft-chip"
-          onClick={() => onSelect(translate(locale, key).replace(/^[^\s]+\s/, ''))}
-        >
-          {translate(locale, key)}
-        </button>
-      ))}
+      {aiChips && aiChips.length > 0 ? (
+        aiChips.map((chipText, idx) => (
+          <button
+            key={idx}
+            className="ft-chip"
+            onClick={() => onSelect(chipText)}
+          >
+            {chipText}
+          </button>
+        ))
+      ) : (
+        defaultChips.map(key => (
+          <button
+            key={key}
+            className="ft-chip"
+            onClick={() => onSelect(translate(locale, key).replace(/^[^\s]+\s/, ''))}
+          >
+            {translate(locale, key)}
+          </button>
+        ))
+      )}
     </div>
   )
 }

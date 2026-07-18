@@ -19,7 +19,6 @@ const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'lainnya
 const PRIORITIES = ['low', 'medium', 'high']
 const TODO_SORT_PREF_KEY = 'todo_sort_pref'
 const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'
-const SWIPE_THRESHOLD_PX = 80
 
 function priorityClass(p) {
   if (p === 'high') return 'bg-rose-500'
@@ -47,7 +46,6 @@ const TodoItemCard = memo(function TodoItemCard({
   todo,
   subProgress,
   isSwiping,
-  confirmDeleteId,
   setSwipeTodoId,
   swipeTodoIdRef,
   swipeStartXRef,
@@ -106,7 +104,6 @@ const TodoItemCard = memo(function TodoItemCard({
             const touch = e.touches[0]
             const dx = touch.clientX - swipeStartXRef.current
             const dy = touch.clientY - swipeStartYRef.current
-            const absDx = Math.abs(dx)
             const absDy = Math.abs(dy)
 
             if (absDy > Math.abs(dx) * 1.2 && Math.abs(dy) > 10 && Math.abs(dx) < 15) {
@@ -714,7 +711,7 @@ function TodoList() {
     } else if (todo?.dueDate) {
       void scheduleTodoDueNotifications({ id, title: todo.title, dueDate: todo.dueDate })
     }
-  }, [])
+  }, [cancelTodoDueNotifications, scheduleTodoDueNotifications])
 
   const toggleDetailComplete = async () => {
     if (!selectedTodo) return

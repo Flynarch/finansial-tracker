@@ -100,6 +100,7 @@ const useSettingsStore = create((set, get) => ({
         ? record.motionPreference
         : 'system',
       profileName: record.profileName || '',
+      initialBalance: Number(record.initialBalance) || 0,
       hasCompletedOnboarding: onboardingDone,
       securityEnabled,
       securityMethod: record.securityMethod || 'pin',
