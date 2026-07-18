@@ -1,0 +1,52 @@
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import AppShell from './components/layout/AppShell'
+import LoadingScreen from './components/ui/LoadingScreen'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Transactions = lazy(() => import('./pages/Transactions'))
+const TodoList = lazy(() => import('./pages/TodoList'))
+const Investments = lazy(() => import('./pages/Investments'))
+const Calendar = lazy(() => import('./pages/Calendar'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Budget = lazy(() => import('./pages/Budget'))
+const Savings = lazy(() => import('./pages/Savings'))
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'))
+const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'))
+const SettingsSecurity = lazy(() => import('./pages/settings/SettingsSecurity'))
+const SettingsCategories = lazy(() => import('./pages/settings/SettingsCategories'))
+const SettingsRecurring = lazy(() => import('./pages/settings/SettingsRecurring'))
+const SettingsData = lazy(() => import('./pages/settings/SettingsData'))
+const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
+
+function App() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/todos" element={<TodoList />} />
+          <Route path="/investments" element={<Investments />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/budget" element={<Budget />} />
+          <Route path="/savings" element={<Savings />} />
+          <Route path="/settings" element={<SettingsLayout />}>
+            <Route index element={<SettingsHome />} />
+            <Route path="security" element={<SettingsSecurity />} />
+            <Route path="categories" element={<SettingsCategories />} />
+            <Route path="recurring" element={<SettingsRecurring />} />
+            <Route path="data" element={<SettingsData />} />
+            <Route path="help" element={<SettingsHelp />} />
+          </Route>
+        </Route>
+      </Routes>
+    </Suspense>
+  )
+}
+
+export default App

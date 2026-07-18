@@ -1,0 +1,139 @@
+/* Loaded after react-big-calendar.css from Calendar.jsx — maps RBC to app tokens */
+
+.rbc-calendar {
+  background: var(--panel-strong);
+  color: var(--fg);
+  font-family: inherit;
+}
+
+.rbc-off-range {
+  color: var(--muted-2);
+}
+
+.rbc-off-range-bg {
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.rbc-header {
+  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  padding: 0.5rem 0;
+}
+
+.rbc-header + .rbc-header {
+  border-left-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-rtl .rbc-header + .rbc-header {
+  border-right-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-today {
+  background-color: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.rbc-month-view,
+.rbc-time-view {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.rbc-month-row {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-month-row + .rbc-month-row {
+  border-top-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-day-bg {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-day-bg + .rbc-day-bg {
+  border-left-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-time-content {
+  border-top-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-time-header-content {
+  border-left-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-time-column {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-timeslot-group {
+  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-day-slot .rbc-time-slot {
+  border-top-color: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.rbc-show-more {
+  background-color: var(--field-bg);
+  color: var(--accent);
+}
+
+.rbc-show-more:hover,
+.rbc-show-more:focus {
+  color: var(--accent-strong);
+}
+
+.rbc-event {
+  color: var(--fg);
+}
+
+/* Month grid: show dots only (hide event chips + +more overlay). */
+.rbc-month-view .rbc-event,
+.rbc-month-view .rbc-show-more {
+  display: none !important;
+}
+
+.rbc-event:focus {
+  outline: 2px solid var(--ring);
+}
+
+.rbc-slot-selection {
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.rbc-agenda-view table.rbc-agenda-table {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td {
+  border-left-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-agenda-view table.rbc-agenda-table .rbc-agenda-time-cell {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-current-time-indicator {
+  background-color: var(--accent);
+}
+
+.rbc-overlay {
+  background: var(--panel-strong);
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow: var(--shadow-card);
+  color: var(--fg);
+}
+
+.rbc-overlay-header {
+  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+}

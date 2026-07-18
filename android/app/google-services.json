@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "805641721747",
+    "project_id": "financialtracking-3ecbc",
+    "storage_bucket": "financialtracking-3ecbc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:805641721747:android:139e57b0eefac6e709ba66",
+        "android_client_info": {
+          "package_name": "com.fintrack.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCCldN9G8yLjrHyHL4z7bBLaxoKonQeFk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
