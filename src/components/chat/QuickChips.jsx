@@ -42,7 +42,7 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
           <button
             key={key}
             className="ft-chip"
-            onClick={() => onSelect(translate(locale, key).replace(/^[^\s]+\s/, ''))}
+            onClick={() => onSelect(translate(locale, key))}
           >
             {translate(locale, key)}
           </button>
