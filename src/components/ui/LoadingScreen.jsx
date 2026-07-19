@@ -1,25 +1,22 @@
 function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--fg)]">
-      <div className="flex flex-col items-center gap-4">
-        {/* Pulsing logo circle */}
-        <div
-          className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-md"
-          style={{
-            animation: 'ft-glow-pulse 2s ease-in-out infinite',
-          }}
-        >
-          <svg viewBox="0 0 24 24" className="h-7 w-7 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
-          </svg>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--bg)] text-[var(--fg)] relative overflow-hidden">
+      {/* Background ambient glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[300px] w-[300px] rounded-full bg-[var(--accent)] opacity-[0.07] blur-[100px]" />
+      
+      <div className="flex flex-col items-center gap-8 relative z-10">
+        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[var(--fg)] shadow-[0_16px_40px_rgba(0,0,0,0.3)] ring-1 ring-white/5">
+          <span className="text-3xl font-black tracking-[0.15em] text-[var(--bg)] ml-2">FT</span>
+          
+          {/* Smooth spinning rings */}
+          <div className="absolute -inset-[3px] rounded-full border border-transparent border-t-[var(--accent)] opacity-100 animate-[spin_1.2s_cubic-bezier(0.5,0,0.5,1)_infinite]" />
+          <div className="absolute -inset-[3px] rounded-full border border-transparent border-b-[var(--accent)] opacity-50 animate-[spin_2s_cubic-bezier(0.5,0,0.5,1)_infinite]" />
         </div>
-        {/* Animated text */}
-        <div className="flex items-center gap-1.5">
-          <span className="ft-display text-sm font-semibold tracking-tight text-[var(--fg)]">FinTrack</span>
-          <span className="flex gap-0.5">
-            <span className="h-1 w-1 rounded-full bg-[var(--accent)]" style={{ animation: 'ft-float 1.2s ease-in-out infinite', animationDelay: '0ms' }} />
-            <span className="h-1 w-1 rounded-full bg-[var(--accent)]" style={{ animation: 'ft-float 1.2s ease-in-out infinite', animationDelay: '200ms' }} />
-            <span className="h-1 w-1 rounded-full bg-[var(--accent)]" style={{ animation: 'ft-float 1.2s ease-in-out infinite', animationDelay: '400ms' }} />
+        
+        <div className="flex flex-col items-center gap-2.5">
+          <h1 className="text-[13px] font-bold tracking-[0.3em] uppercase text-[var(--fg)] ml-1">FinTrack</h1>
+          <span className="text-[9px] font-bold tracking-widest text-[var(--muted)] uppercase animate-pulse">
+            Memuat Data...
           </span>
         </div>
       </div>

@@ -9,37 +9,68 @@ export const INCOME_TREE = [
   {
     id: 'gaji',
     names: { id: 'Gaji', en: 'Salary' },
-    children: [],
+    children: [
+      { id: 'gaji_pokok', names: { id: 'Gaji Pokok', en: 'Basic Salary' } },
+      { id: 'lembur', names: { id: 'Lembur', en: 'Overtime' } },
+      { id: 'tunjangan', names: { id: 'Tunjangan', en: 'Allowance' } },
+    ],
   },
   {
     id: 'uang_jajan',
-    names: { id: 'Uang jajan', en: 'Pocket money' },
-    children: [],
+    names: { id: 'Uang Jajan', en: 'Pocket Money' },
+    children: [
+      { id: 'uang_saku', names: { id: 'Uang Saku', en: 'Allowance' } },
+      { id: 'dikasih_orang', names: { id: 'Dikasih Orang', en: 'Given by someone' } },
+    ],
   },
   {
     id: 'bonus',
     names: { id: 'Bonus & THR', en: 'Bonus & THR' },
-    children: [],
+    children: [
+      { id: 'thr', names: { id: 'THR', en: 'Holiday Allowance' } },
+      { id: 'bonus_tahunan', names: { id: 'Bonus Tahunan', en: 'Annual Bonus' } },
+      { id: 'hadiah', names: { id: 'Hadiah / Kado', en: 'Gift' } },
+      { id: 'cashback', names: { id: 'Cashback', en: 'Cashback' } },
+    ],
   },
   {
     id: 'bisnis',
     names: { id: 'Bisnis & Usaha', en: 'Business' },
-    children: [],
+    children: [
+      { id: 'penjualan', names: { id: 'Penjualan', en: 'Sales' } },
+      { id: 'freelance', names: { id: 'Freelance / Jasa', en: 'Freelance / Services' } },
+      { id: 'komisi', names: { id: 'Komisi', en: 'Commission' } },
+      { id: 'content_creator', names: { id: 'Content Creator', en: 'Content Creator' } },
+    ],
   },
   {
     id: 'kas_kecil',
-    names: { id: 'Kas kecil & Piutang', en: 'Petty cash & Debt' },
-    children: [],
+    names: { id: 'Kas Kecil & Piutang', en: 'Petty Cash & Debt' },
+    children: [
+      { id: 'bayar_utang', names: { id: 'Dibayar Utang (Piutang)', en: 'Debt Repayment' } },
+      { id: 'kembalian', names: { id: 'Kembalian', en: 'Change' } },
+      { id: 'patungan', names: { id: 'Uang Patungan', en: 'Split bill' } },
+    ],
   },
   {
     id: 'investasi',
     names: { id: 'Investasi', en: 'Investment' },
-    children: [],
+    children: [
+      { id: 'dividen', names: { id: 'Dividen', en: 'Dividend' } },
+      { id: 'bunga_bank', names: { id: 'Bunga Bank / Deposito', en: 'Bank Interest' } },
+      { id: 'cair_reksadana', names: { id: 'Pencairan Reksadana', en: 'Mutual Fund' } },
+      { id: 'jual_saham', names: { id: 'Keuntungan Saham', en: 'Stock Profit' } },
+      { id: 'jual_crypto', names: { id: 'Keuntungan Crypto', en: 'Crypto Profit' } },
+    ],
   },
   {
     id: 'lainnya',
     names: { id: 'Lainnya', en: 'Other' },
-    children: [],
+    children: [
+      { id: 'umum', names: { id: 'Umum', en: 'General' } },
+      { id: 'menang_undian', names: { id: 'Menang Undian / Lomba', en: 'Lottery / Prize' } },
+      { id: 'nemu_uang', names: { id: 'Nemu Uang', en: 'Found Money' } },
+    ],
   },
 ]
 

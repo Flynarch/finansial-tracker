@@ -21,7 +21,7 @@ function Modal({ isOpen, title, children, onClose }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 ft-motion-overlay"
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-[10vh] ft-motion-overlay"
       style={{ background: 'rgba(0, 0, 0, 0.55)' }}
       // Prevent background scroll without breaking inner scroll containers.
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
@@ -29,7 +29,7 @@ function Modal({ isOpen, title, children, onClose }) {
       onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-2xl"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto hide-scrollbar rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-2xl"
         style={{ animation: 'ft-scale-in var(--motion-duration) var(--motion-ease) both' }}
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}

@@ -148,7 +148,7 @@ function AppShell() {
 
   return (
     <div className="ft-app-shell min-h-screen text-[var(--fg)]">
-      <Navbar />
+      {(location.pathname === '/dashboard' || location.pathname === '/') && <Navbar />}
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
         <main className="min-h-[calc(100dvh-64px)] flex-1 min-w-0 px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6">

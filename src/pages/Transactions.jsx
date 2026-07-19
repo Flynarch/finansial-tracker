@@ -465,6 +465,12 @@ function Transactions() {
       const startPass = filters.startDate ? item.date >= filters.startDate : true
       const endPass = filters.endDate ? item.date <= filters.endDate : true
       return searchPass && typePass && categoryPass && startPass && endPass
+    }).sort((a, b) => {
+      const byDate = String(b.date || '').localeCompare(String(a.date || ''))
+      if (byDate !== 0) return byDate
+      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
+      if (byCreatedAt !== 0) return byCreatedAt
+      return String(b.id || '').localeCompare(String(a.id || ''))
     })
   }, [filters, transactions])
 

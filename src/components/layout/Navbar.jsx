@@ -49,30 +49,24 @@ function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel-strong)] px-4 py-2.5 shadow-2xs">
+    <header className="pt-5 pb-2 px-4 sm:px-6 sm:pt-6">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--fg)] text-xs font-black tracking-wider text-[var(--bg)] shadow-sm">
-            FT
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--fg)] text-xs font-bold tracking-[0.15em] text-[var(--bg)] shadow-sm">
+            {profileName ? profileName.substring(0, 2).toUpperCase() : 'FT'}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--muted)]">FinTrack</span>
-              {profileName ? (
-                <>
-                  <span className="text-[10px] text-[var(--border-strong)]">•</span>
-                  <span className="truncate text-[11px] font-semibold text-[var(--accent)]">{profileName}</span>
-                </>
-              ) : null}
-            </div>
-            <p className="truncate text-sm font-bold tracking-tight text-[var(--fg)] sm:text-base">
-              {profileName ? `Hai, ${profileName}` : 'Keuangan Pribadi'}
+          <div className="min-w-0 flex flex-col justify-center">
+            <p className="truncate text-[10px] font-bold tracking-widest text-[var(--muted)] uppercase mb-0.5">
+              {profileName ? 'Hai, Selamat Datang' : 'Keuangan Pribadi'}
             </p>
+            <h1 className="truncate text-base font-bold tracking-tight text-[var(--fg)] leading-none">
+              {profileName || 'FinTrack'}
+            </h1>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2.5" ref={dropdownRef}>
-          <span className="hidden rounded-lg border border-[var(--border)]/60 bg-[var(--field-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)] sm:inline-block">
+        <div className="flex shrink-0 items-center gap-3" ref={dropdownRef}>
+          <span className="hidden rounded-lg bg-[var(--field-bg)] px-3 py-1.5 text-[11px] font-bold tracking-wide text-[var(--muted)] sm:inline-block">
             {todayLabel}
           </span>
 
@@ -82,20 +76,18 @@ function Navbar() {
               onClick={() => setShowNotifications((prev) => !prev)}
               aria-label={t('navbar.notifications') || 'Notifikasi'}
               aria-expanded={showNotifications}
-              className={`relative inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
+              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 ${
                 showNotifications
-                  ? 'border-[var(--fg)] bg-[var(--panel)] text-[var(--fg)] shadow-sm'
-                  : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] hover:shadow-[var(--accent-glow)]'
+                  ? 'bg-[var(--fg)] text-[var(--bg)]'
+                  : 'bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40'
               }`}
             >
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M6.5 16.5V11a5.5 5.5 0 1 1 11 0v5.5l1.5 1.5H5z" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M10 19a2 2 0 0 0 4 0" strokeLinecap="round" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm ring-2 ring-[var(--panel-strong)]">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+                <span className="absolute top-2.5 right-3 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--panel-strong)]"></span>
               )}
             </button>
 
