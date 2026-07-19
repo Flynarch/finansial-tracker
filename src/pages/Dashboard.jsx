@@ -1340,7 +1340,19 @@ function Dashboard() {
               </div>
             )
           })() : (
-            <p className="text-xs text-[var(--muted)]">{t('dashboard.history.empty')}</p>
+            <div className="flex items-center gap-3 py-3 px-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"/>
+                  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+                  <path d="M12 17V7"/>
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-[12px] font-bold text-[var(--fg)]">{t('dashboard.history.empty')}</p>
+                <p className="text-[10px] mt-0.5 font-medium text-[var(--muted)]">Mulai catat pengeluaran pertamamu.</p>
+              </div>
+            </div>
           )}
         </button>
       </section>
