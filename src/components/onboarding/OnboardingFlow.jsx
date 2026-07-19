@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
+import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
+import AddAccountPage from '../../pages/AddAccountPage'
 
 const PROGRESS_KEY = 'ft_onboarding_progress'
 const TOTAL_STEPS = 5 // welcome, username, balance, features, confirm
@@ -352,14 +354,15 @@ export default function OnboardingFlow() {
 
   const [step, setStep] = useState(saved?.step ?? 0)
   const [username, setUsername] = useState(saved?.username ?? '')
-  const [balance, setBalance] = useState(saved?.balance ?? '')
   const [featureIdx, setFeatureIdx] = useState(0)
   const [direction, setDirection] = useState(1) // 1=forward, -1=back
   const [isAnimating, setIsAnimating] = useState(false)
 
   // Validation
   const [usernameError, setUsernameError] = useState('')
-  const [balanceError, setBalanceError] = useState('')
+
+  // Live wallet count for step 2 validation
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
   // Entrance animation
   const [mounted, setMounted] = useState(false)
@@ -372,9 +375,9 @@ export default function OnboardingFlow() {
   // Persist progress on change
   useEffect(() => {
     if (step > 0) {
-      saveProgress({ step, username, balance })
+      saveProgress({ step, username })
     }
-  }, [step, username, balance])
+  }, [step, username])
 
   // Touch swipe for feature slides
   const touchStart = useRef(null)
@@ -413,16 +416,8 @@ export default function OnboardingFlow() {
       if (trimmed.length < 2) { setUsernameError('Minimal 2 karakter'); return }
       setUsernameError('')
     }
-    if (step === 2) {
-      // Validate balance
-      const rawNum = String(balance).replace(/\D/g, '')
-      const num = Number(rawNum)
-      if (balance !== '' && isNaN(num)) { setBalanceError('Masukkan angka yang valid'); return }
-      if (num < 0) { setBalanceError('Saldo tidak boleh negatif'); return }
-      setBalanceError('')
-    }
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
-  }, [step, username, balance, goTo])
+  }, [step, username, goTo])
 
   const handleBack = useCallback(() => {
     if (step === 3 && featureIdx > 0) {
@@ -436,17 +431,13 @@ export default function OnboardingFlow() {
     const trimmedName = username.trim()
     // Save profile name
     await setProfileName(trimmedName)
-    // Save initial balance directly instead of a transaction
-    const rawNum = String(balance).replace(/\D/g, '')
-    const num = Number(rawNum) || 0
-    await useSettingsStore.getState().setInitialBalance(num)
     // Mark onboarding complete
     await completeOnboarding()
     clearProgress()
     // Also mark old onboarding as seen
     try { localStorage.setItem('ft_onboarding_seen_v1', '1') } catch { /* ignore */ }
     navigate('/dashboard', { replace: true })
-  }, [username, balance, setProfileName, completeOnboarding, navigate])
+  }, [username, setProfileName, completeOnboarding, navigate])
 
   // Don't render if already completed or settings not loaded yet
   if (!isLoaded || hasCompleted) return null
@@ -549,51 +540,14 @@ export default function OnboardingFlow() {
             </div>
           )}
 
-          {/* ── Step 2: Balance ────────────────────────────────── */}
+          {/* ── Step 2: Tambah Akun / Wallet ────────────────── */}
           {step === 2 && (
-            <div className="flex flex-col">
-              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">Langkah 2 dari 3</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--fg)]">Saldo dompet saat ini</h2>
-              <p className="mt-1.5 text-sm text-[var(--muted)]">Berapa total uang tunai yang kamu miliki sekarang? Boleh 0 jika belum ingin mengisi.</p>
-
-              <div className="mt-8">
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--muted)]">Rp</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={balance}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '')
-                      setBalance(val ? Number(val).toLocaleString('id-ID') : '')
-                      setBalanceError('')
-                    }}
-                    placeholder="0"
-                    autoFocus
-                    className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3.5 pl-12 pr-4 text-base font-semibold tabular-nums text-[var(--fg)] outline-none transition placeholder:text-[var(--muted-2)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                  />
-                </div>
-                {balanceError && (
-                  <p className="mt-2 text-xs font-semibold text-rose-400">{balanceError}</p>
-                )}
-              </div>
-
-              <div className="mt-8 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel)] active:scale-[0.97]"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex-1 rounded-2xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-[0.97]"
-                >
-                  Lanjut
-                </button>
-              </div>
+            <div className="flex flex-col -mx-6 -my-8 h-screen">
+              <AddAccountPage
+                isOnboarding
+                onBack={handleBack}
+                onSuccess={() => goTo(3)}
+              />
             </div>
           )}
 
@@ -714,11 +668,13 @@ export default function OnboardingFlow() {
                   </button>
                 </div>
 
-                {/* Balance */}
+                {/* Wallet */}
                 <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Saldo Awal</p>
-                    <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--fg)]">{formatBalancePreview(balance)}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Dompet</p>
+                    <p className="mt-0.5 text-sm font-bold text-[var(--fg)]">
+                      {wallets?.length > 0 ? `${wallets.length} wallet tersimpan` : 'Belum ada wallet'}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -744,7 +700,7 @@ export default function OnboardingFlow() {
                   onClick={handleFinish}
                   className="flex-1 rounded-2xl bg-[var(--accent)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-lg transition active:scale-[0.97]"
                 >
-                  Mulai Pakai FinTrack 🚀
+                  Mulai Pakai FinTrack
                 </button>
               </div>
             </div>

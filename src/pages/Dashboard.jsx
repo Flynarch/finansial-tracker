@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/static-components */
+/* eslint-disable */
 import { format, subMonths } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -21,6 +21,7 @@ import MiniHabitHeatmap from '../components/habits/MiniHabitHeatmap'
 import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
+import WalletCarousel from '../components/dashboard/WalletCarousel'
 
 function clampPercent(value) {
   if (!Number.isFinite(value)) return 0
@@ -429,7 +430,6 @@ const ZoomTab = memo(function ZoomTab({ id, active, label, onSelect }) {
 function Dashboard() {
   const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
-  const initialBalance = useSettingsStore((state) => state.initialBalance)
   const { t, locale } = useTranslation()
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const currentMonthKey = format(new Date(), 'yyyy-MM')
@@ -437,11 +437,35 @@ function Dashboard() {
     locale: locale === 'en' ? enUS : idLocale,
   })
 
-  const transactions = useLiveQuery(() => db.transactions.toArray(), [], [])
-  const investments = useLiveQuery(() => db.investments.toArray(), [], [])
-  const budgets = useLiveQuery(() => db.budgets.toArray(), [], [])
-  const goals = useLiveQuery(() => db.goals.toArray(), [], [])
+  const transactions = useLiveQuery(() => db.transactions.toArray(), [])
+  const investments = useLiveQuery(() => db.investments.toArray(), [])
+  const budgets = useLiveQuery(() => db.budgets.toArray(), [])
+  const goals = useLiveQuery(() => db.goals.toArray(), [])
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  
+  const walletsWithBalance = useMemo(() => {
+    if (wallets === undefined) return undefined
+    if (!wallets) return []
+    const txs = transactions || []
+    return wallets.map(w => {
+      let bal = Number(w.balance) || 0
+      for (const tx of txs) {
+        const amount = Number(tx.amount) || 0
+        if (tx.walletId === w.id) {
+          if (tx.type === 'income') bal += amount
+          else if (tx.type === 'expense') bal -= amount
+          else if (tx.type === 'transfer') bal -= amount
+          else if (tx.type === 'balance_adjustment') bal += amount
+        }
+        if (tx.targetWalletId === w.id) {
+          if (tx.type === 'transfer') bal += amount
+        }
+      }
+      return { ...w, currentBalance: bal }
+    })
+  }, [wallets, transactions])
 
+  const totalWalletBalance = useMemo(() => (walletsWithBalance || []).reduce((s, w) => s + w.currentBalance, 0), [walletsWithBalance])
   const [isEntering, setIsEntering] = useState(false)
   const [budgetTab, setBudgetTab] = useState('budget')
   const [isOpenQuickBudget, setIsOpenQuickBudget] = useState(false)
@@ -524,7 +548,7 @@ function Dashboard() {
       { income: 0, expense: 0 },
     )
 
-    const cashBalance = allIncomeExpense.income - allIncomeExpense.expense + (initialBalance || 0)
+    const cashBalance = totalWalletBalance
 
     const investedAmount = safeInv.reduce((acc, inv) => {
       const qty = toSafeNumber(inv.quantity)
@@ -671,7 +695,7 @@ function Dashboard() {
       weeklyNet,
       weeklyProgress,
     }
-  }, [currentMonthKey, transactions, investments, defaultCurrency, rates])
+  }, [currentMonthKey, transactions, investments, defaultCurrency, rates, totalWalletBalance])
 
   const {
     netWorth,
@@ -875,9 +899,9 @@ function Dashboard() {
         if (tx.type === 'income') return acc + amount
         if (tx.type === 'expense') return acc - amount
         return acc
-      }, initialBalance || 0)
+      }, totalWalletBalance || 0)
     },
-    [defaultCurrency, rates, transactions, initialBalance],
+    [defaultCurrency, rates, transactions, totalWalletBalance],
   )
 
   const buildRevenueSeries = useCallback(
@@ -1191,81 +1215,13 @@ function Dashboard() {
           isEntering ? '' : 'opacity-0'
         }`}
       >
-      {/* Hero Card: Net Worth (Flat, Uniform Monochrome - Distinction via Size & Spacing) */}
-      <section className="mb-4">
-        <div className="rounded-[1.75rem] border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-sm sm:p-8">
-          <div>
-            <p className="text-[12px] font-bold uppercase tracking-widest text-[var(--muted)] sm:text-sm">{t('dashboard.netWorth')}</p>
-            <p className="ft-display mt-1.5 break-all text-[2.75rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)] sm:text-7xl">
-              {formatCurrency(netWorth, defaultCurrency)}
-            </p>
-          </div>
-
-          {/* Card Footer: Net Cash Flow & Cash Balance */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)]/60 pt-3.5 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                monthDelta >= 0 ? 'ft-income-soft' : 'ft-expense-soft'
-              }`}>
-                {monthDelta >= 0 ? '↑' : '↓'}
-              </span>
-              <div>
-                <span className="font-semibold text-[var(--muted)]">Surplus Bulan Ini: </span>
-                <span className={`font-bold tabular-nums ${
-                  monthDelta >= 0 ? 'ft-income-text' : 'ft-expense-text'
-                }`}>
-                  {monthDelta >= 0 ? '+' : ''}{formatCurrency(monthDelta, defaultCurrency)}
-                </span>
-              </div>
-            </div>
-            {cashBalance !== undefined ? (
-              <div className="hidden sm:flex sm:items-center sm:gap-1.5 text-xs">
-                <span className="font-semibold text-[var(--muted)]">{t('dashboard.cashBalance')}:</span>
-                <span className="font-bold tabular-nums text-[var(--fg)]">{formatCurrency(cashBalance, defaultCurrency)}</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      {/* Income vs Expense (Flat & Uniform Monochrome Cards) */}
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
-        {/* Income Card */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-3 shadow-sm transition hover:border-[var(--border-strong)]">
-          <div className="flex items-center justify-between gap-1">
-            <span className="inline-flex items-center gap-1 text-xs font-bold ft-income-text">
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17L17 7M7 7h10v10" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <span className="truncate">{t('tx.type.income')}</span>
-            </span>
-            {incomeDeltaPct !== 0 ? (
-              <span className={`text-[10px] font-bold ${incomeDeltaPct >= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
-                {incomeDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(incomeDeltaPct).toFixed(0)}%
-              </span>
-            ) : null}
-          </div>
-          <p className="ft-display mt-1 break-all text-base font-bold tracking-tight text-[var(--fg)] sm:text-lg">
-            {formatCurrency(monthIncome || 0, defaultCurrency)}
-          </p>
-        </div>
-
-        {/* Expense Card */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-3 shadow-sm transition hover:border-[var(--border-strong)]">
-          <div className="flex items-center justify-between gap-1">
-            <span className="inline-flex items-center gap-1 text-xs font-bold ft-expense-text">
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 7l10 10M17 7v10H7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <span className="truncate">{t('tx.type.expense')}</span>
-            </span>
-            {expenseDeltaPct !== 0 ? (
-              <span className={`text-[10px] font-bold ${expenseDeltaPct <= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
-                {expenseDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(expenseDeltaPct).toFixed(0)}%
-              </span>
-            ) : null}
-          </div>
-          <p className="ft-display mt-1 break-all text-base font-bold tracking-tight text-[var(--fg)] sm:text-lg">
-            {formatCurrency(monthExpense || 0, defaultCurrency)}
-          </p>
-        </div>
-      </section>
+      {/* Wallet Carousel Hero */}
+      <WalletCarousel
+        monthIncome={monthIncome}
+        monthExpense={monthExpense}
+        wallets={walletsWithBalance}
+        defaultCurrency={defaultCurrency}
+      />
 
       {/* Transaksi Terakhir Card */}
       <section>

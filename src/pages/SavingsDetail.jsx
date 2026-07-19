@@ -30,7 +30,10 @@ export default function SavingsDetail() {
   const profileName = useSettingsStore((state) => state.profileName)
 
   const goal = useLiveQuery(() => db.goals.get(goalId), [goalId])
-  const logs = useLiveQuery(() => db.goalLogs.where({ goalId }).reverse().sortBy('date'), [goalId])
+  const logs = useLiveQuery(async () => {
+    const data = await db.goalLogs.where({ goalId }).toArray()
+    return data.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+  }, [goalId])
 
   const { isOpen: sheetOpen, isVisible: sheetVisible, openSheet, closeSheet } = useBottomSheet(false)
   const [amountInput, setAmountInput] = useState('')

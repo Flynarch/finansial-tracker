@@ -66,7 +66,7 @@ function getInvestmentNameByType(type) {
   return 'Investasi'
 }
 
-function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
+function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const addTransaction = useTransactionStore((state) => state.addTransaction)
@@ -78,6 +78,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
     category: getDefaultExpenseCategoryPath(),
     notes: '',
     currency: defaultCurrency,
+    walletId: initialWalletId || '',
+    targetWalletId: '',
   }))
   const [investmentForm, setInvestmentForm] = useState(() => ({
     action: 'buy',
@@ -93,6 +95,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
     fundingSource: 'balance',
   }))
   const ownedInvestments = useLiveQuery(() => db.investments.toArray(), [], [])
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
@@ -190,6 +193,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
         category: '',
         notes: '',
         currency: defaultCurrency,
+        walletId: initialWalletId || (wallets?.length > 0 ? wallets[0].id : ''),
+        targetWalletId: '',
       }))
       syncExpenseParentFromCategory('')
       syncIncomeParentFromCategory('')
@@ -404,17 +409,34 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
           }
         }
       } else {
-        if (!form.category || !form.category.trim()) {
+        if (txType !== 'transfer' && (!form.category || !form.category.trim())) {
           setSubmitError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
           return
         }
+        if (!form.walletId) {
+          setSubmitError('Silakan pilih wallet terlebih dahulu.')
+          return
+        }
+        if (txType === 'transfer') {
+          if (!form.targetWalletId) {
+            setSubmitError('Silakan pilih wallet tujuan.')
+            return
+          }
+          if (form.walletId === form.targetWalletId) {
+            setSubmitError('Wallet asal dan tujuan tidak boleh sama.')
+            return
+          }
+        }
+        
         await addTransaction({
           date: form.date,
           amount: parseMoneyInput(form.amount, form.currency),
           type: txType,
-          category: form.category,
+          category: txType === 'transfer' ? 'transfer' : form.category,
           notes: form.notes.trim() || '',
           currency: form.currency,
+          walletId: form.walletId,
+          ...(txType === 'transfer' ? { targetWalletId: form.targetWalletId } : {})
         })
       }
       onClose()
@@ -473,7 +495,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
   return (
     <Modal key={nonce} isOpen={isOpen} title={t('addTx.title')} onClose={onClose}>
       {submitError ? <ToastBanner message={submitError} /> : null}
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+      <div className={`mb-4 grid gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 ${wallets?.length >= 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <button
           type="button"
           onClick={() => {
@@ -481,7 +503,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
             setForm((p) => ({ ...p, category: '' }))
             setIncomeParentId(null)
           }}
-          className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+          className={`rounded-lg px-3 py-2.5 text-[13px] sm:text-sm font-semibold transition ${
             txType === 'income' ? 'bg-emerald-500 text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--fg)]'
           }`}
         >
@@ -494,12 +516,26 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
             setForm((p) => ({ ...p, category: '' }))
             setExpenseParentId(null)
           }}
-          className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+          className={`rounded-lg px-3 py-2.5 text-[13px] sm:text-sm font-semibold transition ${
             txType === 'expense' ? 'bg-rose-500 text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--fg)]'
           }`}
         >
           {t('addTx.expense')}
         </button>
+        {wallets?.length >= 2 && (
+          <button
+            type="button"
+            onClick={() => {
+              setTxType('transfer')
+              setForm((p) => ({ ...p, category: 'Lainnya' }))
+            }}
+            className={`rounded-lg px-3 py-2.5 text-[13px] sm:text-sm font-semibold transition ${
+              txType === 'transfer' ? 'bg-blue-500 text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
+          >
+            Transfer
+          </button>
+        )}
       </div>
 
       <form className="grid gap-3" onSubmit={handleSubmit}>
@@ -769,80 +805,142 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose }) {
         ) : (
           <>
             <label className="ft-label">
-          {t('addTx.date')}
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-            required
-            className="ft-field"
-          />
+              {t('addTx.date')}
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+                required
+                className="ft-field"
+              />
+            </label>
+
+            {txType === 'transfer' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="ft-label">
+                  Dari Wallet
+                  <select
+                    value={form.walletId}
+                    onChange={(e) => setForm((p) => ({ ...p, walletId: Number(e.target.value) }))}
+                    className="ft-field mt-1"
+                    required
+                  >
+                    <option value="">Pilih Wallet</option>
+                    {wallets?.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ft-label">
+                  Ke Wallet
+                  <select
+                    value={form.targetWalletId}
+                    onChange={(e) => setForm((p) => ({ ...p, targetWalletId: Number(e.target.value) }))}
+                    className="ft-field mt-1"
+                    required
+                  >
+                    <option value="">Pilih Wallet</option>
+                    {wallets?.map(w => (
+                      <option key={w.id} value={w.id} disabled={w.id === form.walletId}>{w.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <label className="ft-label">
+                Wallet
+                <select
+                  value={form.walletId}
+                  onChange={(e) => setForm((p) => ({ ...p, walletId: Number(e.target.value) }))}
+                  className="ft-field mt-1"
+                  required
+                >
+                  {wallets?.length === 0 ? <option value="">Tidak ada wallet</option> : <option value="">Pilih Wallet</option>}
+                  {wallets?.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <label className="ft-label">
+              {t('addTx.amount')}
+              <div className="ft-money-input mt-1">
+                <span className="ft-money-currency">{form.currency}</span>
+                <input
+                  ref={amountInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={form.amount}
+                  onChange={(e) => {
+                    const rawValue = e.target.value
+                    const currency = form.currency
+                    const formatted = formatMoneyInput(rawValue, currency)
+                    const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
+                    setForm((p) => ({ ...p, amount: formatted }))
+                    window.requestAnimationFrame(() => {
+                      const el = amountInputRef.current
+                      if (!el) return
+                      el.setSelectionRange(caret, caret)
+                    })
+                  }}
+                  required
+                  className="ft-field outline-none"
+                />
+              </div>
+            </label>
+
+            {txType !== 'transfer' && (
+              <div className="ft-label">
+                {t('addTx.category')}
+                <button
+                  type="button"
+                  onClick={openCategorySheet}
+                  className="ft-field mt-1 flex w-full items-center justify-between gap-2 text-left"
+                >
+                  <span className={`min-w-0 flex-1 leading-snug ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted)]' : 'font-medium text-[var(--fg)]'}`}>
+                    {txType === 'expense' ? (
+                      form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
+                    ) : (
+                      form.category ? formatIncomeCategory(form.category, locale) : 'Pilih Kategori'
+                    )}
+                  </span>
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            <label className="ft-label">
+              {t('addTx.currency')}
+              <select
+                value={form.currency}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    currency: e.target.value,
+                    amount: formatMoneyInput(p.amount, e.target.value),
+                  }))
+                }
+                className="ft-field"
+              >
+                {currencyOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="ft-label">
-          {t('addTx.amount')}
-          <input
-            ref={amountInputRef}
-            type="text"
-            inputMode="numeric"
-            value={form.amount}
-            onChange={(e) => {
-              const rawValue = e.target.value
-              const currency = form.currency
-              const formatted = formatMoneyInput(rawValue, currency)
-              const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-              setForm((p) => ({ ...p, amount: formatted }))
-              window.requestAnimationFrame(() => {
-                const el = amountInputRef.current
-                if (!el) return
-                el.setSelectionRange(caret, caret)
-              })
-            }}
-            required
-            className="ft-field"
-          />
-            </label>
-            <div className="ft-label">
-          {t('addTx.category')}
-          <button
-            type="button"
-            onClick={openCategorySheet}
-            className="ft-field mt-1 flex w-full items-center justify-between gap-2 text-left"
-          >
-            <span className={`min-w-0 flex-1 leading-snug ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted)]' : 'font-medium text-[var(--fg)]'}`}>{categoryButtonLabel}</span>
-            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-            </div>
-            <label className="ft-label">
-          {t('addTx.currency')}
-          <select
-            value={form.currency}
-            onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                currency: e.target.value,
-                amount: formatMoneyInput(p.amount, e.target.value),
-              }))
-            }
-            className="ft-field"
-          >
-            {currencyOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-            </label>
-            <label className="ft-label">
-          {t('addTx.notes')}
-          <input
-            type="text"
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            placeholder={t('addTx.notesPlaceholder')}
-            className="ft-field"
-          />
+              {t('addTx.notes')}
+              <input
+                type="text"
+                value={form.notes}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder={t('addTx.notesPlaceholder')}
+                className="ft-field"
+              />
             </label>
           </>
         )}

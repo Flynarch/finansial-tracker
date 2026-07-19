@@ -13,7 +13,10 @@ function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false)
   const dropdownRef = useRef(null)
 
-  const notifications = useLiveQuery(() => db.notifications.reverse().sortBy('createdAt'))
+  const notifications = useLiveQuery(async () => {
+    const data = await db.notifications.toArray()
+    return data.sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+  })
   const unreadCount = notifications ? notifications.filter(n => !n.read).length : 0
 
   const todayLabel = new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'id-ID', {
