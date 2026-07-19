@@ -423,6 +423,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       if (newMsgs.length > 0) {
+         if (result.chips && result.chips.length > 0) {
+           newMsgs[newMsgs.length - 1].chips = result.chips
+         }
          setMessages(prev => [...prev, ...newMsgs])
       }
       
@@ -548,7 +551,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
 
               {/* Show QuickChips only after the very last AI message (except welcome which has its own) */}
               {isLastAi && !isLoading && msg.type !== 'welcome' && msg.type !== 'text' && msg.type !== 'chart' && (
-                <QuickChips onSelect={handleSend} />
+                <QuickChips chips={msg.chips} onSelect={handleSend} />
               )}
             </div>
           )})}

@@ -56,7 +56,8 @@ const getTools = () => ([
                 required: ["type", "category", "amount", "date", "notes"]
               }
             },
-            replyMessage: { type: "STRING", description: "Pesan sukses ramah." }
+            replyMessage: { type: "STRING", description: "Pesan sukses ramah." },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["transactions"]
         }
@@ -77,7 +78,8 @@ const getTools = () => ([
                 date: { type: "STRING" }
               }
             },
-            replyMessage: { type: "STRING" }
+            replyMessage: { type: "STRING" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["searchQuery", "updatedFields"]
         }
@@ -90,7 +92,8 @@ const getTools = () => ([
           properties: {
             searchQuery: { type: "STRING", description: "Kata kunci transaksi (misal: 'makan siang')." },
             date: { type: "STRING", description: "Tanggal transaksi jika disebutkan (YYYY-MM-DD)." },
-            replyMessage: { type: "STRING" }
+            replyMessage: { type: "STRING" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["searchQuery"]
         }
@@ -120,7 +123,8 @@ const getTools = () => ([
             color: { type: "STRING", description: "Warna habit (misal: 'red', 'blue', 'indigo')" },
             frequencyType: { type: "STRING", enum: ["daily", "weekly", "monthly"], description: "Frekuensi habit" },
             reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '08:00')" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["action", "title"]
         }
@@ -137,7 +141,8 @@ const getTools = () => ([
             reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '15:30')" },
             priority: { type: "STRING", enum: ["low", "medium", "high"], description: "Prioritas tugas" },
             subTasks: { type: "ARRAY", items: { type: "STRING" }, description: "Daftar sub-tugas" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["action", "title"]
         }
@@ -151,7 +156,8 @@ const getTools = () => ([
             action: { type: "STRING", enum: ["create", "update"], description: "create/update budget" },
             category: { type: "STRING", description: "Kategori budget (misal: 'Makanan')" },
             limit: { type: "NUMBER", description: "Batas nominal budget (angka)" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["action", "category", "limit"]
         }
@@ -165,7 +171,8 @@ const getTools = () => ([
             action: { type: "STRING", enum: ["create", "add_funds"], description: "create untuk target baru, add_funds untuk mengisi tabungan/menambah saldo" },
             name: { type: "STRING", description: "Nama tabungan/goal (misal: 'Beli Laptop')" },
             amount: { type: "NUMBER", description: "Target dana (jika create) atau Jumlah uang yang ditambahkan (jika add_funds)" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
         }
       },
@@ -180,7 +187,8 @@ const getTools = () => ([
             amount: { type: "NUMBER", description: "Nominal tagihan (angka) - opsional jika action=delete" },
             category: { type: "STRING", description: "Kategori (misal: 'Hiburan', 'Tagihan')" },
             frequency: { type: "STRING", enum: ["daily", "weekly", "monthly", "yearly"], description: "Frekuensi tagihan" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
           required: ["action", "title"]
         }
@@ -192,7 +200,8 @@ const getTools = () => ([
           type: "OBJECT",
           properties: {
             month: { type: "STRING", description: "Bulan yang ingin diekspor (YYYY-MM). Kosongkan untuk semua data." },
-            replyMessage: { type: "STRING", description: "Pesan balasan (contoh: 'Laporan sedang diunduh...')" }
+            replyMessage: { type: "STRING", description: "Pesan balasan (contoh: 'Laporan sedang diunduh...')" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           }
         }
       }
@@ -231,6 +240,7 @@ ATURAN UTAMA:
 6. DISKUSI, TANYA JAWAB & ADVICE: 
    - Jika user hanya menyapa ("Halo") atau membahas [KONTEKS SISTEM], JAWAB LANGSUNG DENGAN TEKS.
    - JIKA user meminta evaluasi keuangannya atau nasihat pengeluaran pribadinya (misal: "aku kurangi apa biar ga boros?", "cek pengeluaranku", "analisa keuanganku"), PANGGIL 'query_database' (set renderChart: false jika user tidak minta grafik) agar kamu bisa memberikan nasihat spesifik berdasarkan data riil pengguna! JANGAN hanya memberi saran umum.
+   - Jika Anda hanya merespons dengan teks biasa (tidak memanggil fungsi/tool), WAJIB tambahkan rekomendasi aksi/pertanyaan di akhir pesan menggunakan format: <chips>Rekomendasi 1|Rekomendasi 2</chips>.
 
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
@@ -376,39 +386,39 @@ ${buildCategoryContext(locale)}`
       
       if (fnCall.name === 'record_transactions') {
         const txs = fnCall.args.transactions?.map(t => ({ ...t, currency: defaultCurrency })) || []
-        return { type: 'transactions', action: 'create', transactions: txs, text: fnCall.args.replyMessage || "Berhasil dicatat!" }
+        return { type: 'transactions', action: 'create', transactions: txs, text: fnCall.args.replyMessage || "Berhasil dicatat!", chips: fnCall.args.suggestedChips }
       }
       
       if (fnCall.name === 'update_transaction') {
-         return { type: 'transactions', action: 'update', searchQuery: fnCall.args.searchQuery, updatedFields: fnCall.args.updatedFields, text: fnCall.args.replyMessage || "Siap mengubah transaksi." }
+         return { type: 'transactions', action: 'update', searchQuery: fnCall.args.searchQuery, updatedFields: fnCall.args.updatedFields, text: fnCall.args.replyMessage || "Siap mengubah transaksi.", chips: fnCall.args.suggestedChips }
       }
       
       if (fnCall.name === 'delete_transaction') {
-         return { type: 'transactions', action: 'delete', searchQuery: fnCall.args.searchQuery, date: fnCall.args.date, text: fnCall.args.replyMessage || "Siap menghapus transaksi." }
+         return { type: 'transactions', action: 'delete', searchQuery: fnCall.args.searchQuery, date: fnCall.args.date, text: fnCall.args.replyMessage || "Siap menghapus transaksi.", chips: fnCall.args.suggestedChips }
       }
       
       if (fnCall.name === 'manage_habit') {
-        return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit..." }
+        return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_todo') {
-        return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do..." }
+        return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_budget') {
-        return { type: 'budget', action: fnCall.args.action, category: fnCall.args.category, limit: fnCall.args.limit, text: fnCall.args.replyMessage || "Memproses budget..." }
+        return { type: 'budget', action: fnCall.args.action, category: fnCall.args.category, limit: fnCall.args.limit, text: fnCall.args.replyMessage || "Memproses budget...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_savings') {
-        return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, text: fnCall.args.replyMessage || "Memproses tabungan..." }
+        return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, text: fnCall.args.replyMessage || "Memproses tabungan...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_recurring') {
-        return { type: 'recurring', action: fnCall.args.action, title: fnCall.args.title, amount: fnCall.args.amount, category: fnCall.args.category, frequency: fnCall.args.frequency, text: fnCall.args.replyMessage || "Memproses langganan..." }
+        return { type: 'recurring', action: fnCall.args.action, title: fnCall.args.title, amount: fnCall.args.amount, category: fnCall.args.category, frequency: fnCall.args.frequency, text: fnCall.args.replyMessage || "Memproses langganan...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'export_report') {
-        return { type: 'export', month: fnCall.args.month, text: fnCall.args.replyMessage || "Menyiapkan file laporan Anda..." }
+        return { type: 'export', month: fnCall.args.month, text: fnCall.args.replyMessage || "Menyiapkan file laporan Anda...", chips: fnCall.args.suggestedChips }
       }
       
       if (fnCall.name === 'query_database') {
@@ -433,14 +443,25 @@ ${buildCategoryContext(locale)}`
         })
         
         const secondRes = await callApiStreamWithFallback(contents)
-        // Generate dynamic chips heuristically
-        const chips = ["Analisis pengeluaranku", "Gimana cara lebih hemat?"]
-        return { type: 'text', text: secondRes.text || "Maaf, tidak bisa merangkum data.", chips }
+        let textOutput = secondRes.text || "Maaf, tidak bisa merangkum data."
+        let chips = ["Analisis pengeluaranku", "Gimana cara lebih hemat?"]
+        const chipMatch = textOutput.match(/<chips>(.*?)<\/chips>/)
+        if (chipMatch) {
+          chips = chipMatch[1].split('|').map(c => c.trim())
+          textOutput = textOutput.replace(/<chips>.*?<\/chips>/, '').trim()
+        }
+        return { type: 'text', text: textOutput, chips }
       }
     }
 
-    const chips = ["Tampilkan grafik", "Ringkasan bulan ini"]
-    return { type: 'text', text: response.text || 'Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail?', chips }
+    let textOutput = response.text || 'Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail?'
+    let chips = ["Tampilkan grafik", "Ringkasan bulan ini"]
+    const chipMatch = textOutput.match(/<chips>(.*?)<\/chips>/)
+    if (chipMatch) {
+      chips = chipMatch[1].split('|').map(c => c.trim())
+      textOutput = textOutput.replace(/<chips>.*?<\/chips>/, '').trim()
+    }
+    return { type: 'text', text: textOutput, chips }
     
   } catch (err) {
     console.error(err)
