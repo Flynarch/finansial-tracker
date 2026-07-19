@@ -86,6 +86,7 @@ function Savings() {
       targetAmount: '',
       currentAmount: '',
       currency: defaultCurrency,
+      deadline: '',
     })
     openSheet()
   }, [defaultCurrency, openSheet, setSwipedId])
@@ -99,6 +100,7 @@ function Savings() {
       targetAmount: formatMoneyValueForInput(goal.targetAmount, goal.currency || defaultCurrency),
       currentAmount: formatMoneyValueForInput(goal.currentAmount, goal.currency || defaultCurrency),
       currency: goal.currency || defaultCurrency,
+      deadline: goal.deadline || '',
     })
     openSheet()
   }
@@ -111,6 +113,7 @@ function Savings() {
       targetAmount: parseMoneyInput(form.targetAmount, form.currency),
       currentAmount: parseMoneyInput(form.currentAmount, form.currency),
       currency: form.currency || defaultCurrency,
+      deadline: form.deadline || null,
     }
     if (!payload.name) {
       setSheetError(t('savings.validation.name'))
@@ -126,10 +129,19 @@ function Savings() {
     }
     try {
       setSheetError('')
+      const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19)
       if (editingId) {
+        const oldGoal = await db.goals.get(editingId)
         await db.goals.update(editingId, payload)
+        if (oldGoal && payload.currentAmount > oldGoal.currentAmount) {
+          const diff = payload.currentAmount - oldGoal.currentAmount
+          await db.goalLogs.add({ goalId: editingId, amount: diff, date: nowStr })
+        }
       } else {
-        await db.goals.add(payload)
+        const newId = await db.goals.add(payload)
+        if (payload.currentAmount > 0) {
+          await db.goalLogs.add({ goalId: newId, amount: payload.currentAmount, date: nowStr })
+        }
       }
       closeSheet()
       setEditingId(null)
@@ -244,7 +256,11 @@ function Savings() {
                 <article
                   className={`relative bg-[var(--field-bg)] p-3 transition-all duration-200 ${
                     swipedId === g.id ? '-translate-x-[124px]' : 'translate-x-0'
-                  } touch-pan-y`}
+                  } touch-pan-y cursor-pointer`}
+                  onClick={() => {
+                    if (swipedId === g.id) setSwipedId(null)
+                    else navigate(`/savings/${g.id}`)
+                  }}
                   {...getSwipeHandlers(g.id)}
                 >
                   <div className="min-w-0">
@@ -307,7 +323,7 @@ function Savings() {
                     className="ft-field"
                   />
                 </label>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={`grid gap-3 ${editingId ? 'sm:grid-cols-2' : ''}`}>
                   <label className="ft-label text-xs">
                     {t('savings.target')}
                     <input
@@ -330,28 +346,30 @@ function Savings() {
                       className="ft-field"
                     />
                   </label>
-                  <label className="ft-label text-xs">
-                    {t('savings.current')}
-                    <input
-                      ref={currentAmountInputRef}
-                      type="text"
-                      inputMode="numeric"
-                      value={form.currentAmount}
-                      onChange={(e) => {
-                        const rawValue = e.target.value
-                        const currency = form.currency
-                        const formatted = formatMoneyInput(rawValue, currency)
-                        const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-                        setForm((p) => ({ ...p, currentAmount: formatted }))
-                        window.requestAnimationFrame(() => {
-                          const el = currentAmountInputRef.current
-                          if (!el) return
-                          el.setSelectionRange(caret, caret)
-                        })
-                      }}
-                      className="ft-field"
-                    />
-                  </label>
+                  {editingId && (
+                    <label className="ft-label text-xs">
+                      {t('savings.current')}
+                      <input
+                        ref={currentAmountInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        value={form.currentAmount}
+                        onChange={(e) => {
+                          const rawValue = e.target.value
+                          const currency = form.currency
+                          const formatted = formatMoneyInput(rawValue, currency)
+                          const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
+                          setForm((p) => ({ ...p, currentAmount: formatted }))
+                          window.requestAnimationFrame(() => {
+                            const el = currentAmountInputRef.current
+                            if (!el) return
+                            el.setSelectionRange(caret, caret)
+                          })
+                        }}
+                        className="ft-field"
+                      />
+                    </label>
+                  )}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="ft-label text-xs">
@@ -374,6 +392,15 @@ function Savings() {
                         </option>
                       ))}
                     </select>
+                  </label>
+                  <label className="ft-label text-xs">
+                    Batas Waktu (Opsional)
+                    <input
+                      type="date"
+                      value={form.deadline || ''}
+                      onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))}
+                      className="ft-field"
+                    />
                   </label>
                 </div>
 

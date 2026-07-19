@@ -272,6 +272,11 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           const matched = goals.find(g => fuzzyMatch(g.name, result.name))
           if (matched) {
             await db.goals.update(matched.id, { currentAmount: matched.currentAmount + result.amount })
+            await db.goalLogs.add({
+              goalId: matched.id,
+              amount: result.amount,
+              date: format(new Date(), 'yyyy-MM-dd HH:mm:ss')
+            })
             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'add_funds', title: matched.name, subtitle: `Ditambah: Rp ${result.amount.toLocaleString('id-ID')}` } })
           } else {
             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Tabungan yang mirip dengan "${result.name}" tidak ditemukan.` })
@@ -337,7 +342,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         }
       }
       if (result.type === 'chart') {
-         newMsgs.push({ id: Date.now() + 5, role: 'ai', type: 'chart', data: result.data, chips: result.chips })
+         newMsgs.push({ id: Date.now() + 5, role: 'ai', type: 'chart', data: result.data, chips: result.chips, chartType: result.chartType })
       }
 
       if (result.type === 'recurring') {
