@@ -275,6 +275,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             await db.goalLogs.add({
               goalId: matched.id,
               amount: result.amount,
+              notes: 'Dicatat oleh AI',
               date: format(new Date(), 'yyyy-MM-dd HH:mm:ss')
             })
             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'add_funds', title: matched.name, subtitle: `Ditambah: Rp ${result.amount.toLocaleString('id-ID')}` } })

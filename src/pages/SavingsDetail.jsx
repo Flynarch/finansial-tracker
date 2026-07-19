@@ -187,10 +187,10 @@ export default function SavingsDetail() {
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
                     <MoneyBag size={20} className="text-emerald-500" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--fg)]">Tabungan</p>
                     <p className="text-xs text-[var(--muted)]">{format(new Date(log.date), 'dd MMM yyyy')}</p>
-                    {log.notes && <p className="text-xs text-[var(--fg)] mt-0.5">{log.notes}</p>}
+                    {log.notes && <p className="text-xs text-[var(--fg)] mt-1 opacity-70 break-words line-clamp-2">{log.notes}</p>}
                   </div>
                 </div>
                 <span className="font-bold text-blue-500">
