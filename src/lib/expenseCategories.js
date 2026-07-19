@@ -262,13 +262,14 @@ export function updateExpenseCategoryName(parentId, childId, nameId, nameEn) {
 
 export function addExpenseParentCategory(nameId, nameEn, colorKey) {
   const trimmed = String(nameId || '').trim()
-  if (!trimmed) return
+  if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
   const custom = loadCustom()
   const id = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   custom.parents.push({ id, names: { id: trimmed, en }, children: [] })
   if (colorKey) custom.colors[id] = colorKey
   saveCustom(custom)
+  return id
 }
 
 export function removeExpenseParentCategory(parentId) {
@@ -284,13 +285,14 @@ export function isBuiltinExpenseChild(parentId, childId) {
 
 export function addExpenseSubcategory(parentId, nameId, nameEn) {
   const trimmed = String(nameId || '').trim()
-  if (!trimmed) return
+  if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
   const custom = loadCustom()
   if (!custom.extras[parentId]) custom.extras[parentId] = []
   const id = `x_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
   custom.extras[parentId].push({ id, names: { id: trimmed, en } })
   saveCustom(custom)
+  return id
 }
 
 export function removeExpenseSubcategory(parentId, childId) {

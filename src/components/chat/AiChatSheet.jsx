@@ -152,7 +152,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     
     setInputValue('')
     setSelectedImage(null)
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     setIsLoading(true)
+    setConsecutiveErrors(0)
 
     const aiMsgId = Date.now() + 1
     setMessages(prev => [...prev, userMsg, { id: aiMsgId, role: 'ai', type: 'text', content: '' }])
@@ -582,36 +584,45 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
              </div>
           )}
           <form 
-            className="flex items-center gap-2 bg-[var(--field-bg)] border border-[var(--border)] rounded-full px-3 py-1.5 focus-within:ring-2 ring-[var(--accent)] transition-all"
+            className="flex items-end gap-2 bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-3 py-2 focus-within:ring-2 ring-[var(--accent)] transition-all"
             onSubmit={(e) => {
               e.preventDefault()
               handleSend()
             }}
           >
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageSelect} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors p-1" title="Upload Image">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors p-1.5 shrink-0 mb-0.5" title="Upload Image">
                <ImageIcon size={18} />
             </button>
-            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--text)]'} transition-colors p-1`} title="Voice Input">
+            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--text)]'} transition-colors p-1.5 shrink-0 mb-0.5`} title="Voice Input">
                <Mic size={18} />
             </button>
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
-              className="flex-1 bg-transparent border-none text-[14px] text-[var(--text)] focus:outline-none px-1 placeholder-[var(--muted)]"
+              rows={1}
+              className="flex-1 bg-transparent border-none text-[14px] text-[var(--text)] focus:outline-none px-1 py-1.5 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
               placeholder={isRecording ? "Mendengarkan..." : translate(locale, 'aiChat.placeholder')}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                setInputValue(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px'
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                  e.target.style.height = 'auto'
+                }
+              }}
               disabled={isLoading}
-              autoComplete="off"
-              enterKeyHint="send"
             />
             <button 
               type="submit" 
-              className={`p-1.5 rounded-full transition-colors ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-white' : 'text-[var(--muted)]'}`}
-              disabled={(!inputValue.trim() && !selectedImage) || isLoading}
+              className={`p-1.5 rounded-full shrink-0 mb-0.5 transition-colors ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--muted)]'}`}
+              disabled={isLoading || (!inputValue.trim() && !selectedImage)}
             >
-              <Send size={16} className={(inputValue.trim() || selectedImage) && !isLoading ? 'translate-x-[-1px] translate-y-[1px]' : ''} />
+              <Send size={16} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
             </button>
           </form>
         </div>

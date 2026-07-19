@@ -7,6 +7,8 @@ import CategoryIcon from '../ui/CategoryIcon'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { format, parseISO } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
+import { useNavigate } from 'react-router-dom'
+import useChatStore from '../../store/useChatStore'
 
 export default function TransactionSuccess({ data, onUndo }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -38,8 +40,12 @@ export default function TransactionSuccess({ data, onUndo }) {
     return String(cat).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
+  const navigate = useNavigate()
+  const setIsOpen = useChatStore(s => s.setIsOpen)
+
   const handleViewAll = () => {
-    window.location.hash = '#/transactions'
+    navigate('/transactions')
+    setIsOpen(false)
   }
   
   return (

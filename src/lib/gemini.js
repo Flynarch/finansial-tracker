@@ -8,17 +8,28 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 const GEMINI_MODELS = [
   'gemini-3.1-flash-lite',
   'gemini-3-flash',
+  'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.5-pro'
+  'gemini-2.5-pro',
+  'gemini-2.0-flash',
+  'gemini-2.0-pro'
 ]
 
 export function buildCategoryContext(locale) {
   const expenseTree = getMergedExpenseTree()
   const incomeTree = getMergedIncomeTree()
-  let context = 'KATEGORI PENGELUARAN:\n'
-  expenseTree.forEach(p => (p.children || []).forEach(s => context += `- ${p.id}/${s.id} - ${locale==='en'?(s.names?.en||s.names?.id):s.names?.id}\n`))
-  context += '\nKATEGORI PEMASUKAN:\n'
-  incomeTree.forEach(i => context += `- ${i.id} - ${locale==='en'?(i.names?.en||i.names?.id):i.names?.id}\n`)
+  let context = 'KATEGORI PENGELUARAN (PENTING: Selalu gunakan format parentId/childId sebagai ID Kategori!):\n'
+  expenseTree.forEach(p => {
+    const pName = locale==='en'?(p.names?.en||p.names?.id):p.names?.id
+    const childrenStr = (p.children || []).map(s => `${p.id}/${s.id}`).join(', ')
+    context += `- ${pName}: ${childrenStr}\n`
+  })
+  context += '\nKATEGORI PEMASUKAN (Format: parentId/childId):\n'
+  incomeTree.forEach(i => {
+    const iName = locale==='en'?(i.names?.en||i.names?.id):i.names?.id
+    const childrenStr = (i.children || []).map(s => `${i.id}/${s.id}`).join(', ')
+    context += `- ${iName}: ${childrenStr}\n`
+  })
   return context
 }
 
@@ -206,18 +217,20 @@ export async function parseTransactionFromText(userMessage, context) {
 DILARANG KERAS MENJALANKAN KODE PYTHON ATAU MENGGUNAKAN TOOL LAIN SELAIN YANG DISEDIAKAN.
 
 ATURAN UTAMA:
-1. TRANSAKSI & LANGGANAN: 
-   - Transaksi biasa: Panggil 'record_transactions'.
-   - Langganan/Tagihan Rutin (Netflix bulanan, dll): Panggil 'manage_recurring'.
-2. TO-DO, HABIT, & LANGGANAN BARU (PENTING!): Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
+1. TRANSAKSI (PENTING):
+   - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya: "Berapa harga makannya?".
+   - Jika kategori tidak ditemukan, gunakan "Lainnya" atau kategori induk terdekat.
+   - Panggil 'record_transactions' HANYA jika data sudah lengkap (nama & harga).
+2. TO-DO, HABIT, & LANGGANAN BARU: Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
    - To-Do kurang jelas: "Kapan tenggat waktunya? Mau diingatkan jam berapa?"
    - Habit kurang jelas: "Mau warna apa? Seberapa sering?"
    - Langganan kurang jelas: "Berapa harganya? Bayar bulanan atau tahunan?"
    TAPI JIKA user SUDAH memberikan informasi tersebut secara lengkap di awal (misal: "Catat langganan Spotify 50rb tiap bulan"), LANGSUNG panggil fungsi create tanpa perlu bertanya lagi!
 3. HABIT LOG & TODO COMPLETE: Jika user bilang "Aku sudah lari pagi" atau "Tugas bayar listrik sudah beres", langsung panggil fungsi tanpa banyak tanya.
 4. EKSPOR LAPORAN: Jika user minta unduh/ekspor laporan atau data ke CSV/Excel/PDF, panggil 'export_report'.
-5. SMART RECEIPT SCANNER (GAMBAR STRUK): Jika user mengunggah gambar struk belanja panjang, JANGAN gabungkan semuanya menjadi 1 transaksi. Pecah belah setiap barang di struk tersebut menjadi beberapa transaksi terpisah dengan kategori yang tepat.
-6. DISKUSI & NASIHAT: Jika user bertanya hal umum, meminta penjelasan, meminta nasihat hemat, atau membahas [KONTEKS SISTEM] yang diberikan, JAWAB LANGSUNG DENGAN TEKS. JANGAN panggil fungsi 'query_database' kecuali user BENAR-BENAR secara harfiah meminta untuk melihat grafik (chart) atau angka rekap baru.
+6. DISKUSI, TANYA JAWAB & ADVICE: 
+   - Jika user hanya menyapa ("Halo") atau membahas [KONTEKS SISTEM], JAWAB LANGSUNG DENGAN TEKS.
+   - JIKA user meminta evaluasi keuangannya atau nasihat pengeluaran pribadinya (misal: "aku kurangi apa biar ga boros?", "cek pengeluaranku", "analisa keuanganku"), PANGGIL 'query_database' (set renderChart: false jika user tidak minta grafik) agar kamu bisa memberikan nasihat spesifik berdasarkan data riil pengguna! JANGAN hanya memberi saran umum.
 
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
@@ -341,12 +354,17 @@ ${buildCategoryContext(locale)}`
 
       } catch (err) {
         lastError = err
-        // Let it fall through to try the next model even if it's a Rate Limit, 
-        // because different models might have separate quota buckets on the free tier.
+        
+        if (err.message && (err.message.includes('404') || err.message.includes('Rate limit') || err.message.includes('429'))) {
+           if (err.message.includes('Rate limit') || err.message.includes('429')) {
+             console.warn(`[${model}] Rate Limit hit. Aborting fallback loop to prevent spam.`)
+             break
+           }
+        }
       }
     }
     
-    // If all models failed
+    // If all models failed or loop broken
     throw lastError
   }
 
@@ -422,7 +440,7 @@ ${buildCategoryContext(locale)}`
     }
 
     const chips = ["Tampilkan grafik", "Ringkasan bulan ini"]
-    return { type: 'text', text: response.text || 'Respon kosong.', chips }
+    return { type: 'text', text: response.text || 'Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail?', chips }
     
   } catch (err) {
     console.error(err)
