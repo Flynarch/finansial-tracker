@@ -2,7 +2,11 @@ import React from 'react'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
-import { CheckCircle2, Undo2 } from 'lucide-react'
+import { Check, Undo2, Plus, Minus } from 'lucide-react'
+import CategoryIcon from '../ui/CategoryIcon'
+import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
+import { format, parseISO } from 'date-fns'
+import { id as idLocale, enUS } from 'date-fns/locale'
 
 export default function TransactionSuccess({ data, onUndo, contextMsg }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -11,70 +15,125 @@ export default function TransactionSuccess({ data, onUndo, contextMsg }) {
   
   const totalExpense = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
   const totalIncome = txs.filter(t => t.type === 'income').reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  const netTotal = totalIncome - totalExpense
+
+  // Group transactions by date
+  const grouped = {}
+  txs.forEach(tx => {
+    const d = tx.date || 'unknown'
+    if (!grouped[d]) grouped[d] = []
+    grouped[d].push(tx)
+  })
+
+  const formatDate = (dateStr) => {
+    try {
+      const parsed = parseISO(dateStr)
+      return format(parsed, 'EEE, dd MMM yyyy', { locale: locale === 'id' ? idLocale : enUS })
+    } catch {
+      return dateStr
+    }
+  }
+
+  const getDayTotal = (items) => {
+    const inc = items.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+    const exp = items.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+    return inc - exp
+  }
+
+  const handleViewAll = () => {
+    window.location.hash = '#/transactions'
+  }
   
   return (
-    <div className="ft-swush-in relative overflow-hidden bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-sm">
-      {/* Premium Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-white/5 dark:bg-white/5">
-        <div className="flex items-center gap-2 text-emerald-500">
-          <CheckCircle2 size={18} className="ft-scale-in" strokeWidth={2.5} style={{ animationDelay: '100ms' }} />
-          <span className="font-semibold text-sm text-[var(--fg)] tracking-tight">
-            {isArray && txs.length > 1 ? `${txs.length} Transaksi Dicatat` : 'Transaksi Berhasil'}
+    <div className="ft-swush-in ft-tx-success-card">
+      {/* Blue Header Banner */}
+      <div className="ft-tx-success-banner">
+        <div className="ft-tx-success-banner-left">
+          <div className="ft-tx-success-check">
+            <Check size={12} strokeWidth={3} />
+          </div>
+          <span className="ft-tx-success-banner-text">
+            {txs.length > 1 
+              ? `${txs.length} ${locale === 'en' ? 'transactions added' : 'transaksi ditambahkan'}`
+              : locale === 'en' ? 'Transaction added' : 'Transaksi ditambahkan'}
           </span>
         </div>
-        
+        <button onClick={handleViewAll} className="ft-tx-success-view-all">
+          {locale === 'en' ? 'View all transactions' : 'Tinjau semua transaksi'}
+        </button>
+      </div>
+
+      {/* Transaction Details */}
+      <div className="ft-tx-success-body">
+        {Object.entries(grouped).map(([dateStr, items], gi) => {
+          const dayTotal = getDayTotal(items)
+          return (
+            <div key={dateStr} className="ft-tx-success-group" style={{ animationDelay: `${gi * 100}ms` }}>
+              {/* Date Header */}
+              <div className="ft-tx-success-date-row">
+                <span className="ft-tx-success-date">{formatDate(dateStr)}</span>
+                <span className={`ft-tx-success-date-total ${dayTotal >= 0 ? 'ft-amount-positive' : 'ft-amount-negative'}`}>
+                  {dayTotal >= 0 ? '+' : '-'}{formatCurrency(Math.abs(dayTotal), items[0]?.currency || 'IDR')}
+                </span>
+              </div>
+
+              {/* Items */}
+              {items.map((tx, i) => {
+                const iconKey = resolveTransactionIconKey(tx.category, tx.type)
+                const colorClass = getCategoryColorClass(iconKey, tx.type, tx.category)
+                const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
+                const isIncome = tx.type === 'income'
+
+                return (
+                  <div key={i} className="ft-tx-success-item" style={{ animationDelay: `${150 + (gi * 100) + (i * 80)}ms` }}>
+                    {/* Icon with +/- overlay */}
+                    <div className="ft-tx-success-icon-wrap">
+                      <div className={`ft-tx-success-item-icon ${colorClass}`}>
+                        <CategoryIcon icon={iconKey} className="w-5 h-5" />
+                      </div>
+                      <div className={`ft-tx-success-type-badge ${isIncome ? 'ft-badge-income' : 'ft-badge-expense'}`}>
+                        {isIncome ? <Plus size={8} strokeWidth={3} /> : <Minus size={8} strokeWidth={3} />}
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="ft-tx-success-item-details">
+                      <span className="ft-tx-success-item-category">{labels.main || tx.category}</span>
+                      {labels.sub && <span className="ft-tx-success-item-sub">{labels.sub}</span>}
+                      {tx.notes && <span className="ft-tx-success-item-notes">{tx.notes}</span>}
+                    </div>
+
+                    {/* Amount */}
+                    <span className={`ft-tx-success-item-amount ${isIncome ? 'ft-amount-positive' : 'ft-amount-negative'}`}>
+                      {isIncome ? '+' : '-'}{formatCurrency(tx.amount, tx.currency || 'IDR')}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer: Total + Undo */}
+      <div className="ft-tx-success-footer">
+        {txs.length > 1 && (
+          <div className="ft-tx-success-total-row">
+            <span className="ft-tx-success-total-label">
+              {locale === 'en' ? 'Total Transaction' : 'Total Transaksi'}
+            </span>
+            <span className={`ft-tx-success-total-value ${netTotal >= 0 ? 'ft-amount-positive' : 'ft-amount-negative'}`}>
+              {netTotal >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netTotal), txs[0]?.currency || 'IDR')}
+            </span>
+          </div>
+        )}
         {onUndo && (
-          <button
-            onClick={onUndo}
-            className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--fg)] bg-[var(--field-bg)] px-2.5 py-1 rounded-md transition-colors active:scale-95"
-          >
-            <Undo2 size={14} />
+          <button onClick={onUndo} className="ft-tx-success-undo">
+            <Undo2 size={13} />
             {translate(locale, 'aiChat.undo')}
           </button>
         )}
       </div>
-
-      {/* Clean List */}
-      <div className="flex flex-col py-2 px-1">
-        {txs.map((tx, i) => (
-          <div key={i} className="flex items-center justify-between px-3 py-2.5 group hover:bg-[var(--field-bg)] rounded-xl transition-colors mx-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[14px] font-medium text-[var(--fg)]">{tx.notes || tx.category}</span>
-              <span className="text-[11px] text-[var(--muted)]">{tx.date} • {tx.type === 'expense' ? translate(locale, 'addTx.expense') : translate(locale, 'addTx.income')}</span>
-            </div>
-            <div className={`text-[14px] font-semibold tabular-nums ${tx.type === 'income' ? 'text-emerald-500' : 'text-[var(--fg)]'}`}>
-              {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, tx.currency || 'IDR')}
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Sleek Totals */}
-      {txs.length > 1 && (
-        <div className="px-5 py-3.5 border-t border-[var(--border)] bg-[var(--field-bg)] flex flex-col gap-2">
-          {totalExpense > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-[12px] font-medium text-[var(--muted)] uppercase tracking-wider">Total Pengeluaran</span>
-              <span className="text-[15px] font-bold text-[var(--fg)] tabular-nums">{formatCurrency(totalExpense, txs[0]?.currency || 'IDR')}</span>
-            </div>
-          )}
-          {totalIncome > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-[12px] font-medium text-[var(--muted)] uppercase tracking-wider">Total Pemasukan</span>
-              <span className="text-[15px] font-bold text-emerald-500 tabular-nums">{formatCurrency(totalIncome, txs[0]?.currency || 'IDR')}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Context Tips */}
-      {contextMsg && (
-        <div className="px-4 pb-4 pt-2">
-          <div className="px-3 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-[12px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-            <span className="font-semibold mr-1">💡 Tips:</span>{contextMsg.replace('💡', '').trim()}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

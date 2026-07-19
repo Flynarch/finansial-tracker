@@ -11,8 +11,10 @@ import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import AiTriggerBar from '../chat/AiTriggerBar'
 import AiChatSheet from '../chat/AiChatSheet'
+import useNotificationEngine from '../../hooks/useNotificationEngine'
 
 function AppShell() {
+  useNotificationEngine()
   const theme = useSettingsStore((state) => state.theme)
   const locale = useSettingsStore((state) => state.locale)
   const motionPreference = useSettingsStore((state) => state.motionPreference)

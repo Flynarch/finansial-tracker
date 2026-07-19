@@ -46,11 +46,14 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     if (tx.type === 'expense') totalExpense += tx.amount
   })
 
-  // Group by category for expenses
+  // Group by category
   const expenseByCategory = {}
+  const incomeByCategory = {}
   txs.forEach(tx => {
     if (tx.type === 'expense') {
       expenseByCategory[tx.category] = (expenseByCategory[tx.category] || 0) + tx.amount
+    } else if (tx.type === 'income') {
+      incomeByCategory[tx.category] = (incomeByCategory[tx.category] || 0) + tx.amount
     }
   })
 
@@ -62,6 +65,7 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     totalExpense,
     netBalance: totalIncome - totalExpense,
     expenseByCategory,
+    incomeByCategory,
     // Only return the 10 most recent transactions to avoid exceeding AI context window
     recentSampleTransactions: txs.slice(-10).map(tx => ({
       date: tx.date,

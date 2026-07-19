@@ -4,10 +4,11 @@ import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions } from './aiDatabaseQueries'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+
 const GEMINI_MODELS = [
-  'gemini-3.1-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.5-pro'
 ]
 
@@ -96,6 +97,93 @@ const getTools = () => ([
             renderChart: { type: "BOOLEAN", description: "Set true jika user meminta visualisasi/grafik/chart." }
           }
         }
+      },
+      {
+        name: "manage_habit",
+        description: "Kelola (buat/centang) Habit/Kebiasaan pengguna. Jika user minta centang semua habit, gunakan action 'log_all'.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "log", "log_all"], description: "create untuk buat habit, log untuk centang 1 habit, log_all untuk centang SEMUA habit" },
+            title: { type: "STRING", description: "Nama habit. Jika log_all, isi dengan 'semua'" },
+            color: { type: "STRING", description: "Warna habit (misal: 'red', 'blue', 'indigo')" },
+            frequencyType: { type: "STRING", enum: ["daily", "weekly", "monthly"], description: "Frekuensi habit" },
+            reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '08:00')" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+          },
+          required: ["action", "title"]
+        }
+      },
+      {
+        name: "manage_todo",
+        description: "Kelola (buat/selesaikan) To-Do List/Tugas pengguna.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "complete"], description: "create untuk buat tugas baru, complete untuk menandai selesai" },
+            title: { type: "STRING", description: "Nama tugas (misal: 'Bayar Listrik')" },
+            dueDate: { type: "STRING", description: "Tenggat waktu (YYYY-MM-DD)" },
+            reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '15:30')" },
+            priority: { type: "STRING", enum: ["low", "medium", "high"], description: "Prioritas tugas" },
+            subTasks: { type: "ARRAY", items: { type: "STRING" }, description: "Daftar sub-tugas" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+          },
+          required: ["action", "title"]
+        }
+      },
+      {
+        name: "manage_budget",
+        description: "Kelola (buat/update) Budget/Anggaran bulanan.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "update"], description: "create/update budget" },
+            category: { type: "STRING", description: "Kategori budget (misal: 'Makanan')" },
+            limit: { type: "NUMBER", description: "Batas nominal budget (angka)" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+          },
+          required: ["action", "category", "limit"]
+        }
+      },
+      {
+        name: "manage_savings",
+        description: "Kelola tabungan/goals pengguna. Panggil ini untuk membuat target tabungan baru, atau menambahkan uang ke tabungan yang sudah ada (top up).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "add_funds"], description: "create untuk target baru, add_funds untuk mengisi tabungan/menambah saldo" },
+            name: { type: "STRING", description: "Nama tabungan/goal (misal: 'Beli Laptop')" },
+            amount: { type: "NUMBER", description: "Target dana (jika create) atau Jumlah uang yang ditambahkan (jika add_funds)" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+          },
+        }
+      },
+      {
+        name: "manage_recurring",
+        description: "Kelola (buat/ubah/hapus) Tagihan/Langganan berulang bulanan/tahunan (contoh: langganan Netflix).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "update", "delete"], description: "create untuk tambah baru, update untuk ubah nominal/frekuensi, delete untuk membatalkan/menghapus langganan" },
+            title: { type: "STRING", description: "Nama tagihan/langganan (misal: 'Netflix')" },
+            amount: { type: "NUMBER", description: "Nominal tagihan (angka) - opsional jika action=delete" },
+            category: { type: "STRING", description: "Kategori (misal: 'Hiburan', 'Tagihan')" },
+            frequency: { type: "STRING", enum: ["daily", "weekly", "monthly", "yearly"], description: "Frekuensi tagihan" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" }
+          },
+          required: ["action", "title"]
+        }
+      },
+      {
+        name: "export_report",
+        description: "Unduh/ekspor laporan keuangan user ke dalam format CSV/Excel.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            month: { type: "STRING", description: "Bulan yang ingin diekspor (YYYY-MM). Kosongkan untuk semua data." },
+            replyMessage: { type: "STRING", description: "Pesan balasan (contoh: 'Laporan sedang diunduh...')" }
+          }
+        }
       }
     ]
   }
@@ -110,26 +198,29 @@ export async function parseTransactionFromText(userMessage, context) {
 
   if (!GEMINI_API_KEY) return { error: true, message: 'API Key Gemini belum diset.' }
 
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const sysPrompt = `Kamu adalah AI Asisten Finansial FinTrack yang sangat cerdas, minimalis, dan andal (Proactive Advisor). Hari ini adalah tanggal: ${today}. Default currency: ${defaultCurrency}.
+  const now = new Date()
+  const today = format(now, 'yyyy-MM-dd')
+  const currentTime = format(now, 'HH:mm')
+  const sysPrompt = `Kamu adalah AI Asisten Finansial FinTrack yang sangat cerdas, minimalis, dan andal (Proactive Advisor). Hari ini adalah tanggal: ${today} dan waktu saat ini adalah jam ${currentTime} waktu lokal. Gunakan waktu ini sebagai acuan untuk mendeteksi transaksi (misal: membedakan antara sarapan, makan siang, atau makan malam). Default currency: ${defaultCurrency}.
 
 DILARANG KERAS MENJALANKAN KODE PYTHON ATAU MENGGUNAKAN TOOL LAIN SELAIN YANG DISEDIAKAN.
 
 ATURAN UTAMA:
-1. PENCATATAN, UPDATE, DELETE TRANSAKSI:
-   - Kamu HARUS mendeteksi niat user untuk mencatat, mengubah, atau menghapus transaksi.
-   - Deteksi tanggal relatif dengan presisi tinggi ("Kemarin" -> 1 hari sebelum ${today}).
-   - Pilih Kategori secara akurat (format "parent/child").
-   - Jika mendeteksi gambar struk, ekstrak nama item dan harga, lalu panggil 'record_transactions'.
-   
-2. PERTANYAAN DATA & GRAFIK:
-   - Jika user bertanya atau meminta laporan, panggil 'query_database'. Jika user minta "chart" atau "grafik", set renderChart: true.
+1. TRANSAKSI & LANGGANAN: 
+   - Transaksi biasa: Panggil 'record_transactions'.
+   - Langganan/Tagihan Rutin (Netflix bulanan, dll): Panggil 'manage_recurring'.
+2. TO-DO, HABIT, & LANGGANAN BARU (PENTING!): Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
+   - To-Do kurang jelas: "Kapan tenggat waktunya? Mau diingatkan jam berapa?"
+   - Habit kurang jelas: "Mau warna apa? Seberapa sering?"
+   - Langganan kurang jelas: "Berapa harganya? Bayar bulanan atau tahunan?"
+   TAPI JIKA user SUDAH memberikan informasi tersebut secara lengkap di awal (misal: "Catat langganan Spotify 50rb tiap bulan"), LANGSUNG panggil fungsi create tanpa perlu bertanya lagi!
+3. HABIT LOG & TODO COMPLETE: Jika user bilang "Aku sudah lari pagi" atau "Tugas bayar listrik sudah beres", langsung panggil fungsi tanpa banyak tanya.
+4. EKSPOR LAPORAN: Jika user minta unduh/ekspor laporan atau data ke CSV/Excel/PDF, panggil 'export_report'.
 
-3. PROACTIVE ADVISOR & GAYA KOMUNIKASI:
-   - Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
-   - Jawab langsung ke inti. Dilarang menggunakan "Tentu", "Baiklah".
-   - Di akhir balasan teks biasa, berikan saran (suggested actions) 1-2 kalimat jika relevan.
-   - Tebalkan nominal uang (contoh: **Rp 50.000**).
+PROACTIVE ADVISOR & GAYA KOMUNIKASI:
+- Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
+- Jawab langsung ke inti. Dilarang menggunakan "Tentu", "Baiklah".
+- Tebalkan nominal uang (contoh: **Rp 50.000**).
 
 Daftar Kategori:
 ${buildCategoryContext(locale)}`
@@ -248,12 +339,8 @@ ${buildCategoryContext(locale)}`
 
       } catch (err) {
         lastError = err
-        // Jika kena Rate Limit, langsung hentikan karena API Key yang dilimit, 
-        // mencoba model lain secara instan malah akan dianggap spam oleh server Google.
-        if (err.message.includes('Rate limit')) {
-           throw err
-        }
-        // Try the next model
+        // Let it fall through to try the next model even if it's a Rate Limit, 
+        // because different models might have separate quota buckets on the free tier.
       }
     }
     
@@ -280,16 +367,42 @@ ${buildCategoryContext(locale)}`
          return { type: 'transactions', action: 'delete', searchQuery: fnCall.args.searchQuery, date: fnCall.args.date, text: fnCall.args.replyMessage || "Siap menghapus transaksi." }
       }
       
+      if (fnCall.name === 'manage_habit') {
+        return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit..." }
+      }
+
+      if (fnCall.name === 'manage_todo') {
+        return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do..." }
+      }
+
+      if (fnCall.name === 'manage_budget') {
+        return { type: 'budget', action: fnCall.args.action, category: fnCall.args.category, limit: fnCall.args.limit, text: fnCall.args.replyMessage || "Memproses budget..." }
+      }
+
+      if (fnCall.name === 'manage_savings') {
+        return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, text: fnCall.args.replyMessage || "Memproses tabungan..." }
+      }
+
+      if (fnCall.name === 'manage_recurring') {
+        return { type: 'recurring', action: fnCall.args.action, title: fnCall.args.title, amount: fnCall.args.amount, category: fnCall.args.category, frequency: fnCall.args.frequency, text: fnCall.args.replyMessage || "Memproses langganan..." }
+      }
+
+      if (fnCall.name === 'export_report') {
+        return { type: 'export', month: fnCall.args.month, text: fnCall.args.replyMessage || "Menyiapkan file laporan Anda..." }
+      }
+      
       if (fnCall.name === 'query_database') {
         const dbResult = await queryTransactions(fnCall.args)
         
         // If renderChart is true, we return chart data immediately along with a generic text
         if (fnCall.args.renderChart) {
+           const isIncome = fnCall.args.type === 'income'
            return { 
-             type: 'chart', 
-             data: dbResult.expenseByCategory, 
-             text: "Berikut adalah grafik pengeluaran Anda:",
-             chips: ["Apa pengeluaran terbesarku?", "Bandingkan dengan bulan lalu"] 
+             type: 'chart',
+             chartType: isIncome ? 'income' : 'expense',
+             data: isIncome ? dbResult.incomeByCategory : dbResult.expenseByCategory, 
+             text: isIncome ? "Berikut adalah grafik pemasukan Anda:" : "Berikut adalah grafik pengeluaran Anda:",
+             chips: isIncome ? ["Apa pemasukan terbesarku?"] : ["Apa pengeluaran terbesarku?", "Bandingkan dengan bulan lalu"] 
            }
         }
         

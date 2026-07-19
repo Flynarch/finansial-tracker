@@ -124,3 +124,26 @@ db.version(9).stores({
   ideas: '++id, type, content, color, x, y, createdAt',
   board_links: '++id, sourceId, targetId',
 })
+
+db.version(10).stores({
+  transactions: '++id, date, type, category, amount, currency, notes',
+  investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
+  investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
+  budgets: '++id, category, limit, month',
+  goals: '++id, name, targetAmount, currentAmount, deadline, currency',
+  calendarEvents: '++id, date, title, type, color',
+  recurringTransactions:
+    '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled',
+  settings: 'key',
+  todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
+  sub_tasks: '++id, todoId, label, checked',
+  habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
+  habitLogs: '++id, habitId, date',
+  ideas: '++id, type, content, color, x, y, createdAt',
+  board_links: '++id, sourceId, targetId',
+  notifications: '++id, type, title, message, read, relatedId, createdAt',
+}).upgrade((trans) => {
+  return trans.todos.toCollection().modify(todo => {
+    if (todo.reminderTime === undefined) todo.reminderTime = null
+  })
+})

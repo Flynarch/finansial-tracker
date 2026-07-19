@@ -3,11 +3,14 @@ import { createPortal } from 'react-dom'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
+import { db } from '../../lib/db'
 import { parseTransactionFromText } from '../../lib/gemini'
+import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
 import TransactionCard from './TransactionCard'
 import TransactionSuccess from './TransactionSuccess'
+import ActionSuccessCard from './ActionSuccessCard'
 import QuickChips from './QuickChips'
 
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
@@ -203,8 +206,201 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         }
       }
       
+      if (result.type === 'habit') {
+        const habits = await db.habits.toArray()
+        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        
+        if (result.action === 'create') {
+          const newHabit = {
+            title: result.title,
+            color: result.color || 'indigo',
+            category: 'Lainnya',
+            frequencyType: result.frequencyType || 'daily',
+            frequencyValue: null,
+            reminderEnabled: !!result.reminderTime,
+            reminderTime: result.reminderTime || null,
+            createdAt: new Date().toISOString()
+          }
+          await db.habits.add(newHabit)
+          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'habit', action: 'create', title: result.title } })
+        } else if (result.action === 'log') {
+          const matched = habits.find(h => fuzzyMatch(h.title, result.title))
+          if (matched) {
+            const todayStr = format(new Date(), 'yyyy-MM-dd')
+            const existingLog = await db.habitLogs.where({ habitId: matched.id, date: todayStr }).first()
+            if (!existingLog) {
+              await db.habitLogs.add({ habitId: matched.id, date: todayStr })
+              newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'habit', action: 'log', title: matched.title } })
+            } else {
+              newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Habit "**${matched.title}**" sudah dicentang sebelumnya hari ini.` })
+            }
+          } else {
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Habit yang mirip dengan "${result.title}" tidak ditemukan di daftar Anda.` })
+          }
+        } else if (result.action === 'log_all') {
+          const todayStr = format(new Date(), 'yyyy-MM-dd')
+          let count = 0
+          for (const h of habits) {
+            const existingLog = await db.habitLogs.where({ habitId: h.id, date: todayStr }).first()
+            if (!existingLog) {
+              await db.habitLogs.add({ habitId: h.id, date: todayStr })
+              count++
+            }
+          }
+          if (count > 0) {
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'habit', action: 'log_all', subtitle: `${count} habit berhasil dicentang` } })
+          } else {
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: "Semua habit sudah dicentang sebelumnya hari ini! Luar biasa!" })
+          }
+        }
+      }
+
+      if (result.type === 'savings') {
+        const goals = await db.goals.toArray()
+        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        
+        if (result.action === 'create') {
+          await db.goals.add({
+            name: result.name,
+            targetAmount: result.amount,
+            currentAmount: 0,
+            deadline: null,
+            currency: defaultCurrency
+          })
+          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'create', title: result.name, subtitle: `Target: Rp ${result.amount.toLocaleString('id-ID')}` } })
+        } else if (result.action === 'add_funds') {
+          const matched = goals.find(g => fuzzyMatch(g.name, result.name))
+          if (matched) {
+            await db.goals.update(matched.id, { currentAmount: matched.currentAmount + result.amount })
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'add_funds', title: matched.name, subtitle: `Ditambah: Rp ${result.amount.toLocaleString('id-ID')}` } })
+          } else {
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Tabungan yang mirip dengan "${result.name}" tidak ditemukan.` })
+          }
+        }
+      }
+
+      if (result.type === 'todo') {
+        const todos = await db.todos.toArray()
+        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        
+        if (result.action === 'create') {
+          const todoId = await db.todos.add({
+            title: result.title,
+            category: 'lainnya',
+            dueDate: result.dueDate || format(new Date(), 'yyyy-MM-dd'),
+            priority: result.priority || 'medium',
+            completed: false,
+            reminderTime: result.reminderTime || null,
+            createdAt: new Date().toISOString()
+          })
+          
+          if (result.subTasks && Array.isArray(result.subTasks) && result.subTasks.length > 0) {
+            const subTasksToInsert = result.subTasks.map(label => ({
+              todoId,
+              label,
+              checked: false
+            }))
+            await db.sub_tasks.bulkAdd(subTasksToInsert)
+          }
+          
+          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'todo', action: 'create', title: result.title } })
+        } else if (result.action === 'complete') {
+          const matched = todos.find(t => !t.completed && fuzzyMatch(t.title, result.title))
+          if (matched) {
+            await db.todos.update(matched.id, { completed: true })
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'todo', action: 'complete', title: matched.title } })
+          } else {
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Tugas aktif yang mirip dengan "${result.title}" tidak ditemukan.` })
+          }
+        }
+      }
+
+      if (result.type === 'budget') {
+        const budgets = await db.budgets.toArray()
+        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        const monthStr = format(new Date(), 'yyyy-MM')
+        const limitFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(result.limit)
+        
+        if (result.action === 'create' || result.action === 'update') {
+          const matched = budgets.find(b => b.month === monthStr && fuzzyMatch(b.category, result.category))
+          if (matched) {
+            await db.budgets.update(matched.id, { limit: result.limit })
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'budget', action: 'update', title: `Kategori: ${matched.category}`, subtitle: `Batas: ${limitFormatted}` } })
+          } else {
+            await db.budgets.add({
+              category: result.category,
+              limit: result.limit,
+              month: monthStr
+            })
+            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'budget', action: 'create', title: `Kategori: ${result.category}`, subtitle: `Batas: ${limitFormatted}` } })
+          }
+        }
+      }
       if (result.type === 'chart') {
          newMsgs.push({ id: Date.now() + 5, role: 'ai', type: 'chart', data: result.data, chips: result.chips })
+      }
+
+      if (result.type === 'recurring') {
+        const recurrings = await db.recurringTransactions.toArray()
+        const fuzzyMatch = (str, query) => str?.toLowerCase().includes(query.toLowerCase())
+        
+        if (result.action === 'create') {
+          await db.recurringTransactions.add({
+            title: result.title,
+            type: 'expense',
+            category: result.category || 'Lainnya',
+            amount: result.amount || 0,
+            currency: defaultCurrency,
+            frequency: result.frequency || 'monthly',
+            nextDate: format(new Date(), 'yyyy-MM-dd'),
+            enabled: true
+          })
+          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'create', title: result.title, subtitle: `Rp ${(result.amount || 0).toLocaleString('id-ID')} (${result.frequency || 'monthly'})` } })
+        } else if (result.action === 'update' || result.action === 'delete') {
+          const matched = recurrings.find(r => fuzzyMatch(r.title, result.title))
+          if (matched) {
+            if (result.action === 'update') {
+               const updates = {}
+               if (result.amount) updates.amount = result.amount
+               if (result.frequency) updates.frequency = result.frequency
+               await db.recurringTransactions.update(matched.id, updates)
+               newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'update', title: matched.title, subtitle: `Langganan diperbarui` } })
+            } else {
+               await db.recurringTransactions.delete(matched.id)
+               newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'delete', title: matched.title, subtitle: 'Langganan berhasil dibatalkan' } })
+            }
+          } else {
+             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Maaf, langganan bernama "${result.title}" tidak ditemukan.` })
+          }
+        }
+      }
+
+      if (result.type === 'export') {
+        const txs = await db.transactions.toArray()
+        const filtered = result.month ? txs.filter(t => t.date.startsWith(result.month)) : txs
+        
+        if (filtered.length === 0) {
+           newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: "Tidak ada data transaksi untuk diekspor." })
+        } else {
+          const headers = ['Tanggal', 'Tipe', 'Kategori', 'Nominal', 'Catatan']
+          const rows = filtered.map(t => [t.date, t.type, t.category, t.amount, t.notes || ''])
+          const csvContent = [
+            headers.join(','),
+            ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          ].join('\n')
+          
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `Laporan-Keuangan-${result.month || 'Semua'}.csv`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          
+          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'export', action: 'create', title: 'Ekspor Berhasil', subtitle: `File CSV berhasil diunduh (${filtered.length} baris)` } })
+        }
       }
 
       if (newMsgs.length > 0) {
@@ -270,7 +466,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
-          {messages.map(msg => (
+          {messages.map((msg, idx) => {
+            const isLastAi = msg.role === 'ai' && idx === messages.length - 1
+            return (
             <div key={msg.id} className="flex flex-col gap-2">
               {msg.role === 'user' && (
                 <div className="flex flex-col items-end gap-1">
@@ -282,7 +480,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               {msg.role === 'ai' && msg.type === 'text' && (
                  <>
                    {msg.content && <AiBubble content={msg.content} />}
-                   {msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
+                   {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
                  </>
               )}
               
@@ -294,9 +492,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               )}
               
               {msg.role === 'ai' && msg.type === 'chart' && (
-                 <>
-                   {ChartBubble && <ChartBubble data={msg.data} />}
-                   {msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
+                  <>
+                   {ChartBubble && <ChartBubble data={msg.data} chartType={msg.chartType} />}
+                   {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
                  </>
               )}
               
@@ -314,13 +512,27 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                     }}
                     contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
                   />
-                  <div className="mt-2">
-                     <QuickChips onSelect={handleSend} />
-                  </div>
                 </div>
               )}
+
+              {msg.role === 'ai' && msg.type === 'action_success' && (
+                <div className="ml-8">
+                  <ActionSuccessCard 
+                    type={msg.data.type}
+                    action={msg.data.action}
+                    title={msg.data.title}
+                    subtitle={msg.data.subtitle}
+                  />
+                </div>
+              )}
+
+              {/* Show QuickChips only after the very last AI message (except welcome which has its own) */}
+              {isLastAi && !isLoading && msg.type !== 'welcome' && msg.type !== 'text' && msg.type !== 'chart' && (
+                <QuickChips onSelect={handleSend} />
+              )}
             </div>
-          ))}
+          )})}
+
 
           {isLoading && !messages.find(m => m.content === '') && <TypingIndicator />}
           
