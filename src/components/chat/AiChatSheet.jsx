@@ -12,6 +12,7 @@ import TransactionCard from './TransactionCard'
 import TransactionSuccess from './TransactionSuccess'
 import ActionSuccessCard from './ActionSuccessCard'
 import QuickChips from './QuickChips'
+import useChatStore from '../../store/useChatStore'
 
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -36,6 +37,16 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+
+  const initialInput = useChatStore((s) => s.initialInput)
+  const setInitialInput = useChatStore((s) => s.setInitialInput)
+
+  useEffect(() => {
+    if (isOpen && initialInput) {
+      setInputValue(initialInput)
+      setInitialInput('')
+    }
+  }, [isOpen, initialInput, setInitialInput])
 
   // Initialization & Auto-focus
   useEffect(() => {
@@ -472,8 +483,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
-          {messages.map((msg, idx) => {
-            const isLastAi = msg.role === 'ai' && idx === messages.length - 1
+          {messages.filter(m => m.type !== 'hidden').map((msg, idx) => {
+            const visibleMessages = messages.filter(m => m.type !== 'hidden')
+            const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
             return (
             <div key={msg.id} className="flex flex-col gap-2">
               {msg.role === 'user' && (

@@ -1,6 +1,9 @@
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
+import { Sparkles, X, Loader2, CheckCircle, AlertCircle, Info, Lightbulb, MessageSquare } from 'lucide-react'
+import { getFinancialAdvice } from '../lib/gemini'
 import { useLiveQuery } from 'dexie-react-hooks'
+import useChatStore from '../store/useChatStore'
 import {
   Area,
   AreaChart,
@@ -201,6 +204,11 @@ function Reports() {
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD'))
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
   const initialBalance = useSettingsStore((s) => s.initialBalance)
+  const profileName = useSettingsStore((s) => s.profileName)
+
+  const [aiAdvice, setAiAdvice] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false)
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setIsEntering(true))
@@ -230,6 +238,22 @@ function Reports() {
 
   const transactions = useLiveQuery(() => db.transactions.toArray(), [], [])
   const investments = useLiveQuery(() => db.investments.toArray(), [], [])
+
+  const handleGetAiAdvice = async () => {
+    try {
+      setIsAiLoading(true)
+      setIsAiModalOpen(true)
+      setAiAdvice('')
+      const latestMonthStr = format(startOfMonth(new Date()), 'yyyy-MM')
+      const currentMonthTxs = transactions.filter(t => safeMonthKey(t?.date) === latestMonthStr)
+      const advice = await getFinancialAdvice(currentMonthTxs, { locale, profileName })
+      setAiAdvice(advice)
+    } catch (e) {
+      setAiAdvice('Gagal mengambil analisis: ' + e.message)
+    } finally {
+      setIsAiLoading(false)
+    }
+  }
 
   const monthlyIncomeExpense = useMemo(() => {
     const monthMap = new Map()
@@ -409,6 +433,25 @@ function Reports() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ── AI Analysis Banner ── */}
+      <section className="relative overflow-hidden rounded-[1.25rem] border border-[color-mix(in_srgb,var(--accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--panel-strong))] p-4 shadow-[var(--shadow-card)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)] text-white shadow-[var(--accent-glow)]">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-[var(--fg)]">Analisis Cerdas AI</h2>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">Dapatkan *insight* otomatis pengeluaran bulan ini dari AI.</p>
+          </div>
+        </div>
+        <button
+          onClick={handleGetAiAdvice}
+          className="shrink-0 rounded-xl bg-[var(--fg)] px-4 py-2 text-xs font-bold text-[var(--bg)] transition hover:bg-[color-mix(in_srgb,var(--fg)_80%,transparent)] shadow-md"
+        >
+          {locale === 'en' ? 'Get AI Advice' : 'Minta Analisis AI'}
+        </button>
       </section>
 
       {/* ── KPI Cards ── */}
@@ -715,6 +758,133 @@ function Reports() {
         </div>
       </PremiumSection>
     </div>
+
+    {/* ── AI Modal ── */}
+    {isAiModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm ft-motion-overlay pt-16 sm:pt-4">
+        <div className="w-full max-w-lg bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[var(--accent)]" />
+              <h3 className="font-bold text-[var(--fg)] text-base">Analisis AI</h3>
+            </div>
+            <button onClick={() => setIsAiModalOpen(false)} className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-5 ft-hide-scrollbar text-sm leading-relaxed text-[var(--text)]">
+            {isAiLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-[var(--accent)]">
+                <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                <p className="font-medium animate-pulse">AI sedang menganalisis data bulan ini...</p>
+              </div>
+            ) : (() => {
+              let adviceData = null
+              try {
+                // Handle potential markdown formatting from AI like ```json ... ```
+                const cleanAdvice = aiAdvice.replace(/```json/g, '').replace(/```/g, '').trim()
+                adviceData = JSON.parse(cleanAdvice)
+              } catch (e) {}
+
+              if (adviceData) {
+                const statusColor = adviceData.status === 'sehat' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' 
+                                  : adviceData.status === 'boros' ? 'text-rose-500 bg-rose-500/10 border-rose-500/20'
+                                  : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+                const StatusIcon = adviceData.status === 'sehat' ? CheckCircle 
+                                 : adviceData.status === 'boros' ? AlertCircle : Info
+
+                return (
+                  <div className="space-y-5">
+                    <div className={`p-4 rounded-2xl border ${statusColor} flex gap-3 items-start`}>
+                      <StatusIcon className="h-5 w-5 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider mb-1">Status: {adviceData.status}</h4>
+                        <p className="text-sm font-medium leading-relaxed opacity-90">{adviceData.summary}</p>
+                      </div>
+                    </div>
+
+                    {adviceData.topCategory && (
+                      <div className="p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]">
+                        <div className="flex items-center gap-2 mb-2 text-[var(--fg)]">
+                          <Info className="h-4 w-4 text-[var(--muted-2)]" />
+                          <h4 className="font-bold text-sm">Sorotan: {adviceData.topCategory.name}</h4>
+                        </div>
+                        <p className="text-sm text-[var(--muted)] leading-relaxed pl-6">{adviceData.topCategory.message}</p>
+                      </div>
+                    )}
+
+                    {adviceData.tips && adviceData.tips.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3 px-1 text-[var(--fg)]">
+                          <Lightbulb className="h-4 w-4 text-amber-500" />
+                          <h4 className="font-bold text-sm">Saran AI untuk Anda</h4>
+                        </div>
+                        <ul className="space-y-2">
+                          {adviceData.tips.map((tip, idx) => (
+                            <li key={idx} className="flex gap-3 bg-[var(--panel)] border border-[var(--border)] p-3 rounded-xl items-start">
+                              <span className="flex shrink-0 items-center justify-center h-5 w-5 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] text-xs font-bold mt-0.5">
+                                {idx + 1}
+                              </span>
+                              <span className="text-sm text-[var(--text)] leading-relaxed">{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              // Fallback if not JSON
+              return (
+                <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-ul:my-2 prose-li:my-0">
+                  {aiAdvice.split('\n').map((line, i) => {
+                    const boldRegex = /\*\*(.*?)\*\*/g;
+                    if (line.trim().startsWith('-')) {
+                      const content = line.substring(1).trim();
+                      const parts = content.split(boldRegex);
+                      return (
+                        <li key={i} className="ml-4 list-disc mb-1">
+                          {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+                        </li>
+                      )
+                    }
+                    const parts = line.split(boldRegex);
+                    return (
+                      <p key={i}>
+                        {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+                      </p>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+          
+          {!isAiLoading && aiAdvice && (
+            <div className="border-t border-[var(--border)] p-4 bg-[color-mix(in_srgb,var(--panel-strong)_95%,transparent)]">
+              <button 
+                onClick={() => {
+                  setIsAiModalOpen(false)
+                  const store = useChatStore.getState()
+                  store.addMessage({
+                    id: Date.now(),
+                    role: 'system',
+                    type: 'hidden',
+                    content: `[KONTEKS SISTEM: Berikut adalah ringkasan laporan keuangan bulan ini yang baru saja dibaca oleh user:\n${aiAdvice}\nBerdasarkan data ini, jawablah pertanyaan user dengan baik dan berikan nasihat.]`
+                  })
+                  store.openWithPrompt("Tolong jelaskan lebih lanjut hasil laporan pengeluaran saya bulan ini. Apa yang bisa saya hemat lagi?")
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_80%,black)] text-white font-bold py-3 px-4 rounded-xl transition"
+              >
+                <MessageSquare className="h-5 w-5" />
+                Diskusikan dengan AI
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
   </div>
   )
 }

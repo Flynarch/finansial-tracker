@@ -16,9 +16,10 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../lib/utils'
-import { ChevronLeft, Edit2, Target, Plus, History } from 'lucide-react'
+import { ChevronLeft, Edit2, Target, Plus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import MoneyBag from '../components/icons/MoneyBag'
-import { format } from 'date-fns'
+import { format, differenceInMonths } from 'date-fns'
+import { getSavingsPrediction } from '../lib/gemini'
 
 export default function SavingsDetail() {
   const { id } = useParams()
@@ -26,6 +27,7 @@ export default function SavingsDetail() {
   const navigate = useNavigate()
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const profileName = useSettingsStore((state) => state.profileName)
 
   const goal = useLiveQuery(() => db.goals.get(goalId), [goalId])
   const logs = useLiveQuery(() => db.goalLogs.where({ goalId }).reverse().sortBy('date'), [goalId])
@@ -35,6 +37,10 @@ export default function SavingsDetail() {
   const [dateInput, setDateInput] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notesInput, setNotesInput] = useState('')
   const inputRef = useRef(null)
+
+  const [aiPrediction, setAiPrediction] = useState(null)
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -59,6 +65,42 @@ export default function SavingsDetail() {
       date: format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
     })
     closeSheet()
+  }
+
+  const handleGetPrediction = async () => {
+    setIsAiLoading(true)
+    setIsAiModalOpen(true)
+    setAiPrediction(null)
+    
+    try {
+      let avgSavings = 0
+      if (logs && logs.length > 0) {
+        // Calculate average savings per month based on logs
+        const firstLogDate = new Date(logs[logs.length - 1].date)
+        const monthsDiff = Math.max(1, differenceInMonths(new Date(), firstLogDate))
+        const totalSaved = logs.reduce((acc, log) => acc + (log.amount || 0), 0)
+        avgSavings = Math.round(totalSaved / monthsDiff)
+      }
+
+      const predictionRaw = await getSavingsPrediction({
+        name: goal.name,
+        currentAmount: goal.currentAmount,
+        targetAmount: goal.targetAmount,
+        deadline: goal.deadline,
+        avgSavings
+      }, { locale, profileName })
+
+      try {
+        const cleanJson = predictionRaw.replace(/```json/g, '').replace(/```/g, '').trim()
+        setAiPrediction(JSON.parse(cleanJson))
+      } catch (e) {
+        setAiPrediction({ error: true, text: predictionRaw })
+      }
+    } catch (error) {
+      setAiPrediction({ error: true, text: 'Gagal mendapatkan prediksi AI: ' + error.message })
+    } finally {
+      setIsAiLoading(false)
+    }
   }
 
   if (goal === undefined) return null // loading
@@ -152,6 +194,13 @@ export default function SavingsDetail() {
             <span className="text-sm font-medium text-[var(--muted)]">Target</span>
             <span className="font-semibold text-[var(--fg)]">{formatCurrency(target, goal.currency || defaultCurrency)}</span>
           </div>
+          <button 
+            onClick={handleGetPrediction}
+            className="w-full mt-2 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-[var(--accent)] font-bold py-3 px-4 rounded-xl transition"
+          >
+            <Sparkles className="h-5 w-5" />
+            Tanya Prediksi AI
+          </button>
         </div>
       </div>
 
@@ -280,6 +329,74 @@ export default function SavingsDetail() {
         </div>,
         document.body
       ) : null}
+
+      {/* AI Prediction Modal */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm ft-motion-overlay pt-16 sm:pt-4">
+          <div className="w-full max-w-lg bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-[var(--accent)]" />
+                <h3 className="font-bold text-[var(--fg)] text-base">Prediksi AI</h3>
+              </div>
+              <button onClick={() => setIsAiModalOpen(false)} className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 ft-hide-scrollbar text-sm leading-relaxed text-[var(--text)]">
+              {isAiLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-[var(--accent)]">
+                  <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                  <p className="font-medium animate-pulse">AI sedang menghitung prediksi targetmu...</p>
+                </div>
+              ) : aiPrediction && !aiPrediction.error ? (
+                <div className="space-y-5">
+                  <div className={`p-4 rounded-2xl border ${aiPrediction.isOnTrack ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20'} flex gap-3 items-start`}>
+                    {aiPrediction.isOnTrack ? <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" /> : <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />}
+                    <div>
+                      <h4 className="font-bold text-sm uppercase tracking-wider mb-1">
+                        {aiPrediction.isOnTrack ? 'On Track' : 'Butuh Perhatian'}
+                      </h4>
+                      <p className="text-sm font-medium leading-relaxed opacity-90">{aiPrediction.summary}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-center">
+                    <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1">Estimasi Tercapai</p>
+                    <div className="flex items-center justify-center gap-2 text-xl font-black text-[var(--accent)]">
+                      <Clock className="h-5 w-5" />
+                      {aiPrediction.predictedDate}
+                    </div>
+                  </div>
+
+                  {aiPrediction.tips && aiPrediction.tips.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 px-1 text-[var(--fg)]">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        <h4 className="font-bold text-sm">Saran Akselerasi</h4>
+                      </div>
+                      <ul className="space-y-2">
+                        {aiPrediction.tips.map((tip, idx) => (
+                          <li key={idx} className="flex gap-3 bg-[var(--panel)] border border-[var(--border)] p-3 rounded-xl items-start">
+                            <span className="flex shrink-0 items-center justify-center h-5 w-5 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] text-xs font-bold mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span className="text-sm text-[var(--text)] leading-relaxed">{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-rose-500 text-center py-6">
+                  {aiPrediction?.text || 'Terjadi kesalahan saat mengambil prediksi.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

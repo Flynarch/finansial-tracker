@@ -216,6 +216,8 @@ ATURAN UTAMA:
    TAPI JIKA user SUDAH memberikan informasi tersebut secara lengkap di awal (misal: "Catat langganan Spotify 50rb tiap bulan"), LANGSUNG panggil fungsi create tanpa perlu bertanya lagi!
 3. HABIT LOG & TODO COMPLETE: Jika user bilang "Aku sudah lari pagi" atau "Tugas bayar listrik sudah beres", langsung panggil fungsi tanpa banyak tanya.
 4. EKSPOR LAPORAN: Jika user minta unduh/ekspor laporan atau data ke CSV/Excel/PDF, panggil 'export_report'.
+5. SMART RECEIPT SCANNER (GAMBAR STRUK): Jika user mengunggah gambar struk belanja panjang, JANGAN gabungkan semuanya menjadi 1 transaksi. Pecah belah setiap barang di struk tersebut menjadi beberapa transaksi terpisah dengan kategori yang tepat.
+6. DISKUSI & NASIHAT: Jika user bertanya hal umum, meminta penjelasan, meminta nasihat hemat, atau membahas [KONTEKS SISTEM] yang diberikan, JAWAB LANGSUNG DENGAN TEKS. JANGAN panggil fungsi 'query_database' kecuali user BENAR-BENAR secara harfiah meminta untuk melihat grafik (chart) atau angka rekap baru.
 
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
@@ -425,6 +427,170 @@ ${buildCategoryContext(locale)}`
   } catch (err) {
     console.error(err)
     return { error: true, message: err.message || 'Terjadi kesalahan saat menghubungi AI.' }
+  }
+}
+
+export async function getFinancialAdvice(monthData, context = {}) {
+  const { locale = 'id', profileName = '' } = context
+  
+  if (!navigator.onLine) {
+    throw new Error('Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.')
+  }
+  if (!GEMINI_API_KEY) {
+    throw new Error('API Key Gemini belum diset.')
+  }
+
+  // Summarize monthData
+  let txSummary = ''
+  if (!monthData || monthData.length === 0) {
+    txSummary = 'Belum ada transaksi bulan ini.'
+  } else {
+    const expenses = monthData.filter(tx => tx.type === 'expense')
+    const totalExpense = expenses.reduce((acc, tx) => acc + (tx.amount || 0), 0)
+    const income = monthData.filter(tx => tx.type === 'income')
+    const totalIncome = income.reduce((acc, tx) => acc + (tx.amount || 0), 0)
+    
+    txSummary = `Total Pemasukan: ${totalIncome}\nTotal Pengeluaran: ${totalExpense}\n`
+    
+    // Group by category
+    const byCategory = {}
+    expenses.forEach(tx => {
+      byCategory[tx.category] = (byCategory[tx.category] || 0) + tx.amount
+    })
+    
+    txSummary += '\nRincian Pengeluaran berdasarkan kategori:\n'
+    Object.entries(byCategory)
+      .sort(([, a], [, b]) => b - a)
+      .forEach(([cat, amt]) => {
+        txSummary += `- ${cat}: ${amt}\n`
+      })
+  }
+
+  const prompt = `
+Anda adalah konsultan keuangan pribadi yang cerdas.
+Nama pengguna: ${profileName || 'Pengguna'}
+Bahasa: ${locale === 'en' ? 'Inggris (English)' : 'Indonesia (Bahasa Indonesia)'}
+
+Data transaksi bulan ini:
+${txSummary}
+
+TUGAS ANDA:
+Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format JSON harus sesuai persis seperti ini:
+{
+  "status": "sehat" | "boros" | "waspada",
+  "summary": "1-2 kalimat ringkasan tentang kondisi keuangan bulan ini.",
+  "topCategory": {
+    "name": "Kategori Pengeluaran Terbesar",
+    "message": "Komentar singkat tentang kategori ini."
+  },
+  "tips": [
+    "Saran praktis 1...",
+    "Saran praktis 2..."
+  ]
+}
+`
+
+  const callApiWithFallback = async (reqContents) => {
+    let lastError = null
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+        const res = await fetch(`${url}?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            contents: reqContents, 
+            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+          })
+        })
+        
+        if (!res.ok) {
+          const errText = await res.text()
+          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+        }
+        
+        const data = await res.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        return { text }
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError
+  }
+
+  try {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }]
+    const response = await callApiWithFallback(contents)
+    return response.text
+  } catch (err) {
+    console.error(err)
+    throw err
+  }
+}
+
+export async function getSavingsPrediction(goalData, { locale = 'id', profileName = '' } = {}) {
+  const prompt = `
+Anda adalah konsultan keuangan pribadi.
+Nama pengguna: ${profileName || 'Pengguna'}
+Bahasa: ${locale === 'en' ? 'Inggris (English)' : 'Indonesia (Bahasa Indonesia)'}
+
+Data Target Tabungan Pengguna:
+- Nama Target: ${goalData.name}
+- Dana Terkumpul: Rp ${goalData.currentAmount}
+- Target Dana: Rp ${goalData.targetAmount}
+- Sisa Kebutuhan: Rp ${goalData.targetAmount - goalData.currentAmount}
+- Rata-rata tabungan bulanan (estimasi): Rp ${goalData.avgSavings}
+- Tenggat Waktu (Opsional): ${goalData.deadline || 'Tidak ada'}
+
+TUGAS ANDA:
+Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown block. Format JSON harus persis seperti ini:
+{
+  "predictedDate": "Bulan Tahun (contoh: Agustus 2026)",
+  "isOnTrack": true | false,
+  "summary": "1 kalimat ringkasan tentang progres",
+  "tips": [
+    "Saran akselerasi 1...",
+    "Saran akselerasi 2..."
+  ]
+}
+`
+  const callApiWithFallback = async (reqContents) => {
+    let lastError = null
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+        const res = await fetch(`${url}?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            contents: reqContents, 
+            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+          })
+        })
+        
+        if (!res.ok) {
+          const errText = await res.text()
+          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+        }
+        
+        const data = await res.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        return { text }
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError
+  }
+
+  try {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }]
+    const response = await callApiWithFallback(contents)
+    return response.text
+  } catch (err) {
+    console.error(err)
+    throw err
   }
 }
 

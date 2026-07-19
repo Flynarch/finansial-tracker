@@ -246,11 +246,14 @@ function Budget() {
             {monthBudgets.map((b) => {
               const spent = toSafeNumber(spentByCategoryPath[String(b.category || '')] ?? 0)
               const limit = toSafeNumber(b.limit)
-              const pct = limit > 0 ? clampPercent((spent / limit) * 100) : 0
+              const pct = limit > 0 ? (spent / limit) * 100 : 0
               const label = getBudgetLabel(b.category)
-              const isWarn = pct >= 85
+              
+              const isDanger = pct >= 100
+              const isWarn = pct >= 80 && pct < 100
+              
               return (
-                <div key={b.id} className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
+                <div key={b.id} className={`relative overflow-hidden rounded-2xl border transition-colors ${isDanger ? 'border-rose-500/50 shadow-[0_0_15px_-3px_rgba(244,63,94,0.15)]' : isWarn ? 'border-amber-500/50 shadow-[0_0_15px_-3px_rgba(245,158,11,0.15)]' : 'border-[var(--border)]'}`}>
                   <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
                     <button
                       type="button"
@@ -278,20 +281,29 @@ function Budget() {
                     } touch-pan-y`}
                     {...getSwipeHandlers(b.id)}
                   >
-                    <div className="min-w-0">
-                      <p className="line-clamp-3 break-words text-sm font-semibold text-[var(--fg)]">{label.main}</p>
-                      {label.sub ? (
-                        <p className="mt-0.5 line-clamp-3 break-words text-[11px] font-medium text-[var(--muted)]">{label.sub}</p>
-                      ) : null}
-                      <p className="ft-muted mt-1 text-[11px] tabular-nums">
-                        {formatCurrency(spent, defaultCurrency)} / {formatCurrency(limit, defaultCurrency)}
-                      </p>
+                    <div className="min-w-0 flex items-start justify-between gap-2">
+                      <div>
+                        <p className={`line-clamp-3 break-words text-sm font-semibold ${isDanger ? 'text-rose-400' : isWarn ? 'text-amber-400' : 'text-[var(--fg)]'}`}>{label.main}</p>
+                        {label.sub ? (
+                          <p className="mt-0.5 line-clamp-3 break-words text-[11px] font-medium text-[var(--muted)]">{label.sub}</p>
+                        ) : null}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-xs font-bold tabular-nums ${isDanger ? 'text-rose-400' : isWarn ? 'text-amber-400' : 'text-[var(--fg)]'}`}>
+                          {Math.round(pct)}%
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium text-[var(--muted)] tabular-nums">
+                       <span>{formatCurrency(spent, defaultCurrency)}</span>
+                       <span>{formatCurrency(limit, defaultCurrency)}</span>
                     </div>
 
-                    <div className="mt-2 h-2 w-full rounded-full bg-[var(--border-strong)]/40">
+                    <div className="mt-2 h-2 w-full rounded-full bg-[var(--border-strong)]/40 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full ${isWarn ? 'bg-rose-500/80' : 'bg-emerald-500/70'}`}
-                        style={{ width: `${pct}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${isDanger ? 'bg-rose-500' : isWarn ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                       />
                     </div>
                   </article>

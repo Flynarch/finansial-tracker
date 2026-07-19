@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { App } from '@capacitor/app'
 import { backButtonManager } from '../../lib/backButtonManager'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
 import useSettingsStore from '../../store/useSettingsStore'
+import useChatStore from '../../store/useChatStore'
 import LockScreen from '../ui/LockScreen'
 import OnboardingFlow from '../onboarding/OnboardingFlow'
 import BottomNav from './BottomNav'
@@ -33,8 +34,10 @@ function AppShell() {
   const historyStack = useRef([])
   
   // AI Chat states
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const [chatMessages, setChatMessages] = useState([])
+  const isChatOpen = useChatStore((state) => state.isOpen)
+  const setIsChatOpen = useChatStore((state) => state.setIsOpen)
+  const chatMessages = useChatStore((state) => state.messages)
+  const setChatMessages = useChatStore((state) => state.setMessages)
 
   useEffect(() => {
     const currentPath = location.pathname
