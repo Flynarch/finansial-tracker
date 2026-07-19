@@ -10,12 +10,15 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
 
   return (
     <button
-      className="ft-ai-bar md:hidden flex items-center justify-center gap-1.5"
+      className="ft-ai-bar md:hidden flex items-center justify-center group relative overflow-hidden p-[1.5px] shadow-lg shadow-[var(--accent)]/20"
       onClick={onOpen}
       aria-label="Open AI Chat"
     >
-      <Sparkles size={13} className="text-[#ffffff] shrink-0" />
-      <span>{translate(locale, 'aiChat.trigger')}</span>
+      <div className="absolute inset-[-1000%] animate-[spin_5s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,color-mix(in_srgb,var(--accent)_20%,transparent)_25%,var(--accent)_50%,color-mix(in_srgb,var(--accent)_20%,transparent)_75%,transparent_100%)] opacity-100" />
+      <div className="relative flex h-full w-full items-center justify-center gap-1.5 rounded-full bg-[var(--fg)] px-[14px] py-[6px]">
+        <Sparkles size={13} className="text-[#ffffff] shrink-0" />
+        <span className="text-[var(--bg)]">{translate(locale, 'aiChat.trigger')}</span>
+      </div>
     </button>
   )
 }
