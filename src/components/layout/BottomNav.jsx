@@ -14,25 +14,19 @@ function linkClassName({ isActive }) {
 
 function NavIcon({ name, isActive }) {
   const common = `h-5 w-5 ${isActive ? 'text-[var(--nav-item-active)]' : 'text-[var(--nav-item-inactive)]'}`
+  const sw = isActive ? '2.5' : '1.8'
+
   switch (name) {
     case 'home':
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
-          <path d="M12 3.2 3 10.7v9.9c0 .9.7 1.6 1.6 1.6h4.8c.6 0 1.1-.5 1.1-1.1v-6c0-.6.5-1.1 1.1-1.1h1c.6 0 1.1.5 1.1 1.1v6c0 .6.5 1.1 1.1 1.1h4.8c.9 0 1.6-.7 1.6-1.6v-9.9L12 3.2z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M3 10.5 12 3l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M5.5 10.5V21h13V10.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )
     case 'list':
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
-          <path d="M4 5.25c0-.69.56-1.25 1.25-1.25H7c.69 0 1.25.56 1.25 1.25V7c0 .69-.56 1.25-1.25 1.25H5.25C4.56 8.25 4 7.69 4 7V5.25zM9.5 5.75c0-.55.45-1 1-1H20c.55 0 1 .45 1 1s-.45 1-1 1h-9.5c-.55 0-1-.45-1-1zM4 11.25C4 10.56 4.56 10 5.25 10H7c.69 0 1.25.56 1.25 1.25V13c0 .69-.56 1.25-1.25 1.25H5.25C4.56 14.25 4 13.69 4 13v-1.75zM9.5 11.75c0-.55.45-1 1-1H20c.55 0 1 .45 1 1s-.45 1-1 1h-9.5c-.55 0-1-.45-1-1zM4 17.25C4 16.56 4.56 16 5.25 16H7c.69 0 1.25.56 1.25 1.25V19c0 .69-.56 1.25-1.25 1.25H5.25C4.56 20.25 4 19.69 4 19v-1.75zM9.5 17.75c0-.55.45-1 1-1H20c.55 0 1 .45 1 1s-.45 1-1 1h-9.5c-.55 0-1-.45-1-1z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M8 6h13" strokeLinecap="round" />
           <path d="M8 12h13" strokeLinecap="round" />
           <path d="M8 18h13" strokeLinecap="round" />
@@ -40,39 +34,30 @@ function NavIcon({ name, isActive }) {
         </svg>
       )
     case 'chart':
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
-          <path d="M5 3.75c.55 0 1 .45 1 1v13.5h14c.55 0 1 .45 1 1s-.45 1-1 1H5c-.55 0-1-.45-1-1V4.75c0-.55.45-1 1-1z" />
-          <path d="M9.2 15.6a1 1 0 0 1-.76-1.64l3.9-4.78a1 1 0 0 1 1.5-.05l2.28 2.28 4.13-5.79a1 1 0 1 1 1.63 1.16l-4.8 6.73a1 1 0 0 1-1.53.12l-2.32-2.32-3.18 3.9a1 1 0 0 1-.85.39z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M4 19V5" strokeLinecap="round" />
           <path d="M4 19h16" strokeLinecap="round" />
           <path d="M7 16l4-5 3 3 5-7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )
     case 'todo':
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
-          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8.29 12.29L8 11.59 9.41 10l3.3 3.3L16.59 9 18 10.41l-7.29 7.28z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M5 5h14v14H5z" strokeLinejoin="round" />
           <path d="M9 9h6M9 12.5h6M9 16h4" strokeLinecap="round" />
         </svg>
       )
     case 'wallet':
       return (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" strokeLinejoin="round" />
           <path d="M16 12h4v3h-4a1.5 1.5 0 0 1 0-3z" strokeLinejoin="round" />
         </svg>
       )
     case 'calendar':
       return (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M7 3v3M17 3v3" strokeLinecap="round" />
           <path d="M4 7h16" strokeLinecap="round" />
           <path d="M6 5h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" strokeLinejoin="round" />
@@ -80,7 +65,7 @@ function NavIcon({ name, isActive }) {
       )
     case 'report':
       return (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M7 3h7l3 3v15a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" strokeLinejoin="round" />
           <path d="M14 3v4h4" strokeLinejoin="round" />
           <path d="M8 12h8M8 16h8" strokeLinecap="round" />
@@ -88,7 +73,7 @@ function NavIcon({ name, isActive }) {
       )
     case 'gear':
       return (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path
             d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"
             strokeLinejoin="round"
@@ -100,13 +85,8 @@ function NavIcon({ name, isActive }) {
         </svg>
       )
     case 'user':
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
-          <path d="M12 12.2c-2.43 0-4.4-1.97-4.4-4.4S9.57 3.4 12 3.4s4.4 1.97 4.4 4.4-1.97 4.4-4.4 4.4z" />
-          <path d="M4.2 20.6c.38-4.08 3.8-7.2 7.8-7.2s7.42 3.12 7.8 7.2c.06.63-.44 1.2-1.08 1.2H5.28c-.64 0-1.14-.57-1.08-1.2z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" strokeLinejoin="round" />
           <path d="M4 21a8 8 0 0 1 16 0" strokeLinecap="round" />
         </svg>

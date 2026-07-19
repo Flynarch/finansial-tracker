@@ -76,10 +76,10 @@ function Navbar() {
               onClick={() => setShowNotifications((prev) => !prev)}
               aria-label={t('navbar.notifications') || 'Notifikasi'}
               aria-expanded={showNotifications}
-              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 ${
+              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-200 ${
                 showNotifications
-                  ? 'bg-[var(--fg)] text-[var(--bg)]'
-                  : 'bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40'
+                  ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent'
+                  : 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border)] hover:bg-[var(--border)]/40'
               }`}
             >
               <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2.2">
