@@ -47,11 +47,13 @@ const getTools = () => ([
               items: {
                 type: "OBJECT",
                 properties: {
-                  type: { type: "STRING", enum: ["income", "expense"] },
+                  type: { type: "STRING", enum: ["income", "expense", "transfer"] },
                   category: { type: "STRING", description: "ID kategori dari daftar." },
                   amount: { type: "NUMBER" },
                   date: { type: "STRING", description: "YYYY-MM-DD" },
-                  notes: { type: "STRING" }
+                  notes: { type: "STRING" },
+                  walletId: { type: "NUMBER", description: "ID dompet (wallet) yang digunakan." },
+                  targetWalletId: { type: "NUMBER", description: "ID dompet tujuan JIKA type='transfer'." }
                 },
                 required: ["type", "category", "amount", "date", "notes"]
               }
@@ -210,7 +212,7 @@ const getTools = () => ([
 ])
 
 export async function parseTransactionFromText(userMessage, context) {
-  const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, onStream = null } = context
+  const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null } = context
 
   if (!navigator.onLine) {
     return { error: true, message: 'Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.' }
@@ -230,6 +232,11 @@ ATURAN UTAMA:
    - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya: "Berapa harga makannya?".
    - Jika kategori tidak ditemukan, gunakan "Lainnya" atau kategori induk terdekat.
    - Panggil 'record_transactions' HANYA jika data sudah lengkap (nama & harga).
+   - JIKA user menyebutkan dompet/akun (contoh: "pakai BCA", "dari cash", "ke Gopay"), isi 'walletId' (dan 'targetWalletId' jika transfer) menggunakan ID dari Daftar Dompet di bawah.
+   - ATURAN PEMILIHAN DOMPET JIKA JUMLAH DOMPET > 1:
+     a. Jika mencatat PENGELUARAN dan TIDAK menyebutkan dompet: Cek saldo tiap dompet. Jika HANYA 1 dompet yang saldonya cukup (>= harga), LANGSUNG gunakan dompet tersebut. Jika >1 dompet cukup (atau semua kurang), JANGAN panggil fungsi! Tanyalah: "Dompet mana yang mau dipakai? [Sebutkan opsi yang cukup]".
+     b. Jika mencatat PEMASUKAN dan TIDAK menyebutkan dompet: JANGAN panggil fungsi! Tanyalah: "Masuk ke dompet mana?".
+     c. Pengecualian: Jika total dompet hanya 1, langsung gunakan dompet tersebut tanpa bertanya.
 2. TO-DO, HABIT, & LANGGANAN BARU: Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
    - To-Do kurang jelas: "Kapan tenggat waktunya? Mau diingatkan jam berapa?"
    - Habit kurang jelas: "Mau warna apa? Seberapa sering?"
@@ -246,6 +253,9 @@ PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
 - Jawab langsung ke inti. Dilarang menggunakan "Tentu", "Baiklah".
 - Tebalkan nominal uang (contoh: **Rp 50.000**).
+
+Daftar Dompet (Wallets):
+${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
 
 Daftar Kategori:
 ${buildCategoryContext(locale)}`

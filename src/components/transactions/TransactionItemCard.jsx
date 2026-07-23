@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Wallet } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
 
@@ -65,6 +66,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
   const sub = labels.sub || null
   const noteStr = transaction.notes ? String(transaction.notes).trim() : ''
+  const walletName = transaction.type !== 'transfer' ? getWalletName(transaction.walletId) : null
 
   return (
     <div
@@ -127,11 +129,18 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
             <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
-            {sub ? (
+            {sub || walletName ? (
               <>
-                <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
-                  {sub}
-                </p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium leading-tight text-[var(--muted)]">
+                  {sub && <span className="truncate">{sub}</span>}
+                  {sub && walletName && <span className="opacity-40 text-[8px]">•</span>}
+                  {walletName && (
+                    <span className="flex items-center gap-1 rounded-[4px] bg-[var(--border)]/60 px-1.5 py-0.5 text-[10px] text-[var(--fg)]/80">
+                      <Wallet size={10} className="opacity-70" />
+                      <span className="truncate max-w-[90px]">{walletName}</span>
+                    </span>
+                  )}
+                </div>
                 {noteStr ? (
                   <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
                     {noteStr}

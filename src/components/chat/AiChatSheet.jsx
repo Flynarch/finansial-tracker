@@ -4,6 +4,7 @@ import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
 import { db } from '../../lib/db'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
 import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
@@ -21,6 +22,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const updateTransaction = useTransactionStore((s) => s.updateTransaction)
   const deleteTransaction = useTransactionStore((s) => s.deleteTransaction)
   const transactions = useTransactionStore((s) => s.transactions)
+  const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
   
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -165,6 +167,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         defaultCurrency,
         previousMessages: messages,
         imageData: image,
+        wallets,
         onStream: (chunk) => {
            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + chunk } : m))
         }
@@ -186,11 +189,23 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         if (result.action === 'create' && result.transactions?.length > 0) {
           const savedTxs = []
           for (const tx of result.transactions) {
+             let finalWalletId = tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null)
+             if (finalWalletId !== null && !wallets.find(w => w.id === finalWalletId)) {
+                finalWalletId = wallets.length > 0 ? wallets[0].id : null
+             }
+             
              const txToSave = {
                ...tx,
+               walletId: finalWalletId,
                id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
                createdAt: new Date().toISOString()
              }
+             
+             if (tx.type === 'transfer' && tx.targetWalletId) {
+                let twId = Number(tx.targetWalletId)
+                if (wallets.find(w => w.id === twId)) txToSave.targetWalletId = twId
+             }
+             
              await addTransaction(txToSave)
              savedTxs.push(txToSave)
           }
