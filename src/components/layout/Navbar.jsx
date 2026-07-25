@@ -7,9 +7,24 @@ import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { CheckCheck } from 'lucide-react'
 
+function getTimeBasedGreeting(locale = 'id') {
+  const hour = new Date().getHours()
+  if (locale === 'en') {
+    if (hour >= 4 && hour < 12) return 'Good Morning'
+    if (hour >= 12 && hour < 17) return 'Good Afternoon'
+    if (hour >= 17 && hour < 22) return 'Good Evening'
+    return 'Good Night'
+  }
+  if (hour >= 4 && hour < 11) return 'Selamat Pagi'
+  if (hour >= 11 && hour < 15) return 'Selamat Siang'
+  if (hour >= 15 && hour < 18) return 'Selamat Sore'
+  return 'Selamat Malam'
+}
+
 function Navbar() {
   const { t, locale } = useTranslation()
   const profileName = useSettingsStore((state) => state.profileName)
+  const greetingText = getTimeBasedGreeting(locale)
   const [showNotifications, setShowNotifications] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -60,7 +75,7 @@ function Navbar() {
           </div>
           <div className="min-w-0 flex flex-col justify-center">
             <p className="truncate text-[10px] font-bold tracking-widest text-[var(--muted)] uppercase mb-0.5">
-              {profileName ? 'Hai, Selamat Datang' : 'Keuangan Pribadi'}
+              {greetingText}
             </p>
             <h1 className="truncate text-base font-bold tracking-tight text-[var(--fg)] leading-none">
               {profileName || 'FinTrack'}
