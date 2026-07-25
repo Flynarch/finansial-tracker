@@ -1,16 +1,24 @@
 /** When live FX fetch fails: 1 USD = IDR (approximate fallback). */
 export const FALLBACK_EXCHANGE_RATES = Object.freeze({ USD: 1, IDR: 17400 })
 
+/** Cache for Intl.NumberFormat instances keyed by locale+currency to avoid re-instantiation on every call. */
+const _fmtCache = new Map()
+
 export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
   const numeric = Number(amount || 0)
-  const isIdr = currency === 'IDR'
-
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: isIdr ? 0 : 0,
-    maximumFractionDigits: isIdr ? 0 : 2,
-  }).format(Number.isFinite(numeric) ? numeric : 0)
+  const key = `${locale}:${currency}`
+  let fmt = _fmtCache.get(key)
+  if (!fmt) {
+    const isIdr = currency === 'IDR'
+    fmt = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: isIdr ? 0 : 0,
+      maximumFractionDigits: isIdr ? 0 : 2,
+    })
+    _fmtCache.set(key, fmt)
+  }
+  return fmt.format(Number.isFinite(numeric) ? numeric : 0)
 }
 
 export function toSafeNumber(value) {
