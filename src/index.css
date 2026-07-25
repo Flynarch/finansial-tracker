@@ -1258,8 +1258,8 @@ html:not([data-theme="light"]) .ft-wallet-detail-hero {
 }
 
 [data-theme="light"] .ft-wallet-detail-hero {
-  background: linear-gradient(155deg, #ffffff 0%, #f1f5f9 100%);
-  border-color: rgba(15, 23, 42, 0.1);
+  background: linear-gradient(180deg, #eef2f7 0%, #e2e8f0 100%);
+  border-color: rgba(15, 23, 42, 0.08);
 }
 
 .ft-wallet-action-btn {

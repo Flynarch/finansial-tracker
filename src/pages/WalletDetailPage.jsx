@@ -312,7 +312,7 @@ export default function WalletDetailPage() {
 
         {/* ── 2. Overlapping Balance Card with Pencil Edit Icon ─────── */}
         <div className="px-4 -mt-8 relative z-20">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-lg flex items-center justify-between gap-3">
+          <div className="rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-md flex items-center justify-between gap-3">
             {/* Left Money Icon */}
             <div className="w-10 h-10 rounded-xl bg-[var(--field-bg)] flex items-center justify-center text-amber-500 shrink-0 border border-[var(--border)] shadow-sm">
               <MoneyBagIcon size={20} strokeWidth={2.5} />
