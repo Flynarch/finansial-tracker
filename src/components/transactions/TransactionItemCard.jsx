@@ -26,8 +26,10 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   setApiError,
   setApiErrorTone,
   contextWalletId,
+  wallets: walletsProp,
 }) {
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const walletsInternal = useLiveQuery(() => (walletsProp ? undefined : db.wallets.toArray()), [walletsProp])
+  const wallets = walletsProp || walletsInternal
 
   const getWalletName = (id) => wallets?.find(w => w.id === id)?.name || 'Wallet'
 

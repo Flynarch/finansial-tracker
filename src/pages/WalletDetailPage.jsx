@@ -23,6 +23,7 @@ export default function WalletDetailPage() {
   const navigate = useNavigate()
   
   const wallet = useLiveQuery(() => db.wallets.get(walletId), [walletId])
+  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const allTransactions = useLiveQuery(async () => {
     const txs = await db.transactions
       .where('walletId').equals(walletId)
@@ -481,6 +482,7 @@ export default function WalletDetailPage() {
                         openEditTransaction={() => {}}
                         deleteTransaction={() => {}}
                         contextWalletId={walletId}
+                        wallets={allWallets}
                       />
                     ))}
                   </div>

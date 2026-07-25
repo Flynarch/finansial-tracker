@@ -208,6 +208,7 @@ function Transactions() {
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [], [])
+  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const transactions = useMemo(() => transactionsRaw || [], [transactionsRaw])
   const {
     categories,
@@ -722,6 +723,7 @@ function Transactions() {
                           rates={rates}
                           setApiError={setApiError}
                           setApiErrorTone={setApiErrorTone}
+                          wallets={allWallets}
                         />
                       ))}
                     </div>
