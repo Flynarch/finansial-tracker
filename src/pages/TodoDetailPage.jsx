@@ -272,7 +272,7 @@ export default function TodoDetailPage() {
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
 
   return (
-    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-44 sm:pb-36">
+    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-12 sm:pb-8">
       {/* ── Sleek Top Navigation Header ───────────────────────────────── */}
       <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-4 sm:px-6">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 py-2">

@@ -32,7 +32,14 @@ function AppShell() {
   const navigationType = useNavigationType()
 
   const historyStack = useRef([])
-  
+
+  // Hide global navigation & AI trigger bar on dedicated sub-detail pages
+  const isDetailPage =
+    location.pathname.startsWith('/todos/') ||
+    location.pathname.startsWith('/wallets/') ||
+    location.pathname.startsWith('/savings/') ||
+    location.pathname === '/add-account'
+
   // AI Chat states
   const isChatOpen = useChatStore((state) => state.isOpen)
   const setIsChatOpen = useChatStore((state) => state.setIsOpen)
@@ -42,7 +49,7 @@ function AppShell() {
   useEffect(() => {
     const currentPath = location.pathname
     const currentKey = location.key || 'initial'
-    
+
     if (navigationType === 'PUSH') {
       historyStack.current.push({ path: currentPath, key: currentKey })
     } else if (navigationType === 'REPLACE') {
@@ -52,7 +59,7 @@ function AppShell() {
         historyStack.current.push({ path: currentPath, key: currentKey })
       }
     } else if (navigationType === 'POP') {
-      const index = historyStack.current.findIndex(item => item.key === currentKey)
+      const index = historyStack.current.findIndex((item) => item.key === currentKey)
       if (index !== -1) {
         historyStack.current = historyStack.current.slice(0, index + 1)
       } else {
@@ -93,7 +100,7 @@ function AppShell() {
     const listenerPromise = App.addListener('backButton', handleBackButton)
 
     return () => {
-      listenerPromise.then(l => l.remove())
+      listenerPromise.then((l) => l.remove())
     }
   }, [location.pathname, navigate])
 
@@ -145,7 +152,7 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
-    // Reset scroll position ke paling atas setiap ganti route/tab apa pun.
+    // Reset scroll position to top when route changes
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [location.pathname])
 
@@ -154,22 +161,23 @@ function AppShell() {
       {(location.pathname === '/dashboard' || location.pathname === '/') && <Navbar />}
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
-        <main className="min-h-[calc(100dvh-64px)] flex-1 min-w-0 px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6">
+        <main
+          className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 px-4 pt-4 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
+            isDetailPage ? 'pb-8' : 'pb-[calc(8.5rem+env(safe-area-inset-bottom))]'
+          }`}
+        >
           <Outlet />
         </main>
       </div>
-      <BottomNav />
+      {!isDetailPage && <BottomNav />}
       <OnboardingFlow />
       {isLoaded && securityEnabled && !isUnlocked ? (
         <LockScreen method={securityMethod} secret={lockSecret} onUnlock={unlock} />
       ) : null}
-      
-      <AiTriggerBar 
-        isVisible={!isChatOpen} 
-        onOpen={() => setIsChatOpen(true)} 
-      />
-      
-      <AiChatSheet 
+
+      <AiTriggerBar isVisible={!isDetailPage && !isChatOpen} onOpen={() => setIsChatOpen(true)} />
+
+      <AiChatSheet
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         messages={chatMessages}
