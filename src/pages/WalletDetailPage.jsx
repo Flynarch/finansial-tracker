@@ -309,37 +309,48 @@ export default function WalletDetailPage() {
           </div>
         </div>
 
-        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon ─────── */}
+        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Idea 1) ─────── */}
         <div className="px-4 -mt-8 relative z-20">
-          <div className="rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-md flex items-center justify-between gap-3">
-            {/* Left Money Icon */}
-            <div className="w-10 h-10 rounded-xl bg-[var(--field-bg)] flex items-center justify-center text-amber-500 shrink-0 border border-[var(--border)] shadow-sm">
-              <MoneyBagIcon size={20} strokeWidth={2.5} />
+          <div className="rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-md space-y-2">
+            {/* Top Row: Label Caption & Edit Pencil Button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                <div className="w-5 h-5 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-amber-500">
+                  <MoneyBagIcon size={12} strokeWidth={2.5} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
+                  Saldo Akun Saat Ini
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBalanceRaw(currentBalance.toString())
+                  setIsEditBalanceModalOpen(true)
+                }}
+                className="w-7 h-7 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
+                title="Penyesuaian Saldo"
+                aria-label="Penyesuaian Saldo"
+              >
+                <Edit2 size={13} strokeWidth={2} />
+              </button>
             </div>
 
-            {/* Middle Amount & Timestamp */}
-            <div className="flex-1 min-w-0">
-              <p className="ft-display text-xl font-black text-[var(--fg)] tabular-nums truncate leading-tight">
+            {/* Middle Row: Big Bold Balance Display */}
+            <div>
+              <p className="ft-display text-2xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
                 {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
               </p>
-              <p className="text-[10px] font-medium text-[var(--muted-2)] mt-0.5 truncate">
-                Terakhir update {updatedAt}
-              </p>
             </div>
 
-            {/* Right Edit Pencil Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setNewBalanceRaw(currentBalance.toString())
-                setIsEditBalanceModalOpen(true)
-              }}
-              className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
-              title="Penyesuaian Saldo"
-              aria-label="Penyesuaian Saldo"
-            >
-              <Edit2 size={16} strokeWidth={2} />
-            </button>
+            {/* Bottom Row: Timestamp Sub-info & Currency Badge */}
+            <div className="pt-1.5 border-t border-[var(--border)]/30 flex items-center justify-between text-[10px] text-[var(--muted-2)]">
+              <span>Terakhir update {updatedAt}</span>
+              <span className="font-extrabold text-[var(--muted)] uppercase tracking-wider">
+                {wallet.currency || defaultCurrency}
+              </span>
+            </div>
           </div>
         </div>
 
