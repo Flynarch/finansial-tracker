@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { format, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -437,19 +437,29 @@ function Dashboard() {
     locale: locale === 'en' ? enUS : idLocale,
   })
 
-  const transactions = useLiveQuery(() => db.transactions.toArray(), [], null)
+  // Scope to last 13 months — covers current + 12m chart + last-month delta.
+  // Uses the new `date` index added in db.version(13) for efficient range query.
+  const txCutoffDate = format(startOfMonth(subMonths(new Date(), 12)), 'yyyy-MM-dd')
+  const transactions = useLiveQuery(
+    () => db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray(),
+    [txCutoffDate],
+    null,
+  )
   const investments = useLiveQuery(() => db.investments.toArray(), [], null)
   const budgets = useLiveQuery(() => db.budgets.toArray(), [], null)
   const goals = useLiveQuery(() => db.goals.toArray(), [], null)
+  // Wallets balance needs ALL transactions (including older ones for correct balance history)
+  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], null)
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], null)
 
-  // null = still loading (3rd arg is defaultValue). Prevents flashing empty states before real data arrives.
-  const isDbLoading = transactions === null || wallets === null
+  // null = still loading. Wallets balance loading also waits for allTransactionsForBalance.
+  const isDbLoading = transactions === null || wallets === null || allTransactionsForBalance === null
   
   const walletsWithBalance = useMemo(() => {
     if (wallets === null || wallets === undefined) return undefined
     if (!wallets) return []
-    const txs = transactions || []
+    // Use full transaction history so balances include transactions older than 13 months
+    const txs = allTransactionsForBalance || []
     return wallets.map(w => {
       let bal = Number(w.balance) || 0
       for (const tx of txs) {
@@ -466,7 +476,7 @@ function Dashboard() {
       }
       return { ...w, currentBalance: bal }
     })
-  }, [wallets, transactions])
+  }, [wallets, allTransactionsForBalance])
 
   const totalWalletBalance = useMemo(() => (walletsWithBalance || []).reduce((s, w) => s + w.currentBalance, 0), [walletsWithBalance])
   const [isEntering, setIsEntering] = useState(false)
