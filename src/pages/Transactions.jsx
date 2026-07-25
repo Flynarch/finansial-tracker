@@ -1,4 +1,5 @@
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
+import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from '../components/ui/Button'
@@ -416,6 +417,63 @@ function Transactions() {
   const groupedEntries = useMemo(() => {
     return Object.entries(groupedTransactions).sort((a, b) => String(b[0]).localeCompare(String(a[0])))
   }, [groupedTransactions])
+
+  const groupedEntriesDetailed = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
+
+    return groupedEntries.map(([dateKey, items]) => {
+      let label = ''
+      if (dateKey === todayStr) {
+        label = 'HARI INI'
+      } else if (dateKey === yesterdayStr) {
+        label = 'KEMARIN'
+      } else if (dateKey !== 'unknown') {
+        try {
+          const dateObj = new Date(`${dateKey}T12:00:00`)
+          label = format(dateObj, 'EEEE, d MMMM yyyy', {
+            locale: locale === 'en' ? enUS : idLocale
+          }).toUpperCase()
+        } catch {
+          label = dateKey
+        }
+      } else {
+        label = t('tx.unknownDate')
+      }
+
+      let totalIncome = 0
+      let totalExpense = 0
+
+      for (const item of items) {
+        const convertedAmount = convertCurrency(
+          item.amount,
+          item.currency || defaultCurrency,
+          defaultCurrency,
+          rates,
+        )
+        if (item.type === 'income') totalIncome += convertedAmount
+        else if (item.type === 'expense') totalExpense += convertedAmount
+      }
+
+      const net = totalIncome - totalExpense
+      let dailySummaryText = ''
+      if (net > 0) {
+        dailySummaryText = `+${formatCurrency(net, defaultCurrency)}`
+      } else if (net < 0) {
+        dailySummaryText = `-${formatCurrency(Math.abs(net), defaultCurrency)}`
+      } else if (totalExpense > 0) {
+        dailySummaryText = `-${formatCurrency(totalExpense, defaultCurrency)}`
+      }
+
+      return {
+        dateKey,
+        items,
+        dateLabel: label,
+        dailySummaryText,
+        isPositive: net > 0,
+      }
+    })
+  }, [groupedEntries, locale, defaultCurrency, rates, t])
   // Always keep the list as the scroll container. The page wrapper uses overflow-hidden
   // for layout stability, so letting the list "grow" can make the screen non-scrollable.
   // Kept for future tuning; currently list is always scroll container.
@@ -628,15 +686,20 @@ function Transactions() {
                 }}
               >
                 <div className="min-h-full space-y-4 p-1 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
-                {groupedEntries.map(([dateKey, items]) => (
-                  <section key={dateKey} className="space-y-2">
-                    <div className="z-[1] inline-flex rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[11px] font-semibold text-[var(--muted)]">
-                      {dateKey && dateKey !== 'unknown'
-                        ? format(new Date(dateKey), 'dd MMM yyyy')
-                        : t('tx.unknownDate')}
+                {groupedEntriesDetailed.map((group) => (
+                  <section key={group.dateKey} className="space-y-2">
+                    <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
+                      <span className="text-[10px] font-bold tracking-wider text-[var(--muted-2)] uppercase">
+                        {group.dateLabel}
+                      </span>
+                      {group.dailySummaryText ? (
+                        <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
+                          {group.dailySummaryText}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="space-y-2">
-                      {items.map((transaction) => (
+                      {group.items.map((transaction) => (
                         <TransactionItemCard
                           key={transaction.id}
                           transaction={transaction}

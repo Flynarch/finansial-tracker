@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { format } from 'date-fns'
-import { ChevronLeft, Edit2, Trash2, Plus, Receipt, DollarSign } from 'lucide-react'
+import { format, subDays } from 'date-fns'
+import { enUS, id as idLocale } from 'date-fns/locale'
+import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
@@ -55,6 +56,76 @@ export default function WalletDetailPage() {
     })
   }, [allTransactions, activeTab, walletId])
 
+  const groupedTransactions = useMemo(() => {
+    if (!filteredTransactions || filteredTransactions.length === 0) return []
+    
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
+    
+    const groupsMap = new Map()
+
+    for (const tx of filteredTransactions) {
+      const dateKey = tx.date || 'Lainnya'
+      if (!groupsMap.has(dateKey)) {
+        groupsMap.set(dateKey, {
+          dateKey,
+          items: [],
+          totalExpense: 0,
+          totalIncome: 0,
+        })
+      }
+      const group = groupsMap.get(dateKey)
+      group.items.push(tx)
+
+      const amount = Number(tx.amount) || 0
+      if (tx.type === 'expense') {
+        group.totalExpense += amount
+      } else if (tx.type === 'income') {
+        group.totalIncome += amount
+      } else if (tx.type === 'transfer') {
+        if (tx.walletId === walletId) group.totalExpense += amount
+        if (tx.targetWalletId === walletId) group.totalIncome += amount
+      }
+    }
+
+    return Array.from(groupsMap.values()).map(group => {
+      let label = ''
+      if (group.dateKey === todayStr) {
+        label = 'HARI INI'
+      } else if (group.dateKey === yesterdayStr) {
+        label = 'KEMARIN'
+      } else if (group.dateKey !== 'Lainnya') {
+        try {
+          const dateObj = new Date(`${group.dateKey}T12:00:00`)
+          label = format(dateObj, 'EEEE, d MMMM yyyy', {
+            locale: locale === 'en' ? enUS : idLocale
+          }).toUpperCase()
+        } catch {
+          label = group.dateKey
+        }
+      } else {
+        label = 'LAINNYA'
+      }
+
+      const net = group.totalIncome - group.totalExpense
+      let dailySummaryText = ''
+      if (net > 0) {
+        dailySummaryText = `+${formatCurrency(net, wallet?.currency || defaultCurrency)}`
+      } else if (net < 0) {
+        dailySummaryText = `-${formatCurrency(Math.abs(net), wallet?.currency || defaultCurrency)}`
+      } else if (group.totalExpense > 0) {
+        dailySummaryText = `-${formatCurrency(group.totalExpense, wallet?.currency || defaultCurrency)}`
+      }
+
+      return {
+        ...group,
+        dateLabel: label,
+        dailySummaryText,
+        isPositive: net > 0,
+      }
+    })
+  }, [filteredTransactions, locale, walletId, wallet?.currency, defaultCurrency])
+
   const currentBalance = useMemo(() => {
     if (!wallet) return 0
     let bal = Number(wallet.balance) || 0
@@ -74,9 +145,26 @@ export default function WalletDetailPage() {
     return bal
   }, [wallet, allTransactions, walletId])
 
+  // Monthly income/expense for this wallet
+  const { monthIncome, monthExpense } = useMemo(() => {
+    if (!allTransactions) return { monthIncome: 0, monthExpense: 0 }
+    const currentMonth = format(new Date(), 'yyyy-MM')
+    let inc = 0, exp = 0
+    for (const tx of allTransactions) {
+      if (!tx.date?.startsWith(currentMonth)) continue
+      const amount = Number(tx.amount) || 0
+      if (tx.type === 'income' && tx.walletId === walletId) inc += amount
+      else if (tx.type === 'expense' && tx.walletId === walletId) exp += amount
+      else if (tx.type === 'transfer') {
+        if (tx.walletId === walletId) exp += amount
+        if (tx.targetWalletId === walletId) inc += amount
+      }
+    }
+    return { monthIncome: inc, monthExpense: exp }
+  }, [allTransactions, walletId])
+
   const handleDeleteWallet = async () => {
     try {
-      // Cascade delete
       const txsToDelete = await db.transactions
         .filter(tx => tx.walletId === walletId || tx.targetWalletId === walletId)
         .primaryKeys()
@@ -98,7 +186,6 @@ export default function WalletDetailPage() {
 
     const diff = newBal - currentBalance
     if (diff !== 0) {
-      // Create adjustment transaction
       await addTransaction({
         date: format(new Date(), 'yyyy-MM-dd'),
         type: 'balance_adjustment',
@@ -115,43 +202,66 @@ export default function WalletDetailPage() {
 
   const getInitials = (text) => text ? text.substring(0, 2).toUpperCase() : ''
 
-  if (!wallet) return <div className="min-h-screen bg-white" />
+  if (!wallet) return <div className="min-h-screen bg-[var(--bg)]" />
 
   const updatedAt = wallet.createdAt ? format(new Date(wallet.createdAt), 'dd MMM yyyy, HH:mm') : 'Baru saja'
 
+  const TABS = [
+    { id: 'all', label: 'Semua' },
+    { id: 'expense', label: 'Pengeluaran' },
+    { id: 'income', label: 'Pemasukan' },
+  ]
+
   return (
     <>
-      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-24">
-        {/* ── Top Header Section ─────────────────────────── */}
-        <div className="relative bg-[var(--panel-strong)] border-b border-[var(--border)] text-[var(--fg)] px-4 pt-5 pb-8 shrink-0 shadow-sm rounded-b-[2rem]">
-          {/* Header Nav */}
-          <div className="relative z-10 flex items-center justify-between mb-6">
-            <button onClick={() => navigate('/dashboard')} className="p-2 -ml-2 text-[var(--fg)] hover:bg-[var(--fg)]/10 rounded-full transition">
-              <ChevronLeft size={28} strokeWidth={2.5} />
+      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-20">
+        {/* ── Hero Digital Wallet Banner ─────────────────────────────── */}
+        <div className="ft-wallet-detail-hero">
+          {/* Top Nav Bar */}
+          <div className="relative z-10 flex items-center justify-between mb-5">
+            <button 
+              onClick={() => navigate('/dashboard')} 
+              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
+              aria-label="Kembali"
+            >
+              <ChevronLeft size={24} strokeWidth={2.5} />
             </button>
-            
-            <div className="bg-[var(--fg)]/5 backdrop-blur-md border border-[var(--border)] text-[var(--fg)] px-5 py-1.5 rounded-full text-[13px] font-bold shadow-sm">
-              {wallet.institutionType !== 'lainnya' ? 'Akun Institusi' : 'Akun Manual'}
-            </div>
 
-            <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 -mr-2 text-rose-500 hover:text-white hover:bg-rose-500 rounded-full transition">
-              <Trash2 size={22} strokeWidth={2.5} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => {
+                  setNewBalanceRaw(currentBalance.toString())
+                  setIsEditBalanceModalOpen(true)
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95 border border-[var(--border)]"
+                title="Penyesuaian Saldo"
+              >
+                <Edit2 size={13} strokeWidth={2} />
+                <span>Edit Saldo</span>
+              </button>
+              <button 
+                onClick={() => setIsDeleteModalOpen(true)} 
+                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                title="Hapus Akun"
+              >
+                <Trash2 size={16} strokeWidth={2} />
+              </button>
+            </div>
           </div>
 
-          {/* Logo and Name Horizontal Layout */}
-          <div className="relative z-10 flex items-center gap-4 px-2">
-            {/* Logo Circle */}
-            <div className="w-[52px] h-[52px] rounded-full bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 shadow-md ring-4 ring-[var(--panel)]">
+          {/* Wallet Identity Row */}
+          <div className="relative z-10 flex items-center gap-3.5">
+            {/* Logo */}
+            <div className="w-12 h-12 rounded-full bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 border border-[var(--border)] shadow-md">
               {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
-                <div className="w-full h-full flex items-center justify-center text-amber-500 drop-shadow-sm">
-                  <MoneyBagIcon size={28} strokeWidth={2.5} />
+                <div className="w-full h-full flex items-center justify-center text-amber-500">
+                  <MoneyBagIcon size={24} strokeWidth={2.5} />
                 </div>
               ) : wallet.logoUrl ? (
                 <img 
                   src={wallet.logoUrl} 
                   alt={wallet.name} 
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain p-1.5"
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
@@ -159,107 +269,178 @@ export default function WalletDetailPage() {
                 />
               ) : null}
               <div 
-                className="w-full h-full flex items-center justify-center font-extrabold text-[17px] text-[var(--fg)]"
+                className="w-full h-full flex items-center justify-center font-extrabold text-[15px] text-[var(--fg)]"
                 style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || wallet.logoUrl ? 'none' : 'flex' }}
               >
                 {getInitials(wallet.name)}
               </div>
             </div>
 
-            {/* Name & Balance Preview */}
-            <div className="flex-1">
-              <h2 className="text-[22px] font-extrabold text-[var(--fg)] tracking-tight line-clamp-1">{wallet.name}</h2>
-              <p className="text-[var(--muted)] text-sm font-medium mt-0.5">{wallet.currency} Account</p>
+            {/* Title & Metadata Badges */}
+            <div className="flex-1 min-w-0">
+              <h1 className="ft-display text-xl font-extrabold text-[var(--fg)] tracking-tight truncate leading-snug">
+                {wallet.name}
+              </h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
+                  {wallet.institutionType !== 'lainnya' ? wallet.institutionType : 'Akun Manual'}
+                </span>
+                <span className="text-[10px] font-semibold text-[var(--muted-2)]">•</span>
+                <span className="text-[11px] font-bold text-[var(--muted)] tabular-nums">
+                  {wallet.currency || defaultCurrency}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Clean Integrated Balance Section */}
+          <div className="relative z-10 mt-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
+              Saldo Saat Ini
+            </p>
+            <p className="ft-display mt-1 text-[2.25rem] leading-[1.05] font-black tracking-tight tabular-nums text-[var(--fg)] break-all">
+              {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
+            </p>
+            <p className="text-[10px] font-medium text-[var(--muted-2)] mt-1.5">
+              Diperbarui {updatedAt}
+            </p>
+          </div>
+
+          {/* Hero Quick Action Buttons */}
+          <div className="relative z-10 mt-5 flex gap-2.5">
+            <button
+              onClick={() => setIsQuickAddOpen(true)}
+              className="ft-wallet-action-btn ft-wallet-action-primary flex-1"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              <span>+ Transaksi</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                setNewBalanceRaw(currentBalance.toString())
+                setIsEditBalanceModalOpen(true)
+              }}
+              className="ft-wallet-action-btn ft-wallet-action-secondary"
+            >
+              <SlidersHorizontal size={16} strokeWidth={2} />
+              <span>Penyesuaian</span>
+            </button>
+          </div>
+
+          {/* Monthly Stats Summary */}
+          <div className="relative z-10 mt-4 flex gap-2">
+            <div className="ft-stat-pill ft-stat-pill--income">
+              <div className="ft-stat-pill-icon">
+                <ArrowDownLeft size={16} strokeWidth={2.5} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-income)' }}>
+                  Pemasukan
+                </p>
+                <p className="text-[11px] font-black tabular-nums truncate" style={{ color: 'var(--status-income)' }}>
+                  {formatCurrency(monthIncome, wallet.currency || defaultCurrency)}
+                </p>
+              </div>
+            </div>
+
+            <div className="ft-stat-pill ft-stat-pill--expense">
+              <div className="ft-stat-pill-icon">
+                <ArrowUpRight size={16} strokeWidth={2.5} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-expense)' }}>
+                  Pengeluaran
+                </p>
+                <p className="text-[11px] font-black tabular-nums truncate" style={{ color: 'var(--status-expense)' }}>
+                  {formatCurrency(monthExpense, wallet.currency || defaultCurrency)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── Main Content ──────────────────────────────────────────────── */}
-        <div className="px-5 -mt-4 relative z-20">
-          
-          {/* Balance Card */}
-          <div className="bg-[var(--field-bg)] rounded-3xl p-6 shadow-lg shadow-black/5 border border-[var(--border)]">
-            <p className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider mb-2">Saldo saat ini</p>
-            <div className="flex items-center gap-3">
-              <h3 className="text-3xl font-black text-[var(--fg)] tracking-tight break-all">
-                {formatCurrency(currentBalance, wallet.currency)}
-              </h3>
-              <button 
-                onClick={() => {
-                  setNewBalanceRaw(currentBalance.toString())
-                  setIsEditBalanceModalOpen(true)
-                }}
-                className="p-2 bg-[var(--fg)]/10 text-[var(--fg)] rounded-full hover:bg-[var(--fg)]/20 transition shrink-0"
-              >
-                <Edit2 size={16} strokeWidth={2.5} />
-              </button>
-            </div>
-            <p className="text-[12px] text-[var(--muted-2)] font-medium mt-3">
-              Terakhir update {updatedAt}
-            </p>
-          </div>
-
-          {/* Filters */}
-          <div className="mt-8 flex gap-2 overflow-x-auto ft-no-scrollbar pb-2">
-            {['all', 'expense', 'income'].map((tab) => (
+        {/* ── Content Section: Filters & Transactions Feed ─────────── */}
+        <div className="px-4 mt-5">
+          {/* Tab Filters */}
+          <div className="flex gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+            {TABS.map((tab) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`whitespace-nowrap px-5 py-2 rounded-full text-[13px] font-bold transition-all border-[1.5px] ${
-                  activeTab === tab
-                    ? 'bg-[var(--fg)] border-[var(--fg)] text-[var(--bg)] shadow-md'
-                    : 'bg-[var(--field-bg)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 rounded-lg py-2 px-2 text-[12px] font-bold transition ${
+                  activeTab === tab.id
+                    ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
+                    : 'text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
-                {tab === 'all' ? 'Semua' : tab === 'expense' ? 'Pengeluaran' : 'Pemasukan'}
+                {tab.label}
               </button>
             ))}
           </div>
 
-          {/* Transactions List */}
-          <div className="mt-6 space-y-3">
-            {filteredTransactions && filteredTransactions.length > 0 ? (
-              filteredTransactions.map((tx) => (
-                <TransactionItemCard
-                  key={tx.id}
-                  transaction={tx}
-                  locale={locale}
-                  t={t}
-                  format={format}
-                  defaultCurrency={defaultCurrency}
-                  formatCurrency={formatCurrency}
-                  getCategoryColorClass={getCategoryColorClass}
-                  resolveTransactionIconKey={resolveTransactionIconKey}
-                  getTransactionCategoryLabels={getTransactionCategoryLabels}
-                  convertCurrency={() => 0} // Dummy for now
-                  rates={FALLBACK_EXCHANGE_RATES}
-                  // Mock handlers since we don't have full editing in detail page yet
-                  openEditTransaction={() => {}}
-                  deleteTransaction={() => {}}
-                  contextWalletId={walletId}
-                />
+          {/* Header Row: Transaction Count */}
+          <div className="mt-4 flex items-center justify-between px-1">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted-2)]">
+              Riwayat Transaksi
+            </h3>
+            <span className="text-[11px] font-semibold tabular-nums text-[var(--muted)]">
+              {filteredTransactions?.length || 0} transaksi
+            </span>
+          </div>
+
+          {/* Transactions Feed List (Grouped Timeline) */}
+          <div className="mt-4 space-y-4 pb-4">
+            {groupedTransactions && groupedTransactions.length > 0 ? (
+              groupedTransactions.map((group) => (
+                <div key={group.dateKey} className="space-y-2">
+                  {/* Timeline Date Header */}
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
+                    <span className="text-[10px] font-bold tracking-wider text-[var(--muted-2)] uppercase">
+                      {group.dateLabel}
+                    </span>
+                    {group.dailySummaryText ? (
+                      <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
+                        {group.dailySummaryText}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Transaction Cards in this Date Group */}
+                  <div className="space-y-2">
+                    {group.items.map((tx) => (
+                      <TransactionItemCard
+                        key={tx.id}
+                        transaction={tx}
+                        locale={locale}
+                        t={t}
+                        format={format}
+                        defaultCurrency={defaultCurrency}
+                        formatCurrency={formatCurrency}
+                        getCategoryColorClass={getCategoryColorClass}
+                        resolveTransactionIconKey={resolveTransactionIconKey}
+                        getTransactionCategoryLabels={getTransactionCategoryLabels}
+                        convertCurrency={() => 0}
+                        rates={FALLBACK_EXCHANGE_RATES}
+                        openEditTransaction={() => {}}
+                        deleteTransaction={() => {}}
+                        contextWalletId={walletId}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))
             ) : (
               <div className="py-10">
                 <EmptyState
-                  icon={<Receipt className="text-[var(--muted-2)] mx-auto mb-3" size={48} strokeWidth={1} />}
+                  icon={<Receipt className="text-[var(--muted-2)] mx-auto mb-3" size={44} strokeWidth={1.2} />}
                   title="Belum ada transaksi"
-                  description={`Belum ada transaksi ${activeTab !== 'all' ? 'ini' : ''} di dompet ini.`}
+                  description={`Belum ada transaksi ${activeTab !== 'all' ? activeTab : ''} tercatat di akun ini.`}
                 />
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      {/* FAB - Moved outside the ft-page-enter container to avoid transform stack issues */}
-      <div className="fixed bottom-24 right-6 z-40 ft-page-enter">
-        <button
-          onClick={() => setIsQuickAddOpen(true)}
-          className="w-14 h-14 bg-[var(--accent)] text-[var(--bg)] rounded-full flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:scale-105 active:scale-95 transition-all"
-        >
-          <Plus size={28} strokeWidth={3} />
-        </button>
       </div>
 
       {/* Modals */}
@@ -270,20 +451,20 @@ export default function WalletDetailPage() {
       />
 
       <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Hapus Dompet">
-        <div className="p-4">
-          <p className="text-gray-600 mb-6">
-            Apakah Anda yakin ingin menghapus dompet <strong>{wallet.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
+        <div className="pt-1">
+          <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-5">
+            Apakah Anda yakin ingin menghapus dompet <strong className="text-[var(--fg)]">{wallet.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-2.5">
             <button 
               onClick={() => setIsDeleteModalOpen(false)}
-              className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98]"
             >
               Batal
             </button>
             <button 
               onClick={handleDeleteWallet}
-              className="flex-1 py-3 bg-rose-500 text-white font-bold rounded-xl shadow-md shadow-rose-500/20"
+              className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold text-[13px] shadow-sm transition hover:bg-rose-600 active:scale-[0.98]"
             >
               Hapus
             </button>
@@ -292,32 +473,32 @@ export default function WalletDetailPage() {
       </Modal>
 
       <Modal isOpen={isEditBalanceModalOpen} onClose={() => setIsEditBalanceModalOpen(false)} title="Penyesuaian Saldo">
-        <form onSubmit={handleEditBalance} className="p-4">
-          <p className="text-sm text-gray-500 mb-4">
+        <form onSubmit={handleEditBalance} className="pt-1">
+          <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-4">
             Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.
           </p>
-          <div className="relative flex items-center bg-gray-50 border-2 border-gray-200 rounded-2xl focus-within:border-blue-500 mb-6">
-            <span className="pl-4 text-gray-500 font-bold">Rp</span>
+          <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] focus-within:border-[var(--accent)] transition-colors mb-5">
+            <span className="pl-4 text-[var(--muted)] font-bold text-sm">Rp</span>
             <input
               type="text"
               inputMode="numeric"
               value={newBalanceRaw ? Number(newBalanceRaw.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
               onChange={(e) => setNewBalanceRaw(e.target.value.replace(/\D/g, ''))}
-              className="w-full bg-transparent py-4 pl-3 pr-4 font-black text-2xl text-gray-900 outline-none"
+              className="w-full bg-transparent py-3.5 pl-3 pr-4 font-black text-xl text-[var(--fg)] outline-none"
               autoFocus
             />
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2.5">
             <button 
               type="button"
               onClick={() => setIsEditBalanceModalOpen(false)}
-              className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98]"
             >
               Batal
             </button>
             <button 
               type="submit"
-              className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md shadow-blue-600/20"
+              className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98]"
             >
               Simpan Saldo
             </button>
