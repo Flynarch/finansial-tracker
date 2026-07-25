@@ -385,7 +385,7 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Transactions Feed Card Wrapper */}
-          <div className="mt-4 -mx-2.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-4 shadow-sm space-y-3.5">
+          <div className="mt-4 -mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-4 shadow-sm space-y-3.5">
             <div className="flex items-center justify-between px-1 pb-2 border-b border-[var(--border)]/40">
               <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
                 Riwayat Transaksi
