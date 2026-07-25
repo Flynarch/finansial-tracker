@@ -203,37 +203,54 @@ export function getTransactionCategoryLabels(rawCategory, txType, locale = 'id')
   if (txType === 'expense') {
     const parsed = parseExpenseCategoryPath(rawCategory)
     if (parsed) {
-      if (!parsed.child) {
-        return {
-          main: parsed.parent?.names?.[lang] || parsed.parent?.id || formatFallback(rawCategory),
-          sub: null,
-        }
-      }
       return {
         main: parsed.parent?.names?.[lang] || parsed.parent?.id || formatFallback(rawCategory),
         sub: parsed.child?.names?.[lang] || parsed.child?.id || null,
       }
     }
     
-    // Fallback for hallucinated or missing categories
+    // Fallback for missing/custom categories
     const parts = String(rawCategory || '').split('/')
     return { 
       main: formatFallback(parts[0]) || rawCategory, 
       sub: parts.length > 1 ? formatFallback(parts[1]) : null 
     }
   }
-  if (typeof rawCategory === 'string' && rawCategory.startsWith('investasi/')) {
-    const sub = rawCategory.split('/')[1] || 'investasi_lain'
-    const subLabelMap = {
-      emas: locale === 'en' ? 'Gold' : 'Emas',
-      crypto: 'Crypto',
-      saham: locale === 'en' ? 'Stock' : 'Saham',
-      investasi_lain: locale === 'en' ? 'Other' : 'Lainnya',
+
+  if (txType === 'income') {
+    const parsed = parseIncomeCategoryPath(rawCategory)
+    if (parsed) {
+      return {
+        main: parsed.parent?.names?.[lang] || parsed.parent?.id || formatFallback(rawCategory),
+        sub: parsed.child?.names?.[lang] || parsed.child?.id || null,
+      }
     }
-    return {
-      main: locale === 'en' ? 'Investment' : 'Investasi',
-      sub: subLabelMap[sub] || subLabelMap.investasi_lain,
+
+    if (typeof rawCategory === 'string' && rawCategory.startsWith('investasi/')) {
+      const sub = rawCategory.split('/')[1] || 'investasi_lain'
+      const subLabelMap = {
+        emas: locale === 'en' ? 'Gold' : 'Emas',
+        crypto: 'Crypto',
+        saham: locale === 'en' ? 'Stock' : 'Saham',
+        investasi_lain: locale === 'en' ? 'Other' : 'Lainnya',
+      }
+      return {
+        main: locale === 'en' ? 'Investment' : 'Investasi',
+        sub: subLabelMap[sub] || subLabelMap.investasi_lain,
+      }
+    }
+
+    const parts = String(rawCategory || '').split('/')
+    return { 
+      main: formatFallback(parts[0]) || rawCategory, 
+      sub: parts.length > 1 ? formatFallback(parts[1]) : null 
     }
   }
-  return { main: formatIncomeCategory(rawCategory, locale), sub: null }
+
+  // Fallback for transfer or other types
+  const parts = String(rawCategory || '').split('/')
+  return { 
+    main: formatFallback(parts[0]) || rawCategory, 
+    sub: parts.length > 1 ? formatFallback(parts[1]) : null 
+  }
 }

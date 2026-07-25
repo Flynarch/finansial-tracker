@@ -1274,14 +1274,10 @@ function Dashboard() {
                         ) : null}
                         <p className="truncate text-[13px] font-bold text-[var(--fg)]">{labels.main}</p>
                         {sub ? (
-                          <>
-                            <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
-                            {noteStr ? (
-                              <p className="mt-0.5 truncate text-[9px] italic leading-tight text-[var(--muted-2)]">{noteStr}</p>
-                            ) : null}
-                          </>
-                        ) : noteStr ? (
-                          <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{noteStr}</p>
+                          <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
+                        ) : null}
+                        {noteStr ? (
+                          <p className="mt-0.5 truncate text-[9px] italic leading-tight text-[var(--muted-2)]">{noteStr}</p>
                         ) : null}
                       </div>
                     </div>

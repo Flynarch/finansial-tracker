@@ -401,18 +401,12 @@ function Calendar() {
                                   <>
                                     <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
                                     {sub ? (
-                                      <>
-                                        <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
-                                          {sub}
-                                        </p>
-                                        {noteStr ? (
-                                          <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
-                                            {noteStr}
-                                          </p>
-                                        ) : null}
-                                      </>
-                                    ) : noteStr ? (
                                       <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
+                                        {sub}
+                                      </p>
+                                    ) : null}
+                                    {noteStr ? (
+                                      <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
                                         {noteStr}
                                       </p>
                                     ) : null}

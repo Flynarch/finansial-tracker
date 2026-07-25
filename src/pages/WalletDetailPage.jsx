@@ -202,14 +202,28 @@ export default function WalletDetailPage() {
 
   const getInitials = (text) => text ? text.substring(0, 2).toUpperCase() : ''
 
+  const counts = useMemo(() => {
+    if (!allTransactions) return { all: 0, expense: 0, income: 0 }
+    let expense = 0, income = 0
+    for (const tx of allTransactions) {
+      if (tx.type === 'expense') expense++
+      else if (tx.type === 'income') income++
+      else if (tx.type === 'transfer') {
+        if (tx.walletId === walletId) expense++
+        if (tx.targetWalletId === walletId) income++
+      }
+    }
+    return { all: allTransactions.length, expense, income }
+  }, [allTransactions, walletId])
+
   if (!wallet) return <div className="min-h-screen bg-[var(--bg)]" />
 
   const updatedAt = wallet.createdAt ? format(new Date(wallet.createdAt), 'dd MMM yyyy, HH:mm') : 'Baru saja'
 
   const TABS = [
-    { id: 'all', label: 'Semua' },
-    { id: 'expense', label: 'Pengeluaran' },
-    { id: 'income', label: 'Pemasukan' },
+    { id: 'all', label: 'Semua', count: counts.all },
+    { id: 'expense', label: 'Pengeluaran', count: counts.expense },
+    { id: 'income', label: 'Pemasukan', count: counts.income },
   ]
 
   return (
@@ -227,32 +241,26 @@ export default function WalletDetailPage() {
               <ChevronLeft size={24} strokeWidth={2.5} />
             </button>
 
-            <div className="flex items-center gap-1.5">
-              <button 
-                onClick={() => {
-                  setNewBalanceRaw(currentBalance.toString())
-                  setIsEditBalanceModalOpen(true)
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95 border border-[var(--border)]"
-                title="Penyesuaian Saldo"
-              >
-                <Edit2 size={13} strokeWidth={2} />
-                <span>Edit Saldo</span>
-              </button>
+            <h2 className="text-sm font-bold tracking-tight text-[var(--fg)]">
+              Detail Akun
+            </h2>
+
+            <div className="flex items-center gap-1">
               <button 
                 onClick={() => setIsDeleteModalOpen(true)} 
-                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
                 title="Hapus Akun"
+                aria-label="Hapus Akun"
               >
-                <Trash2 size={16} strokeWidth={2} />
+                <Trash2 size={18} strokeWidth={2} />
               </button>
             </div>
           </div>
 
-          {/* Wallet Identity Row */}
+          {/* Wallet Digital Pass Card Header */}
           <div className="relative z-10 flex items-center gap-3.5">
-            {/* Logo */}
-            <div className="w-12 h-12 rounded-full bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 border border-[var(--border)] shadow-md">
+            {/* Logo Circle */}
+            <div className="w-12 h-12 rounded-2xl bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 border border-[var(--border)] shadow-sm">
               {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
                 <div className="w-full h-full flex items-center justify-center text-amber-500">
                   <MoneyBagIcon size={24} strokeWidth={2.5} />
@@ -282,8 +290,8 @@ export default function WalletDetailPage() {
                 {wallet.name}
               </h1>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-                  {wallet.institutionType !== 'lainnya' ? wallet.institutionType : 'Akun Manual'}
+                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">
+                  {wallet.institutionType && wallet.institutionType !== 'lainnya' ? wallet.institutionType : 'Akun Manual'}
                 </span>
                 <span className="text-[10px] font-semibold text-[var(--muted-2)]">•</span>
                 <span className="text-[11px] font-bold text-[var(--muted)] tabular-nums">
@@ -321,7 +329,7 @@ export default function WalletDetailPage() {
                 setNewBalanceRaw(currentBalance.toString())
                 setIsEditBalanceModalOpen(true)
               }}
-              className="ft-wallet-action-btn ft-wallet-action-secondary"
+              className="ft-wallet-action-btn ft-wallet-action-secondary flex-1"
             >
               <SlidersHorizontal size={16} strokeWidth={2} />
               <span>Penyesuaian</span>
@@ -368,13 +376,20 @@ export default function WalletDetailPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 rounded-lg py-2 px-2 text-[12px] font-bold transition ${
+                className={`flex-1 rounded-lg py-2 px-2 text-[12px] font-bold transition flex items-center justify-center gap-1.5 ${
                   activeTab === tab.id
                     ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                     : 'text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold tabular-nums ${
+                  activeTab === tab.id
+                    ? 'bg-[var(--bg)] text-[var(--fg)]'
+                    : 'bg-[var(--border)] text-[var(--muted)]'
+                }`}>
+                  {tab.count}
+                </span>
               </button>
             ))}
           </div>
