@@ -384,8 +384,17 @@ export default function WalletDetailPage() {
             )}
           </div>
 
-          {/* Transactions Feed List / Empty State */}
-          <div className="mt-5 space-y-4 pb-4">
+          {/* Transactions Feed Card Wrapper */}
+          <div className="mt-4 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]/40">
+              <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
+                Riwayat Transaksi
+              </h3>
+              <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
+                {filteredTransactions?.length || 0} transaksi
+              </span>
+            </div>
+
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group) => (
                 <div key={group.dateKey} className="space-y-2">
@@ -426,13 +435,13 @@ export default function WalletDetailPage() {
                 </div>
               ))
             ) : (
-              <div className="py-14 text-center">
-                <div className="w-16 h-16 rounded-3xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center mx-auto mb-4 text-[var(--muted-2)]">
-                  <Receipt size={32} strokeWidth={1.5} />
+              <div className="py-10 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center mx-auto mb-3 text-[var(--muted-2)]">
+                  <Receipt size={28} strokeWidth={1.5} />
                 </div>
-                <h3 className="text-base font-bold text-[var(--fg)] mb-1">Kamu belum punya transaksi</h3>
-                <p className="text-xs text-[var(--muted)] max-w-xs mx-auto">
-                  Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} pada akun dompet ini.
+                <h3 className="text-sm font-bold text-[var(--fg)] mb-1">Belum ada transaksi</h3>
+                <p className="text-[11px] text-[var(--muted)] max-w-xs mx-auto">
+                  Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} tercatat di akun ini.
                 </p>
               </div>
             )}
