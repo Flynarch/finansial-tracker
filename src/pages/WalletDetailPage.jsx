@@ -246,7 +246,7 @@ export default function WalletDetailPage() {
 
   return (
     <>
-      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-24 relative">
+      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-32 relative">
         {/* ── 1. Hero Header Banner (Centered Identity Stack) ───────── */}
         <div className="ft-wallet-detail-hero -mx-4 -mt-4 pb-11 pt-4 px-4 text-center relative overflow-hidden">
           {/* Top Nav Bar */}
@@ -351,14 +351,14 @@ export default function WalletDetailPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-2 py-2 text-[11px] font-extrabold transition flex items-center justify-center gap-1 min-w-0 ${
+                className={`rounded-full px-1.5 py-1.5 text-[10px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 min-w-0 ${
                   activeTab === tab.id
                     ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                     : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
                 <span className="truncate">{tab.label}</span>
-                <span className="text-[10px] opacity-75 shrink-0">({tab.count})</span>
+                <span className="text-[9.5px] opacity-75 shrink-0">({tab.count})</span>
               </button>
             ))}
           </div>
@@ -385,7 +385,7 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Transactions Feed Card Wrapper */}
-          <div className="mt-4 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] px-2.5 py-3.5 shadow-sm space-y-3.5">
+          <div className="mt-4 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-4 shadow-sm space-y-3.5">
             <div className="flex items-center justify-between px-1 pb-2 border-b border-[var(--border)]/40">
               <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
                 Riwayat Transaksi
