@@ -1,6 +1,7 @@
 import { addDays, format, parse } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
@@ -267,6 +268,7 @@ const TodoItemCard = memo(function TodoItemCard({
 })
 
 function TodoList() {
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const [activeTab, setActiveTab] = useState('todo')
@@ -972,7 +974,7 @@ function TodoList() {
                 ignoreNextClickRef={ignoreNextClickRef}
                 rafIdRef={rafIdRef}
                 toggleCardComplete={toggleCardComplete}
-                openDetail={openDetail}
+                openDetail={(id) => navigate(`/todos/${id}`)}
                 onDeleteTodoFromCard={onDeleteTodoFromCard}
                 dueStatus={dueStatus}
                 dueBadgeClass={dueBadgeClass}

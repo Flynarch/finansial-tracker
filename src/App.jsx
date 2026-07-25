@@ -22,6 +22,7 @@ const SettingsData = lazy(() => import('./pages/settings/SettingsData'))
 const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
 const AddAccountPage = lazy(() => import('./pages/AddAccountPage'))
 const WalletDetailPage = lazy(() => import('./pages/WalletDetailPage'))
+const TodoDetailPage = lazy(() => import('./pages/TodoDetailPage'))
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
           <Route path="/savings/:id" element={<SavingsDetail />} />
           <Route path="/add-account" element={<AddAccountPage />} />
           <Route path="/wallet/:id" element={<WalletDetailPage />} />
+          <Route path="/todos/:id" element={<TodoDetailPage />} />
           <Route path="/settings" element={<SettingsLayout />}>
             <Route index element={<SettingsHome />} />
             <Route path="security" element={<SettingsSecurity />} />
