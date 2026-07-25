@@ -878,15 +878,14 @@ function TodoList() {
               maxLength={2000}
             />
           </label>
-          <label className="ft-label">
+          <div className="ft-label block">
             {t('todo.field.category')}
-            <div className="relative mt-1">
-                <button
+            <div className="relative mt-1" data-todo-popover="add-category">
+              <button
                 type="button"
-                className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm"
+                className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm cursor-pointer"
                 onClick={() => setAddCategoryOpen((v) => !v)}
                 aria-expanded={addCategoryOpen}
-                  data-todo-popover="add-category"
               >
                 <span>{t(`todo.cat.${addForm.category}`)}</span>
                 <span className={`text-xs text-[var(--muted)] transition-transform ${addCategoryOpen ? 'rotate-180' : ''}`}>⌄</span>
@@ -901,10 +900,12 @@ function TodoList() {
                     <button
                       key={c}
                       type="button"
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition cursor-pointer ${
                         addForm.category === c ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
                       }`}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
                         setAddForm((p) => ({ ...p, category: c }))
                         setAddCategoryOpen(false)
                       }}
@@ -915,7 +916,7 @@ function TodoList() {
                 </div>
               </div>
             </div>
-          </label>
+          </div>
           <label className="ft-label">
             {t('todo.field.due')}
             <input

@@ -342,7 +342,7 @@ export default function TodoDetailPage() {
               {/* Title & Date */}
               <div>
                 <h1
-                  className={`text-lg sm:text-xl font-bold tracking-tight text-[var(--fg)] leading-snug ${
+                  className={`text-lg sm:text-xl font-bold tracking-tight text-[var(--fg)] leading-snug break-words [overflow-wrap:anywhere] ${
                     todo.completed ? 'line-through opacity-60' : ''
                   }`}
                 >
@@ -359,11 +359,11 @@ export default function TodoDetailPage() {
 
               {/* Description Card */}
               {todo.description ? (
-                <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-3.5">
+                <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-3.5 max-h-80 overflow-y-auto">
                   <h3 className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
                     {t('todo.field.description')}
                   </h3>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--fg)]">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--fg)] break-words [overflow-wrap:anywhere]">
                     {todo.description}
                   </p>
                 </div>
@@ -452,7 +452,7 @@ export default function TodoDetailPage() {
                               onChange={() => handleToggleSubTask(row)}
                             />
                             <span
-                              className={`text-sm font-medium transition ${
+                              className={`text-sm font-medium transition min-w-0 break-words [overflow-wrap:anywhere] ${
                                 row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
                               }`}
                             >
