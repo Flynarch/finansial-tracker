@@ -249,7 +249,7 @@ export default function WalletDetailPage() {
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-24 relative">
         {/* ── 1. Hero Header Banner (Centered Identity Stack) ───────── */}
-        <div className="ft-wallet-detail-hero pb-11 pt-4 px-4 text-center relative overflow-hidden">
+        <div className="ft-wallet-detail-hero -mx-4 -mt-4 pb-11 pt-4 px-4 text-center relative overflow-hidden">
           {/* Top Nav Bar */}
           <div className="relative z-10 flex items-center justify-between mb-2">
             <button 
