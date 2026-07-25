@@ -234,7 +234,47 @@ export default function WalletDetailPage() {
     return { all: allTransactions.length, expense, income }
   }, [allTransactions, walletId])
 
+  // Idea B: Dynamic ambient tint color based on wallet category/type/name
+  const heroAmbientStyle = useMemo(() => {
+    if (!wallet) return {}
+    const wType = String(wallet.type || '').toLowerCase()
+    const wName = String(wallet.name || '').toLowerCase()
+
+    let tintRgb = '245, 158, 11' // Amber (Cash / Default)
+    if (wType.includes('bank') || wName.includes('bca') || wName.includes('mandiri') || wName.includes('bni') || wName.includes('bri') || wName.includes('jago')) {
+      tintRgb = '99, 102, 241' // Indigo Blue (Bank)
+    } else if (wType.includes('ewallet') || wType.includes('e-wallet') || wName.includes('dana') || wName.includes('gopay') || wName.includes('ovo') || wName.includes('shopee')) {
+      tintRgb = '20, 184, 166' // Emerald/Cyan (E-Wallet)
+    }
+
+    return {
+      background: `
+        radial-gradient(ellipse at 50% 0%, rgba(${tintRgb}, 0.14) 0%, transparent 68%),
+        linear-gradient(180deg, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%)
+      `
+    }
+  }, [wallet])
+
   if (!wallet) return <div className="min-h-screen bg-[var(--bg)]" />
+
+  const formatAccountType = (type, name) => {
+    const rawType = String(type || '').toLowerCase().trim()
+    const rawName = String(name || '').toLowerCase().trim()
+
+    if (rawType.includes('ewallet') || rawType.includes('e-wallet') || rawType.includes('e wallet') ||
+        rawName.includes('dana') || rawName.includes('gopay') || rawName.includes('ovo') || rawName.includes('shopee')) {
+      return 'E-Wallet'
+    }
+    if (rawType.includes('bank') || rawName.includes('bca') || rawName.includes('mandiri') || rawName.includes('bni') || rawName.includes('bri') || rawName.includes('jago')) {
+      return 'Bank'
+    }
+    if (rawType.includes('cash') || rawType.includes('tunai') || rawName.includes('cash') || rawName.includes('tunai')) {
+      return 'Akun Manual'
+    }
+    if (rawType === 'investasi' || rawType === 'investment') return 'Investasi'
+    if (!type || type === 'lainnya') return 'Akun Manual'
+    return type.charAt(0).toUpperCase() + type.slice(1)
+  }
 
   const updatedAt = wallet.createdAt ? format(new Date(wallet.createdAt), 'dd MMM yyyy, HH:mm') : 'Baru saja'
 
@@ -248,7 +288,10 @@ export default function WalletDetailPage() {
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-32 relative">
         {/* ── 1. Hero Header Banner (Centered Identity Stack) ───────── */}
-        <div className="ft-wallet-detail-hero -mx-4 -mt-4 pb-11 pt-4 px-4 text-center relative overflow-hidden">
+        <div 
+          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-14 pt-4 px-4 text-center relative overflow-hidden"
+          style={heroAmbientStyle}
+        >
           {/* Top Nav Bar */}
           <div className="relative z-10 flex items-center justify-between mb-2">
             <button 
@@ -298,23 +341,23 @@ export default function WalletDetailPage() {
             </div>
           </div>
 
-          {/* Subtitles: Institution & Account Type */}
-          <div className="relative z-10 space-y-1">
-            <p className="text-[11px] font-bold tracking-wider text-[var(--muted)] uppercase">
+          {/* Subtitles: Account Type Pill Badge */}
+          <div className="relative z-10 space-y-1.5 flex flex-col items-center">
+            <h3 className="ft-display text-base font-black tracking-tight text-[var(--fg)]">
               {wallet.name}
-            </p>
-            <p className="text-sm font-extrabold text-[var(--fg)] tracking-tight">
-              {wallet.institutionType && wallet.institutionType !== 'lainnya' ? wallet.institutionType : 'Akun Manual'}
-            </p>
+            </h3>
+            <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-3 py-0.5 text-[10.5px] font-extrabold text-[var(--muted)] shadow-xs">
+              <span>{formatAccountType(wallet.institutionType, wallet.name)}</span>
+            </div>
           </div>
         </div>
 
-        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Idea 1) ─────── */}
+        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Wide & Compact) ─────── */}
         <div className="px-4 -mt-8 relative z-20">
-          <div className="rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-md space-y-2">
+          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-3 sm:p-3.5 shadow-md space-y-1.5">
             {/* Top Row: Label Caption & Edit Pencil Button */}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
+              <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
                 Saldo Akun Saat Ini
               </span>
 
@@ -324,23 +367,23 @@ export default function WalletDetailPage() {
                   setNewBalanceRaw(currentBalance.toString())
                   setIsEditBalanceModalOpen(true)
                 }}
-                className="w-7 h-7 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
+                className="w-6.5 h-6.5 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
                 title="Penyesuaian Saldo"
                 aria-label="Penyesuaian Saldo"
               >
-                <Edit2 size={13} strokeWidth={2} />
+                <Edit2 size={12} strokeWidth={2} />
               </button>
             </div>
 
-            {/* Middle Row: Big Bold Balance Display */}
+            {/* Middle Row: Crisp Bold Balance Display */}
             <div>
-              <p className="ft-display text-2xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
+              <p className="ft-display text-xl sm:text-2xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
                 {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
               </p>
             </div>
 
             {/* Bottom Row: Timestamp Sub-info & Currency Badge */}
-            <div className="pt-1.5 border-t border-[var(--border)]/30 flex items-center justify-between text-[10px] text-[var(--muted-2)]">
+            <div className="pt-1 border-t border-[var(--border)]/30 flex items-center justify-between text-[9.5px] sm:text-[10px] text-[var(--muted-2)]">
               <span>Terakhir update {updatedAt}</span>
               <span className="font-extrabold text-[var(--muted)] uppercase tracking-wider">
                 {wallet.currency || defaultCurrency}
@@ -457,15 +500,6 @@ export default function WalletDetailPage() {
           </div>
         </div>
 
-        {/* ── 4. Floating Action Button (FAB) ───────────────────────── */}
-        <button
-          onClick={() => setIsQuickAddOpen(true)}
-          className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xl flex items-center justify-center transition-transform active:scale-95 focus:outline-none"
-          aria-label="Tambah Transaksi"
-          title="Tambah Transaksi"
-        >
-          <Plus size={26} strokeWidth={2.5} />
-        </button>
       </div>
 
       {/* Modals */}

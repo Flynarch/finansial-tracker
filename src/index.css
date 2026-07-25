@@ -1253,16 +1253,12 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 }
 
 html:not([data-theme="light"]) .ft-wallet-detail-hero {
-  background: 
-    radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 70%),
-    linear-gradient(180deg, #182134 0%, #0f1a2e 50%, #0b1320 100%);
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 50%, #020617 100%);
   border-color: rgba(94, 234, 212, 0.12);
 }
 
 [data-theme="light"] .ft-wallet-detail-hero {
-  background: 
-    radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 65%),
-    linear-gradient(180deg, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
   border-color: rgba(15, 23, 42, 0.06);
 }
 
