@@ -200,7 +200,6 @@ export default function TodoDetailPage() {
     const next = !todo.completed
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.todos.update(todoId, { completed: next })
-      // Simultaneously mark all subtasks as checked (if complete) or unchecked (if incomplete)
       await db.sub_tasks.where('todoId').equals(todoId).modify({ checked: next })
     })
   }, [todo, todoId])
@@ -546,7 +545,7 @@ export default function TodoDetailPage() {
               </div>
             )}
 
-            <label className="ft-label block">
+            <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.title')}</span>
               <input
                 className="ft-field appearance-none text-base md:text-sm mt-1.5"
@@ -555,9 +554,9 @@ export default function TodoDetailPage() {
                 required
                 maxLength={200}
               />
-            </label>
+            </div>
 
-            <label className="ft-label block">
+            <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.description')}</span>
               <textarea
                 className="ft-field min-h-[5rem] resize-y text-base md:text-sm mt-1.5 leading-relaxed"
@@ -565,17 +564,16 @@ export default function TodoDetailPage() {
                 onChange={(e) => setEditDraft((p) => ({ ...p, description: e.target.value }))}
                 maxLength={2000}
               />
-            </label>
+            </div>
 
-            <label className="ft-label block">
+            <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.category')}</span>
-              <div className="relative mt-1.5">
+              <div className="relative mt-1.5" data-todo-popover="detail-category">
                 <button
                   type="button"
-                  className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm"
+                  className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm cursor-pointer"
                   onClick={() => setCategoryOpen((v) => !v)}
                   aria-expanded={categoryOpen}
-                  data-todo-popover="detail-category"
                 >
                   <span className="flex items-center gap-2">
                     {getCategoryIcon(editDraft.category)}
@@ -593,10 +591,12 @@ export default function TodoDetailPage() {
                       <button
                         key={c}
                         type="button"
-                        className={`flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition ${
+                        className={`flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
                           editDraft.category === c ? 'bg-[var(--fg)] text-[var(--bg)] font-bold' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
                         }`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
                           setEditDraft((p) => ({ ...p, category: c }))
                           setCategoryOpen(false)
                         }}
@@ -608,9 +608,9 @@ export default function TodoDetailPage() {
                   </div>
                 </div>
               </div>
-            </label>
+            </div>
 
-            <label className="ft-label block">
+            <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.due')}</span>
               <input
                 type="date"
@@ -618,16 +618,16 @@ export default function TodoDetailPage() {
                 value={editDraft.dueDate}
                 onChange={(e) => setEditDraft((p) => ({ ...p, dueDate: e.target.value }))}
               />
-            </label>
+            </div>
 
-            <label className="ft-label block">
+            <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.priority')}</span>
               <div className="mt-1.5 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5">
                 {PRIORITIES.map((p) => (
                   <button
                     key={p}
                     type="button"
-                    className={`rounded-lg px-2 py-2 text-xs font-bold transition active:scale-95 ${
+                    className={`rounded-lg px-2 py-2 text-xs font-bold transition active:scale-95 cursor-pointer ${
                       editDraft.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                     }`}
                     onClick={() => setEditDraft((s) => ({ ...s, priority: p }))}
@@ -636,7 +636,7 @@ export default function TodoDetailPage() {
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
 
             <div className="flex items-center justify-end gap-2.5 border-t border-[var(--border)] pt-4 mt-3">
               <Button
