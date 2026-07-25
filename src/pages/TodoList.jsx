@@ -775,7 +775,7 @@ function TodoList() {
         }`}
       >
         <header className="flex items-center justify-between px-1">
-          <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">{t('todo.pageTitle')}</h1>
+          <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)]">{t('todo.pageTitle')}</h1>
           {activeTab === 'todo' && (
             <button
               type="button"
