@@ -343,56 +343,59 @@ export default function WalletDetailPage() {
           </div>
         </div>
 
-        {/* ── 3. Content Section: Pill Filter Tabs, Search & Feed ─────── */}
-        <div className="px-4 mt-6">
-          {/* Rounded Pill Tabs with Transaction Counts */}
-          <div className="grid grid-cols-3 gap-1.5 w-full">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-1.5 py-1.5 text-[10px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 min-w-0 ${
-                  activeTab === tab.id
-                    ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
-                    : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
-                }`}
-              >
-                <span className="truncate">{tab.label}</span>
-                <span className="text-[9.5px] opacity-75 shrink-0">({tab.count})</span>
-              </button>
-            ))}
-          </div>
+        {/* ── 3. Content Section: Unified Transaction Feed Card ─────── */}
+        <div className="px-4 mt-3">
+          {/* Transactions Feed Card Wrapper with Integrated Controls */}
+          <div className="mt-2 -mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-3 sm:p-4 shadow-sm space-y-3.5">
+            {/* Unified Card Header & Control Section */}
+            <div className="space-y-2.5 pb-3 border-b border-[var(--border)]/40">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
+                  Riwayat Transaksi
+                </h3>
+                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
+                  {filteredTransactions?.length || 0} transaksi
+                </span>
+              </div>
 
-          {/* Real-time Search Input */}
-          <div className="relative mt-3">
-            <Search size={15} strokeWidth={2} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari transaksi (catatan, kategori, nominal)..."
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 pl-9 pr-8 text-xs text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)]"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+              {/* Integrated Search Input */}
+              <div className="relative">
+                <Search size={14} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari transaksi (catatan, kategori, nominal)..."
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 pl-8 pr-8 text-xs text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)]"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
 
-          {/* Transactions Feed Card Wrapper */}
-          <div className="mt-4 -mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-4 shadow-sm space-y-3.5">
-            <div className="flex items-center justify-between px-1 pb-2 border-b border-[var(--border)]/40">
-              <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
-                Riwayat Transaksi
-              </h3>
-              <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
-                {filteredTransactions?.length || 0} transaksi
-              </span>
+              {/* Integrated 3-Column Pill Filter Tabs */}
+              <div className="grid grid-cols-3 gap-1.5 w-full">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`rounded-xl px-1.5 py-1.5 text-[10px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 min-w-0 ${
+                      activeTab === tab.id
+                        ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
+                        : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                    }`}
+                  >
+                    <span className="truncate">{tab.label}</span>
+                    <span className="text-[9.5px] opacity-75 shrink-0">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {groupedTransactions && groupedTransactions.length > 0 ? (
