@@ -314,14 +314,9 @@ export default function WalletDetailPage() {
           <div className="rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-4 shadow-md space-y-2">
             {/* Top Row: Label Caption & Edit Pencil Button */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[var(--muted)]">
-                <div className="w-5 h-5 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-amber-500">
-                  <MoneyBagIcon size={12} strokeWidth={2.5} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
-                  Saldo Akun Saat Ini
-                </span>
-              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
+                Saldo Akun Saat Ini
+              </span>
 
               <button
                 type="button"
