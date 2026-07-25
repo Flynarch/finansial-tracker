@@ -197,7 +197,12 @@ export default function TodoDetailPage() {
 
   const handleToggleComplete = useCallback(async () => {
     if (!todo || !todoId) return
-    await db.todos.update(todoId, { completed: !todo.completed })
+    const next = !todo.completed
+    await db.transaction('rw', db.todos, db.sub_tasks, async () => {
+      await db.todos.update(todoId, { completed: next })
+      // Simultaneously mark all subtasks as checked (if complete) or unchecked (if incomplete)
+      await db.sub_tasks.where('todoId').equals(todoId).modify({ checked: next })
+    })
   }, [todo, todoId])
 
   const handleDeleteTodo = useCallback(async () => {
