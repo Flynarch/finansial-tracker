@@ -16,7 +16,7 @@ import IdeaBoard from './IdeaBoard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import useSwipeAction from '../hooks/useSwipeAction'
 
-const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'lainnya']
+const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
 const PRIORITIES = ['low', 'medium', 'high']
 const TODO_SORT_PREF_KEY = 'todo_sort_pref'
 const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'

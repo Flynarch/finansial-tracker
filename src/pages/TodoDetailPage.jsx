@@ -21,13 +21,19 @@ import {
   ShoppingBag,
   Landmark,
   Folder,
+  Briefcase,
+  User,
+  HeartPulse,
+  GraduationCap,
+  Home,
+  Car,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 
-const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'lainnya']
+const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
 const PRIORITIES = ['low', 'medium', 'high']
 
 function getCategoryIcon(cat) {
@@ -40,6 +46,18 @@ function getCategoryIcon(cat) {
       return <ShoppingBag size={14} className="text-sky-500" />
     case 'tabungan':
       return <Landmark size={14} className="text-indigo-500" />
+    case 'pekerjaan':
+      return <Briefcase size={14} className="text-violet-500" />
+    case 'pribadi':
+      return <User size={14} className="text-pink-500" />
+    case 'kesehatan':
+      return <HeartPulse size={14} className="text-rose-500" />
+    case 'pendidikan':
+      return <GraduationCap size={14} className="text-cyan-500" />
+    case 'rumah':
+      return <Home size={14} className="text-orange-500" />
+    case 'transportasi':
+      return <Car size={14} className="text-teal-500" />
     default:
       return <Folder size={14} className="text-[var(--muted)]" />
   }

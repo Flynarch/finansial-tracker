@@ -318,9 +318,12 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
         
         if (result.action === 'create') {
+          const validCategories = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
+          const aiCategory = result.category && validCategories.includes(result.category) ? result.category : 'lainnya'
           const todoId = await db.todos.add({
             title: result.title,
-            category: 'lainnya',
+            description: result.description || '',
+            category: aiCategory,
             dueDate: result.dueDate || format(new Date(), 'yyyy-MM-dd'),
             priority: result.priority || 'medium',
             completed: false,

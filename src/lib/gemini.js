@@ -133,16 +133,18 @@ const getTools = () => ([
       },
       {
         name: "manage_todo",
-        description: "Kelola (buat/selesaikan) To-Do List/Tugas pengguna.",
+        description: "Kelola (buat/selesaikan) To-Do List/Tugas pengguna. Saat membuat tugas baru, SELALU coba isi description, category, subTasks, dan priority agar tugas langsung lengkap dan terstruktur.",
         parameters: {
           type: "OBJECT",
           properties: {
             action: { type: "STRING", enum: ["create", "complete"], description: "create untuk buat tugas baru, complete untuk menandai selesai" },
             title: { type: "STRING", description: "Nama tugas (misal: 'Bayar Listrik')" },
+            description: { type: "STRING", description: "Deskripsi/catatan detail tugas. Isi dengan konteks tambahan, langkah-langkah, atau catatan penting terkait tugas ini. Boleh multi-baris." },
+            category: { type: "STRING", enum: ["tagihan", "investasi", "belanja", "tabungan", "pekerjaan", "pribadi", "kesehatan", "pendidikan", "rumah", "transportasi", "lainnya"], description: "Kategori tugas. Pilih yang paling sesuai: tagihan (Bills), investasi (Investment), belanja (Shopping), tabungan (Savings), pekerjaan (Work), pribadi (Personal), kesehatan (Health), pendidikan (Education), rumah (Household), transportasi (Transport), lainnya (Other)." },
             dueDate: { type: "STRING", description: "Tenggat waktu (YYYY-MM-DD)" },
             reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '15:30')" },
             priority: { type: "STRING", enum: ["low", "medium", "high"], description: "Prioritas tugas" },
-            subTasks: { type: "ARRAY", items: { type: "STRING" }, description: "Daftar sub-tugas" },
+            subTasks: { type: "ARRAY", items: { type: "STRING" }, description: "Daftar sub-tugas/checklist. Pecah tugas besar menjadi langkah-langkah kecil agar mudah dieksekusi. Contoh: ['Cek tagihan', 'Siapkan dana', 'Bayar via app']" },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
@@ -412,7 +414,7 @@ ${buildCategoryContext(locale)}`
       }
 
       if (fnCall.name === 'manage_todo') {
-        return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do...", chips: fnCall.args.suggestedChips }
+        return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, description: fnCall.args.description, category: fnCall.args.category, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_budget') {
