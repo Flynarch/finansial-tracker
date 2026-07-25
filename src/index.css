@@ -1329,3 +1329,27 @@ html:not([data-theme="light"]) .ft-wallet-detail-hero {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ── Android & Mobile WebView 60 FPS Performance Optimizations ───── */
+/* Force dedicated GPU compositing layer for interactive elements & cards to prevent main-thread layout thrashing */
+.ft-interactive-card,
+.ft-todo-card,
+.ft-item-card,
+section,
+[role="button"] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* On mobile viewports (Android WebView), disable realtime GPU backdrop-filter blurs */
+/* Realtime blurs cause heavy frame-drops during list scrolling. Solid/opaque backgrounds keep scrolling at 60fps. */
+@media (max-width: 768px) {
+  .backdrop-blur,
+  .backdrop-blur-md,
+  .backdrop-blur-sm,
+  .backdrop-blur-xs,
+  .backdrop-blur-lg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
