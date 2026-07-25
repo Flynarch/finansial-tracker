@@ -379,20 +379,20 @@ export default function WalletDetailPage() {
                 )}
               </div>
 
-              {/* Integrated 3-Column Pill Filter Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 w-full">
+              {/* Integrated Left-Aligned Inline Filter Pills */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-xl px-1.5 py-1.5 text-[10px] sm:text-[11px] font-black transition flex items-center justify-center gap-1 min-w-0 ${
+                    className={`rounded-xl px-3 py-1.5 text-[10.5px] sm:text-xs font-extrabold transition flex items-center gap-1 shrink-0 ${
                       activeTab === tab.id
                         ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                         : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                     }`}
                   >
-                    <span className="truncate">{tab.label}</span>
-                    <span className="text-[9.5px] opacity-75 shrink-0">({tab.count})</span>
+                    <span>{tab.label}</span>
+                    <span className="text-[9.5px] opacity-75">({tab.count})</span>
                   </button>
                 ))}
               </div>
