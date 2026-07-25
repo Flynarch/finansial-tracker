@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
-import AddAccountPage from '../../pages/AddAccountPage'
+
+const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
 
 const PROGRESS_KEY = 'ft_onboarding_progress'
 const TOTAL_STEPS = 5 // welcome, username, balance, features, confirm
@@ -543,11 +544,13 @@ export default function OnboardingFlow() {
           {/* ── Step 2: Tambah Akun / Wallet ────────────────── */}
           {step === 2 && (
             <div className="flex flex-col -mx-6 -my-8 h-screen">
-              <AddAccountPage
-                isOnboarding
-                onBack={handleBack}
-                onSuccess={() => goTo(3)}
-              />
+              <Suspense fallback={<div className="flex-1 animate-pulse bg-[var(--bg)]" />}>
+                <AddAccountPage
+                  isOnboarding
+                  onBack={handleBack}
+                  onSuccess={() => goTo(3)}
+                />
+              </Suspense>
             </div>
           )}
 
