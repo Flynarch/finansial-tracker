@@ -229,179 +229,106 @@ export default function WalletDetailPage() {
   return (
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-20">
-        {/* ── Hero Digital Wallet Banner ─────────────────────────────── */}
-        <div className="ft-wallet-detail-hero">
-          {/* Top Nav Bar */}
-          <div className="relative z-10 flex items-center justify-between mb-5">
-            <button 
-              onClick={() => navigate('/dashboard')} 
-              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
-              aria-label="Kembali"
-            >
-              <ChevronLeft size={24} strokeWidth={2.5} />
-            </button>
+        {/* ── Simplified Sticky Header ───────────────────────────────────── */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)]/40">
+          <button 
+            onClick={() => navigate('/dashboard')} 
+            className="flex items-center justify-center w-9 h-9 -ml-1.5 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
+            aria-label="Kembali"
+          >
+            <ChevronLeft size={22} strokeWidth={2.5} />
+          </button>
 
-            <h2 className="text-sm font-bold tracking-tight text-[var(--fg)]">
-              Detail Akun
-            </h2>
-
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => setIsDeleteModalOpen(true)} 
-                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
-                title="Hapus Akun"
-                aria-label="Hapus Akun"
-              >
-                <Trash2 size={18} strokeWidth={2} />
-              </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6.5 h-6.5 rounded-lg bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 border border-[var(--border)]">
+              {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
+                <MoneyBagIcon size={14} strokeWidth={2.5} className="text-amber-500" />
+              ) : wallet.logoUrl ? (
+                <img src={wallet.logoUrl} alt={wallet.name} className="w-full h-full object-contain p-0.5" />
+              ) : (
+                <span className="text-[9px] font-bold text-[var(--fg)]">{getInitials(wallet.name)}</span>
+              )}
             </div>
+            <span className="font-extrabold text-sm text-[var(--fg)] truncate max-w-[150px]">{wallet.name}</span>
           </div>
 
-          {/* Wallet Digital Pass Card Header */}
-          <div className="relative z-10 flex items-center gap-3.5">
-            {/* Logo Circle */}
-            <div className="w-12 h-12 rounded-2xl bg-[var(--field-bg)] flex items-center justify-center overflow-hidden shrink-0 border border-[var(--border)] shadow-sm">
-              {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
-                <div className="w-full h-full flex items-center justify-center text-amber-500">
-                  <MoneyBagIcon size={24} strokeWidth={2.5} />
-                </div>
-              ) : wallet.logoUrl ? (
-                <img 
-                  src={wallet.logoUrl} 
-                  alt={wallet.name} 
-                  className="w-full h-full object-contain p-1.5"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div 
-                className="w-full h-full flex items-center justify-center font-extrabold text-[15px] text-[var(--fg)]"
-                style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || wallet.logoUrl ? 'none' : 'flex' }}
-              >
-                {getInitials(wallet.name)}
-              </div>
-            </div>
+          <button 
+            onClick={() => setIsDeleteModalOpen(true)} 
+            className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+            title="Hapus Akun"
+            aria-label="Hapus Akun"
+          >
+            <Trash2 size={17} strokeWidth={2} />
+          </button>
+        </div>
 
-            {/* Title & Metadata Badges */}
-            <div className="flex-1 min-w-0">
-              <h1 className="ft-display text-xl font-extrabold text-[var(--fg)] tracking-tight truncate leading-snug">
-                {wallet.name}
-              </h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {/* ── Main Balance & Action Card ────────────────────────────── */}
+        <div className="px-4 pt-3">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm space-y-3.5">
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-[var(--muted-2)] uppercase">
+                <span>Saldo Akun</span>
+                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9px] font-extrabold text-[var(--muted)]">
                   {wallet.institutionType && wallet.institutionType !== 'lainnya' ? wallet.institutionType : 'Akun Manual'}
                 </span>
-                <span className="text-[10px] font-semibold text-[var(--muted-2)]">•</span>
-                <span className="text-[11px] font-bold text-[var(--muted)] tabular-nums">
-                  {wallet.currency || defaultCurrency}
+              </div>
+              <p className="ft-display mt-1 text-[2rem] leading-none font-black tracking-tight tabular-nums text-[var(--fg)] break-all">
+                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
+              </p>
+              <div className="mt-3 flex items-center justify-between text-[11px] font-bold border-t border-[var(--border)]/40 pt-2 text-[var(--muted)]">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <ArrowDownLeft size={13} strokeWidth={2.5} />
+                  +{formatCurrency(monthIncome, wallet.currency || defaultCurrency)}
+                </span>
+                <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                  <ArrowUpRight size={13} strokeWidth={2.5} />
+                  -{formatCurrency(monthExpense, wallet.currency || defaultCurrency)}
                 </span>
               </div>
             </div>
-          </div>
 
-          {/* Clean Integrated Balance Section */}
-          <div className="relative z-10 mt-5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-              Saldo Saat Ini
-            </p>
-            <p className="ft-display mt-1 text-[2.25rem] leading-[1.05] font-black tracking-tight tabular-nums text-[var(--fg)] break-all">
-              {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
-            </p>
-            <p className="text-[10px] font-medium text-[var(--muted-2)] mt-1.5">
-              Diperbarui {updatedAt}
-            </p>
-          </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsQuickAddOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-bold shadow-sm transition active:scale-95"
+              >
+                <Plus size={16} strokeWidth={2.5} />
+                <span>Transaksi</span>
+              </button>
 
-          {/* Hero Quick Action Buttons */}
-          <div className="relative z-10 mt-5 flex gap-2.5">
-            <button
-              onClick={() => setIsQuickAddOpen(true)}
-              className="ft-wallet-action-btn ft-wallet-action-primary flex-1"
-            >
-              <Plus size={18} strokeWidth={2.5} />
-              <span>Transaksi</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setNewBalanceRaw(currentBalance.toString())
-                setIsEditBalanceModalOpen(true)
-              }}
-              className="ft-wallet-action-btn ft-wallet-action-secondary flex-1"
-            >
-              <SlidersHorizontal size={16} strokeWidth={2} />
-              <span>Penyesuaian</span>
-            </button>
-          </div>
-
-          {/* Monthly Stats Summary */}
-          <div className="relative z-10 mt-4 flex gap-2">
-            <div className="ft-stat-pill ft-stat-pill--income">
-              <div className="ft-stat-pill-icon">
-                <ArrowDownLeft size={16} strokeWidth={2.5} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-income)' }}>
-                  Pemasukan
-                </p>
-                <p className="text-[11px] font-black tabular-nums truncate" style={{ color: 'var(--status-income)' }}>
-                  {formatCurrency(monthIncome, wallet.currency || defaultCurrency)}
-                </p>
-              </div>
-            </div>
-
-            <div className="ft-stat-pill ft-stat-pill--expense">
-              <div className="ft-stat-pill-icon">
-                <ArrowUpRight size={16} strokeWidth={2.5} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-expense)' }}>
-                  Pengeluaran
-                </p>
-                <p className="text-[11px] font-black tabular-nums truncate" style={{ color: 'var(--status-expense)' }}>
-                  {formatCurrency(monthExpense, wallet.currency || defaultCurrency)}
-                </p>
-              </div>
+              <button
+                onClick={() => {
+                  setNewBalanceRaw(currentBalance.toString())
+                  setIsEditBalanceModalOpen(true)
+                }}
+                className="flex items-center justify-center gap-1 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-xs font-bold transition active:scale-95"
+                title="Penyesuaian Saldo"
+              >
+                <SlidersHorizontal size={14} strokeWidth={2} />
+                <span>Penyesuaian</span>
+              </button>
             </div>
           </div>
         </div>
 
         {/* ── Content Section: Filters & Transactions Feed ─────────── */}
-        <div className="px-4 mt-5">
+        <div className="px-4 mt-4">
           {/* Tab Filters */}
-          <div className="flex gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+          <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 rounded-lg py-2 px-2 text-[12px] font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 rounded-lg py-1.5 px-2 text-[12px] font-bold transition flex items-center justify-center gap-1 ${
                   activeTab === tab.id
                     ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                     : 'text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold tabular-nums ${
-                  activeTab === tab.id
-                    ? 'bg-[var(--bg)] text-[var(--fg)]'
-                    : 'bg-[var(--border)] text-[var(--muted)]'
-                }`}>
-                  {tab.count}
-                </span>
+                <span className="text-[10px] opacity-70">({tab.count})</span>
               </button>
             ))}
-          </div>
-
-          {/* Header Row: Transaction Count */}
-          <div className="mt-5 mb-1 flex items-center justify-between px-1">
-            <h3 className="ft-display text-base font-extrabold text-[var(--fg)] tracking-tight">
-              Riwayat Transaksi
-            </h3>
-            <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]">
-              {filteredTransactions?.length || 0} transaksi
-            </span>
           </div>
 
           {/* Transactions Feed List (Grouped Timeline) */}
