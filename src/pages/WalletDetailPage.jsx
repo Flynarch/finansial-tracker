@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Eye, EyeOff, Search } from 'lucide-react'
+import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Search } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
@@ -38,7 +38,6 @@ export default function WalletDetailPage() {
   const defaultCurrency = useSettingsStore(state => state.defaultCurrency)
   
   const [activeTab, setActiveTab] = useState('all') // all, expense, income
-  const [showBalance, setShowBalance] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
@@ -321,38 +320,26 @@ export default function WalletDetailPage() {
             {/* Middle Amount & Timestamp */}
             <div className="flex-1 min-w-0">
               <p className="ft-display text-xl font-black text-[var(--fg)] tabular-nums truncate leading-tight">
-                {showBalance ? formatCurrency(currentBalance, wallet.currency || defaultCurrency) : '••••••••'}
+                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
               </p>
               <p className="text-[10px] font-medium text-[var(--muted-2)] mt-0.5 truncate">
                 Terakhir update {updatedAt}
               </p>
             </div>
 
-            {/* Right Privacy Eye & Edit Pencil Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowBalance(prev => !prev)}
-                className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
-                title={showBalance ? "Sembunyikan Saldo" : "Tampilkan Saldo"}
-                aria-label={showBalance ? "Sembunyikan Saldo" : "Tampilkan Saldo"}
-              >
-                {showBalance ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setNewBalanceRaw(currentBalance.toString())
-                  setIsEditBalanceModalOpen(true)
-                }}
-                className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
-                title="Penyesuaian Saldo"
-                aria-label="Penyesuaian Saldo"
-              >
-                <Edit2 size={16} strokeWidth={2} />
-              </button>
-            </div>
+            {/* Right Edit Pencil Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewBalanceRaw(currentBalance.toString())
+                setIsEditBalanceModalOpen(true)
+              }}
+              className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
+              title="Penyesuaian Saldo"
+              aria-label="Penyesuaian Saldo"
+            >
+              <Edit2 size={16} strokeWidth={2} />
+            </button>
           </div>
         </div>
 
