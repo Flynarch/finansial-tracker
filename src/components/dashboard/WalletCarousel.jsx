@@ -226,7 +226,7 @@ export default function WalletCarousel({
               </div>
               <div className="min-w-0 flex flex-col text-left">
                 <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] leading-tight">Akun Baru</span>
-                <span className="ft-wallet-mini-balance" style={{ color: 'var(--muted)', fontSize: '12px' }}>+ Tambah</span>
+                <span className="ft-wallet-mini-balance" style={{ color: 'var(--muted)', fontSize: '12px' }}>Tambah</span>
               </div>
             </button>
           </div>

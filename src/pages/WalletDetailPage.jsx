@@ -321,7 +321,7 @@ export default function WalletDetailPage() {
               className="ft-wallet-action-btn ft-wallet-action-primary flex-1"
             >
               <Plus size={18} strokeWidth={2.5} />
-              <span>+ Transaksi</span>
+              <span>Transaksi</span>
             </button>
             
             <button
