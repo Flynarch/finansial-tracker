@@ -293,14 +293,6 @@ function TodoList() {
     priority: 'medium',
   }))
 
-  const [detailId, setDetailId] = useState(null)
-  const [detailEdit, setDetailEdit] = useState(false)
-  const [detailCategoryOpen, setDetailCategoryOpen] = useState(false)
-  const [detailSubTasksLoading, setDetailSubTasksLoading] = useState(false)
-  const [detailSubTasksLeaving, setDetailSubTasksLeaving] = useState(false)
-  const [detailHydrating, setDetailHydrating] = useState(false)
-  const [detailDraft, setDetailDraft] = useState(null)
-  const [newSubLabel, setNewSubLabel] = useState('')
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTodoId, setDeleteTodoId] = useState(null)
 
@@ -313,7 +305,6 @@ function TodoList() {
     swipeDxRef,
     ignoreNextClickRef,
   } = useSwipeAction()
-  const detailLoadStartedAtRef = useRef(0)
   const rafIdRef = useRef(null)
   const [notifPermissionAsked, setNotifPermissionAsked] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -322,13 +313,6 @@ function TodoList() {
 
   const todos = useLiveQuery(() => db.todos.orderBy('createdAt').reverse().toArray(), [])
   const allSubTasks = useLiveQuery(() => db.sub_tasks.toArray(), [])
-  const detailSubTasks = useLiveQuery(
-    () => {
-      if (!detailId) return Promise.resolve([])
-      return db.sub_tasks.where('todoId').equals(Number(detailId)).sortBy('id')
-    },
-    [detailId],
-  )
   const isDataReady = Array.isArray(todos) && Array.isArray(allSubTasks)
 
   const subProgressByTodo = useMemo(() => {
@@ -397,11 +381,6 @@ function TodoList() {
     return next
   }, [filteredTodos, sortPref])
 
-  const selectedTodo = useMemo(() => {
-    if (!detailId || !todos) return null
-    return todos.find((row) => Number(row?.id) === Number(detailId)) || null
-  }, [detailId, todos])
-
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(frameId)
@@ -411,7 +390,6 @@ function TodoList() {
     const closePopovers = () => {
       setSortOpen(false)
       setAddCategoryOpen(false)
-      setDetailCategoryOpen(false)
     }
     window.addEventListener('scroll', closePopovers, { passive: true })
     return () => window.removeEventListener('scroll', closePopovers)
@@ -423,10 +401,8 @@ function TodoList() {
       if (!(target instanceof HTMLElement)) return
       if (target.closest('[data-todo-popover="sort"]')) return
       if (target.closest('[data-todo-popover="add-category"]')) return
-      if (target.closest('[data-todo-popover="detail-category"]')) return
       setSortOpen(false)
       setAddCategoryOpen(false)
-      setDetailCategoryOpen(false)
     }
     window.addEventListener('pointerdown', onPointerDown, { passive: true })
     return () => window.removeEventListener('pointerdown', onPointerDown)
@@ -436,20 +412,6 @@ function TodoList() {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(TODO_SORT_PREF_KEY, sortPref)
   }, [sortPref])
-
-  useEffect(() => {
-    if (!detailId) return
-    if (!Array.isArray(detailSubTasks)) return
-    const elapsed = Date.now() - detailLoadStartedAtRef.current
-    const MIN_LOADING_MS = 120
-    const waitMs = Math.max(0, MIN_LOADING_MS - elapsed)
-    window.setTimeout(() => {
-      setDetailSubTasksLoading(false)
-      setDetailSubTasksLeaving(true)
-      window.setTimeout(() => setDetailSubTasksLeaving(false), 140)
-      window.setTimeout(() => setDetailHydrating(false), 0)
-    }, waitMs)
-  }, [detailId, detailSubTasks])
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -601,82 +563,12 @@ function TodoList() {
     setAddCategoryOpen(false)
   }
 
-  const openDetail = useCallback((id) => {
-    detailLoadStartedAtRef.current = Date.now()
-    setDetailSubTasksLoading(true)
-    setDetailSubTasksLeaving(false)
-    setDetailHydrating(true)
-    setDetailId(id)
-    setDetailEdit(false)
-    setDetailDraft(null)
-    setNewSubLabel('')
-  }, [])
-
   const onDeleteTodoFromCard = useCallback((todoId) => {
     setDeleteTodoId(Number(todoId))
     setDeleteConfirmOpen(true)
     ignoreNextClickRef.current = true
     setTimeout(() => { ignoreNextClickRef.current = false }, 100)
   }, [ignoreNextClickRef])
-
-  const closeDetail = () => {
-    setDetailId(null)
-    setDetailEdit(false)
-    setDetailDraft(null)
-    setNewSubLabel('')
-    setDetailCategoryOpen(false)
-    setSortOpen(false)
-    setDetailSubTasksLoading(false)
-    setDetailSubTasksLeaving(false)
-    setDetailHydrating(false)
-  }
-
-  const startDetailEdit = () => {
-    if (!selectedTodo) return
-    setDetailDraft({
-      title: selectedTodo.title || '',
-      description: selectedTodo.description || '',
-      category: selectedTodo.category || 'lainnya',
-      dueDate: selectedTodo.dueDate || '',
-      priority: selectedTodo.priority || 'medium',
-    })
-    setDetailEdit(true)
-    setDetailCategoryOpen(false)
-    setDetailSubTasksLoading(false)
-    setDetailHydrating(false)
-  }
-
-  const saveDetailEdit = async () => {
-    if (!detailId || !detailDraft) return
-    const title = String(detailDraft.title || '').trim()
-    if (!title) return
-    const id = Number(detailId)
-    const dueDate = detailDraft.dueDate || ''
-    const nextData = {
-      title,
-      description: String(detailDraft.description || '').trim(),
-      category: detailDraft.category,
-      dueDate,
-      priority: detailDraft.priority,
-    }
-    await db.todos.update(id, nextData)
-    const stillCompleted = Boolean(selectedTodo?.completed)
-    if (stillCompleted) {
-      void cancelTodoDueNotifications(id)
-    } else if (dueDate) {
-      void scheduleTodoDueNotifications({ id, ...nextData })
-    } else {
-      void cancelTodoDueNotifications(id)
-    }
-    setDetailEdit(false)
-    setDetailDraft(null)
-  }
-
-  const cancelDetailEdit = () => {
-    setDetailEdit(false)
-    setDetailDraft(null)
-    setDetailCategoryOpen(false)
-  }
 
   const handleAddTodo = async (event) => {
     event.preventDefault()
@@ -715,21 +607,6 @@ function TodoList() {
     }
   }, [cancelTodoDueNotifications, scheduleTodoDueNotifications])
 
-  const toggleDetailComplete = async () => {
-    if (!selectedTodo) return
-    const id = Number(selectedTodo.id)
-    const next = !selectedTodo.completed
-    await db.transaction('rw', db.todos, db.sub_tasks, async () => {
-      await db.todos.update(id, { completed: next })
-      await db.sub_tasks.where('todoId').equals(id).modify({ checked: next })
-    })
-    if (next) {
-      void cancelTodoDueNotifications(id)
-    } else if (selectedTodo?.dueDate) {
-      void scheduleTodoDueNotifications({ id, title: selectedTodo.title, dueDate: selectedTodo.dueDate })
-    }
-  }
-
   const removeTodo = async () => {
     if (!deleteTodoId) return
     const id = Number(deleteTodoId)
@@ -741,27 +618,6 @@ function TodoList() {
     })
     setDeleteConfirmOpen(false)
     setDeleteTodoId(null)
-    if (String(detailId) === String(deleteTodoId)) closeDetail()
-  }
-
-  const addSubTask = async () => {
-    if (!detailId) return
-    const label = String(newSubLabel || '').trim()
-    if (!label) return
-    await db.sub_tasks.add({
-      todoId: Number(detailId),
-      label,
-      checked: false,
-    })
-    setNewSubLabel('')
-  }
-
-  const toggleSubTask = async (row) => {
-    await db.sub_tasks.update(row.id, { checked: !row.checked })
-  }
-
-  const deleteSubTask = async (id) => {
-    await db.sub_tasks.delete(id)
   }
 
   const pillClass = (active) =>
@@ -1084,255 +940,6 @@ function TodoList() {
             <Button type="submit">{t('todo.save')}</Button>
           </div>
         </form>
-      </Modal>
-
-      <Modal isOpen={Boolean(detailId && selectedTodo)} title={t('todo.detailTitle')} onClose={closeDetail}>
-        {selectedTodo && detailDraft === null && !detailEdit ? (
-          <div className="relative">
-            {/* Keep layout stable; show loading as overlay (no jump) */}
-            <div
-              className={`pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-xl bg-[var(--panel-strong)]/95 transition-opacity duration-150 ${
-                detailHydrating ? 'opacity-100' : 'opacity-0'
-              }`}
-              aria-hidden={!detailHydrating}
-            >
-              <div className="flex flex-col items-center gap-3 text-center">
-                <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--field-border)] border-t-[var(--fg)]" aria-hidden />
-                <p className="text-sm font-semibold text-[var(--fg)]">{t('todo.loadingDetail')}</p>
-                <p className="text-xs text-[var(--muted)]">{t('todo.loadingSubtasks')}</p>
-              </div>
-            </div>
-
-            <div
-              className={`ft-sheet-enter grid max-h-[min(78dvh,34rem)] gap-4 overflow-y-auto pr-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-opacity duration-150 ${
-                detailHydrating ? 'opacity-0' : 'opacity-100'
-              }`}
-            >
-            <div>
-              <p className={`text-base font-bold text-[var(--fg)] ${selectedTodo.completed ? 'line-through opacity-70' : ''}`}>
-                {selectedTodo.title}
-              </p>
-              {selectedTodo.description ? (
-                <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--muted)]">{selectedTodo.description}</p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-semibold text-[var(--muted)]">
-                  {t(`todo.cat.${selectedTodo.category || 'lainnya'}`)}
-                </span>
-                {selectedTodo.dueDate ? (
-                  <span className="text-[11px] text-[var(--muted)]">{formatDue(selectedTodo.dueDate)}</span>
-                ) : null}
-                <span className={`inline-block h-2 w-2 rounded-full ${priorityClass(selectedTodo.priority)}`} />
-                <span className="text-[11px] font-medium text-[var(--muted)]">{t(`todo.priority.${selectedTodo.priority || 'medium'}`)}</span>
-              </div>
-            </div>
-
-            <div className="border-t border-[var(--border)] pt-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{t('todo.subtasksHeading')}</p>
-              {/* Reserve height so layout never jumps when sub-tasks load */}
-              <div className="relative min-h-[3.75rem]">
-                <div
-                  className={`absolute inset-0 transition-opacity duration-150 ${
-                    detailSubTasksLoading || detailSubTasksLeaving ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  aria-hidden={!(detailSubTasksLoading || detailSubTasksLeaving)}
-                >
-                  <div className="space-y-2">
-                    <div className="h-6 animate-pulse rounded-md bg-[color-mix(in_srgb,var(--field-bg)_75%,transparent)]" />
-                    <div className="h-6 w-10/12 animate-pulse rounded-md bg-[color-mix(in_srgb,var(--field-bg)_70%,transparent)]" />
-                  </div>
-                </div>
-
-                <div
-                  className={`absolute inset-0 transition-opacity duration-150 ${
-                    detailSubTasksLoading ? 'opacity-0' : 'opacity-100'
-                  }`}
-                >
-                  {(detailSubTasks || []).length === 0 ? (
-                    <EmptyState title={t('todo.subtasksEmpty')} />
-                  ) : (
-                    <ul className="space-y-2">
-                      {(detailSubTasks || []).map((row) => (
-                        <li key={row.id} className="flex items-start gap-2">
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
-                            <input
-                              type="checkbox"
-                              className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--border)]"
-                              checked={Boolean(row.checked)}
-                              onChange={() => toggleSubTask(row)}
-                            />
-                            <span
-                              className={`text-sm ${row.checked ? 'text-[var(--muted)] line-through' : 'text-[var(--fg)]'}`}
-                            >
-                              {row.label}
-                            </span>
-                          </label>
-                          <button
-                            type="button"
-                            className="shrink-0 rounded-lg p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                            aria-label={t('todo.subtask.delete')}
-                            onClick={() => deleteSubTask(row.id)}
-                          >
-                            ×
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <input
-                  className="ft-field min-w-0 flex-1 text-sm"
-                  value={newSubLabel}
-                  placeholder={t('todo.subtask.placeholder')}
-                  onChange={(e) => setNewSubLabel(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void addSubTask()
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  className="shrink-0 bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                  onClick={() => void addSubTask()}
-                >
-                  {t('todo.subtask.add')}
-                </Button>
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap gap-2 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--panel-strong)_92%,transparent)] px-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-              <Button
-                type="button"
-                className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                onClick={startDetailEdit}
-              >
-                {t('todo.edit')}
-              </Button>
-              <Button
-                type="button"
-                className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                onClick={() => {
-                  setDeleteTodoId(Number(selectedTodo?.id))
-                  setDeleteConfirmOpen(true)
-                }}
-              >
-                {t('todo.delete')}
-              </Button>
-              <Button type="button" onClick={() => void toggleDetailComplete()}>
-                {selectedTodo.completed ? t('todo.uncomplete') : t('todo.complete')}
-              </Button>
-            </div>
-            </div>
-          </div>
-        ) : null}
-
-        {selectedTodo && detailEdit && detailDraft ? (
-          <form
-            className="ft-sheet-enter grid max-h-[min(78dvh,34rem)] gap-3 overflow-y-auto pr-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void saveDetailEdit()
-            }}
-          >
-            <label className="ft-label">
-              {t('todo.field.title')}
-              <input
-                className="ft-field appearance-none text-base md:text-sm"
-                value={detailDraft.title}
-                onChange={(e) => setDetailDraft((p) => ({ ...p, title: e.target.value }))}
-                required
-                maxLength={200}
-              />
-            </label>
-            <label className="ft-label">
-              {t('todo.field.description')}
-              <textarea
-                className="ft-field min-h-[4rem] resize-y text-base md:text-sm"
-                value={detailDraft.description}
-                onChange={(e) => setDetailDraft((p) => ({ ...p, description: e.target.value }))}
-                maxLength={2000}
-              />
-            </label>
-            <label className="ft-label">
-              {t('todo.field.category')}
-              <div className="relative mt-1">
-                <button
-                  type="button"
-                  className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm"
-                  onClick={() => setDetailCategoryOpen((v) => !v)}
-                  aria-expanded={detailCategoryOpen}
-                  data-todo-popover="detail-category"
-                >
-                  <span>{t(`todo.cat.${detailDraft.category}`)}</span>
-                  <span className={`text-xs text-[var(--muted)] transition-transform ${detailCategoryOpen ? 'rotate-180' : ''}`}>⌄</span>
-                </button>
-                <div
-                  className={`absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 origin-top transition-all duration-200 ${
-                    detailCategoryOpen ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
-                  }`}
-                >
-                  <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-[var(--shadow-card)]">
-                    {TODO_CATEGORIES.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                          detailDraft.category === c ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
-                        }`}
-                        onClick={() => {
-                          setDetailDraft((p) => ({ ...p, category: c }))
-                          setDetailCategoryOpen(false)
-                        }}
-                      >
-                        {t(`todo.cat.${c}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </label>
-            <label className="ft-label">
-              {t('todo.field.due')}
-              <input
-                type="date"
-                className="ft-field text-base md:text-sm"
-                value={detailDraft.dueDate}
-                onChange={(e) => setDetailDraft((p) => ({ ...p, dueDate: e.target.value }))}
-              />
-            </label>
-            <label className="ft-label">
-              {t('todo.field.priority')}
-              <div className="mt-1 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
-                {PRIORITIES.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={`rounded-lg px-2 py-2 text-xs font-semibold ${
-                      detailDraft.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : 'text-[var(--muted)]'
-                    }`}
-                    onClick={() => setDetailDraft((s) => ({ ...s, priority: p }))}
-                  >
-                    {t(`todo.priority.${p}`)}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <div className="sticky bottom-0 z-10 mt-1 flex justify-end gap-2 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--panel-strong)_92%,transparent)] pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-              <Button
-                type="button"
-                className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                onClick={cancelDetailEdit}
-              >
-                {t('todo.editCancel')}
-              </Button>
-              <Button type="submit">{t('todo.editSave')}</Button>
-            </div>
-          </form>
-        ) : null}
       </Modal>
 
       <Modal
