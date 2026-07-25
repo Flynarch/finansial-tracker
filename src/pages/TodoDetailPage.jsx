@@ -114,6 +114,7 @@ function getDueStatusConfig(dueStr, completed, t) {
 export default function TodoDetailPage() {
   const { id } = useParams()
   const todoId = Number(id)
+  const isValidId = !isNaN(todoId) && todoId > 0
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -127,11 +128,12 @@ export default function TodoDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editDraft, setEditDraft] = useState(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
+  const [editError, setEditError] = useState('')
 
-  const todo = useLiveQuery(() => db.todos.get(todoId), [todoId])
+  const todo = useLiveQuery(() => (isValidId ? db.todos.get(todoId) : Promise.resolve(undefined)), [todoId, isValidId])
   const subTasks = useLiveQuery(
-    () => (todoId ? db.sub_tasks.where('todoId').equals(todoId).sortBy('id') : Promise.resolve([])),
-    [todoId],
+    () => (isValidId ? db.sub_tasks.where('todoId').equals(todoId).sortBy('id') : Promise.resolve([])),
+    [todoId, isValidId],
   )
 
   useEffect(() => {
@@ -154,6 +156,7 @@ export default function TodoDetailPage() {
       dueDate: todo.dueDate || '',
       priority: todo.priority || 'medium',
     })
+    setEditError('')
     setIsEditing(true)
     setCategoryOpen(false)
   }, [todo])
@@ -161,6 +164,7 @@ export default function TodoDetailPage() {
   const cancelEditing = useCallback(() => {
     setIsEditing(false)
     setEditDraft(null)
+    setEditError('')
     setCategoryOpen(false)
   }, [])
 
@@ -169,7 +173,10 @@ export default function TodoDetailPage() {
       if (e) e.preventDefault()
       if (!editDraft || !todoId) return
       const title = String(editDraft.title || '').trim()
-      if (!title) return
+      if (!title) {
+        setEditError('Judul todo tidak boleh kosong.')
+        return
+      }
 
       const dueDate = editDraft.dueDate || ''
       await db.todos.update(todoId, {
@@ -182,18 +189,19 @@ export default function TodoDetailPage() {
 
       setIsEditing(false)
       setEditDraft(null)
+      setEditError('')
       setCategoryOpen(false)
     },
     [editDraft, todoId],
   )
 
   const handleToggleComplete = useCallback(async () => {
-    if (!todo) return
+    if (!todo || !todoId) return
     await db.todos.update(todoId, { completed: !todo.completed })
   }, [todo, todoId])
 
   const handleDeleteTodo = useCallback(async () => {
-    if (!todo) return
+    if (!todo || !todoId) return
     setIsDeleting(true)
     await db.sub_tasks.where('todoId').equals(todoId).delete()
     await db.todos.delete(todoId)
@@ -240,7 +248,7 @@ export default function TodoDetailPage() {
         <button
           type="button"
           onClick={() => navigate('/todos')}
-          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
+          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95 shadow-xs"
         >
           <ChevronLeft size={18} />
           {t('common.back')}
@@ -252,46 +260,54 @@ export default function TodoDetailPage() {
 
   const statusCfg = getDueStatusConfig(todo.dueDate, todo.completed, t)
   const priorityCfg = priorityConfig(todo.priority)
-  const formattedDue = todo.dueDate ? format(new Date(String(todo.dueDate)), 'dd MMMM yyyy', { locale: idLocale }) : ''
+  const formattedDue = todo.dueDate
+    ? format(new Date(String(todo.dueDate) + 'T00:00:00'), 'dd MMMM yyyy', { locale: idLocale })
+    : ''
   const doneSubCount = (subTasks || []).filter((s) => s.checked).length
   const totalSubCount = (subTasks || []).length
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
 
   return (
     <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-36">
-      {/* ── Top Navigation Bar (Solid Background, No Text Overlap) ─────── */}
-      <div className="border-b border-[var(--border)]/60 bg-[var(--panel-strong)] px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 shadow-xs sm:px-6">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+      {/* ── Sleek Top Navigation Header ───────────────────────────────── */}
+      <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-4 sm:px-6">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 py-2">
+          {/* Back Button */}
           <button
             type="button"
             onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs hover:border-[var(--border-strong)] transition-all active:scale-95"
             aria-label={t('common.back')}
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
 
+          {/* Page Action / Title */}
           <div className="flex items-center gap-2">
             {!isEditing ? (
               <button
                 type="button"
                 onClick={startEditing}
-                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-4 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs hover:border-[var(--border-strong)] transition-all active:scale-95"
               >
-                <Edit3 size={14} />
+                <Edit3 size={13} />
                 <span>{t('todo.edit')}</span>
               </button>
             ) : (
-              <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                Mode Edit
-              </span>
+              <button
+                type="button"
+                onClick={cancelEditing}
+                className="rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] shadow-xs transition-all active:scale-95"
+              >
+                {t('todo.editCancel')}
+              </button>
             )}
           </div>
         </div>
       </div>
 
       {/* ── Main Container ───────────────────────────────────────────── */}
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 sm:px-6">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-2 sm:px-6">
         {!isEditing ? (
           /* ── VIEW MODE LAYOUT ──────────────────────────────────────── */
           <>
@@ -519,6 +535,12 @@ export default function TodoDetailPage() {
         ) : (
           /* ── EDIT FORM MODE ────────────────────────────────────────── */
           <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs">
+            {editError && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-500">
+                {editError}
+              </div>
+            )}
+
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.title')}</span>
               <input
