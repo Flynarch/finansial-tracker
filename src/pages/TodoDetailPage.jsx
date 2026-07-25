@@ -1,9 +1,27 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format, addDays } from 'date-fns'
+import { format, addDays, isToday, isTomorrow, isBefore, startOfDay } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Trash2, CheckCircle, Circle, Plus, X, Calendar, Tag, Edit2, CheckSquare } from 'lucide-react'
+import {
+  ChevronLeft,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  Plus,
+  X,
+  Calendar,
+  Tag,
+  Edit3,
+  CheckSquare,
+  Clock,
+  AlertCircle,
+  Receipt,
+  TrendingUp,
+  ShoppingBag,
+  Landmark,
+  Folder,
+} from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import EmptyState from '../components/ui/EmptyState'
@@ -12,30 +30,85 @@ import Button from '../components/ui/Button'
 const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'lainnya']
 const PRIORITIES = ['low', 'medium', 'high']
 
-function priorityClass(p) {
-  if (p === 'high') return 'bg-rose-500'
-  if (p === 'medium') return 'bg-amber-400'
-  return 'bg-slate-400'
+function getCategoryIcon(cat) {
+  switch (cat) {
+    case 'tagihan':
+      return <Receipt size={14} className="text-amber-500" />
+    case 'investasi':
+      return <TrendingUp size={14} className="text-emerald-500" />
+    case 'belanja':
+      return <ShoppingBag size={14} className="text-sky-500" />
+    case 'tabungan':
+      return <Landmark size={14} className="text-indigo-500" />
+    default:
+      return <Folder size={14} className="text-[var(--muted)]" />
+  }
 }
 
-function dueStatus(dueStr, t) {
+function priorityConfig(p) {
+  if (p === 'high') {
+    return {
+      dot: 'bg-rose-500',
+      badge: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
+    }
+  }
+  if (p === 'medium') {
+    return {
+      dot: 'bg-amber-400',
+      badge: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+    }
+  }
+  return {
+    dot: 'bg-slate-400',
+    badge: 'border-slate-500/30 bg-slate-500/10 text-slate-400',
+  }
+}
+
+function getDueStatusConfig(dueStr, completed, t) {
+  if (completed) {
+    return {
+      label: t('todo.completed') || 'Selesai',
+      badgeClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+      icon: <CheckCircle2 size={13} />,
+    }
+  }
   if (!dueStr) return null
+
   const dueKey = String(dueStr)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueKey)) return null
 
-  const todayKey = format(new Date(), 'yyyy-MM-dd')
-  const tomorrowKey = format(addDays(new Date(todayKey + 'T00:00:00'), 1), 'yyyy-MM-dd')
+  const dueDateObj = startOfDay(new Date(dueKey + 'T00:00:00'))
+  const todayObj = startOfDay(new Date())
 
-  if (dueKey === todayKey) {
-    return { kind: 'today', label: t('todo.due.today'), badgeClass: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-500' }
+  if (isToday(dueDateObj)) {
+    return {
+      label: t('todo.due.today'),
+      badgeClass: 'border-amber-500/40 bg-amber-500/15 text-amber-400 font-bold',
+      icon: <Clock size={13} />,
+    }
   }
-  if (dueKey === tomorrowKey) {
-    return { kind: 'tomorrow', label: t('todo.due.tomorrow'), badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400' }
+
+  if (isTomorrow(dueDateObj)) {
+    return {
+      label: t('todo.due.tomorrow'),
+      badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
+      icon: <Calendar size={13} />,
+    }
   }
-  if (dueKey < todayKey) {
-    return { kind: 'overdue', label: t('todo.due.overdue'), badgeClass: 'border-rose-500/30 bg-rose-500/10 text-rose-400' }
+
+  if (isBefore(dueDateObj, todayObj)) {
+    return {
+      label: t('todo.due.overdue'),
+      badgeClass: 'border-rose-500/40 bg-rose-500/15 text-rose-400 font-bold',
+      icon: <AlertCircle size={13} />,
+    }
   }
-  return null
+
+  return {
+    label: format(dueDateObj, 'dd MMM yyyy', { locale: idLocale }),
+    badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)]',
+    icon: <Calendar size={13} />,
+  }
 }
 
 export default function TodoDetailPage() {
@@ -44,11 +117,11 @@ export default function TodoDetailPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
 
-  // View state & subtask state
+  // View & subtask states
   const [newSubLabel, setNewSubLabel] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Edit mode state
+  // Edit mode states
   const [isEditing, setIsEditing] = useState(false)
   const [editDraft, setEditDraft] = useState(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -89,25 +162,28 @@ export default function TodoDetailPage() {
     setCategoryOpen(false)
   }, [])
 
-  const saveEdit = useCallback(async (e) => {
-    if (e) e.preventDefault()
-    if (!editDraft || !todoId) return
-    const title = String(editDraft.title || '').trim()
-    if (!title) return
+  const saveEdit = useCallback(
+    async (e) => {
+      if (e) e.preventDefault()
+      if (!editDraft || !todoId) return
+      const title = String(editDraft.title || '').trim()
+      if (!title) return
 
-    const dueDate = editDraft.dueDate || ''
-    await db.todos.update(todoId, {
-      title,
-      description: String(editDraft.description || '').trim(),
-      category: editDraft.category,
-      dueDate,
-      priority: editDraft.priority,
-    })
+      const dueDate = editDraft.dueDate || ''
+      await db.todos.update(todoId, {
+        title,
+        description: String(editDraft.description || '').trim(),
+        category: editDraft.category,
+        dueDate,
+        priority: editDraft.priority,
+      })
 
-    setIsEditing(false)
-    setEditDraft(null)
-    setCategoryOpen(false)
-  }, [editDraft, todoId])
+      setIsEditing(false)
+      setEditDraft(null)
+      setCategoryOpen(false)
+    },
+    [editDraft, todoId],
+  )
 
   const handleToggleComplete = useCallback(async () => {
     if (!todo) return
@@ -147,8 +223,9 @@ export default function TodoDetailPage() {
     return (
       <div className="min-h-screen bg-[var(--bg)] p-4 pt-[calc(1rem+env(safe-area-inset-top))]">
         <button
+          type="button"
           onClick={() => navigate('/todos')}
-          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
+          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
         >
           <ChevronLeft size={18} />
           {t('common.back')}
@@ -158,119 +235,229 @@ export default function TodoDetailPage() {
     )
   }
 
-  const status = dueStatus(todo.dueDate, t)
-  const formattedDue = todo.dueDate ? format(new Date(String(todo.dueDate)), 'dd MMM yyyy', { locale: idLocale }) : ''
+  const statusCfg = getDueStatusConfig(todo.dueDate, todo.completed, t)
+  const priorityCfg = priorityConfig(todo.priority)
+  const formattedDue = todo.dueDate ? format(new Date(String(todo.dueDate)), 'dd MMMM yyyy', { locale: idLocale }) : ''
   const doneSubCount = (subTasks || []).filter((s) => s.checked).length
   const totalSubCount = (subTasks || []).length
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
 
   return (
-    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-32 sm:pb-28">
-      {/* ── Hero Header ────────────────────────────────────────────── */}
-      <div className="relative border-b border-[var(--border)] bg-gradient-to-b from-[var(--panel-strong)] to-[var(--bg)] px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6 sm:px-6 shadow-sm">
-        <div className="mx-auto max-w-2xl">
-          {/* Top navigation & action bar */}
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] shadow-sm hover:bg-[var(--border)]/40 transition active:scale-95"
-              aria-label={t('common.back')}
-            >
-              <ChevronLeft size={20} />
-            </button>
+    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-36 sm:pb-28">
+      {/* ── Top Header Navigation Bar ──────────────────────────── */}
+      <div className="sticky top-0 z-30 border-b border-[var(--border)]/60 bg-[var(--bg)]/90 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs hover:bg-[var(--border)]/40 transition active:scale-95"
+            aria-label={t('common.back')}
+          >
+            <ChevronLeft size={20} />
+          </button>
 
-            {/* Quick Action Pills Row */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-              {!isEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-sm hover:bg-[var(--border)]/40 transition active:scale-95"
-                  >
-                    <Edit2 size={14} />
-                    <span>{t('todo.edit')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleToggleComplete}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold shadow-sm transition active:scale-95 ${
-                      todo.completed
-                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                        : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40'
-                    }`}
-                  >
-                    {todo.completed ? <CheckCircle size={14} /> : <Circle size={14} />}
-                    <span>{todo.completed ? t('todo.uncomplete') : t('todo.complete')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDeleteTodo}
-                    disabled={isDeleting}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-bold text-rose-500 shadow-sm hover:bg-rose-500/20 transition active:scale-95 disabled:opacity-50"
-                  >
-                    <Trash2 size={14} />
-                    <span>{t('todo.delete')}</span>
-                  </button>
-                </>
-              ) : (
-                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Mode Edit
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Todo Title & Badges (View Mode Header) */}
-          {!isEditing && (
-            <div className="space-y-3.5 pt-1">
-              <h1
-                className={`text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl leading-snug ${
-                  todo.completed ? 'line-through opacity-60' : ''
-                }`}
+          <div className="flex items-center gap-2">
+            {!isEditing ? (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs hover:bg-[var(--border)]/40 transition active:scale-95"
               >
-                {todo.title}
-              </h1>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-semibold text-[var(--muted)] shadow-xs">
-                  <Tag size={12} />
-                  {t(`todo.cat.${todo.category || 'lainnya'}`)}
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-semibold text-[var(--fg)] shadow-xs">
-                  <span className={`h-2 w-2 rounded-full ${priorityClass(todo.priority)}`} />
-                  {t(`todo.priority.${todo.priority || 'medium'}`)}
-                </span>
-
-                {todo.dueDate ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-semibold text-[var(--muted)] shadow-xs">
-                    <Calendar size={12} />
-                    {formattedDue}
-                  </span>
-                ) : null}
-
-                {status ? (
-                  <span
-                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold shadow-xs ${status.badgeClass}`}
-                  >
-                    {status.label}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          )}
+                <Edit3 size={14} />
+                <span>{t('todo.edit')}</span>
+              </button>
+            ) : (
+              <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
+                Mode Edit
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ── Main Content Area ───────────────────────────────────────── */}
+      {/* ── Main Container ───────────────────────────────────────────── */}
       <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 sm:px-6">
-        {isEditing && editDraft ? (
+        {!isEditing ? (
+          /* ── VIEW MODE LAYOUT ──────────────────────────────────────── */
+          <>
+            {/* Executive Hero Card */}
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm sm:p-6 space-y-4">
+              {/* Category & Priority Row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold text-[var(--fg)]">
+                    {getCategoryIcon(todo.category)}
+                    <span>{t(`todo.cat.${todo.category || 'lainnya'}`)}</span>
+                  </span>
+
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${priorityCfg.badge}`}>
+                    <span className={`h-2 w-2 rounded-full ${priorityCfg.dot}`} />
+                    <span>{t(`todo.priority.${todo.priority || 'medium'}`)}</span>
+                  </span>
+                </div>
+
+                {statusCfg && (
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusCfg.badgeClass}`}>
+                    {statusCfg.icon}
+                    <span>{statusCfg.label}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Title Stack */}
+              <div>
+                <h1
+                  className={`text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl leading-snug ${
+                    todo.completed ? 'line-through opacity-60' : ''
+                  }`}
+                >
+                  {todo.title}
+                </h1>
+
+                {todo.dueDate && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
+                    <Calendar size={13} />
+                    <span>Tenggat: {formattedDue}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Description (inside card if present) */}
+              {todo.description ? (
+                <div className="rounded-2xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-4">
+                  <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                    {t('todo.field.description')}
+                  </h3>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--fg)]">
+                    {todo.description}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Subtasks Section with Segmented Progress Bar */}
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm sm:p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckSquare size={17} className="text-[var(--fg)]" />
+                  <h2 className="text-sm font-bold text-[var(--fg)] tracking-tight">
+                    {t('todo.subtasksHeading')}
+                  </h2>
+                </div>
+                {totalSubCount > 0 && (
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold tabular-nums text-[var(--fg)]">
+                    {doneSubCount}/{totalSubCount} ({subPercent}%)
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              {totalSubCount > 0 && (
+                <div className="space-y-1.5">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 p-0.5">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
+                      style={{ width: `${subPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Subtask List Cards */}
+              {(subTasks || []).length === 0 ? (
+                <div className="py-6 text-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
+                  <p className="text-xs font-medium text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
+                </div>
+              ) : (
+                <ul className="space-y-2.5">
+                  {(subTasks || []).map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 transition hover:border-[var(--border-strong)] active:scale-[0.99]"
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          className="h-4.5 w-4.5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
+                          checked={Boolean(row.checked)}
+                          onChange={() => handleToggleSubTask(row)}
+                        />
+                        <span
+                          className={`text-sm font-medium transition ${
+                            row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
+                          }`}
+                        >
+                          {row.label}
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSubTask(row.id)}
+                        className="shrink-0 rounded-xl p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
+                        aria-label={t('todo.subtask.delete')}
+                      >
+                        <X size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Add Subtask Form */}
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  className="ft-field min-w-0 flex-1 text-sm mt-0"
+                  value={newSubLabel}
+                  placeholder={t('todo.subtask.placeholder')}
+                  onChange={(e) => setNewSubLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void handleAddSubTask()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleAddSubTask()}
+                  className="flex items-center gap-1.5 rounded-xl bg-[var(--fg)] px-4 py-2.5 text-sm font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 shrink-0 shadow-xs"
+                >
+                  <Plus size={16} />
+                  <span>{t('todo.subtask.add')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Floating Mobile Bottom Action Bar */}
+            <div className="fixed bottom-16 left-4 right-4 z-40 sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:mt-6 flex items-center justify-between gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)]/95 p-3 backdrop-blur-md shadow-lg">
+              <button
+                type="button"
+                onClick={handleToggleComplete}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-bold transition active:scale-95 shadow-xs ${
+                  todo.completed
+                    ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20'
+                    : 'bg-[var(--fg)] text-[var(--bg)] hover:opacity-95'
+                }`}
+              >
+                {todo.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                <span>{todo.completed ? t('todo.uncomplete') : t('todo.complete')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteTodo}
+                disabled={isDeleting}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 hover:bg-rose-500/20 transition active:scale-95 disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+                <span>{t('todo.delete')}</span>
+              </button>
+            </div>
+          </>
+        ) : (
           /* ── EDIT FORM MODE ────────────────────────────────────────── */
-          <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-6 shadow-sm">
+          <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4.5 rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-sm">
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.title')}</span>
               <input
@@ -302,7 +489,10 @@ export default function TodoDetailPage() {
                   aria-expanded={categoryOpen}
                   data-todo-popover="detail-category"
                 >
-                  <span>{t(`todo.cat.${editDraft.category}`)}</span>
+                  <span className="flex items-center gap-2">
+                    {getCategoryIcon(editDraft.category)}
+                    <span>{t(`todo.cat.${editDraft.category}`)}</span>
+                  </span>
                   <span className={`text-xs text-[var(--muted)] transition-transform duration-200 ${categoryOpen ? 'rotate-180' : ''}`}>⌄</span>
                 </button>
                 <div
@@ -310,20 +500,21 @@ export default function TodoDetailPage() {
                     categoryOpen ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
                   }`}
                 >
-                  <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-[var(--shadow-card)]">
+                  <div className="space-y-1 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl">
                     {TODO_CATEGORIES.map((c) => (
                       <button
                         key={c}
                         type="button"
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
-                          editDraft.category === c ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
+                        className={`flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition ${
+                          editDraft.category === c ? 'bg-[var(--fg)] text-[var(--bg)] font-bold' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
                         }`}
                         onClick={() => {
                           setEditDraft((p) => ({ ...p, category: c }))
                           setCategoryOpen(false)
                         }}
                       >
-                        {t(`todo.cat.${c}`)}
+                        {getCategoryIcon(c)}
+                        <span>{t(`todo.cat.${c}`)}</span>
                       </button>
                     ))}
                   </div>
@@ -343,12 +534,12 @@ export default function TodoDetailPage() {
 
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.priority')}</span>
-              <div className="mt-1.5 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5">
+              <div className="mt-1.5 grid grid-cols-3 gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5">
                 {PRIORITIES.map((p) => (
                   <button
                     key={p}
                     type="button"
-                    className={`rounded-lg px-2 py-2 text-xs font-bold transition active:scale-95 ${
+                    className={`rounded-xl px-2 py-2.5 text-xs font-bold transition active:scale-95 ${
                       editDraft.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                     }`}
                     onClick={() => setEditDraft((s) => ({ ...s, priority: p }))}
@@ -359,7 +550,7 @@ export default function TodoDetailPage() {
               </div>
             </label>
 
-            <div className="flex items-center justify-end gap-2.5 border-t border-[var(--border)] pt-4 mt-2">
+            <div className="flex items-center justify-end gap-2.5 border-t border-[var(--border)] pt-4 mt-3">
               <Button
                 type="button"
                 className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)] active:scale-95"
@@ -370,113 +561,6 @@ export default function TodoDetailPage() {
               <Button type="submit" className="active:scale-95">{t('todo.editSave')}</Button>
             </div>
           </form>
-        ) : (
-          /* ── VIEW MODE ─────────────────────────────────────────────── */
-          <>
-            {/* Description Section */}
-            {todo.description ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4.5 shadow-sm sm:p-5">
-                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                  {t('todo.field.description')}
-                </h3>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--fg)]">
-                  {todo.description}
-                </p>
-              </div>
-            ) : null}
-
-            {/* Subtasks Section */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4.5 shadow-sm sm:p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckSquare size={16} className="text-[var(--muted)]" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                    {t('todo.subtasksHeading')}
-                  </h3>
-                </div>
-                {totalSubCount > 0 && (
-                  <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[var(--muted)]">
-                    {doneSubCount}/{totalSubCount} ({subPercent}%)
-                  </span>
-                )}
-              </div>
-
-              {/* Progress Bar when subtasks exist */}
-              {totalSubCount > 0 && (
-                <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40">
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-300 ease-out"
-                    style={{ width: `${subPercent}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Subtask list */}
-              {(subTasks || []).length === 0 ? (
-                <div className="py-4 text-center">
-                  <p className="text-xs text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {(subTasks || []).map((row) => (
-                    <li
-                      key={row.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)] p-3 transition active:scale-[0.99]"
-                    >
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          className="h-4.5 w-4.5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
-                          checked={Boolean(row.checked)}
-                          onChange={() => handleToggleSubTask(row)}
-                        />
-                        <span
-                          className={`text-sm font-medium transition ${
-                            row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
-                          }`}
-                        >
-                          {row.label}
-                        </span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSubTask(row.id)}
-                        className="shrink-0 rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition"
-                        aria-label={t('todo.subtask.delete')}
-                      >
-                        <X size={16} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* Add subtask input */}
-              <div className="mt-4 flex gap-2">
-                <input
-                  type="text"
-                  className="ft-field min-w-0 flex-1 text-sm mt-0"
-                  value={newSubLabel}
-                  placeholder={t('todo.subtask.placeholder')}
-                  onChange={(e) => setNewSubLabel(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void handleAddSubTask()
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleAddSubTask()}
-                  className="flex items-center gap-1 rounded-xl bg-[var(--fg)] px-4 py-2.5 text-sm font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 shrink-0"
-                >
-                  <Plus size={16} />
-                  <span>{t('todo.subtask.add')}</span>
-                </button>
-              </div>
-            </div>
-          </>
         )}
       </div>
     </div>
