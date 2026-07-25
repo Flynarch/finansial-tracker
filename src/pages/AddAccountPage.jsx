@@ -276,7 +276,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
             <Search size={36} className="text-muted-2 opacity-40 mb-3" />
             <h3 className="text-[15px] font-semibold text-fg">Tidak ditemukan</h3>
             <p className="text-[13px] text-muted mt-1 max-w-[240px]">
-              Institusi &lsquo;{search}&rsquo; tidak ada dalam preset.
+              Akun &lsquo;{search}&rsquo; tidak ada dalam preset.
             </p>
           </div>
         )}

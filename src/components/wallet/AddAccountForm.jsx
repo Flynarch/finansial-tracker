@@ -74,7 +74,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           </button>
           
           <div className="bg-[var(--fg)]/5 backdrop-blur-md border border-[var(--border)] text-[var(--fg)] px-5 py-1.5 rounded-full text-[13px] font-bold shadow-sm">
-            {institution ? 'Akun Institusi' : 'Akun Manual'}
+            Akun Manual
           </div>
         </div>
 
