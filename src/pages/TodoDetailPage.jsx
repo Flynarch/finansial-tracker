@@ -317,29 +317,7 @@ export default function TodoDetailPage() {
           <>
             {/* Executive Hero Card */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs space-y-4">
-              {/* Category, Priority & Status Badges */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold text-[var(--fg)]">
-                    {getCategoryIcon(todo.category)}
-                    <span>{t(`todo.cat.${todo.category || 'lainnya'}`)}</span>
-                  </span>
-
-                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${priorityCfg.badge}`}>
-                    <span className={`h-2 w-2 rounded-full ${priorityCfg.dot}`} />
-                    <span>{t(`todo.priority.${todo.priority || 'medium'}`)}</span>
-                  </span>
-                </div>
-
-                {statusCfg && (
-                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusCfg.badgeClass}`}>
-                    {statusCfg.icon}
-                    <span>{statusCfg.label}</span>
-                  </span>
-                )}
-              </div>
-
-              {/* Title & Date */}
+              {/* 1. Title First (Primary Reading Hierarchy) */}
               <div>
                 <h1
                   className={`text-lg sm:text-xl font-bold tracking-tight text-[var(--fg)] leading-snug break-words [overflow-wrap:anywhere] ${
@@ -349,17 +327,37 @@ export default function TodoDetailPage() {
                   {todo.title}
                 </h1>
 
+                {/* Metadata Badges Directly Below Title */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold text-[var(--fg)]">
+                    {getCategoryIcon(todo.category)}
+                    <span>{t(`todo.cat.${todo.category || 'lainnya'}`)}</span>
+                  </span>
+
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${priorityCfg.badge}`}>
+                    <span className={`h-2 w-2 rounded-full ${priorityCfg.dot}`} />
+                    <span>{t(`todo.priority.${todo.priority || 'medium'}`)}</span>
+                  </span>
+
+                  {statusCfg && (
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusCfg.badgeClass}`}>
+                      {statusCfg.icon}
+                      <span>{statusCfg.label}</span>
+                    </span>
+                  )}
+                </div>
+
                 {todo.dueDate && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
+                  <p className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
                     <Calendar size={13} />
                     <span>Tenggat: {formattedDue}</span>
                   </p>
                 )}
               </div>
 
-              {/* Description Card */}
+              {/* Description Block (Clean Tint & Left Accent Line without heavy border) */}
               {todo.description ? (
-                <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-3.5 max-h-80 overflow-y-auto">
+                <div className="rounded-r-xl border-l-2 border-[var(--fg)]/40 bg-[var(--field-bg)]/60 p-3.5 max-h-80 overflow-y-auto">
                   <h3 className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
                     {t('todo.field.description')}
                   </h3>
@@ -396,23 +394,23 @@ export default function TodoDetailPage() {
                 </div>
               )}
 
-              {/* Subtask Items with Inline Editing */}
+              {/* Subtask Items (Clean List Layout with Dividers - No Heavy Cards) */}
               {(subTasks || []).length === 0 ? (
                 <div className="py-5 text-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
                   <p className="text-xs font-medium text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="divide-y divide-[var(--border)]/40 rounded-xl bg-[var(--field-bg)]/40 px-3">
                   {(subTasks || []).map((row) => (
                     <li
                       key={row.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 transition"
+                      className="flex items-center justify-between gap-3 py-2.5 transition"
                     >
                       {editingSubId === row.id ? (
                         <div className="flex flex-1 items-center gap-2">
                           <input
                             type="text"
-                            className="ft-field min-w-0 flex-1 text-xs py-1 px-2.5 mt-0 font-medium"
+                            className="ft-field min-w-0 flex-1 text-xs py-1.5 px-3 mt-0 font-medium"
                             value={editingSubText}
                             onChange={(e) => setEditingSubText(e.target.value)}
                             onKeyDown={(e) => {
@@ -428,51 +426,46 @@ export default function TodoDetailPage() {
                           <button
                             type="button"
                             onClick={() => void saveSubTaskEdit(row.id)}
-                            className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-500/10 transition active:scale-95"
+                            className="h-9 w-9 grid place-items-center rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition active:scale-95 shrink-0"
                             aria-label="Simpan subtask"
                           >
-                            <CheckCircle2 size={16} />
+                            <CheckCircle2 size={18} />
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingSubId(null)}
-                            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--border)]/40 transition active:scale-95"
+                            className="h-9 w-9 grid place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--border)]/40 transition active:scale-95 shrink-0"
                             aria-label="Batal"
                           >
-                            <X size={16} />
+                            <X size={18} />
                           </button>
                         </div>
                       ) : (
                         <>
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
                             <input
                               type="checkbox"
-                              className="h-4.5 w-4.5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
+                              className="h-5 w-5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
                               checked={Boolean(row.checked)}
                               onChange={() => handleToggleSubTask(row)}
                             />
                             <span
-                              className={`text-sm font-medium transition min-w-0 break-words [overflow-wrap:anywhere] ${
+                              onClick={() => startEditingSubTask(row)}
+                              title="Klik untuk mengedit"
+                              className={`text-sm font-medium transition min-w-0 break-words [overflow-wrap:anywhere] cursor-pointer hover:opacity-80 ${
                                 row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
                               }`}
                             >
                               {row.label}
                             </span>
-                          </label>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => startEditingSubTask(row)}
-                              className="rounded-lg p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
-                              aria-label="Edit subtask"
-                            >
-                              <Edit3 size={14} />
-                            </button>
+                          </div>
+                          <div className="flex items-center shrink-0">
                             <button
                               type="button"
                               onClick={() => handleDeleteSubTask(row.id)}
-                              className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
+                              className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
                               aria-label={t('todo.subtask.delete')}
+                              title={t('todo.subtask.delete')}
                             >
                               <X size={16} />
                             </button>
