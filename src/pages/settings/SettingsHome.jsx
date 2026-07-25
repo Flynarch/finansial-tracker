@@ -1,9 +1,12 @@
+import { useNavigate } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { currencyOptions } from './settingsConstants'
 import { SettingsLinkRow, SettingsSection, SettingsSplitRow } from './settingsComponents'
 
 export default function SettingsHome() {
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const locale = useSettingsStore((state) => state.locale)
@@ -26,9 +29,19 @@ export default function SettingsHome() {
 
   return (
     <>
-      <header className="ft-settings-hero">
-        <h1 className="ft-page-title">{t('nav.settings')}</h1>
-        <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">{t('settings.pageSubtitle')}</p>
+      <header className="ft-settings-hero flex items-start gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 mt-0.5"
+          aria-label={t('common.back')}
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <div>
+          <h1 className="ft-page-title">{t('nav.settings')}</h1>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{t('settings.pageSubtitle')}</p>
+        </div>
       </header>
 
       <SettingsSection
@@ -60,17 +73,17 @@ export default function SettingsHome() {
             ))}
           </select>
         </SettingsSplitRow>
-        <div className="ft-settings-cell">
-          <p className="mb-2 text-[15px] font-medium text-[var(--fg)]">{t('settings.theme')}</p>
-          <div className="ft-settings-segment" role="group" aria-label={t('settings.theme')}>
-            <button type="button" data-active={theme === 'dark'} onClick={() => setTheme('dark')}>
-              {t('settings.theme.dark')}
-            </button>
-            <button type="button" data-active={theme === 'light'} onClick={() => setTheme('light')}>
-              {t('settings.theme.light')}
-            </button>
-          </div>
-        </div>
+        <SettingsSplitRow label={t('settings.theme')}>
+          <select
+            value={theme}
+            onChange={(event) => setTheme(event.target.value)}
+            className="ft-settings-field-compact"
+            aria-label={t('settings.theme')}
+          >
+            <option value="dark">{t('settings.theme.dark')}</option>
+            <option value="light">{t('settings.theme.light')}</option>
+          </select>
+        </SettingsSplitRow>
         <SettingsSplitRow label={t('settings.motion')}>
           <select
             value={motionPreference}
@@ -85,12 +98,15 @@ export default function SettingsHome() {
         </SettingsSplitRow>
       </SettingsSection>
 
+      <SettingsSection label={t('settings.section.categories')}>
+        <SettingsLinkRow to="/settings/categories" label={t('settings.expenseCategories')} />
+      </SettingsSection>
+
       <SettingsSection label={t('settings.section.more')}>
-        <SettingsLinkRow to="/settings/security" title={t('settings.appLock')} />
-        <SettingsLinkRow to="/settings/categories" title={t('settings.section.categories')} />
-        <SettingsLinkRow to="/settings/recurring" title={t('settings.recurringTitle')} />
-        <SettingsLinkRow to="/settings/data" title={t('settings.nav.data')} />
-        <SettingsLinkRow to="/settings/help" title={t('profile.help')} subtitle={t('profile.helpSub')} />
+        <SettingsLinkRow to="/settings/security" label={t('settings.appLock')} />
+        <SettingsLinkRow to="/settings/recurring" label={t('settings.recurringTitle')} />
+        <SettingsLinkRow to="/settings/data" label={t('settings.nav.data')} />
+        <SettingsLinkRow to="/settings/help" label={t('profile.help')} />
       </SettingsSection>
     </>
   )

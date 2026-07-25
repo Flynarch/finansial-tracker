@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { App } from '@capacitor/app'
 import { backButtonManager } from '../../lib/backButtonManager'
+import { getParentRoute } from '../../lib/navigationHierarchy'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
@@ -74,26 +75,17 @@ function AppShell() {
 
   useEffect(() => {
     const handleBackButton = async () => {
-      // 1. Check LIFO overlay stack
+      // 1. Check LIFO overlay stack (modals, drawers, popovers)
       if (backButtonManager.handleBack()) {
         return
       }
 
-      // 2. Check if we can go back in React Router history
-      const canGoBack = historyStack.current.length > 1
-      if (canGoBack) {
-        navigate(-1)
-        return
-      }
-
-      // 3. Check if on home/dashboard to exit or redirect
-      const currentPath = location.pathname
-      if (currentPath === '/dashboard' || currentPath === '/') {
-        await App.exitApp()
-      } else if (currentPath.startsWith('/settings/')) {
-        navigate('/settings')
+      // 2. Hierarchical parent route navigation
+      const parentRoute = getParentRoute(location.pathname)
+      if (parentRoute) {
+        navigate(parentRoute)
       } else {
-        navigate('/dashboard')
+        await App.exitApp()
       }
     }
 
