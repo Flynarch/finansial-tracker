@@ -395,23 +395,23 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Header Row: Transaction Count */}
-          <div className="mt-4 flex items-center justify-between px-1">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted-2)]">
+          <div className="mt-5 mb-1 flex items-center justify-between px-1">
+            <h3 className="ft-display text-base font-extrabold text-[var(--fg)] tracking-tight">
               Riwayat Transaksi
             </h3>
-            <span className="text-[11px] font-semibold tabular-nums text-[var(--muted)]">
+            <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]">
               {filteredTransactions?.length || 0} transaksi
             </span>
           </div>
 
           {/* Transactions Feed List (Grouped Timeline) */}
-          <div className="mt-4 space-y-4 pb-4">
+          <div className="mt-3 space-y-4 pb-4">
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group) => (
                 <div key={group.dateKey} className="space-y-2">
                   {/* Timeline Date Header */}
                   <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
-                    <span className="text-[10px] font-bold tracking-wider text-[var(--muted-2)] uppercase">
+                    <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (

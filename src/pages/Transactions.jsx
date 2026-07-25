@@ -517,7 +517,7 @@ function Transactions() {
       >
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
         <section className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="min-w-0 flex-1 text-xl font-semibold tracking-tight text-[var(--fg)]">{t('tx.pageTitle')}</h2>
+          <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
               {[
@@ -689,7 +689,7 @@ function Transactions() {
                 {groupedEntriesDetailed.map((group) => (
                   <section key={group.dateKey} className="space-y-2">
                     <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
-                      <span className="text-[10px] font-bold tracking-wider text-[var(--muted-2)] uppercase">
+                      <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
                         {group.dateLabel}
                       </span>
                       {group.dailySummaryText ? (
