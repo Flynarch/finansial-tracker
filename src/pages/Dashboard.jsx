@@ -421,12 +421,14 @@ function Dashboard() {
 
   const computeCashBalanceBeforeDate = useCallback(
     (dateKey) => {
-      const safeTx = transactions ?? []
+      const safeTx = allTransactionsForBalance ?? transactions ?? []
       const target = String(dateKey || '')
-      if (!target) return 0
-      return safeTx.reduce((acc, tx) => {
+      if (!target) return totalWalletBalance || 0
+
+      // Net flow (income - expense) from targetDate up to today
+      const netFlowSinceTarget = safeTx.reduce((acc, tx) => {
         const d = String(tx?.date || '')
-        if (!d || d >= target) return acc
+        if (!d || d < target) return acc
         const amount = convertCurrency(
           toSafeNumber(tx.amount),
           tx.currency || defaultCurrency,
@@ -436,9 +438,11 @@ function Dashboard() {
         if (tx.type === 'income') return acc + amount
         if (tx.type === 'expense') return acc - amount
         return acc
-      }, totalWalletBalance || 0)
+      }, 0)
+
+      return (totalWalletBalance || 0) - netFlowSinceTarget
     },
-    [defaultCurrency, rates, transactions, totalWalletBalance],
+    [defaultCurrency, rates, transactions, allTransactionsForBalance, totalWalletBalance],
   )
 
   const buildRevenueSeries = useCallback(
