@@ -492,246 +492,145 @@ function Dashboard() {
     loadRates()
   }, [defaultCurrency])
 
-  const computed = useMemo(() => {
-    const safeTx = transactions ?? []
-    const safeInv = investments ?? []
-    // Return empty-safe defaults while DB is loading
-    if (transactions === null || investments === null) {
-      return {
-        netWorth: 0, monthIncome: 0, monthExpense: 0, monthDelta: 0,
-        monthDeltaTone: 'success', monthDeltaPct: 0, incomeDeltaPct: 0,
-        expenseDeltaPct: 0, portfolioValue: 0, cashBalance: 0,
-        recentTransactions: null, // null = loading, distinct from [] = empty
-        todayNet: 0, todayIncome: 0,
-        last7: [], last30: [], last12m: [],
-        weeklyIncome: 0, weeklyExpense: 0, weeklyNet: 0, weeklyProgress: 0,
-      }
+  // ── Granular memos — each re-runs only when its own deps change ─────────
+
+  // 1. Month income/expense + delta vs last month (deps: transactions + month key + currency + rates)
+  const monthStats = useMemo(() => {
+    if (transactions === null || investments === null) return {
+      monthIncome: 0, monthExpense: 0, monthDelta: 0, monthDeltaTone: 'success',
+      monthDeltaPct: 0, incomeDeltaPct: 0, expenseDeltaPct: 0,
     }
-
+    const safeTx = transactions ?? []
     const lastMonthKey = format(subMonths(new Date(), 1), 'yyyy-MM')
-    const lastMonthIncomeExpense = safeTx.reduce(
-      (acc, tx) => {
-        if (!tx?.date?.startsWith(lastMonthKey)) return acc
-        const amount = convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
 
-    const monthIncomeExpense = safeTx.reduce(
-      (acc, tx) => {
-        if (!tx?.date?.startsWith(currentMonthKey)) return acc
-        const amount = convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
+    const lastMonth = safeTx.reduce((acc, tx) => {
+      if (!tx?.date?.startsWith(lastMonthKey)) return acc
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      if (tx.type === 'income') acc.income += amount
+      if (tx.type === 'expense') acc.expense += amount
+      return acc
+    }, { income: 0, expense: 0 })
 
-    const incomeDeltaPct = lastMonthIncomeExpense.income > 0
-      ? ((monthIncomeExpense.income - lastMonthIncomeExpense.income) / lastMonthIncomeExpense.income) * 100
-      : 0
-    const expenseDeltaPct = lastMonthIncomeExpense.expense > 0
-      ? ((monthIncomeExpense.expense - lastMonthIncomeExpense.expense) / lastMonthIncomeExpense.expense) * 100
-      : 0
+    const thisMonth = safeTx.reduce((acc, tx) => {
+      if (!tx?.date?.startsWith(currentMonthKey)) return acc
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      if (tx.type === 'income') acc.income += amount
+      if (tx.type === 'expense') acc.expense += amount
+      return acc
+    }, { income: 0, expense: 0 })
 
-    const allIncomeExpense = safeTx.reduce(
-      (acc, tx) => {
-        const amount = convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
+    const monthDelta = thisMonth.income - thisMonth.expense
+    return {
+      monthIncome: thisMonth.income,
+      monthExpense: thisMonth.expense,
+      monthDelta,
+      monthDeltaTone: monthDelta >= 0 ? 'success' : 'danger',
+      monthDeltaPct: thisMonth.income > 0 ? (monthDelta / thisMonth.income) * 100 : 0,
+      incomeDeltaPct: lastMonth.income > 0 ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 : 0,
+      expenseDeltaPct: lastMonth.expense > 0 ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 : 0,
+    }
+  }, [transactions, investments, currentMonthKey, defaultCurrency, rates])
 
-    const cashBalance = totalWalletBalance
-
+  // 2. Portfolio value from investments (deps: investments + currency + rates)
+  const portfolioStats = useMemo(() => {
+    if (investments === null) return { portfolioValue: 0 }
+    const safeInv = investments ?? []
     const investedAmount = safeInv.reduce((acc, inv) => {
-      const qty = toSafeNumber(inv.quantity)
-      const pp = toSafeNumber(inv.purchasePrice)
-      const raw = qty * pp
-      // Convert from purchaseCurrency -> defaultCurrency for all invested amounts.
-      return (
-        acc +
-        convertCurrency(raw, inv.purchaseCurrency || defaultCurrency, defaultCurrency, rates)
-      )
+      const raw = toSafeNumber(inv.quantity) * toSafeNumber(inv.purchasePrice)
+      return acc + convertCurrency(raw, inv.purchaseCurrency || defaultCurrency, defaultCurrency, rates)
     }, 0)
+    return { portfolioValue: investedAmount }
+  }, [investments, defaultCurrency, rates])
 
-    // Without live market pricing here, we default current value to invested amount.
-    const portfolioValue = investedAmount
-    const portfolioChangePct = investedAmount > 0 ? 0 : 0
-
-    const netWorth = cashBalance + portfolioValue
-    const monthDelta = monthIncomeExpense.income - monthIncomeExpense.expense
-    const monthDeltaTone = monthDelta >= 0 ? 'success' : 'danger'
-    const monthDeltaPct = monthIncomeExpense.income > 0 ? (monthDelta / monthIncomeExpense.income) * 100 : 0
-
-    const recentTransactions = [...safeTx].sort((a, b) => {
+  // 3. Recent transactions sorted (deps: transactions only)
+  const recentTransactions = useMemo(() => {
+    if (transactions === null) return null
+    return [...(transactions ?? [])].sort((a, b) => {
       const byDate = String(b.date || '').localeCompare(String(a.date || ''))
       if (byDate !== 0) return byDate
       const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
       if (byCreatedAt !== 0) return byCreatedAt
       return String(b.id || '').localeCompare(String(a.id || ''))
     })
+  }, [transactions])
 
+  // 4. Today income/net (deps: transactions + currency + rates)
+  const todayStats = useMemo(() => {
+    if (transactions === null) return { todayNet: 0, todayIncome: 0 }
     const todayKey = format(new Date(), 'yyyy-MM-dd')
-    const todayFlow = safeTx.reduce(
-      (acc, tx) => {
-        if (tx?.date !== todayKey) return acc
-        const amount = convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
-    const todayIncome = todayFlow.income
-    const todayNet = todayFlow.income - todayFlow.expense
+    const flow = (transactions ?? []).reduce((acc, tx) => {
+      if (tx?.date !== todayKey) return acc
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      if (tx.type === 'income') acc.income += amount
+      if (tx.type === 'expense') acc.expense += amount
+      return acc
+    }, { income: 0, expense: 0 })
+    return { todayIncome: flow.income, todayNet: flow.income - flow.expense }
+  }, [transactions, defaultCurrency, rates])
+
+  // 5. Chart data — last7 / last30 / last12m (deps: transactions + currency + rates)
+  const chartData = useMemo(() => {
+    if (transactions === null) return { last7: [], last30: [], last12m: [], weeklyIncome: 0, weeklyExpense: 0, weeklyNet: 0, weeklyProgress: 0 }
+    const safeTx = transactions ?? []
 
     const last7 = Array.from({ length: 7 }, (_, idx) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (6 - idx))
-      const key = format(d, 'yyyy-MM-dd')
-      return { day: format(d, 'EEE').slice(0, 1), date: key, income: 0, expense: 0, net: 0 }
+      const d = new Date(); d.setDate(d.getDate() - (6 - idx))
+      return { day: format(d, 'EEE').slice(0, 1), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
     })
-    const byDate = new Map(last7.map((row) => [row.date, row]))
+    const byDate7 = new Map(last7.map((r) => [r.date, r]))
     safeTx.forEach((tx) => {
-      const row = byDate.get(tx?.date)
-      if (!row) return
-      const amount = convertCurrency(
-        toSafeNumber(tx.amount),
-        tx.currency || defaultCurrency,
-        defaultCurrency,
-        rates,
-      )
+      const row = byDate7.get(tx?.date); if (!row) return
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
       if (tx.type === 'income') row.income += amount
       if (tx.type === 'expense') row.expense += amount
     })
-    last7.forEach((row) => {
-      row.net = row.income - row.expense
-    })
+    last7.forEach((r) => { r.net = r.income - r.expense })
 
     const last30 = Array.from({ length: 30 }, (_, idx) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (29 - idx))
-      const key = format(d, 'yyyy-MM-dd')
-      return { day: format(d, 'dd'), date: key, income: 0, expense: 0, net: 0 }
+      const d = new Date(); d.setDate(d.getDate() - (29 - idx))
+      return { day: format(d, 'dd'), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
     })
-    const byDate30 = new Map(last30.map((row) => [row.date, row]))
+    const byDate30 = new Map(last30.map((r) => [r.date, r]))
     safeTx.forEach((tx) => {
-      const row = byDate30.get(tx?.date)
-      if (!row) return
-      const amount = convertCurrency(
-        toSafeNumber(tx.amount),
-        tx.currency || defaultCurrency,
-        defaultCurrency,
-        rates,
-      )
+      const row = byDate30.get(tx?.date); if (!row) return
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
       if (tx.type === 'income') row.income += amount
       if (tx.type === 'expense') row.expense += amount
     })
-    last30.forEach((row) => {
-      row.net = row.income - row.expense
-    })
+    last30.forEach((r) => { r.net = r.income - r.expense })
 
     const last12m = Array.from({ length: 12 }, (_, idx) => {
-      const d = new Date()
-      d.setMonth(d.getMonth() - (11 - idx))
-      const key = format(d, 'yyyy-MM')
-      return { day: format(d, 'MMM'), key, income: 0, expense: 0, net: 0 }
+      const d = new Date(); d.setMonth(d.getMonth() - (11 - idx))
+      return { day: format(d, 'MMM'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
     })
-    const byMonth12 = new Map(last12m.map((row) => [row.key, row]))
+    const byMonth12 = new Map(last12m.map((r) => [r.key, r]))
     safeTx.forEach((tx) => {
-      const monthKey = String(tx?.date || '').slice(0, 7)
-      const row = byMonth12.get(monthKey)
-      if (!row) return
-      const amount = convertCurrency(
-        toSafeNumber(tx.amount),
-        tx.currency || defaultCurrency,
-        defaultCurrency,
-        rates,
-      )
+      const row = byMonth12.get(String(tx?.date || '').slice(0, 7)); if (!row) return
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
       if (tx.type === 'income') row.income += amount
       if (tx.type === 'expense') row.expense += amount
     })
-    last12m.forEach((row) => {
-      row.net = row.income - row.expense
-    })
+    last12m.forEach((r) => { r.net = r.income - r.expense })
 
-    const weeklyExpense = last7.reduce((acc, row) => acc + row.expense, 0)
-    const weeklyIncome = last7.reduce((acc, row) => acc + row.income, 0)
-    const weeklyNet = weeklyIncome - weeklyExpense
-    const weeklyProgress = weeklyIncome > 0 ? (weeklyIncome - weeklyExpense) / weeklyIncome : 0
-
+    const weeklyExpense = last7.reduce((acc, r) => acc + r.expense, 0)
+    const weeklyIncome = last7.reduce((acc, r) => acc + r.income, 0)
     return {
-      netWorth,
-      monthIncome: monthIncomeExpense.income,
-      monthExpense: monthIncomeExpense.expense,
-      monthDelta,
-      monthDeltaTone,
-      monthDeltaPct,
-      incomeDeltaPct,
-      expenseDeltaPct,
-      portfolioValue,
-     
-      cashBalance,
-      recentTransactions,
-      todayNet,
-      todayIncome,
-      last7,
-      last30,
-      last12m,
-      weeklyIncome,
-      weeklyExpense,
-      weeklyNet,
-      weeklyProgress,
+      last7, last30, last12m,
+      weeklyIncome, weeklyExpense,
+      weeklyNet: weeklyIncome - weeklyExpense,
+      weeklyProgress: weeklyIncome > 0 ? (weeklyIncome - weeklyExpense) / weeklyIncome : 0,
     }
-  }, [currentMonthKey, transactions, investments, defaultCurrency, rates, totalWalletBalance])
+  }, [transactions, defaultCurrency, rates])
 
-  const {
-    netWorth,
-    monthIncome,
-    monthExpense,
-    monthDelta,
-    monthDeltaPct,
-    incomeDeltaPct,
-    expenseDeltaPct,
-    portfolioValue,
-    recentTransactions,
-    cashBalance,
-    last7,
-    last30,
-    last12m,
-    weeklyIncome,
-    weeklyExpense,
-    weeklyNet,
-  } =
-    computed
+  // ── Derived values from granular memos ───────────────────────────────────
+  const { monthIncome, monthExpense, monthDelta, monthDeltaTone, monthDeltaPct, incomeDeltaPct, expenseDeltaPct } = monthStats
+  const { portfolioValue } = portfolioStats
+  const { todayNet, todayIncome } = todayStats
+  const { last7, last30, last12m, weeklyIncome, weeklyExpense, weeklyNet, weeklyProgress } = chartData
+  const cashBalance = totalWalletBalance
+  const netWorth = cashBalance + portfolioValue
   const showCashAsSeparateMetric = Math.abs(netWorth - cashBalance) > 1
+
 
   const groupedRecentEntries = useMemo(() => {
     if (!recentTransactions) return []
