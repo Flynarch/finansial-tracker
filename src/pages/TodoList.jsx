@@ -234,12 +234,25 @@ const TodoItemCard = memo(function TodoItemCard({
               {formatDue(todo.dueDate)}
             </p>
           ) : null}
-          <div className="mt-2 flex items-center gap-2">
-            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${priorityClass(todo.priority)}`} title={t(`todo.priority.${todo.priority || 'medium'}`)} />
-            {showProg ? (
-              <span className="text-[10px] font-medium text-[var(--muted)]">
-                {t('todo.progress', { done: subProgress.done, total: subProgress.total })}
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${priorityClass(todo.priority)}`} title={t(`todo.priority.${todo.priority || 'medium'}`)} />
+              <span className="text-[10px] font-semibold text-[var(--muted)] capitalize">
+                {t(`todo.priority.${todo.priority || 'medium'}`)}
               </span>
+            </div>
+            {showProg ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-[var(--fg)] tabular-nums">
+                  {subProgress.done}/{subProgress.total}
+                </span>
+                <div className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/60">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                    style={{ width: `${Math.round((subProgress.done / subProgress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
             ) : null}
           </div>
         </button>

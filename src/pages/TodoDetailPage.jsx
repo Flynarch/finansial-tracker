@@ -120,6 +120,8 @@ export default function TodoDetailPage() {
   // View & subtask states
   const [newSubLabel, setNewSubLabel] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [editingSubId, setEditingSubId] = useState(null)
+  const [editingSubText, setEditingSubText] = useState('')
 
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false)
@@ -218,6 +220,19 @@ export default function TodoDetailPage() {
     })
     setNewSubLabel('')
   }, [newSubLabel, todoId])
+
+  const startEditingSubTask = useCallback((row) => {
+    setEditingSubId(row.id)
+    setEditingSubText(row.label || '')
+  }, [])
+
+  const saveSubTaskEdit = useCallback(async (subId) => {
+    const label = editingSubText.trim()
+    if (label && subId) {
+      await db.sub_tasks.update(subId, { label })
+    }
+    setEditingSubId(null)
+  }, [editingSubText])
 
   if (!todo) {
     return (
@@ -361,7 +376,7 @@ export default function TodoDetailPage() {
                 </div>
               )}
 
-              {/* Subtask Items */}
+              {/* Subtask Items with Inline Editing */}
               {(subTasks || []).length === 0 ? (
                 <div className="py-5 text-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
                   <p className="text-xs font-medium text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
@@ -371,31 +386,79 @@ export default function TodoDetailPage() {
                   {(subTasks || []).map((row) => (
                     <li
                       key={row.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 transition active:scale-[0.99]"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 transition"
                     >
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          className="h-4.5 w-4.5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
-                          checked={Boolean(row.checked)}
-                          onChange={() => handleToggleSubTask(row)}
-                        />
-                        <span
-                          className={`text-sm font-medium transition ${
-                            row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
-                          }`}
-                        >
-                          {row.label}
-                        </span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSubTask(row.id)}
-                        className="shrink-0 rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
-                        aria-label={t('todo.subtask.delete')}
-                      >
-                        <X size={16} />
-                      </button>
+                      {editingSubId === row.id ? (
+                        <div className="flex flex-1 items-center gap-2">
+                          <input
+                            type="text"
+                            className="ft-field min-w-0 flex-1 text-xs py-1 px-2.5 mt-0 font-medium"
+                            value={editingSubText}
+                            onChange={(e) => setEditingSubText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                void saveSubTaskEdit(row.id)
+                              } else if (e.key === 'Escape') {
+                                setEditingSubId(null)
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void saveSubTaskEdit(row.id)}
+                            className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-500/10 transition active:scale-95"
+                            aria-label="Simpan subtask"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSubId(null)}
+                            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--border)]/40 transition active:scale-95"
+                            aria-label="Batal"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                            <input
+                              type="checkbox"
+                              className="h-4.5 w-4.5 shrink-0 rounded border-[var(--border)] accent-[var(--fg)] cursor-pointer"
+                              checked={Boolean(row.checked)}
+                              onChange={() => handleToggleSubTask(row)}
+                            />
+                            <span
+                              className={`text-sm font-medium transition ${
+                                row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
+                              }`}
+                            >
+                              {row.label}
+                            </span>
+                          </label>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => startEditingSubTask(row)}
+                              className="rounded-lg p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
+                              aria-label="Edit subtask"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubTask(row.id)}
+                              className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
+                              aria-label={t('todo.subtask.delete')}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
