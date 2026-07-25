@@ -359,19 +359,19 @@ export default function WalletDetailPage() {
         {/* ── 3. Content Section: Pill Filter Tabs, Search & Feed ─────── */}
         <div className="px-4 mt-6">
           {/* Rounded Pill Tabs with Transaction Counts */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+          <div className="grid grid-cols-3 gap-1.5 w-full">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-3.5 py-1.5 text-[12px] font-extrabold transition flex items-center gap-1.5 shrink-0 ${
+                className={`rounded-full px-2 py-2 text-[11px] font-extrabold transition flex items-center justify-center gap-1 min-w-0 ${
                   activeTab === tab.id
                     ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                     : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
-                <span>{tab.label}</span>
-                <span className="text-[10px] opacity-75">({tab.count})</span>
+                <span className="truncate">{tab.label}</span>
+                <span className="text-[10px] opacity-75 shrink-0">({tab.count})</span>
               </button>
             ))}
           </div>
