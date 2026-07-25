@@ -78,7 +78,7 @@ const TodoItemCard = memo(function TodoItemCard({
         </div>
 
         <div
-          className={`relative z-10 flex h-full touch-pan-y flex-col rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors ${doneStyle} ${dimCompleted} ${status?.borderClass || ''} `}
+          className={`relative z-10 flex h-full touch-pan-y flex-col justify-between rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-3 shadow-xs transition-colors ${doneStyle} ${dimCompleted} ${status?.borderClass || ''}`}
           style={{
             transform: isSwiping ? undefined : 'translateX(0px)',
             transition: isSwiping ? 'none' : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -171,7 +171,7 @@ const TodoItemCard = memo(function TodoItemCard({
         >
         <button
           type="button"
-          className={`absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full border-[2.5px] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${todo.completed ? 'border-[var(--fg)] bg-[var(--fg)] text-[var(--bg)] shadow-md' : 'border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] hover:border-[var(--fg)] hover:shadow-sm'}`}
+          className={`absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-full border-[2px] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${todo.completed ? 'border-[var(--fg)] bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] hover:border-[var(--fg)]'}`}
           aria-label={todo.completed ? t('todo.uncomplete') : t('todo.complete')}
           onClick={(e) => {
             if (ignoreNextClickRef.current) {
@@ -184,7 +184,7 @@ const TodoItemCard = memo(function TodoItemCard({
           {todo.completed ? (
             <svg
               viewBox="0 0 24 24"
-              className="h-4 w-4 scale-100 transition-transform duration-200"
+              className="h-3.5 w-3.5 scale-100 transition-transform duration-200"
               fill="currentColor"
               aria-hidden
             >
@@ -194,7 +194,7 @@ const TodoItemCard = memo(function TodoItemCard({
         </button>
         <button
           type="button"
-          className="min-h-[8rem] w-full pr-12 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 flex flex-col justify-between"
+          className="w-full pr-8 text-left focus-visible:outline-none flex flex-col justify-between h-full min-h-[4.5rem]"
           onClick={() => {
             if (ignoreNextClickRef.current) {
               ignoreNextClickRef.current = false
@@ -205,7 +205,7 @@ const TodoItemCard = memo(function TodoItemCard({
         >
           <div>
             <p
-              className={`line-clamp-2 break-words pr-1 text-[15px] font-bold leading-snug text-[var(--fg)] ${
+              className={`line-clamp-2 break-words text-[14px] font-bold leading-tight text-[var(--fg)] ${
                 todo.completed ? 'line-through opacity-70' : ''
               }`}
               title={todo.title}
@@ -213,40 +213,31 @@ const TodoItemCard = memo(function TodoItemCard({
               {todo.title}
             </p>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="inline-block rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)]">
-              {t(`todo.cat.${todo.category || 'lainnya'}`)}
-            </span>
-            {status ? (
-              <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${dueBadgeCls}`}>
-                {status.label}
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-[var(--border)]/30">
+            <div className="flex flex-wrap items-center gap-1 text-[10px]">
+              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--field-bg)] px-2 py-0.5 font-semibold text-[var(--muted)] border border-[var(--border)]/50">
+                {t(`todo.cat.${todo.category || 'lainnya'}`)}
               </span>
-            ) : null}
-          </div>
-          {todo.dueDate ? (
-            <p className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-[var(--muted)]">
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              {formatDue(todo.dueDate)}
-            </p>
-          ) : null}
-          <div className="mt-2.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${priorityClass(todo.priority)}`} title={t(`todo.priority.${todo.priority || 'medium'}`)} />
-              <span className="text-[10px] font-semibold text-[var(--muted)] capitalize">
-                {t(`todo.priority.${todo.priority || 'medium'}`)}
+
+              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--field-bg)] px-2 py-0.5 font-semibold text-[var(--muted)] border border-[var(--border)]/50">
+                <span className={`h-1.5 w-1.5 rounded-full ${priorityClass(todo.priority)}`} />
+                <span className="capitalize">{t(`todo.priority.${todo.priority || 'medium'}`)}</span>
               </span>
+
+              {status ? (
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold border ${dueBadgeCls}`}>
+                  {status.label}
+                </span>
+              ) : null}
             </div>
+
             {showProg ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-[var(--fg)] tabular-nums">
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <span className="font-bold text-[var(--fg)] tabular-nums">
                   {subProgress.done}/{subProgress.total}
                 </span>
-                <div className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/60">
+                <div className="h-1.5 w-10 overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/60">
                   <div
                     className="h-full rounded-full bg-emerald-500 transition-all duration-300"
                     style={{ width: `${Math.round((subProgress.done / subProgress.total) * 100)}%` }}
@@ -256,6 +247,7 @@ const TodoItemCard = memo(function TodoItemCard({
             ) : null}
           </div>
         </button>
+
         </div>
       </div>
     </li>
