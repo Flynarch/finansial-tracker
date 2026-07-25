@@ -1248,10 +1248,8 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 .ft-wallet-detail-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 0 0 2rem 2rem;
-  border-bottom: 1px solid var(--border);
-  padding: 1.25rem 1.25rem 1.5rem 1.25rem;
-  box-shadow: var(--shadow-card);
+  border-radius: 0;
+  border-bottom: none;
 }
 
 html:not([data-theme="light"]) .ft-wallet-detail-hero {
