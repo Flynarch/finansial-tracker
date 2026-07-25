@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format, addDays, isToday, isTomorrow, isBefore, startOfDay } from 'date-fns'
+import { format, isToday, isTomorrow, isBefore, startOfDay } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import {
   ChevronLeft,
@@ -49,13 +49,13 @@ function priorityConfig(p) {
   if (p === 'high') {
     return {
       dot: 'bg-rose-500',
-      badge: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
+      badge: 'border-rose-500/30 bg-rose-500/10 text-rose-500',
     }
   }
   if (p === 'medium') {
     return {
       dot: 'bg-amber-400',
-      badge: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+      badge: 'border-amber-500/30 bg-amber-500/10 text-amber-500',
     }
   }
   return {
@@ -67,8 +67,8 @@ function priorityConfig(p) {
 function getDueStatusConfig(dueStr, completed, t) {
   if (completed) {
     return {
-      label: t('todo.completed') || 'Selesai',
-      badgeClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+      label: t('todo.completed'),
+      badgeClass: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-500 font-bold',
       icon: <CheckCircle2 size={13} />,
     }
   }
@@ -83,7 +83,7 @@ function getDueStatusConfig(dueStr, completed, t) {
   if (isToday(dueDateObj)) {
     return {
       label: t('todo.due.today'),
-      badgeClass: 'border-amber-500/40 bg-amber-500/15 text-amber-400 font-bold',
+      badgeClass: 'border-amber-500/40 bg-amber-500/15 text-amber-500 font-bold',
       icon: <Clock size={13} />,
     }
   }
@@ -91,7 +91,7 @@ function getDueStatusConfig(dueStr, completed, t) {
   if (isTomorrow(dueDateObj)) {
     return {
       label: t('todo.due.tomorrow'),
-      badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
+      badgeClass: 'border-sky-500/40 bg-sky-500/15 text-sky-500 font-bold',
       icon: <Calendar size={13} />,
     }
   }
@@ -99,14 +99,14 @@ function getDueStatusConfig(dueStr, completed, t) {
   if (isBefore(dueDateObj, todayObj)) {
     return {
       label: t('todo.due.overdue'),
-      badgeClass: 'border-rose-500/40 bg-rose-500/15 text-rose-400 font-bold',
+      badgeClass: 'border-rose-500/40 bg-rose-500/15 text-rose-500 font-bold',
       icon: <AlertCircle size={13} />,
     }
   }
 
   return {
     label: format(dueDateObj, 'dd MMM yyyy', { locale: idLocale }),
-    badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)]',
+    badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] font-semibold',
     icon: <Calendar size={13} />,
   }
 }
@@ -243,14 +243,14 @@ export default function TodoDetailPage() {
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
 
   return (
-    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-36 sm:pb-28">
-      {/* ── Top Header Navigation Bar ──────────────────────────── */}
-      <div className="sticky top-0 z-30 border-b border-[var(--border)]/60 bg-[var(--bg)]/90 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-md sm:px-6">
+    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-36">
+      {/* ── Top Navigation Bar (Solid Background, No Text Overlap) ─────── */}
+      <div className="border-b border-[var(--border)]/60 bg-[var(--panel-strong)] px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 shadow-xs sm:px-6">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs hover:bg-[var(--border)]/40 transition active:scale-95"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
             aria-label={t('common.back')}
           >
             <ChevronLeft size={20} />
@@ -261,7 +261,7 @@ export default function TodoDetailPage() {
               <button
                 type="button"
                 onClick={startEditing}
-                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs hover:bg-[var(--border)]/40 transition active:scale-95"
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-4 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-95"
               >
                 <Edit3 size={14} />
                 <span>{t('todo.edit')}</span>
@@ -276,15 +276,15 @@ export default function TodoDetailPage() {
       </div>
 
       {/* ── Main Container ───────────────────────────────────────────── */}
-      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 sm:px-6">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 sm:px-6">
         {!isEditing ? (
           /* ── VIEW MODE LAYOUT ──────────────────────────────────────── */
           <>
             {/* Executive Hero Card */}
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm sm:p-6 space-y-4">
-              {/* Category & Priority Row */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5">
-                <div className="flex items-center gap-2">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs space-y-4">
+              {/* Category, Priority & Status Badges */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold text-[var(--fg)]">
                     {getCategoryIcon(todo.category)}
                     <span>{t(`todo.cat.${todo.category || 'lainnya'}`)}</span>
@@ -297,17 +297,17 @@ export default function TodoDetailPage() {
                 </div>
 
                 {statusCfg && (
-                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusCfg.badgeClass}`}>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusCfg.badgeClass}`}>
                     {statusCfg.icon}
                     <span>{statusCfg.label}</span>
                   </span>
                 )}
               </div>
 
-              {/* Title Stack */}
+              {/* Title & Date */}
               <div>
                 <h1
-                  className={`text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl leading-snug ${
+                  className={`text-lg sm:text-xl font-bold tracking-tight text-[var(--fg)] leading-snug ${
                     todo.completed ? 'line-through opacity-60' : ''
                   }`}
                 >
@@ -322,10 +322,10 @@ export default function TodoDetailPage() {
                 )}
               </div>
 
-              {/* Description (inside card if present) */}
+              {/* Description Card */}
               {todo.description ? (
-                <div className="rounded-2xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-4">
-                  <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--field-bg)] p-3.5">
+                  <h3 className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
                     {t('todo.field.description')}
                   </h3>
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--fg)]">
@@ -335,45 +335,43 @@ export default function TodoDetailPage() {
               ) : null}
             </div>
 
-            {/* Subtasks Section with Segmented Progress Bar */}
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm sm:p-6 space-y-4">
+            {/* Subtasks Section */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CheckSquare size={17} className="text-[var(--fg)]" />
-                  <h2 className="text-sm font-bold text-[var(--fg)] tracking-tight">
+                  <CheckSquare size={16} className="text-[var(--fg)]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
                     {t('todo.subtasksHeading')}
                   </h2>
                 </div>
                 {totalSubCount > 0 && (
-                  <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-bold tabular-nums text-[var(--fg)]">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-xs font-bold tabular-nums text-[var(--fg)]">
                     {doneSubCount}/{totalSubCount} ({subPercent}%)
                   </span>
                 )}
               </div>
 
-              {/* Progress Bar */}
+              {/* Segmented Progress Bar */}
               {totalSubCount > 0 && (
-                <div className="space-y-1.5">
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 p-0.5">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
-                      style={{ width: `${subPercent}%` }}
-                    />
-                  </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
+                    style={{ width: `${subPercent}%` }}
+                  />
                 </div>
               )}
 
-              {/* Subtask List Cards */}
+              {/* Subtask Items */}
               {(subTasks || []).length === 0 ? (
-                <div className="py-6 text-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
+                <div className="py-5 text-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
                   <p className="text-xs font-medium text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
                 </div>
               ) : (
-                <ul className="space-y-2.5">
+                <ul className="space-y-2">
                   {(subTasks || []).map((row) => (
                     <li
                       key={row.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 transition hover:border-[var(--border-strong)] active:scale-[0.99]"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 transition active:scale-[0.99]"
                     >
                       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
                         <input
@@ -393,7 +391,7 @@ export default function TodoDetailPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteSubTask(row.id)}
-                        className="shrink-0 rounded-xl p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
+                        className="shrink-0 rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition active:scale-95"
                         aria-label={t('todo.subtask.delete')}
                       >
                         <X size={16} />
@@ -403,7 +401,7 @@ export default function TodoDetailPage() {
                 </ul>
               )}
 
-              {/* Add Subtask Form */}
+              {/* Add Subtask Input Field */}
               <div className="flex gap-2 pt-1">
                 <input
                   type="text"
@@ -421,7 +419,7 @@ export default function TodoDetailPage() {
                 <button
                   type="button"
                   onClick={() => void handleAddSubTask()}
-                  className="flex items-center gap-1.5 rounded-xl bg-[var(--fg)] px-4 py-2.5 text-sm font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 shrink-0 shadow-xs"
+                  className="flex items-center gap-1.5 rounded-xl bg-[var(--fg)] px-4 py-2.5 text-sm font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 shrink-0"
                 >
                   <Plus size={16} />
                   <span>{t('todo.subtask.add')}</span>
@@ -429,14 +427,14 @@ export default function TodoDetailPage() {
               </div>
             </div>
 
-            {/* Floating Mobile Bottom Action Bar */}
-            <div className="fixed bottom-16 left-4 right-4 z-40 sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:mt-6 flex items-center justify-between gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)]/95 p-3 backdrop-blur-md shadow-lg">
+            {/* Static Action Card (In-Flow, Never Overlaps Bottom Nav or AI Bar) */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={handleToggleComplete}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-bold transition active:scale-95 shadow-xs ${
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-bold transition active:scale-95 ${
                   todo.completed
-                    ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20'
+                    ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/20'
                     : 'bg-[var(--fg)] text-[var(--bg)] hover:opacity-95'
                 }`}
               >
@@ -448,7 +446,7 @@ export default function TodoDetailPage() {
                 type="button"
                 onClick={handleDeleteTodo}
                 disabled={isDeleting}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 hover:bg-rose-500/20 transition active:scale-95 disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition active:scale-95 disabled:opacity-50"
               >
                 <Trash2 size={16} />
                 <span>{t('todo.delete')}</span>
@@ -457,7 +455,7 @@ export default function TodoDetailPage() {
           </>
         ) : (
           /* ── EDIT FORM MODE ────────────────────────────────────────── */
-          <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4.5 rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-sm">
+          <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs">
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.title')}</span>
               <input
@@ -472,7 +470,7 @@ export default function TodoDetailPage() {
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.description')}</span>
               <textarea
-                className="ft-field min-h-[5.5rem] resize-y text-base md:text-sm mt-1.5 leading-relaxed"
+                className="ft-field min-h-[5rem] resize-y text-base md:text-sm mt-1.5 leading-relaxed"
                 value={editDraft.description}
                 onChange={(e) => setEditDraft((p) => ({ ...p, description: e.target.value }))}
                 maxLength={2000}
@@ -500,7 +498,7 @@ export default function TodoDetailPage() {
                     categoryOpen ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
                   }`}
                 >
-                  <div className="space-y-1 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl">
+                  <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl">
                     {TODO_CATEGORIES.map((c) => (
                       <button
                         key={c}
@@ -534,12 +532,12 @@ export default function TodoDetailPage() {
 
             <label className="ft-label block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.priority')}</span>
-              <div className="mt-1.5 grid grid-cols-3 gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5">
+              <div className="mt-1.5 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5">
                 {PRIORITIES.map((p) => (
                   <button
                     key={p}
                     type="button"
-                    className={`rounded-xl px-2 py-2.5 text-xs font-bold transition active:scale-95 ${
+                    className={`rounded-lg px-2 py-2 text-xs font-bold transition active:scale-95 ${
                       editDraft.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                     }`}
                     onClick={() => setEditDraft((s) => ({ ...s, priority: p }))}
