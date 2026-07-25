@@ -776,22 +776,6 @@ function TodoList() {
       >
         <header className="flex items-center justify-between px-1">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)]">{t('todo.pageTitle')}</h1>
-          {activeTab === 'todo' && (
-            <button
-              type="button"
-              onClick={() => {
-                resetAddForm()
-                setAddOpen(true)
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-md transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-              aria-label={t('todo.add')}
-            >
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
         </header>
 
         {/* ── Segmented Control ── */}
@@ -855,7 +839,24 @@ function TodoList() {
                 </button>
               </div>
 
-              <div className="relative flex-shrink-0 mt-[-4px]" data-todo-popover="sort">
+              <div className="flex items-center gap-1.5 flex-shrink-0 mt-[-4px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetAddForm()
+                    setAddOpen(true)
+                  }}
+                  className="flex items-center gap-1 rounded-full bg-[var(--fg)] px-3 py-1.5 text-[12px] font-extrabold text-[var(--bg)] shadow-sm transition-transform active:scale-95"
+                  title={t('todo.add')}
+                >
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3">
+                    <path d="M12 5v14" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>+ Tugas</span>
+                </button>
+
+                <div className="relative" data-todo-popover="sort">
                 <button
                   type="button"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--fg)] transition-colors"
@@ -912,6 +913,7 @@ function TodoList() {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
 
         {!isDataReady ? (
