@@ -491,18 +491,32 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       >
         <div className="ft-chat-drag-handle" />
         
+        {/* Header */}
         <div className="flex items-center justify-between px-4 pb-3 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-1.5 font-semibold text-[15px] font-display">
-            <Sparkles size={16} className="text-[var(--accent)] shrink-0" />
-            {translate(locale, 'aiChat.title')}
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)]/12">
+              <Sparkles size={14} className="text-[var(--accent)]" />
+            </div>
+            <span className="font-bold text-[15px] text-[var(--fg)] tracking-tight">
+              {translate(locale, 'aiChat.title')}
+            </span>
           </div>
-          <button 
-            onClick={handleClear}
-            className="flex items-center gap-1 text-[var(--muted)] text-xs bg-[var(--field-bg)] px-2.5 py-1.5 rounded-full hover:bg-[var(--border)] transition-colors"
-          >
-            <Trash2 size={12} />
-            {translate(locale, 'aiChat.clear')}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleClear}
+              title={translate(locale, 'aiChat.clear')}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
+            >
+              <Trash2 size={15} />
+            </button>
+            <button
+              onClick={onClose}
+              title="Tutup"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
+            >
+              <X size={17} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
@@ -595,34 +609,34 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         {/* Input Bar */}
-        <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--card)] flex flex-col gap-2">
+        <div className="px-3 py-3 border-t border-[var(--border)] bg-[var(--bg)] flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
           {selectedImage && (
              <div className="relative inline-block self-start">
                <img src={selectedImage} alt="Preview" className="h-16 rounded-md border border-[var(--border)]" />
-               <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5">
+               <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5">
                   <X size={12} />
                </button>
              </div>
           )}
-          <form 
-            className="flex items-end gap-2 bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-3 py-2 focus-within:ring-2 ring-[var(--accent)] transition-all"
+          <form
+            className="flex items-end gap-2 bg-[var(--field-bg)] rounded-2xl px-3 py-2.5 transition-all focus-within:ring-2 ring-[var(--accent)]"
             onSubmit={(e) => {
               e.preventDefault()
               handleSend()
             }}
           >
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageSelect} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors p-1.5 shrink-0 mb-0.5" title="Upload Image">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors p-1.5 shrink-0 mb-0.5" title="Upload gambar">
                <ImageIcon size={18} />
             </button>
-            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--text)]'} transition-colors p-1.5 shrink-0 mb-0.5`} title="Voice Input">
+            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-rose-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--fg)]'} transition-colors p-1.5 shrink-0 mb-0.5`} title="Voice input">
                <Mic size={18} />
             </button>
             <textarea
               ref={inputRef}
               rows={1}
-              className="flex-1 bg-transparent border-none text-[14px] text-[var(--text)] focus:outline-none px-1 py-1.5 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
-              placeholder={isRecording ? "Mendengarkan..." : translate(locale, 'aiChat.placeholder')}
+              className="flex-1 bg-transparent border-none text-[14px] text-[var(--fg)] focus:outline-none px-1 py-1.5 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
+              placeholder={isRecording ? 'Mendengarkan...' : 'Ketik sesuatu...'}
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value)
@@ -638,9 +652,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               }}
               disabled={isLoading}
             />
-            <button 
-              type="submit" 
-              className={`p-1.5 rounded-full shrink-0 mb-0.5 transition-colors ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--muted)]'}`}
+            <button
+              type="submit"
+              className={`p-2 rounded-full shrink-0 mb-0.5 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-transparent text-[var(--muted)]'}`}
               disabled={isLoading || (!inputValue.trim() && !selectedImage)}
             >
               <Send size={16} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />

@@ -877,15 +877,15 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   right: 0;
   z-index: 46;
   background: var(--bg);
-  border-top: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   display: flex;
   flex-direction: column;
-  max-height: 85dvh;
-  min-height: 55dvh;
+  max-height: 92dvh;
+  min-height: 60dvh;
   transform: translateY(100%);
-  transition: transform 420ms cubic-bezier(0.34, 1.12, 0.64, 1), bottom 420ms cubic-bezier(0.34, 1.12, 0.64, 1), max-height 420ms cubic-bezier(0.34, 1.12, 0.64, 1), height var(--motion-duration) var(--motion-ease);
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3);
+  transition: transform 400ms cubic-bezier(0.34, 1.12, 0.64, 1), bottom 400ms cubic-bezier(0.34, 1.12, 0.64, 1), max-height 400ms cubic-bezier(0.34, 1.12, 0.64, 1);
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.18);
 }
 .ft-chat-sheet.ft-chat-sheet--open {
   transform: translateY(0);
@@ -951,18 +951,23 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   background: var(--field-bg);
   border: 1px solid var(--border);
   border-radius: 99px;
-  padding: 6px 14px;
+  padding: 7px 14px;
   font-size: 13px;
-  color: var(--muted);
+  font-weight: 500;
+  color: var(--fg);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: all 150ms var(--motion-ease);
 }
+.ft-chip:hover {
+  background: var(--border);
+}
 .ft-chip:active {
-  background: var(--accent);
+  background: var(--fg);
   color: var(--bg);
-  border-color: var(--accent);
+  border-color: var(--fg);
+  transform: scale(0.97);
 }
 
 .ft-chat-input-bar {
