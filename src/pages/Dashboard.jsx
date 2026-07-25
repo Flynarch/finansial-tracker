@@ -437,14 +437,17 @@ function Dashboard() {
     locale: locale === 'en' ? enUS : idLocale,
   })
 
-  const transactions = useLiveQuery(() => db.transactions.toArray(), [])
-  const investments = useLiveQuery(() => db.investments.toArray(), [])
-  const budgets = useLiveQuery(() => db.budgets.toArray(), [])
-  const goals = useLiveQuery(() => db.goals.toArray(), [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const transactions = useLiveQuery(() => db.transactions.toArray(), [], null)
+  const investments = useLiveQuery(() => db.investments.toArray(), [], null)
+  const budgets = useLiveQuery(() => db.budgets.toArray(), [], null)
+  const goals = useLiveQuery(() => db.goals.toArray(), [], null)
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], null)
+
+  // null = still loading (3rd arg is defaultValue). Prevents flashing empty states before real data arrives.
+  const isDbLoading = transactions === null || wallets === null
   
   const walletsWithBalance = useMemo(() => {
-    if (wallets === undefined) return undefined
+    if (wallets === null || wallets === undefined) return undefined
     if (!wallets) return []
     const txs = transactions || []
     return wallets.map(w => {
@@ -492,6 +495,18 @@ function Dashboard() {
   const computed = useMemo(() => {
     const safeTx = transactions ?? []
     const safeInv = investments ?? []
+    // Return empty-safe defaults while DB is loading
+    if (transactions === null || investments === null) {
+      return {
+        netWorth: 0, monthIncome: 0, monthExpense: 0, monthDelta: 0,
+        monthDeltaTone: 'success', monthDeltaPct: 0, incomeDeltaPct: 0,
+        expenseDeltaPct: 0, portfolioValue: 0, cashBalance: 0,
+        recentTransactions: null, // null = loading, distinct from [] = empty
+        todayNet: 0, todayIncome: 0,
+        last7: [], last30: [], last12m: [],
+        weeklyIncome: 0, weeklyExpense: 0, weeklyNet: 0, weeklyProgress: 0,
+      }
+    }
 
     const lastMonthKey = format(subMonths(new Date(), 1), 'yyyy-MM')
     const lastMonthIncomeExpense = safeTx.reduce(
@@ -719,6 +734,7 @@ function Dashboard() {
   const showCashAsSeparateMetric = Math.abs(netWorth - cashBalance) > 1
 
   const groupedRecentEntries = useMemo(() => {
+    if (!recentTransactions) return []
     const grouped = recentTransactions.reduce((acc, tx) => {
       const key = tx?.date || 'unknown'
       if (!acc[key]) acc[key] = []
@@ -734,7 +750,7 @@ function Dashboard() {
     () => groupedRecentEntries.reduce((sum, [, items]) => sum + items.length, 0),
     [groupedRecentEntries],
   )
-  const allowHistoryGrow = recentTransactions.length <= 5
+  const allowHistoryGrow = (recentTransactions?.length ?? 0) <= 5
   const formatHistoryDate = useCallback(
     (value) => {
       if (!value || value === 'unknown') return t('tx.unknownDate')
@@ -1236,7 +1252,16 @@ function Dashboard() {
             <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
           </div>
           
-          {groupedRecentEntries.length > 0 ? (() => {
+          {isDbLoading ? (
+            // Skeleton while DB is loading — prevents empty-state flash on navigation
+            <div className="flex items-center gap-3 py-3 px-2 animate-pulse">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--border)]" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-2/3 rounded bg-[var(--border)]" />
+                <div className="h-2.5 w-1/2 rounded bg-[var(--border)]/60" />
+              </div>
+            </div>
+          ) : groupedRecentEntries.length > 0 ? (() => {
             const [latestDateKey, items] = groupedRecentEntries[0];
             const latestTx = items[0];
             const dateObj = new Date(`${latestDateKey}T12:00:00`);
