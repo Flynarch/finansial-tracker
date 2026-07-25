@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Eye, EyeOff, Search } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
@@ -38,6 +38,8 @@ export default function WalletDetailPage() {
   const defaultCurrency = useSettingsStore(state => state.defaultCurrency)
   
   const [activeTab, setActiveTab] = useState('all') // all, expense, income
+  const [showBalance, setShowBalance] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
@@ -45,16 +47,33 @@ export default function WalletDetailPage() {
 
   const filteredTransactions = useMemo(() => {
     if (!allTransactions) return []
-    if (activeTab === 'all') return allTransactions
+    const query = searchQuery.trim().toLowerCase()
+
     return allTransactions.filter(tx => {
-      if (tx.type === activeTab) return true
-      if (tx.type === 'transfer') {
-        if (activeTab === 'income' && tx.targetWalletId === walletId) return true
-        if (activeTab === 'expense' && tx.walletId === walletId) return true
+      // Tab Filter
+      let matchesTab = true
+      if (activeTab !== 'all') {
+        if (tx.type === activeTab) matchesTab = true
+        else if (tx.type === 'transfer') {
+          if (activeTab === 'income' && tx.targetWalletId === walletId) matchesTab = true
+          else if (activeTab === 'expense' && tx.walletId === walletId) matchesTab = true
+          else matchesTab = false
+        } else {
+          matchesTab = false
+        }
       }
-      return false
+      if (!matchesTab) return false
+
+      // Search Query Filter
+      if (query) {
+        const notesMatch = tx.notes ? tx.notes.toLowerCase().includes(query) : false
+        const categoryMatch = tx.category ? tx.category.toLowerCase().includes(query) : false
+        const amountMatch = String(tx.amount).includes(query)
+        return notesMatch || categoryMatch || amountMatch
+      }
+      return true
     })
-  }, [allTransactions, activeTab, walletId])
+  }, [allTransactions, activeTab, searchQuery, walletId])
 
   const groupedTransactions = useMemo(() => {
     if (!filteredTransactions || filteredTransactions.length === 0) return []
@@ -302,45 +321,80 @@ export default function WalletDetailPage() {
             {/* Middle Amount & Timestamp */}
             <div className="flex-1 min-w-0">
               <p className="ft-display text-xl font-black text-[var(--fg)] tabular-nums truncate leading-tight">
-                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
+                {showBalance ? formatCurrency(currentBalance, wallet.currency || defaultCurrency) : '••••••••'}
               </p>
               <p className="text-[10px] font-medium text-[var(--muted-2)] mt-0.5 truncate">
                 Terakhir update {updatedAt}
               </p>
             </div>
 
-            {/* Right Edit Pencil Button */}
-            <button
-              onClick={() => {
-                setNewBalanceRaw(currentBalance.toString())
-                setIsEditBalanceModalOpen(true)
-              }}
-              className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
-              title="Penyesuaian Saldo"
-              aria-label="Penyesuaian Saldo"
-            >
-              <Edit2 size={16} strokeWidth={2} />
-            </button>
+            {/* Right Privacy Eye & Edit Pencil Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowBalance(prev => !prev)}
+                className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
+                title={showBalance ? "Sembunyikan Saldo" : "Tampilkan Saldo"}
+                aria-label={showBalance ? "Sembunyikan Saldo" : "Tampilkan Saldo"}
+              >
+                {showBalance ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBalanceRaw(currentBalance.toString())
+                  setIsEditBalanceModalOpen(true)
+                }}
+                className="w-9 h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
+                title="Penyesuaian Saldo"
+                aria-label="Penyesuaian Saldo"
+              >
+                <Edit2 size={16} strokeWidth={2} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* ── 3. Content Section: Pill Filter Tabs & Feed ───────────── */}
+        {/* ── 3. Content Section: Pill Filter Tabs, Search & Feed ─────── */}
         <div className="px-4 mt-6">
-          {/* Rounded Pill Tabs */}
-          <div className="flex items-center gap-2">
+          {/* Rounded Pill Tabs with Transaction Counts */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-4 py-1.5 text-[12px] font-extrabold transition ${
+                className={`rounded-full px-3.5 py-1.5 text-[12px] font-extrabold transition flex items-center gap-1.5 shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
                     : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                <span className="text-[10px] opacity-75">({tab.count})</span>
               </button>
             ))}
+          </div>
+
+          {/* Real-time Search Input */}
+          <div className="relative mt-3">
+            <Search size={15} strokeWidth={2} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari transaksi (catatan, kategori, nominal)..."
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 pl-9 pr-8 text-xs text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)]"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Transactions Feed List / Empty State */}
