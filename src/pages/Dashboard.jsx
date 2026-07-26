@@ -39,6 +39,10 @@ import {
   ZoomTab,
 } from '../components/dashboard/DashboardStatComponents'
 
+// Persistent cache for total wallet balances across tab switches
+let cachedWalletsWithBalance = null
+let cachedTotalWalletBalance = null
+
 function Dashboard() {
   const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
