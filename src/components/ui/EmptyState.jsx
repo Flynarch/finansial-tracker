@@ -17,7 +17,7 @@ function EmptyState({ icon, title, description, action, className = '' }) {
   )
 
   return (
-    <div className={`ft-empty-state ${className}`}>
+    <div className={`ft-empty-state ft-smooth-in ${className}`}>
       <div className="ft-empty-state-icon">
         {icon || defaultIcon}
       </div>

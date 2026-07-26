@@ -587,6 +587,7 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
     border-radius: var(--radius-xl);
     border: 1.5px dashed color-mix(in srgb, var(--border) 80%, transparent);
     background: var(--field-bg);
+    animation: ft-smooth-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .ft-empty-state-icon {
@@ -815,6 +816,21 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 
 .ft-swush-in {
   animation: ft-swush-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ft-smooth-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ft-smooth-in {
+  animation: ft-smooth-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes ft-ai-fade-up {

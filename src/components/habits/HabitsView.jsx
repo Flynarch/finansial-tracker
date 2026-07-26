@@ -435,7 +435,7 @@ export default function HabitsView() {
 
   if (!habits) {
     return (
-      <div className="space-y-3 p-1 animate-pulse">
+      <div className="space-y-3 p-1 animate-pulse ft-smooth-in">
         <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
         <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
       </div>
