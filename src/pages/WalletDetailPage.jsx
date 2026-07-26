@@ -310,7 +310,7 @@ export default function WalletDetailPage() {
               <ChevronLeft size={24} strokeWidth={2.5} />
             </button>
 
-            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[55%] truncate text-center text-sm font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
+            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
               {wallet.name}
             </h2>
 
@@ -365,7 +365,7 @@ export default function WalletDetailPage() {
 
           {/* Subtitles: Account Type Pill Badge */}
           <div className="relative z-10 space-y-1.5 flex flex-col items-center">
-            <h3 className="ft-display text-base font-black tracking-tight text-[var(--fg)]">
+            <h3 className="ft-display text-xs font-bold tracking-tight text-[var(--muted)]">
               {wallet.name}
             </h3>
             <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-3 py-0.5 text-[10.5px] font-extrabold text-[var(--muted)] shadow-xs">
