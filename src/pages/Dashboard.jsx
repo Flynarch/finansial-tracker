@@ -39,9 +39,12 @@ import {
   ZoomTab,
 } from '../components/dashboard/DashboardStatComponents'
 
-// Persistent cache for total wallet balances across tab switches
+// Persistent cache for total wallet balances & recent transactions across tab switches
 let cachedWalletsWithBalance = null
 let cachedTotalWalletBalance = null
+let cachedRecentTransactions = null
+let cachedTodayStats = null
+let cachedChartData = null
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -185,19 +188,25 @@ function Dashboard() {
 
   // 3. Recent transactions sorted (deps: transactions only)
   const recentTransactions = useMemo(() => {
-    if (transactions === null) return null
-    return [...(transactions ?? [])].sort((a, b) => {
+    if (transactions === null || transactions === undefined) {
+      return cachedRecentTransactions || null
+    }
+    const computed = [...(transactions ?? [])].sort((a, b) => {
       const byDate = String(b.date || '').localeCompare(String(a.date || ''))
       if (byDate !== 0) return byDate
       const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
       if (byCreatedAt !== 0) return byCreatedAt
       return String(b.id || '').localeCompare(String(a.id || ''))
     })
+    cachedRecentTransactions = computed
+    return computed
   }, [transactions])
 
   // 4. Today income/net (deps: transactions + currency + rates)
   const todayStats = useMemo(() => {
-    if (transactions === null) return { todayNet: 0, todayIncome: 0 }
+    if (transactions === null || transactions === undefined) {
+      return cachedTodayStats || { todayNet: 0, todayIncome: 0 }
+    }
     const todayKey = format(new Date(), 'yyyy-MM-dd')
     const flow = (transactions ?? []).reduce((acc, tx) => {
       if (tx?.date !== todayKey) return acc
@@ -206,7 +215,9 @@ function Dashboard() {
       if (tx.type === 'expense') acc.expense += amount
       return acc
     }, { income: 0, expense: 0 })
-    return { todayIncome: flow.income, todayNet: flow.income - flow.expense }
+    const computed = { todayIncome: flow.income, todayNet: flow.income - flow.expense }
+    cachedTodayStats = computed
+    return computed
   }, [transactions, defaultCurrency, rates])
 
   // 5. Chart data — last7 / last30 / last12m (deps: transactions + currency + rates)
