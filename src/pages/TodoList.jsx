@@ -12,7 +12,6 @@ import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import HabitsView from '../components/habits/HabitsView'
-import IdeaBoard from './IdeaBoard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import useSwipeAction from '../hooks/useSwipeAction'
 
@@ -277,7 +276,6 @@ function TodoList() {
   const { t } = useTranslation()
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const [activeTab, setActiveTab] = useState('todo')
-  const [isBoardOpen, setIsBoardOpen] = useState(false)
   const [filter, setFilter] = useState(() => 'all')
   const [isEntering, setIsEntering] = useState(false)
   const [sortPref, setSortPref] = useState(() => {
@@ -674,36 +672,9 @@ function TodoList() {
           >
             Habits
           </button>
-          <button
-            type="button"
-            className={`flex-1 rounded-[0.75rem] py-2.5 text-[14px] font-bold transition-all duration-200 ${activeTab === 'ideas' ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)]' : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)]'}`}
-            onClick={() => setActiveTab('ideas')}
-          >
-            Papan Ide
-          </button>
         </div>
 
         {activeTab === 'habits' && <HabitsView />}
-        {activeTab === 'ideas' && (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 text-center shadow-sm">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)] text-white shadow-lg">
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </div>
-            <h2 className="mb-2 text-xl font-bold text-[var(--fg)]">Papan Ide Kanvas</h2>
-            <p className="mb-6 max-w-sm text-[14px] text-[var(--muted)] leading-relaxed">
-              Ruang bebas tanpa batas untuk menuangkan ide, membuat pemetaan visual, dan merancang strategi.
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsBoardOpen(true)}
-              className="rounded-full bg-[var(--fg)] px-8 py-3 text-[14px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95"
-            >
-              Buka Kanvas Penuh
-            </button>
-          </div>
-        )}
         {activeTab === 'todo' && (
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-3">
@@ -977,15 +948,6 @@ function TodoList() {
           </Button>
         </div>
       </Modal>
-
-      {/* -- Fullscreen Idea Board -- */}
-      {isBoardOpen && (
-        <div className="fixed inset-0 z-[100] bg-[var(--bg)] animate-in fade-in zoom-in-95 duration-200">
-          <ErrorBoundary>
-            <IdeaBoard onClose={() => setIsBoardOpen(false)} />
-          </ErrorBoundary>
-        </div>
-      )}
     </div>
   )
 }
