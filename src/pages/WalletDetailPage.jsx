@@ -470,9 +470,9 @@ export default function WalletDetailPage() {
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group) => (
                 <div key={group.dateKey} className="space-y-1.5">
-                  {/* Timeline Date Header */}
-                  <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
-                    <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
+                  {/* Timeline Date Header - Rectangular Neutral Box */}
+                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md border border-[var(--border)] bg-[var(--field-bg)]">
+                    <span className="text-[10px] font-extrabold tracking-wider text-[var(--fg)] uppercase">
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (
