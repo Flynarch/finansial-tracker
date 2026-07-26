@@ -1435,6 +1435,8 @@ section,
 body.hide-bottom-nav nav,
 body.hide-bottom-nav .ft-app-shell nav,
 body.hide-bottom-nav [aria-label="Tambah Transaksi"],
-body.hide-bottom-nav .ft-ai-trigger-bar {
+body.hide-bottom-nav .ft-ai-bar,
+body.hide-bottom-nav .ft-ai-trigger-bar,
+body.hide-bottom-nav [aria-label="Open AI Chat"] {
   display: none !important;
 }
