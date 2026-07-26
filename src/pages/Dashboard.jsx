@@ -45,6 +45,8 @@ let cachedTotalWalletBalance = null
 let cachedRecentTransactions = null
 let cachedTodayStats = null
 let cachedChartData = null
+let cachedMonthStats = null
+let cachedGroupedRecentEntries = null
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -140,9 +142,11 @@ function Dashboard() {
 
   // 1. Month income/expense + delta vs last month (deps: transactions + month key + currency + rates)
   const monthStats = useMemo(() => {
-    if (transactions === null || investments === null) return {
-      monthIncome: 0, monthExpense: 0, monthDelta: 0, monthDeltaTone: 'success',
-      monthDeltaPct: 0, incomeDeltaPct: 0, expenseDeltaPct: 0,
+    if (transactions === null || investments === null) {
+      return cachedMonthStats || {
+        monthIncome: 0, monthExpense: 0, monthDelta: 0, monthDeltaTone: 'success',
+        monthDeltaPct: 0, incomeDeltaPct: 0, expenseDeltaPct: 0,
+      }
     }
     const safeTx = transactions ?? []
     const lastMonthKey = format(subMonths(new Date(), 1), 'yyyy-MM')
@@ -164,7 +168,7 @@ function Dashboard() {
     }, { income: 0, expense: 0 })
 
     const monthDelta = thisMonth.income - thisMonth.expense
-    return {
+    const computed = {
       monthIncome: thisMonth.income,
       monthExpense: thisMonth.expense,
       monthDelta,
@@ -173,6 +177,8 @@ function Dashboard() {
       incomeDeltaPct: lastMonth.income > 0 ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 : 0,
       expenseDeltaPct: lastMonth.expense > 0 ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 : 0,
     }
+    cachedMonthStats = computed
+    return computed
   }, [transactions, investments, currentMonthKey, defaultCurrency, rates])
 
   // 2. Portfolio value from investments (deps: investments + currency + rates)
@@ -285,16 +291,18 @@ function Dashboard() {
 
 
   const groupedRecentEntries = useMemo(() => {
-    if (!recentTransactions) return []
+    if (!recentTransactions) return cachedGroupedRecentEntries || []
     const grouped = recentTransactions.reduce((acc, tx) => {
       const key = tx?.date || 'unknown'
       if (!acc[key]) acc[key] = []
       acc[key].push(tx)
       return acc
     }, {})
-    return Object.entries(grouped)
+    const computed = Object.entries(grouped)
       .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
       .map(([dateKey, items]) => [dateKey, items])
+    cachedGroupedRecentEntries = computed
+    return computed
   }, [recentTransactions])
 
   const visibleHistoryCount = useMemo(
@@ -807,16 +815,7 @@ function Dashboard() {
             <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
           </div>
           
-          {isDbLoading ? (
-            // Skeleton while DB is loading — prevents empty-state flash on navigation
-            <div className="flex items-center gap-3 py-3 px-2 animate-pulse">
-              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--border)]" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-2/3 rounded bg-[var(--border)]" />
-                <div className="h-2.5 w-1/2 rounded bg-[var(--border)]/60" />
-              </div>
-            </div>
-          ) : groupedRecentEntries.length > 0 ? (() => {
+          {groupedRecentEntries.length > 0 ? (() => {
             const [latestDateKey, items] = groupedRecentEntries[0];
             const latestTx = items[0];
             const dateObj = new Date(`${latestDateKey}T12:00:00`);
@@ -837,7 +836,7 @@ function Dashboard() {
             const isExpense = latestTx?.type === 'expense';
             
             return (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 ft-smooth-in">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold tracking-wider text-[var(--muted)]">{dateLabel}</p>
                   <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[var(--bg)]">BARU</span>
@@ -861,17 +860,25 @@ function Dashboard() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="shrink-0 max-w-[50%] pl-2 text-right">
-                      <p className={`break-all text-[13px] font-bold tabular-nums ${isExpense ? 'ft-expense-text' : 'ft-income-text'}`}>
-                        {isExpense ? '-' : '+'}
-                        {formatCurrency(Math.abs(Number(latestTx?.amount || 0)), latestTx?.currency || defaultCurrency)}
+                    <div className="shrink-0 text-right">
+                      <p className={`text-[13px] font-black ${isExpense ? 'text-[var(--fg)]' : 'text-emerald-500'}`}>
+                        {isExpense ? '-' : '+'}{formatCurrency(convertCurrency(toSafeNumber(latestTx?.amount), latestTx?.currency || defaultCurrency, defaultCurrency, rates), defaultCurrency, locale)}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-            )
-          })() : (
+            );
+          })() : isDbLoading ? (
+            // Skeleton while DB is loading for initial app launch
+            <div className="flex items-center gap-3 py-3 px-2 animate-pulse">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--border)]" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-2/3 rounded bg-[var(--border)]" />
+                <div className="h-2.5 w-1/2 rounded bg-[var(--border)]/60" />
+              </div>
+            </div>
+          ) : (
             <div className="flex items-center gap-3 py-3 px-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
