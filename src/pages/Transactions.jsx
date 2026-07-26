@@ -558,7 +558,7 @@ function Transactions() {
         }`}
       >
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
-        <section className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <section className="relative z-30 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
@@ -579,31 +579,33 @@ function Transactions() {
                 </button>
               ))}
             </div>
-            <div className="relative">
+            <div className="relative z-50">
               {isMenuOpen ? (
                 <button
                   type="button"
-                  className="fixed inset-0 z-10 cursor-default bg-transparent"
+                  className="fixed inset-0 z-40 cursor-default bg-black/20 backdrop-blur-[1px]"
                   aria-label={t('tx.menu.closeOverlay')}
                   onClick={() => setIsMenuOpen(false)}
                 />
               ) : null}
               <button
                 type="button"
-                className="relative z-20 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)]"
+                className="relative z-50 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95"
                 onClick={() => setIsMenuOpen((v) => !v)}
                 aria-label={t('tx.menu.open')}
               >
                 ⋯
               </button>
               <div
-                className={`absolute right-0 top-11 z-20 w-44 translate-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.28)] transition ${
-                  isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                className={`absolute right-0 top-11 z-50 w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-2xl transition-all duration-200 ${
+                  isMenuOpen
+                    ? 'pointer-events-auto scale-100 opacity-100'
+                    : 'pointer-events-none scale-95 opacity-0'
                 }`}
               >
                 <button
                   type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                  className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98]"
                   onClick={() => {
                     setIsBulkMode(true)
                     setIsMenuOpen(false)
@@ -613,7 +615,7 @@ function Transactions() {
                 </button>
                 <button
                   type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                  className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98]"
                   onClick={() => {
                     handleExportCsv()
                     setIsMenuOpen(false)
