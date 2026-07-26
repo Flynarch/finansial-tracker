@@ -188,7 +188,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           <p
             className={`break-all text-sm font-semibold tabular-nums ${amountColorClass}`}
           >
-            {amountPrefix}
+            {isContextWalletMatch ? '' : amountPrefix}
             {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
           </p>
           {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (

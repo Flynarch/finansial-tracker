@@ -476,7 +476,7 @@ export default function WalletDetailPage() {
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (
-                      <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
+                      <span className="text-[11px] font-extrabold tabular-nums text-[var(--muted)]">
                         {group.dailySummaryText}
                       </span>
                     ) : null}
