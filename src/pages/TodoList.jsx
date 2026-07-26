@@ -7,12 +7,10 @@ import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
-import EmptyState from '../components/ui/EmptyState'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import HabitsView from '../components/habits/HabitsView'
-import { ErrorBoundary } from '../components/ErrorBoundary'
 import useSwipeAction from '../hooks/useSwipeAction'
 
 const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
@@ -58,7 +56,6 @@ const TodoItemCard = memo(function TodoItemCard({
   onDeleteTodoFromCard,
   dueStatus,
   dueBadgeClass,
-  formatDue,
   t,
 }) {
   const showProg = subProgress && subProgress.total > 0

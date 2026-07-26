@@ -5,17 +5,16 @@ export function calculateHabitStats(habit, allLogs) {
   const logDates = new Set(logs.map(log => log.date))
   
   const todayDate = new Date()
-  const todayStr = format(todayDate, 'yyyy-MM-dd')
   const createdAt = habit.createdAt ? new Date(habit.createdAt) : todayDate
   const daysSinceCreation = Math.max(1, differenceInDays(todayDate, createdAt) + 1)
   
-  let currentStreak = 0
+  let currentStreak
   let bestStreak = 0
   let totalScheduledPast = 0
   let totalCompletedPast = 0
   
   let currentWeekCompleted = 0
-  let currentWeekTarget = 0
+  let currentWeekTarget
   
   const trendData = [] // For the last 14 days
   

@@ -16,8 +16,6 @@ import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../lib/utils'
-import { getDefaultExpenseCategoryPath, getMergedExpenseTree, isValidExpenseCategoryPath } from '../lib/expenseCategories'
-import { getDefaultIncomeCategoryId, getMergedIncomeCategories, normalizeIncomeCategoryId } from '../lib/incomeCategories'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 
@@ -146,17 +144,6 @@ function Calendar() {
     notes: '',
   })
   const [amountInput, setAmountInput] = useState('')
-  useEffect(() => {
-    if (isDayModalOpen) {
-      setTxForm((prev) => ({
-        ...prev,
-        type: 'expense',
-        category: '',
-        notes: '',
-      }))
-      setAmountInput('')
-    }
-  }, [isDayModalOpen])
   const [importantForm, setImportantForm] = useState({
     title: '',
     type: 'reminder',
@@ -300,11 +287,15 @@ function Calendar() {
             onSelectSlot={({ start }) => {
               setSelectedDate(start)
               setDayTab('add')
+              setTxForm((prev) => ({ ...prev, type: 'expense', category: '', notes: '' }))
+              setAmountInput('')
               setIsDayModalOpen(true)
             }}
             onSelectEvent={(event) => {
               setSelectedDate(event.start)
               setDayTab('items')
+              setTxForm((prev) => ({ ...prev, type: 'expense', category: '', notes: '' }))
+              setAmountInput('')
               setIsDayModalOpen(true)
             }}
             onNavigate={(date) => setSelectedDate(date)}

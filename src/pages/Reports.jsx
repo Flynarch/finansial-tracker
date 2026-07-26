@@ -796,7 +796,9 @@ function Reports() {
                 // Handle potential markdown formatting from AI like ```json ... ```
                 const cleanAdvice = aiAdvice.replace(/```json/g, '').replace(/```/g, '').trim()
                 adviceData = JSON.parse(cleanAdvice)
-              } catch (e) {}
+              } catch {
+                // Ignore parse errors if AI returned non-JSON text
+              }
 
               if (adviceData) {
                 const statusColor = adviceData.status === 'sehat' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' 

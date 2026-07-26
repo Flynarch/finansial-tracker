@@ -4,14 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Search, Archive, ArchiveRestore } from 'lucide-react'
+import { ChevronLeft, Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
 import Modal from '../components/ui/Modal'
-import EmptyState from '../components/ui/EmptyState'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import useTranslation from '../hooks/useTranslation'
@@ -115,22 +114,22 @@ export default function WalletDetailPage() {
     }
 
     return Array.from(groupsMap.values()).map(group => {
-      let label = ''
+      let dateLabel = ''
       if (group.dateKey === todayStr) {
-        label = 'HARI INI'
+        dateLabel = 'HARI INI'
       } else if (group.dateKey === yesterdayStr) {
-        label = 'KEMARIN'
+        dateLabel = 'KEMARIN'
       } else if (group.dateKey !== 'Lainnya') {
         try {
           const dateObj = new Date(`${group.dateKey}T12:00:00`)
-          label = format(dateObj, 'EEEE, d MMMM yyyy', {
+          dateLabel = format(dateObj, 'EEEE, d MMMM yyyy', {
             locale: locale === 'en' ? enUS : idLocale
           }).toUpperCase()
         } catch {
-          label = group.dateKey
+          dateLabel = group.dateKey
         }
       } else {
-        label = 'LAINNYA'
+        dateLabel = 'LAINNYA'
       }
 
       const net = group.totalIncome - group.totalExpense
@@ -145,7 +144,7 @@ export default function WalletDetailPage() {
 
       return {
         ...group,
-        dateLabel: label,
+        dateLabel,
         dailySummaryText,
         isPositive: net > 0,
       }
@@ -170,24 +169,6 @@ export default function WalletDetailPage() {
     }
     return bal
   }, [wallet, allTransactions, walletId])
-
-  // Monthly income/expense for this wallet
-  const { monthIncome, monthExpense } = useMemo(() => {
-    if (!allTransactions) return { monthIncome: 0, monthExpense: 0 }
-    const currentMonth = format(new Date(), 'yyyy-MM')
-    let inc = 0, exp = 0
-    for (const tx of allTransactions) {
-      if (!tx.date?.startsWith(currentMonth)) continue
-      const amount = Number(tx.amount) || 0
-      if (tx.type === 'income' && tx.walletId === walletId) inc += amount
-      else if (tx.type === 'expense' && tx.walletId === walletId) exp += amount
-      else if (tx.type === 'transfer') {
-        if (tx.walletId === walletId) exp += amount
-        if (tx.targetWalletId === walletId) inc += amount
-      }
-    }
-    return { monthIncome: inc, monthExpense: exp }
-  }, [allTransactions, walletId])
 
   const handleDeleteWallet = async () => {
     try {
@@ -339,7 +320,7 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Centered Circular Logo */}
-          <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto my-1.5">
+          <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto mt-2.5 mb-2">
             {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
               <div className="w-full h-full flex items-center justify-center text-amber-500">
                 <MoneyBagIcon size={24} strokeWidth={2.5} />
@@ -364,7 +345,7 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Subtitles: Account Type Pill Badge */}
-          <div className="relative z-10 flex flex-col items-center">
+          <div className="relative z-10 flex flex-col items-center mb-1">
             <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
               <span>{formatAccountType(wallet.institutionType, wallet.name)}</span>
             </div>
@@ -372,7 +353,7 @@ export default function WalletDetailPage() {
         </div>
 
         {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Compact) ─────── */}
-        <div className="px-4 -mt-5 relative z-20">
+        <div className="px-4 -mt-3 relative z-20">
           <div className="-mx-3.5 sm:mx-0 rounded-xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-md space-y-1">
             {/* Top Row: Label Caption & Edit Pencil Button */}
             <div className="flex items-center justify-between">

@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Wallet } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'

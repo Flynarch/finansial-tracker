@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { createPortal } from 'react-dom'
@@ -8,15 +8,13 @@ import useSettingsStore from '../store/useSettingsStore'
 import useBottomSheet from '../hooks/useBottomSheet'
 import {
   clampPercent,
-  convertCurrency,
   formatCurrency,
   formatMoneyInput,
-  formatMoneyValueForInput,
   getMoneyInputCaret,
   parseMoneyInput,
   toSafeNumber,
 } from '../lib/utils'
-import { ChevronLeft, Edit2, Target, Plus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Target, Plus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import MoneyBag from '../components/icons/MoneyBag'
 import { format, differenceInMonths } from 'date-fns'
 import { getSavingsPrediction } from '../lib/gemini'
@@ -25,7 +23,7 @@ export default function SavingsDetail() {
   const { id } = useParams()
   const goalId = Number(id)
   const navigate = useNavigate()
-  const { t, locale } = useTranslation()
+  const { locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const profileName = useSettingsStore((state) => state.profileName)
 
@@ -96,7 +94,7 @@ export default function SavingsDetail() {
       try {
         const cleanJson = predictionRaw.replace(/```json/g, '').replace(/```/g, '').trim()
         setAiPrediction(JSON.parse(cleanJson))
-      } catch (e) {
+      } catch {
         setAiPrediction({ error: true, text: predictionRaw })
       }
     } catch (error) {

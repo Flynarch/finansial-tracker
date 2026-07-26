@@ -375,7 +375,9 @@ ${buildCategoryContext(locale)}`
                   }
                 }
               }
-            } catch (e) {}
+            } catch {
+              // ignore malformed SSE json chunk
+            }
           }
         }
         

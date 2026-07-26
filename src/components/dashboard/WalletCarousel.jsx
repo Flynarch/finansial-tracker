@@ -217,7 +217,7 @@ export default function WalletCarousel({
                   </span>
                 </div>
                 {/* Name + Saldo Uang */}
-                <div className="min-w-0 flex flex-col text-left">
+                <div className="min-w-0 flex flex-col text-left gap-0.5">
                   <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] truncate max-w-[90px] leading-tight">
                     {w.name}
                   </span>
@@ -237,7 +237,7 @@ export default function WalletCarousel({
               <div className="ft-wallet-mini-logo" style={{ background: 'var(--fg)', color: 'var(--bg)', border: 'none' }}>
                 <Plus size={16} strokeWidth={2.5} />
               </div>
-              <div className="min-w-0 flex flex-col text-left">
+              <div className="min-w-0 flex flex-col text-left gap-0.5">
                 <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] leading-tight">Akun Baru</span>
                 <span className="ft-wallet-mini-balance" style={{ color: 'var(--muted)', fontSize: '12px' }}>Tambah</span>
               </div>

@@ -1,6 +1,6 @@
 import { format, parseISO, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Calendar as CalendarIcon, CalendarDays, Clock, Sparkles, TrendingUp, Layers, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import Button from '../components/ui/Button'
@@ -226,9 +226,7 @@ function Transactions() {
   const [apiErrorTone, setApiErrorTone] = useState('error')
   const [quickRange, setQuickRange] = useState('today')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false)
   useBackButton(() => {
-    setIsCategoryPickerOpen(false)
     setIsFilterOpen(false)
   }, isFilterOpen)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -299,6 +297,17 @@ function Transactions() {
       document.body.classList.remove('hide-bottom-nav')
     }
   }, [isBulkMode])
+
+  useEffect(() => {
+    if (isFilterOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isFilterOpen])
 
   const [isEntering, setIsEntering] = useState(false)
   const hasInitializedDefaultRange = useRef(false)
@@ -388,19 +397,16 @@ function Transactions() {
 
   const toggleTypeFilter = (typeKey) => {
     const currentTypes = draftFilters?.types ?? filters.types ?? ALL_TYPES
+    const isCurrentlyAll = currentTypes.length === ALL_TYPES.length
     let nextTypes = []
-    const isCurrentlyAll = currentTypes.length === 0 || currentTypes.length === ALL_TYPES.length
 
     if (typeKey === 'all') {
       nextTypes = isCurrentlyAll ? [] : [...ALL_TYPES]
     } else {
-      const set = new Set(isCurrentlyAll ? ALL_TYPES : currentTypes)
+      const set = new Set(currentTypes)
       if (set.has(typeKey)) set.delete(typeKey)
       else set.add(typeKey)
       nextTypes = Array.from(set)
-      if (nextTypes.length === ALL_TYPES.length) {
-        nextTypes = [...ALL_TYPES]
-      }
     }
     setDraftFilters((p) => ({ ...(p || filters), types: nextTypes }))
   }
@@ -408,39 +414,33 @@ function Transactions() {
   const toggleWalletFilter = (walletIdKey) => {
     const allIds = userWallets.map((w) => String(w.id))
     const currentWallets = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+    const isCurrentlyAll = currentWallets.length === allIds.length
     let nextWallets = []
-    const isCurrentlyAll = currentWallets.length === 0 || currentWallets.length === allIds.length
 
     if (walletIdKey === 'all') {
       nextWallets = isCurrentlyAll ? [] : [...allIds]
     } else {
-      const set = new Set(isCurrentlyAll ? allIds : currentWallets)
       const targetStr = String(walletIdKey)
+      const set = new Set(currentWallets)
       if (set.has(targetStr)) set.delete(targetStr)
       else set.add(targetStr)
       nextWallets = Array.from(set)
-      if (nextWallets.length === allIds.length) {
-        nextWallets = [...allIds]
-      }
     }
     setDraftFilters((p) => ({ ...(p || filters), walletIds: nextWallets }))
   }
 
   const toggleCategoryFilter = (catKey) => {
     const currentCats = draftFilters?.categories ?? filters.categories ?? usedCategories
+    const isCurrentlyAll = currentCats.length === usedCategories.length
     let nextCats = []
-    const isCurrentlyAll = currentCats.length === 0 || currentCats.length === usedCategories.length
 
     if (catKey === 'all') {
       nextCats = isCurrentlyAll ? [] : [...usedCategories]
     } else {
-      const set = new Set(isCurrentlyAll ? usedCategories : currentCats)
+      const set = new Set(currentCats)
       if (set.has(catKey)) set.delete(catKey)
       else set.add(catKey)
       nextCats = Array.from(set)
-      if (nextCats.length === usedCategories.length) {
-        nextCats = [...usedCategories]
-      }
     }
     setDraftFilters((p) => ({ ...(p || filters), categories: nextCats }))
   }
@@ -570,40 +570,35 @@ function Transactions() {
     { income: 0, expense: 0 },
   )
 
-  const groupedTransactions = useMemo(() => {
-    return filteredTransactions.reduce((acc, tx) => {
-      const key = tx.date || 'unknown'
-      if (!acc[key]) acc[key] = []
-      acc[key].push(tx)
-      return acc
-    }, {})
-  }, [filteredTransactions])
-
   const groupedEntries = useMemo(() => {
-    return Object.entries(groupedTransactions).sort((a, b) => String(b[0]).localeCompare(String(a[0])))
-  }, [groupedTransactions])
+    const grouped = filteredTransactions.reduce((acc, tx) => {
+      const key = tx.date || 'unknown'
+      return { ...acc, [key]: [...(acc[key] || []), tx] }
+    }, {})
+    return Object.entries(grouped).sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+  }, [filteredTransactions])
 
   const groupedEntriesDetailed = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
     return groupedEntries.map(([dateKey, items]) => {
-      let label = ''
+      let dateLabel = ''
       if (dateKey === todayStr) {
-        label = 'HARI INI'
+        dateLabel = 'HARI INI'
       } else if (dateKey === yesterdayStr) {
-        label = 'KEMARIN'
+        dateLabel = 'KEMARIN'
       } else if (dateKey !== 'unknown') {
         try {
           const dateObj = new Date(`${dateKey}T12:00:00`)
-          label = format(dateObj, 'EEEE, d MMMM yyyy', {
+          dateLabel = format(dateObj, 'EEEE, d MMMM yyyy', {
             locale: locale === 'en' ? enUS : idLocale
           }).toUpperCase()
         } catch {
-          label = dateKey
+          dateLabel = dateKey
         }
       } else {
-        label = t('tx.unknownDate')
+        dateLabel = t('tx.unknownDate')
       }
 
       let totalIncome = 0
@@ -633,7 +628,7 @@ function Transactions() {
       return {
         dateKey,
         items,
-        dateLabel: label,
+        dateLabel,
         dailySummaryText,
         isPositive: net > 0,
       }
@@ -683,14 +678,14 @@ function Transactions() {
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
         <section className="relative z-30 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               onClick={() => setIsRangeModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 shadow-2xs min-w-0 truncate"
             >
-              <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.2} />
-              <span>
+              <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+              <span className="truncate">
                 {quickRange === 'all'
                   ? 'Semua Transaksi'
                   : quickRange === 'yearly'
@@ -705,7 +700,7 @@ function Transactions() {
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" strokeWidth={2.2} />
             </button>
-            <div className="relative z-50">
+            <div className="relative z-50 shrink-0">
               {isMenuOpen ? (
                 <button
                   type="button"
@@ -803,7 +798,6 @@ function Transactions() {
             className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)]"
             onClick={() => {
               setIsMenuOpen(false)
-              setIsCategoryPickerOpen(false)
               setDraftFilters({ ...filters })
               setIsFilterOpen(true)
             }}
@@ -956,40 +950,42 @@ function Transactions() {
       </Modal>
 
       <div
-        className={`fixed inset-0 z-50 transition-opacity ${
+        className={`fixed inset-0 z-50 transition-opacity duration-250 ease-out ${
           isFilterOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
         <button
           type="button"
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          className="absolute inset-0 bg-black/40 backdrop-blur-xs"
           onClick={() => {
-            setIsCategoryPickerOpen(false)
             setIsFilterOpen(false)
           }}
           aria-label={t('tx.filter.close')}
         />
         <div
-          className={`absolute inset-x-0 bottom-0 h-[min(78dvh,40rem)] overflow-y-auto rounded-t-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-200 ease-out ${
+          className={`absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform transform-gpu ${
             isFilterOpen ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
-          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold text-[var(--fg)]">{t('tx.filter.title')}</p>
-            <button
-              type="button"
-              className="rounded-xl px-3 py-1 text-sm text-[var(--muted)] hover:bg-[var(--field-bg)]"
-              onClick={() => {
-                setIsCategoryPickerOpen(false)
-                setIsFilterOpen(false)
-              }}
-            >
-              {t('tx.filter.close')}
-            </button>
+          {/* Header (Fixed - Never Scrolls) */}
+          <div className="shrink-0 p-4 pb-3 border-b border-[var(--border)]/40 bg-[var(--panel-strong)] rounded-t-3xl">
+            <div className="mx-auto mb-2.5 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-extrabold text-[var(--fg)] tracking-tight">{t('tx.filter.title')}</p>
+              <button
+                type="button"
+                className="rounded-xl px-3 py-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition"
+                onClick={() => {
+                  setIsFilterOpen(false)
+                }}
+              >
+                {t('tx.filter.close')}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3.5 mt-2">
+          {/* Middle Body (Single Scroll Container - No Outer Scroll Jumps) */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3.5 ft-hide-scrollbar">
             {/* 1. Setting Tanggal (Dari - Sampai) */}
             <div className="space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3">
               <div className="flex items-center justify-between">
@@ -1054,10 +1050,10 @@ function Transactions() {
                 <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'type' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
               </button>
               {activeFilterSection === 'type' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)]">
+                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] ft-slide-in">
                   {(() => {
                     const list = draftFilters?.types ?? filters.types ?? ALL_TYPES
-                    const isAllChecked = list.length === ALL_TYPES.length || list.length === 0
+                    const isAllChecked = list.length === ALL_TYPES.length
                     return (
                       <>
                         <button
@@ -1081,7 +1077,7 @@ function Transactions() {
                           { id: 'expense', label: 'Pengeluaran' },
                           { id: 'transfer', label: 'Transfer (Pindah Saldo)' },
                         ].map((item) => {
-                          const isChecked = isAllChecked || list.includes(item.id)
+                          const isChecked = list.includes(item.id)
                           return (
                             <button
                               key={item.id}
@@ -1110,7 +1106,7 @@ function Transactions() {
             </div>
 
             {/* 3. Akun / Dompet (Checklist Accordion Multi-Select) */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
               <button
                 type="button"
                 onClick={() => setActiveFilterSection((prev) => (prev === 'wallet' ? null : 'wallet'))}
@@ -1134,11 +1130,11 @@ function Transactions() {
                 <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'wallet' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
               </button>
               {activeFilterSection === 'wallet' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto">
+                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
                   {(() => {
                     const allIds = userWallets.map((w) => String(w.id))
                     const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
-                    const isAllChecked = list.length === allIds.length || list.length === 0
+                    const isAllChecked = list.length === allIds.length
                     return (
                       <>
                         <button
@@ -1158,7 +1154,7 @@ function Transactions() {
                           </div>
                         </button>
                         {userWallets.map((wallet) => {
-                          const isChecked = isAllChecked || list.includes(String(wallet.id))
+                          const isChecked = list.includes(String(wallet.id))
                           return (
                             <button
                               key={wallet.id}
@@ -1193,8 +1189,8 @@ function Transactions() {
               )}
             </div>
 
-            {/* 4. Kategori Utama (Checklist Accordion Multi-Select) */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
+            {/* 4. Kategori Utama */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
               <button
                 type="button"
                 onClick={() => setActiveFilterSection((prev) => (prev === 'category' ? null : 'category'))}
@@ -1214,19 +1210,19 @@ function Transactions() {
                 <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'category' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
               </button>
               {activeFilterSection === 'category' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto">
+                <div className="border-t border-[var(--border)] grid grid-cols-2 gap-1.5 p-2 bg-[var(--panel-strong)] max-h-60 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
                   {(() => {
                     const list = draftFilters?.categories ?? filters.categories ?? usedCategories
-                    const isAllChecked = list.length === usedCategories.length || list.length === 0
+                    const isAllChecked = list.length === usedCategories.length
                     return (
                       <>
                         <button
                           type="button"
                           onClick={() => toggleCategoryFilter('all')}
-                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                          className={`col-span-2 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
                             isAllChecked
-                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[var(--accent)]/30'
+                              : 'text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)]'
                           }`}
                         >
                           <span>Semua Kategori</span>
@@ -1237,21 +1233,23 @@ function Transactions() {
                           </div>
                         </button>
                         {usedCategories.map((category) => {
-                          const isChecked = isAllChecked || list.includes(category)
+                          const isChecked = list.includes(category)
                           return (
                             <button
                               key={category}
                               type="button"
                               onClick={() => toggleCategoryFilter(category)}
-                              className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                                isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold text-left transition ${
+                                isChecked
+                                  ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[var(--accent)]/30'
+                                  : 'text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)]'
                               }`}
                             >
                               <span className="truncate">{formatCategoryName(category, locale)}</span>
-                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                              <div className={`h-3.5 w-3.5 rounded-md border flex items-center justify-center transition shrink-0 ml-1 ${
                                 isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                               }`}>
-                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                                {isChecked && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
                               </div>
                             </button>
                           )
@@ -1264,7 +1262,8 @@ function Transactions() {
             </div>
           </div>
 
-          <div className="sticky bottom-0 mt-5 bg-[var(--panel-strong)] pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-2 flex items-center gap-2 border-t border-[var(--border)]">
+          {/* Footer (Fixed - Never Moves or Jumps) */}
+          <div className="shrink-0 p-4 pt-3 bg-[var(--panel-strong)] border-t border-[var(--border)] flex items-center gap-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
             <button
               type="button"
               className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"

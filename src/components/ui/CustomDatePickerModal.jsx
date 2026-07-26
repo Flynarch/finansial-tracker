@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   format,
   addMonths,
@@ -9,7 +9,6 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isSameMonth,
-  isSameDay,
   isAfter,
   isBefore,
   parseISO,
@@ -18,7 +17,7 @@ import {
   startOfYear,
 } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
 
 export default function CustomDatePickerModal({

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Edit2, Check, ChevronDown, DollarSign, XCircle } from 'lucide-react'
+import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 

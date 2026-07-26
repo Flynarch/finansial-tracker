@@ -13,7 +13,7 @@ import { resolveExpenseParentIconKey } from '../lib/categoryIcon'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import { clampPercent, convertCurrency, formatCurrency, formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../lib/utils'
+import { convertCurrency, formatCurrency, formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../lib/utils'
 import { getMergedExpenseTree, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
@@ -119,7 +119,7 @@ function Budget() {
     setExpandedParentId(null)
     setIsCategoryOpen(false)
     openSheet()
-  }, [month, openSheet])
+  }, [month, openSheet, setSwipedId])
 
   const openEdit = (budget) => {
     setSheetError('')

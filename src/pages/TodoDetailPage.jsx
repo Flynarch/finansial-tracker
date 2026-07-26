@@ -11,7 +11,6 @@ import {
   Plus,
   X,
   Calendar,
-  Tag,
   Edit3,
   CheckSquare,
   Clock,

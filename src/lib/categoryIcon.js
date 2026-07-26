@@ -1,5 +1,5 @@
 import { getExpenseCategoryColor, parseExpenseCategoryPath } from './expenseCategories'
-import { formatIncomeCategory, getIncomeCategoryColor, normalizeIncomeCategoryId, parseIncomeCategoryPath } from './incomeCategories'
+import { getIncomeCategoryColor, normalizeIncomeCategoryId, parseIncomeCategoryPath } from './incomeCategories'
 
 const EXPENSE_ICON_BY_PARENT = {
   makanan: 'food',
