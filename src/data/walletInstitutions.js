@@ -16,31 +16,51 @@ export function getWalletLogoUrl(wallet) {
 }
 
 export const walletInstitutions = [
-  // Bank - Recommended
+  // Bank Utama / Recommended
   { id: 'bca', name: 'BCA', type: 'bank', logoUrl: getLogoUrl('bca.co.id'), isRecommended: true },
   { id: 'mandiri', name: 'Mandiri', type: 'bank', logoUrl: getLogoUrl('bankmandiri.co.id'), isRecommended: true },
   { id: 'bni', name: 'BNI', type: 'bank', logoUrl: getLogoUrl('bni.co.id'), isRecommended: true },
-  
-  // Bank - Others
   { id: 'bri', name: 'BRI', type: 'bank', logoUrl: BRI_CUSTOM_LOGO, isRecommended: true },
+  { id: 'jago', name: 'Bank Jago', type: 'bank', logoUrl: getLogoUrl('jago.com'), isRecommended: true },
+  { id: 'seabank', name: 'SeaBank', type: 'bank', logoUrl: getLogoUrl('seabank.co.id'), isRecommended: true },
+  
+  // Bank Lainnya & Bank Digital
   { id: 'bsi', name: 'BSI', type: 'bank', logoUrl: getLogoUrl('bankbsi.co.id'), isRecommended: false },
   { id: 'cimb', name: 'CIMB Niaga', type: 'bank', logoUrl: getLogoUrl('cimbniaga.co.id'), isRecommended: false },
-  { id: 'jago', name: 'Bank Jago', type: 'bank', logoUrl: getLogoUrl('jago.com'), isRecommended: false },
-  { id: 'seabank', name: 'SeaBank', type: 'bank', logoUrl: getLogoUrl('seabank.co.id'), isRecommended: false },
+  { id: 'jenius', name: 'Jenius (BTPN)', type: 'bank', logoUrl: getLogoUrl('jenius.com'), isRecommended: false },
+  { id: 'blu', name: 'blu (BCA Digital)', type: 'bank', logoUrl: getLogoUrl('bcadigital.co.id'), isRecommended: false },
+  { id: 'neobank', name: 'NeoBank (BNC)', type: 'bank', logoUrl: getLogoUrl('bankneocommerce.co.id'), isRecommended: false },
+  { id: 'allobank', name: 'Allo Bank', type: 'bank', logoUrl: getLogoUrl('allobank.com'), isRecommended: false },
+  { id: 'btn', name: 'Bank BTN', type: 'bank', logoUrl: getLogoUrl('btn.co.id'), isRecommended: false },
+  { id: 'permata', name: 'PermataBank', type: 'bank', logoUrl: getLogoUrl('permatabank.com'), isRecommended: false },
+  { id: 'danamon', name: 'Bank Danamon', type: 'bank', logoUrl: getLogoUrl('danamon.co.id'), isRecommended: false },
+  { id: 'mega', name: 'Bank Mega', type: 'bank', logoUrl: getLogoUrl('bankmega.com'), isRecommended: false },
+  { id: 'sinarmas', name: 'Bank Sinarmas', type: 'bank', logoUrl: getLogoUrl('banksinarmas.com'), isRecommended: false },
+  { id: 'panin', name: 'Panin Bank', type: 'bank', logoUrl: getLogoUrl('panin.co.id'), isRecommended: false },
   
-  // E-Wallet
-  { id: 'gopay', name: 'GoPay', type: 'ewallet', logoUrl: getLogoUrl('gopay.co.id'), isRecommended: false },
-  { id: 'ovo', name: 'OVO', type: 'ewallet', logoUrl: getLogoUrl('ovo.id'), isRecommended: false },
-  { id: 'dana', name: 'DANA', type: 'ewallet', logoUrl: getLogoUrl('dana.id'), isRecommended: false },
+  // E-Wallet & PayLater
+  { id: 'gopay', name: 'GoPay', type: 'ewallet', logoUrl: getLogoUrl('gopay.co.id'), isRecommended: true },
+  { id: 'ovo', name: 'OVO', type: 'ewallet', logoUrl: getLogoUrl('ovo.id'), isRecommended: true },
+  { id: 'dana', name: 'DANA', type: 'ewallet', logoUrl: getLogoUrl('dana.id'), isRecommended: true },
   { id: 'shopeepay', name: 'ShopeePay', type: 'ewallet', logoUrl: getLogoUrl('shopeepay.co.id'), isRecommended: false },
   { id: 'linkaja', name: 'LinkAja', type: 'ewallet', logoUrl: getLogoUrl('linkaja.id'), isRecommended: false },
+  { id: 'astrapay', name: 'AstraPay', type: 'ewallet', logoUrl: getLogoUrl('astrapay.com'), isRecommended: false },
+  { id: 'isaku', name: 'iSAKU (Indomaret)', type: 'ewallet', logoUrl: getLogoUrl('isaku-indomaret.com'), isRecommended: false },
+  { id: 'paypal', name: 'PayPal', type: 'ewallet', logoUrl: getLogoUrl('paypal.com'), isRecommended: false },
+  { id: 'kredivo', name: 'Kredivo / PayLater', type: 'ewallet', logoUrl: getLogoUrl('kredivo.com'), isRecommended: false },
   
-  // Investasi
+  // Investasi & Crypto
   { id: 'bibit', name: 'Bibit', type: 'investasi', logoUrl: getLogoUrl('bibit.id'), isRecommended: false },
   { id: 'ajaib', name: 'Ajaib', type: 'investasi', logoUrl: getLogoUrl('ajaib.co.id'), isRecommended: false },
   { id: 'bareksa', name: 'Bareksa', type: 'investasi', logoUrl: getLogoUrl('bareksa.com'), isRecommended: false },
   { id: 'stockbit', name: 'Stockbit', type: 'investasi', logoUrl: getLogoUrl('stockbit.com'), isRecommended: false },
+  { id: 'pintu', name: 'Pintu Crypto', type: 'investasi', logoUrl: getLogoUrl('pintu.co.id'), isRecommended: false },
+  { id: 'indodax', name: 'Indodax', type: 'investasi', logoUrl: getLogoUrl('indodax.com'), isRecommended: false },
+  { id: 'pluang', name: 'Pluang', type: 'investasi', logoUrl: getLogoUrl('pluang.com'), isRecommended: false },
+  { id: 'tokocrypto', name: 'Tokocrypto', type: 'investasi', logoUrl: getLogoUrl('tokocrypto.com'), isRecommended: false },
+  { id: 'binance', name: 'Binance', type: 'investasi', logoUrl: getLogoUrl('binance.com'), isRecommended: false },
+  { id: 'pegadaian', name: 'Pegadaian (Emas)', type: 'investasi', logoUrl: getLogoUrl('pegadaian.co.id'), isRecommended: false },
   
   // Lainnya
-  { id: 'cash', name: 'Cash', type: 'lainnya', logoUrl: '', isRecommended: false, subtitle: 'International', customIcon: 'dollar' },
+  { id: 'cash', name: 'Uang Tunai (Cash)', type: 'lainnya', logoUrl: '', isRecommended: true, subtitle: 'International', customIcon: 'dollar' },
 ]
