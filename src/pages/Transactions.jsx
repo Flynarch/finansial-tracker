@@ -241,6 +241,7 @@ function Transactions() {
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
   const [pendingFocusTransactionId, setPendingFocusTransactionId] = useState(null)
+  const [highlightedTransactionId, setHighlightedTransactionId] = useState(null)
   const listScrollRef = useRef(null)
 
   const [isBulkMode, setIsBulkMode] = useState(false)
@@ -1000,7 +1001,7 @@ function Transactions() {
       {/* ── Category Picker Modal for Batch Category ────────────── */}
       <CategoryPickerModal
         isOpen={isBatchCategoryModalOpen}
-        type="expense"
+        txType="expense"
         onClose={() => setIsBatchCategoryModalOpen(false)}
         onSelectCategory={(categoryKey) => {
           handleBatchCategoryChange(categoryKey)
