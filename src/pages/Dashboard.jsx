@@ -6,7 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { X, TrendingUp } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { db } from '../lib/db'
@@ -42,11 +42,26 @@ import {
 
 const getSavedNetWorthRange = () => {
   try {
-    return localStorage.getItem('ft_networth_range') || 'weekly'
+    const val = localStorage.getItem('ft_networth_range')
+    if (val === 'today') return '1d'
+    if (val === 'weekly') return '1w'
+    if (val === 'monthly') return '1m'
+    if (val === 'yearly') return '1y'
+    return val || '1m'
   } catch {
-    return 'weekly'
+    return '1m'
   }
 }
+
+const COMPACT_ITEMS = [
+  { id: '1d', label: '1H' },
+  { id: '1w', label: '1M' },
+  { id: '1m', label: '1B' },
+  { id: '3m', label: '3B' },
+  { id: 'ytd', label: 'YTD' },
+  { id: '1y', label: '1T' },
+  { id: 'all', label: 'ALL' },
+]
 
 // Persistent cache for total wallet balances & recent transactions across tab switches
 let cachedWalletsWithBalance = null
@@ -89,6 +104,7 @@ function Dashboard() {
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
 
   const setZoomRevenueRange = useCallback((range) => {
+    setZoomTooltipDismissed(true)
     setZoomRevenueRangeState(range)
     setMiniRevenueRangeState(range)
     try {
@@ -97,6 +113,7 @@ function Dashboard() {
   }, [])
 
   const setMiniRevenueRange = useCallback((range) => {
+    setZoomTooltipDismissed(true)
     setMiniRevenueRangeState(range)
     setZoomRevenueRangeState(range)
     try {
@@ -254,57 +271,76 @@ function Dashboard() {
     return computed
   }, [transactions, defaultCurrency, rates])
 
-  // 5. Chart data — last7 / last30 / last12m (deps: transactions + currency + rates)
+  // 5. Chart data — stock-style ranges (deps: transactions + currency + rates)
   const chartData = useMemo(() => {
-    if (transactions === null) return { last7: [], last30: [], last12m: [], weeklyIncome: 0, weeklyExpense: 0, weeklyNet: 0, weeklyProgress: 0 }
+    if (transactions === null) return { data1w: [], data1m: [], data3m: [], dataYtd: [], data1y: [], dataAll: [], weeklyIncome: 0, weeklyExpense: 0, weeklyNet: 0 }
     const safeTx = transactions ?? []
+    
+    // Helper to generate daily buckets
+    const generateDaily = (daysCount) => {
+      const arr = Array.from({ length: daysCount }, (_, idx) => {
+        const d = new Date(); d.setDate(d.getDate() - (daysCount - 1 - idx))
+        return { day: format(d, 'dd MMM'), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
+      })
+      const map = new Map(arr.map(r => [r.date, r]))
+      return { arr, map }
+    }
 
-    const last7 = Array.from({ length: 7 }, (_, idx) => {
-      const d = new Date(); d.setDate(d.getDate() - (6 - idx))
-      return { day: format(d, 'EEE').slice(0, 1), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
-    })
-    const byDate7 = new Map(last7.map((r) => [r.date, r]))
+    // Helper to generate monthly buckets
+    const generateMonthly = (monthsCount, endMonthD = new Date()) => {
+      const arr = Array.from({ length: monthsCount }, (_, idx) => {
+        const d = new Date(endMonthD); d.setMonth(d.getMonth() - (monthsCount - 1 - idx))
+        return { day: format(d, 'MMM yyyy'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
+      })
+      const map = new Map(arr.map(r => [r.key, r]))
+      return { arr, map }
+    }
+
+    const { arr: data1w, map: map1w } = generateDaily(7)
+    const { arr: data1m, map: map1m } = generateDaily(30)
+    const { arr: data3m, map: map3m } = generateDaily(90)
+    
+    const { arr: data1y, map: map1y } = generateMonthly(12)
+    
+    const currentMonth = new Date().getMonth() + 1 // 1-12
+    // Recharts needs at least 2 points to draw an area/line
+    const { arr: dataYtd, map: mapYtd } = generateMonthly(Math.max(2, currentMonth))
+    
+    let oldestDate = new Date()
+    if (safeTx.length > 0) {
+      for (const tx of safeTx) {
+        if (tx.date && new Date(tx.date) < oldestDate) oldestDate = new Date(tx.date)
+      }
+    }
+    const allMonthsDiff = (new Date().getFullYear() - oldestDate.getFullYear()) * 12 + (new Date().getMonth() - oldestDate.getMonth()) + 1
+    const totalMonths = Math.max(2, allMonthsDiff)
+    const { arr: dataAll, map: mapAll } = generateMonthly(totalMonths)
+
     safeTx.forEach((tx) => {
-      const row = byDate7.get(tx?.date); if (!row) return
       const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      if (tx.type === 'income') row.income += amount
-      if (tx.type === 'expense') row.expense += amount
+      const txDate = tx?.date
+      if (!txDate) return
+      
+      const r1w = map1w.get(txDate); if (r1w) { r1w[tx.type] = (r1w[tx.type] || 0) + amount }
+      const r1m = map1m.get(txDate); if (r1m) { r1m[tx.type] = (r1m[tx.type] || 0) + amount }
+      const r3m = map3m.get(txDate); if (r3m) { r3m[tx.type] = (r3m[tx.type] || 0) + amount }
+      
+      const monthKey = txDate.slice(0, 7)
+      const rytd = mapYtd.get(monthKey); if (rytd) { rytd[tx.type] = (rytd[tx.type] || 0) + amount }
+      const r1y = map1y.get(monthKey); if (r1y) { r1y[tx.type] = (r1y[tx.type] || 0) + amount }
+      const rall = mapAll.get(monthKey); if (rall) { rall[tx.type] = (rall[tx.type] || 0) + amount }
     })
-    last7.forEach((r) => { r.net = r.income - r.expense })
 
-    const last30 = Array.from({ length: 30 }, (_, idx) => {
-      const d = new Date(); d.setDate(d.getDate() - (29 - idx))
-      return { day: format(d, 'dd'), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
-    })
-    const byDate30 = new Map(last30.map((r) => [r.date, r]))
-    safeTx.forEach((tx) => {
-      const row = byDate30.get(tx?.date); if (!row) return
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      if (tx.type === 'income') row.income += amount
-      if (tx.type === 'expense') row.expense += amount
-    })
-    last30.forEach((r) => { r.net = r.income - r.expense })
+    const calcNet = (arr) => arr.forEach(r => { r.net = (r.income || 0) - (r.expense || 0) })
+    calcNet(data1w); calcNet(data1m); calcNet(data3m)
+    calcNet(dataYtd); calcNet(data1y); calcNet(dataAll)
 
-    const last12m = Array.from({ length: 12 }, (_, idx) => {
-      const d = new Date(); d.setMonth(d.getMonth() - (11 - idx))
-      return { day: format(d, 'MMM'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
-    })
-    const byMonth12 = new Map(last12m.map((r) => [r.key, r]))
-    safeTx.forEach((tx) => {
-      const row = byMonth12.get(String(tx?.date || '').slice(0, 7)); if (!row) return
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      if (tx.type === 'income') row.income += amount
-      if (tx.type === 'expense') row.expense += amount
-    })
-    last12m.forEach((r) => { r.net = r.income - r.expense })
-
-    const weeklyExpense = last7.reduce((acc, r) => acc + r.expense, 0)
-    const weeklyIncome = last7.reduce((acc, r) => acc + r.income, 0)
+    const weeklyExpense = data1w.reduce((acc, r) => acc + (r.expense || 0), 0)
+    const weeklyIncome = data1w.reduce((acc, r) => acc + (r.income || 0), 0)
     return {
-      last7, last30, last12m,
+      data1w, data1m, data3m, dataYtd, data1y, dataAll,
       weeklyIncome, weeklyExpense,
       weeklyNet: weeklyIncome - weeklyExpense,
-      weeklyProgress: weeklyIncome > 0 ? (weeklyIncome - weeklyExpense) / weeklyIncome : 0,
     }
   }, [transactions, defaultCurrency, rates])
 
@@ -312,7 +348,7 @@ function Dashboard() {
   const { monthIncome, monthExpense, monthDelta, monthDeltaTone, monthDeltaPct, incomeDeltaPct, expenseDeltaPct } = monthStats
   const { portfolioValue } = portfolioStats
   const { todayNet, todayIncome } = todayStats
-  const { last7, last30, last12m, weeklyIncome, weeklyExpense, weeklyNet, weeklyProgress } = chartData
+  const { data1w, data1m, data3m, dataYtd, data1y, dataAll, weeklyIncome, weeklyExpense, weeklyNet } = chartData
   const cashBalance = totalWalletBalance
   const netWorth = cashBalance + portfolioValue
   const showCashAsSeparateMetric = Math.abs(netWorth - cashBalance) > 1
@@ -511,7 +547,7 @@ function Dashboard() {
 
   const buildRevenueSeries = useCallback(
     (rangeId) => {
-    if (rangeId === 'today') {
+    if (rangeId === '1d') {
       const todayKey = format(new Date(), 'yyyy-MM-dd')
       const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue
       const hourNet = Array.from({ length: 24 }, () => 0)
@@ -538,42 +574,35 @@ function Dashboard() {
         return { time: startOfToday + hour * 60 * 60 * 1000, value: running }
       })
     }
-    if (rangeId === 'weekly') {
-      const startDate = last7[0]?.date
-      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue
-      let running = startBalance
-      return last7.map((row) => {
-        running += toSafeNumber(row.net)
-        return { time: new Date(row.date).getTime(), value: running }
-      })
-    }
-    if (rangeId === 'monthly') {
-      const startDate = last30[0]?.date
-      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue
-      let running = startBalance
-      return last30.map((row) => {
-        running += toSafeNumber(row.net)
-        return { time: new Date(row.date).getTime(), value: running }
-      })
-    }
-    // yearly
-    const startMonthKey = last12m[0]?.key
-    const startDate = startMonthKey ? `${startMonthKey}-01` : ''
+
+    let sourceData = []
+    let isMonthly = false
+    
+    if (rangeId === '1w') sourceData = data1w
+    else if (rangeId === '1m') sourceData = data1m
+    else if (rangeId === '3m') sourceData = data3m
+    else if (rangeId === 'ytd') { sourceData = dataYtd; isMonthly = true }
+    else if (rangeId === '1y') { sourceData = data1y; isMonthly = true }
+    else if (rangeId === 'all') { sourceData = dataAll; isMonthly = true }
+
+    if (!sourceData || sourceData.length === 0) return []
+
+    const firstItem = sourceData[0]
+    const startDate = isMonthly ? `${firstItem.key}-01` : firstItem.date
     const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue
+    
     let running = startBalance
-    return last12m.map((row) => {
+    return sourceData.map((row) => {
       running += toSafeNumber(row.net)
-      return { time: new Date(`${row.key}-01`).getTime(), value: running }
+      const timeMs = isMonthly ? new Date(`${row.key}-01`).getTime() : new Date(row.date).getTime()
+      return { time: timeMs, value: running }
     })
     },
-    [computeCashBalanceBeforeDate, defaultCurrency, last12m, last30, last7, portfolioValue, rates, transactions],
+    [computeCashBalanceBeforeDate, defaultCurrency, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, rates, transactions],
   )
 
   const computeRevenueValue = useCallback(
-    (rangeId) => {
-      if (rangeId === 'today') return cashBalance + portfolioValue
-      if (rangeId === 'weekly') return cashBalance + portfolioValue
-      if (rangeId === 'monthly') return cashBalance + portfolioValue
+    () => {
       return cashBalance + portfolioValue
     },
     [cashBalance, portfolioValue],
@@ -588,8 +617,8 @@ function Dashboard() {
   }, [buildRevenueSeries, zoomRevenueRange])
 
   const zoomRevenueValue = useMemo(
-    () => computeRevenueValue(zoomRevenueRange),
-    [computeRevenueValue, zoomRevenueRange],
+    () => computeRevenueValue(),
+    [computeRevenueValue],
   )
 
   const miniRevenueSeries = useMemo(() => {
@@ -643,6 +672,27 @@ function Dashboard() {
   const closeZoomTimeoutRef = useRef(null)
   const motionDelay = reduceMotion ? 0 : 220
 
+  const [zoomTooltipDismissed, setZoomTooltipDismissed] = useState(false)
+  const zoomChartRef = useRef(null)
+
+  useEffect(() => {
+    const handleTapOutside = (event) => {
+      if (zoomChartRef.current && !zoomChartRef.current.contains(event.target)) {
+        setZoomTooltipDismissed(true)
+      }
+    }
+    document.addEventListener('touchstart', handleTapOutside, { passive: true })
+    document.addEventListener('mousedown', handleTapOutside)
+    return () => {
+      document.removeEventListener('touchstart', handleTapOutside)
+      document.removeEventListener('mousedown', handleTapOutside)
+    }
+  }, [])
+
+  const handleZoomChartTouchOrMove = useCallback(() => {
+    setZoomTooltipDismissed(false)
+  }, [])
+
   const closeZoom = () => {
     if (zoomedChart === 'revenue') {
       setMiniRevenueSnapshot(zoomRevenueSeries)
@@ -683,27 +733,88 @@ function Dashboard() {
   // Derive contextual summary stats based on active range
   const rangedSummaryStats = useMemo(() => {
     const range = zoomRevenueRange
-    if (range === 'today') {
+    if (range === '1d') {
       return { income: todayIncome, expense: todayIncome - (todayStats?.todayNet ?? 0), net: todayStats?.todayNet ?? 0 }
     }
-    if (range === 'weekly') {
-      return { income: weeklyIncome, expense: weeklyExpense, net: weeklyNet }
-    }
-    if (range === 'monthly') {
-      return { income: monthIncome, expense: monthExpense, net: monthDelta }
-    }
-    // yearly — sum all 12 months
-    const safeTx = transactions ?? []
-    const yearKey = format(new Date(), 'yyyy')
-    const yearly = safeTx.reduce((acc, tx) => {
-      if (!String(tx?.date || '').startsWith(yearKey)) return acc
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      if (tx.type === 'income') acc.income += amount
-      if (tx.type === 'expense') acc.expense += amount
+    
+    let sourceData = null
+    if (range === '1w') sourceData = data1w
+    else if (range === '1m') sourceData = data1m
+    else if (range === '3m') sourceData = data3m
+    else if (range === 'ytd') sourceData = dataYtd
+    else if (range === '1y') sourceData = data1y
+    else if (range === 'all') sourceData = dataAll
+
+    if (!sourceData) return { income: 0, expense: 0, net: 0 }
+    
+    return sourceData.reduce((acc, r) => {
+      acc.income += (r.income || 0)
+      acc.expense += (r.expense || 0)
+      acc.net += (r.net || 0)
       return acc
-    }, { income: 0, expense: 0 })
-    return { income: yearly.income, expense: yearly.expense, net: yearly.income - yearly.expense }
-  }, [zoomRevenueRange, todayIncome, todayStats, weeklyIncome, weeklyExpense, weeklyNet, monthIncome, monthExpense, monthDelta, transactions, defaultCurrency, rates])
+    }, { income: 0, expense: 0, net: 0 })
+    
+  }, [zoomRevenueRange, todayIncome, todayStats, data1w, data1m, data3m, dataYtd, data1y, dataAll])
+
+  const [isMobileScreen, setIsMobileScreen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false))
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const handleResize = () => setIsMobileScreen(window.innerWidth < 640)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const formatCompactCurrency = (amount, currency = 'IDR') => {
+    if (currency !== 'IDR') return formatCurrency(amount, currency)
+    const n = Number(amount || 0)
+    const sign = n < 0 ? '-' : ''
+    const abs = Math.abs(n)
+    const fmt = (value) =>
+      value.toLocaleString('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 1,
+      })
+    if (abs >= 1_000_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000_000)} T`
+    if (abs >= 1_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000)} M`
+    if (abs >= 1_000_000) return `${sign}Rp ${fmt(abs / 1_000_000)} jt`
+    return formatCurrency(amount, currency)
+  }
+
+  const formatAxisCurrency = (amount, currency = 'IDR') => {
+    if (currency !== 'IDR') return formatCurrency(amount, currency)
+    const n = Number(amount || 0)
+    const sign = n < 0 ? '-' : ''
+    const abs = Math.abs(n)
+    const fmt = (value, digits = 1) =>
+      value.toLocaleString('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: digits,
+      })
+    if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000, 1)} T`
+    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000, 1)} M`
+    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)} jt`
+    if (abs >= 1_000) return `${sign}${fmt(abs / 1_000, 0)} rb`
+    return `${sign}${fmt(abs, 0)}`
+  }
+
+  const netWorthGrowth = useMemo(() => {
+    const net = rangedSummaryStats.net ?? 0
+    const currentVal = zoomRevenueValue ?? 0
+    const startVal = currentVal - net
+    const pct = startVal > 0 ? (net / startVal) * 100 : (startVal === 0 && net > 0 ? 100 : 0)
+
+    const sign = net > 0 ? '+' : ''
+    const formattedAmount = `${sign}${formatCurrency(net, defaultCurrency)}`
+    const formattedAmountCompact = `${sign}${formatCompactCurrency(net, defaultCurrency)}`
+    const absPct = Math.abs(Math.round(pct))
+    const formattedPct = `(${net > 0 ? '+' : net < 0 ? '-' : ''}${absPct}%)`
+    return {
+      net,
+      pct,
+      label: `${formattedAmount} ${formattedPct}`,
+      miniLabel: `${formattedAmountCompact} ${formattedPct}`,
+    }
+  }, [rangedSummaryStats.net, zoomRevenueValue, defaultCurrency])
 
   const RevenueCard = ({ interactive = false }) => {
     const containerProps = interactive
@@ -717,14 +828,6 @@ function Dashboard() {
         }
       : {}
 
-    // Compact labels for mini card on dashboard
-    const compactItems = [
-      { id: 'yearly', label: 'Tahun' },
-      { id: 'monthly', label: 'Bulan' },
-      { id: 'weekly', label: 'Minggu' },
-      { id: 'today', label: 'Hari' },
-    ]
-
     return (
       <div
         {...containerProps}
@@ -735,11 +838,11 @@ function Dashboard() {
             <ChartToggle
               value={zoomRevenueRange}
               onChange={setZoomRevenueRange}
-              items={compactItems}
+              items={COMPACT_ITEMS}
             />
             <div className="shrink-0 text-right pl-2">
               <p className="text-[11px] text-[var(--muted)] leading-tight">
-                {compactItems.find(i => i.id === zoomRevenueRange)?.label}
+                {COMPACT_ITEMS.find(i => i.id === zoomRevenueRange)?.label}
               </p>
               <p className="text-sm font-bold text-[var(--fg)] tabular-nums">
                 {formatCurrency(zoomRevenueValue, defaultCurrency)}
@@ -975,8 +1078,28 @@ function Dashboard() {
       <section className="grid grid-cols-1 gap-3">
         <MiniChartCard
           t={t}
-          title={t('dashboard.netWorthHistory')}
+          title={t('dashboard.netWorth')}
           value={formatCurrency(computeRevenueValue(miniRevenueRange), defaultCurrency)}
+          trendBadge={
+            <span
+              className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border transition-colors ${
+                netWorthGrowth.net > 0
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                  : netWorthGrowth.net < 0
+                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                  : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+              }`}
+            >
+              {netWorthGrowth.net > 0 ? (
+                <TrendingUp className="h-3 w-3 shrink-0 text-emerald-500" strokeWidth={2.5} />
+              ) : netWorthGrowth.net < 0 ? (
+                <TrendingDown className="h-3 w-3 shrink-0 text-rose-500" strokeWidth={2.5} />
+              ) : null}
+              <span>{netWorthGrowth.miniLabel}</span>
+            </span>
+          }
+          rangeId={miniRevenueRange}
+          showXAxisDate
           data={miniRevenueSeries}
           stroke="var(--accent)"
           fill="var(--accent)"
@@ -992,18 +1115,18 @@ function Dashboard() {
           formatValue={(v) => formatCurrency(v, defaultCurrency)}
           xKey="time"
           yDomain={miniRevenueChartDomain}
-          showRightAxis
-          rightAxisTickFormatter={(v) => formatCurrency(v, defaultCurrency)}
-          rightAxisWidth={defaultCurrency === 'IDR' ? 84 : 64}
+          showRightAxis={true}
+          rightAxisTickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
+          rightAxisWidth={defaultCurrency === 'IDR' ? (isMobileScreen ? 36 : 42) : 38}
           rightAxisTicks={miniRevenueAxisTicks}
           rangeLabel={
-            miniRevenueRange === 'yearly'
-              ? t('dashboard.range.yearly')
-              : miniRevenueRange === 'monthly'
-                ? t('dashboard.range.monthly')
-                : miniRevenueRange === 'today'
-                  ? t('dashboard.range.today')
-                  : t('dashboard.range.weekly')
+            miniRevenueRange === 'ytd' ? 'YTD'
+              : miniRevenueRange === '1y' ? '1 Tahun'
+              : miniRevenueRange === 'all' ? 'All Time'
+              : miniRevenueRange === '3m' ? '3 Bulan'
+              : miniRevenueRange === '1m' ? '1 Bulan'
+              : miniRevenueRange === '1d' ? '1 Hari'
+              : '1 Minggu'
           }
         />
       </section>
@@ -1312,12 +1435,15 @@ function Dashboard() {
               ) : (
                 <>
                   {/* — Net Worth Modal Header — */}
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent)]/15">
                         <TrendingUp className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.5} />
                       </div>
-                      <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">{t('dashboard.netWorthHistory')}</h3>
+                      <div>
+                        <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">Kekayaan Bersih</h3>
+                        <p className="text-[10px] font-semibold text-[var(--muted)]">Ringkasan & Fluktuasi Aset</p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1329,81 +1455,136 @@ function Dashboard() {
                     </button>
                   </div>
 
-                  {/* — Hero Balance — */}
-                  <div className="mb-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                      {zoomRevenueRange === 'yearly' ? 'Kekayaan Bersih · Tahunan'
-                        : zoomRevenueRange === 'monthly' ? 'Kekayaan Bersih · Bulanan'
-                        : zoomRevenueRange === 'today' ? 'Kekayaan Bersih · Hari Ini'
-                        : 'Kekayaan Bersih · Mingguan'}
+                  {/* — Hero Balance & Growth Badge — */}
+                  <div className="mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      {zoomRevenueRange === '1d' ? 'Total Hari Ini'
+                        : zoomRevenueRange === '1w' ? 'Total 7 Hari'
+                        : zoomRevenueRange === '1m' ? 'Total 30 Hari'
+                        : zoomRevenueRange === '3m' ? 'Total 90 Hari'
+                        : zoomRevenueRange === 'ytd' ? 'Total Tahun Ini'
+                        : zoomRevenueRange === '1y' ? 'Total 1 Tahun'
+                        : zoomRevenueRange === 'all' ? 'Total Semua Waktu'
+                        : 'Total Mingguan'}
                     </p>
-                    <p className="mt-0.5 text-[28px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
-                      {formatCurrency(zoomRevenueValue, defaultCurrency)}
-                    </p>
+                    <div className="mt-0.5 flex items-center gap-2.5">
+                      <p className="text-[22px] sm:text-[30px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
+                        {formatCurrency(zoomRevenueValue, defaultCurrency)}
+                      </p>
+                      <span
+                        className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-colors ${
+                          netWorthGrowth.net > 0
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : netWorthGrowth.net < 0
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                            : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+                        }`}
+                      >
+                        {netWorthGrowth.net > 0 ? (
+                          <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
+                        ) : netWorthGrowth.net < 0 ? (
+                          <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" strokeWidth={2.5} />
+                        ) : null}
+                        <span>{netWorthGrowth.label}</span>
+                      </span>
+                    </div>
                   </div>
 
-                  {/* — Compact Full-Width Filter — */}
-                  <div className="mb-4">
+                  {/* — Compact Filter Toggle — */}
+                  <div className="mb-3">
                     <ChartToggle
                       value={zoomRevenueRange}
                       onChange={setZoomRevenueRange}
-                      items={[
-                        { id: 'yearly', label: 'Tahun' },
-                        { id: 'monthly', label: 'Bulan' },
-                        { id: 'weekly', label: 'Minggu' },
-                        { id: 'today', label: 'Hari' },
-                      ]}
+                      items={COMPACT_ITEMS}
                     />
                   </div>
 
-                  {/* — Borderless Chart — */}
-                  <div className="h-56 w-full text-[var(--fg)]">
+                  {/* — Chart Area — */}
+                  <div
+                    ref={zoomChartRef}
+                    onTouchStart={handleZoomChartTouchOrMove}
+                    className="h-56 w-full text-[var(--fg)]"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={zoomRevenueSeries} margin={{ top: 14, right: defaultCurrency === 'IDR' ? 88 : 68, bottom: 4, left: 0 }}>
+                      <AreaChart
+                        key={`zoom-chart-${zoomRevenueRange}`}
+                        data={zoomRevenueSeries}
+                        margin={{ top: 14, right: defaultCurrency === 'IDR' ? (isMobileScreen ? 38 : 44) : 40, bottom: 20, left: 4 }}
+                        onMouseMove={handleZoomChartTouchOrMove}
+                        onTouchStart={handleZoomChartTouchOrMove}
+                        onTouchMove={handleZoomChartTouchOrMove}
+                        onMouseLeave={() => setZoomTooltipDismissed(true)}
+                      >
                         <defs>
                           <linearGradient id="nwGradZoom" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--chart-ink)" stopOpacity={0.28} />
-                            <stop offset="100%" stopColor="var(--chart-ink)" stopOpacity={0.01} />
+                            <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.38} />
+                            <stop offset="50%" stopColor="var(--accent)" stopOpacity={0.12} />
+                            <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <XAxis type="number" dataKey="time" scale="time" domain={['dataMin', 'dataMax']} hide />
+                        <XAxis
+                          dataKey="time"
+                          type="number"
+                          scale="time"
+                          domain={['dataMin', 'dataMax']}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                          dy={6}
+                          tickFormatter={(timeMs) => {
+                            if (!timeMs || !Number.isFinite(timeMs)) return ''
+                            const d = new Date(timeMs)
+                            if (zoomRevenueRange === '1d') return format(d, 'HH:mm')
+                            if (zoomRevenueRange === 'all') return format(d, 'MMM yy')
+                            if (zoomRevenueRange === '1y' || zoomRevenueRange === 'ytd') return format(d, 'MMM')
+                            return format(d, 'd MMM')
+                          }}
+                          interval="preserveStartEnd"
+                          minTickGap={28}
+                        />
                         <YAxis
                           domain={zoomRevenueChartDomain}
                           orientation="right"
                           tick={{ fill: 'var(--muted)', fontSize: 10 }}
-                          tickFormatter={(v) => formatCurrency(v, defaultCurrency)}
+                          tickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
                           ticks={zoomRevenueAxisTicks}
                           interval={0}
                           tickCount={undefined}
                           axisLine={false}
                           tickLine={false}
-                          width={defaultCurrency === 'IDR' ? 84 : 64}
+                          width={defaultCurrency === 'IDR' ? (isMobileScreen ? 36 : 42) : 38}
                         />
                         <Tooltip
-                          formatter={(value) => formatCurrency(value, defaultCurrency)}
-                          labelFormatter={(label, payload) => {
-                            const ts = Number(payload?.[0]?.payload?.time ?? label)
-                            if (!Number.isFinite(ts) || ts <= 0) return '-'
-                            return format(new Date(ts), 'dd MMM yyyy, HH:mm')
-                          }}
-                          contentStyle={{
-                            borderRadius: 12,
-                            border: '1px solid var(--border)',
-                            background: 'var(--panel-strong)',
-                            color: 'var(--fg)',
-                            fontSize: 12,
-                            boxShadow: 'var(--shadow-soft)',
+                          cursor={{ stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+                          content={(props) => {
+                            if (zoomTooltipDismissed || !props.active || !props.payload || !props.payload.length) return null
+                            const rawVal = props.payload[0]?.value
+                            const valStr = formatCurrency(rawVal, defaultCurrency)
+                            const ts = Number(props.payload[0]?.payload?.time ?? props.label)
+                            const isMonthlyData = ['1y', 'ytd', 'all'].includes(zoomRevenueRange)
+                            const labelStr = Number.isFinite(ts) && ts > 0
+                              ? format(new Date(ts), isMonthlyData ? 'MMMM yyyy' : 'dd MMM yyyy, HH:mm')
+                              : '-'
+
+                            return (
+                              <div className="pointer-events-none rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3 py-2 text-xs shadow-[var(--shadow-soft)] text-[var(--fg)]">
+                                <p className="text-[10px] font-semibold text-[var(--muted)]">{labelStr}</p>
+                                <p className="mt-0.5 font-bold text-[var(--fg)] tabular-nums">
+                                  Kekayaan Bersih: <span className="text-[var(--accent)]">{valStr}</span>
+                                </p>
+                              </div>
+                            )
                           }}
                         />
                         <Area
                           key={`zoom-${zoomRevenueSeries?.map((d) => d?.value).join('-')}`}
                           type="monotone"
                           dataKey="value"
-                          stroke="var(--chart-ink)"
+                          stroke="var(--accent)"
                           fill="url(#nwGradZoom)"
-                          strokeWidth={2.2}
+                          strokeWidth={2.5}
                           dot={false}
-                          activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--chart-ink)' }}
+                          activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--panel-strong)', fill: 'var(--accent)' }}
                           isAnimationActive={!reduceMotion}
                           animationDuration={700}
                           animationEasing="ease"
@@ -1412,16 +1593,19 @@ function Dashboard() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* — Contextual Summary — */}
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  {/* — Contextual Summary Cards — */}
+                  <div className="mt-3.5 grid grid-cols-3 gap-2">
                     {[
-                      { label: 'Masuk', value: rangedSummaryStats.income, positive: true },
-                      { label: 'Keluar', value: rangedSummaryStats.expense, positive: false },
-                      { label: 'Selisih', value: rangedSummaryStats.net, positive: rangedSummaryStats.net >= 0 },
-                    ].map(({ label, value, positive }) => (
-                      <div key={label} className="rounded-xl bg-[var(--field-bg)] px-3 py-2.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{label}</p>
-                        <p className={`mt-0.5 text-[13px] font-black tabular-nums leading-tight ${
+                      { label: 'Masuk', value: rangedSummaryStats.income, positive: true, icon: ArrowDownRight, iconColor: 'text-emerald-500' },
+                      { label: 'Keluar', value: rangedSummaryStats.expense, positive: false, icon: ArrowUpRight, iconColor: 'text-rose-500' },
+                      { label: 'Selisih', value: rangedSummaryStats.net, positive: rangedSummaryStats.net >= 0, icon: Wallet, iconColor: 'text-[var(--accent)]' },
+                    ].map(({ label, value, positive, icon: Icon, iconColor }) => (
+                      <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2.5 shadow-2xs">
+                        <div className="flex items-center gap-1">
+                          <Icon className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{label}</p>
+                        </div>
+                        <p className={`mt-1 text-[13px] font-black tabular-nums leading-tight ${
                           label === 'Selisih' ? (positive ? 'text-emerald-500' : 'text-rose-500') : 'text-[var(--fg)]'
                         }`}>
                           {label === 'Selisih' && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency)}

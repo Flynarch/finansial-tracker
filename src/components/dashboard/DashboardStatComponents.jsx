@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { clampPercent } from './DashboardChartHelpers'
@@ -56,8 +56,8 @@ export function MetricCard({ title, value, rightLabel, progress = 0, showProgres
 
 /** Mini chart card with area chart */
 export const MiniChartCard = memo(function MiniChartCard({
-  title, value, data, stroke, fill, onOpen, formatValue, rangeLabel,
-  xKey = 'day', yDomain, lowHigh, t: tMini,
+  title, value, data, stroke, fill, onOpen, formatValue, rangeLabel, rangeId,
+  xKey = 'day', yDomain, lowHigh, t: tMini, trendBadge, showXAxisDate = false,
   showRightAxis = false, rightAxisTickFormatter, rightAxisWidth = 56,
   rightAxisTicks, animate = false, premium = false,
   animationDuration = 900, animationEasing = 'ease',
@@ -75,25 +75,62 @@ export const MiniChartCard = memo(function MiniChartCard({
     <button
       type="button"
       onClick={onOpen}
-      className="ft-interactive-card w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-left shadow-sm"
+      className="ft-interactive-card w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-left shadow-sm sm:p-4"
       style={{ boxShadow: 'var(--shadow-card)' }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold tracking-wide text-[var(--muted)]">{title}</p>
-          <p className="mt-0.5 text-[clamp(13px,3.4vw,16px)] font-semibold leading-tight tracking-tight tabular-nums text-[var(--fg)]"></p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">{value}</p>
+            {trendBadge ? (
+              <div className="shrink-0">{trendBadge}</div>
+            ) : null}
+          </div>
         </div>
         {rangeLabel ? (
-          <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--muted)]">
+          <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--muted)]">
             {rangeLabel}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-3 h-28 w-full">
+      <div className={`mt-3 ${showXAxisDate ? 'h-32' : 'h-28'} w-full pointer-events-none`}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 4, left: 4 }}>
-            <XAxis dataKey={xKey} hide />
+          <AreaChart
+            data={data}
+            margin={{ top: 6, right: showRightAxis ? 4 : 8, bottom: showXAxisDate ? 4 : 0, left: 8 }}
+          >
+            <defs>
+              <linearGradient id="miniGradFade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={stroke || 'var(--accent)'} stopOpacity={0.30} />
+                <stop offset="100%" stopColor={stroke || 'var(--accent)'} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            {showXAxisDate ? (
+              <XAxis
+                dataKey={xKey}
+                type={xKey === 'time' ? 'number' : 'category'}
+                scale={xKey === 'time' ? 'time' : 'auto'}
+                domain={xKey === 'time' ? ['dataMin', 'dataMax'] : undefined}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                dy={0}
+                tickFormatter={(val) => {
+                  if (xKey === 'day') return val
+                  if (!val || !Number.isFinite(val)) return ''
+                  if (rangeId === '1d') return format(new Date(val), 'HH:mm')
+                  if (rangeId === 'all') return format(new Date(val), 'MMM yy')
+                  if (rangeId === '1y' || rangeId === 'ytd') return format(new Date(val), 'MMM')
+                  return format(new Date(val), 'dd MMM')
+                }}
+                interval="preserveStartEnd"
+                minTickGap={24}
+              />
+            ) : (
+              <XAxis dataKey={xKey} hide />
+            )}
             {showRightAxis ? (
               <YAxis
                 domain={yDomain} orientation="right" stroke="var(--muted)"
@@ -104,21 +141,10 @@ export const MiniChartCard = memo(function MiniChartCard({
             ) : (
               <YAxis hide domain={yDomain} />
             )}
-            <Tooltip
-              formatter={(v) => (formatValue ? formatValue(v) : v)}
-              labelFormatter={(label, payload) => {
-                if (xKey !== 'time') return label
-                const ts = Number(payload?.[0]?.payload?.time ?? label)
-                if (!Number.isFinite(ts) || ts <= 0) return '-'
-                return format(new Date(ts), 'dd MMM yyyy, HH:mm')
-              }}
-              contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--fg)', fontSize: 12, boxShadow: 'var(--shadow-soft)' }}
-              labelStyle={{ color: 'var(--muted)' }}
-            />
             <Area
               key={data?.map((d) => d?.value).join('-')}
-              type="monotone" dataKey="value" stroke={stroke} fill={fill}
-              fillOpacity={0.1} strokeWidth={1.8} dot={false} activeDot={{ r: 3 }}
+              type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill="url(#miniGradFade)"
+              strokeWidth={2} dot={false}
               isAnimationActive={animate} animationBegin={24}
               animationDuration={animationDuration} animationEasing={animationEasing}
             />
@@ -127,7 +153,7 @@ export const MiniChartCard = memo(function MiniChartCard({
       </div>
 
       {lowHighText ? (
-        <div className="mt-2 flex items-center justify-between text-[11px] tabular-nums">
+        <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums">
           <span className="text-[var(--muted)]">{tMini('dashboard.chart.low')} {lowHighText.min}</span>
           <span className="text-[var(--muted)]">{tMini('dashboard.chart.high')} {lowHighText.max}</span>
         </div>
@@ -138,23 +164,28 @@ export const MiniChartCard = memo(function MiniChartCard({
 
 /** Chart range tab button */
 export const ChartToggle = memo(function ChartToggle({ value, onChange, items, className = '' }) {
+  const colsClass = items?.length === 7 ? 'grid-cols-7' : 'grid-cols-4 sm:grid-cols-7'
   return (
     <div
-      className={`grid w-full gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 ${className}`}
-      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      className={`grid ${colsClass} gap-1 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] p-1 select-none ${className}`}
     >
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onChange?.(item.id)}
-          className={`flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-center text-[12px] font-bold transition-all ${
-            value === item.id ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item) => {
+        const isActive = value === item.id
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange?.(item.id)}
+            className={`relative flex h-8 items-center justify-center rounded-xl text-[11px] font-bold tracking-tight transition-all duration-150 active:scale-95 ${
+              isActive
+                ? 'bg-[var(--accent)] text-white shadow-xs font-extrabold'
+                : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--border)]/40'
+            }`}
+          >
+            {item.label}
+          </button>
+        )
+      })}
     </div>
   )
 })
