@@ -1,6 +1,6 @@
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
-import { Sparkles, X, Loader2, CheckCircle, AlertCircle, Info, Lightbulb, MessageSquare } from 'lucide-react'
+import { Sparkles, X, Loader2, CheckCircle, AlertCircle, Info, Lightbulb, MessageSquare, Printer } from 'lucide-react'
 import { getFinancialAdvice } from '../lib/gemini'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useChatStore from '../store/useChatStore'
@@ -413,24 +413,36 @@ function Reports() {
             <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl">{t('reports.title')}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">{t('reports.subtitle')}</p>
           </div>
-          <div className="inline-flex rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-1 backdrop-blur-md">
-            {RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  setRangeMonths(opt.id)
-                  setSelectedMonthIdx(null)
-                }}
-                className={`rounded-[0.625rem] px-3 py-1.5 text-xs font-bold tracking-wide transition ${
-                  rangeMonths === opt.id
-                    ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
-                    : 'text-[var(--muted)] hover:text-[var(--fg)]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="no-print inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95"
+              title="Ekspor Laporan ke PDF"
+            >
+              <Printer className="h-3.5 w-3.5 text-[var(--accent)]" />
+              <span>Ekspor PDF</span>
+            </button>
+
+            <div className="no-print inline-flex rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-1 backdrop-blur-md">
+              {RANGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setRangeMonths(opt.id)
+                    setSelectedMonthIdx(null)
+                  }}
+                  className={`rounded-[0.625rem] px-3 py-1.5 text-xs font-bold tracking-wide transition ${
+                    rangeMonths === opt.id
+                      ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
+                      : 'text-[var(--muted)] hover:text-[var(--fg)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>

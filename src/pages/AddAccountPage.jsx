@@ -270,6 +270,43 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
           </section>
         )}
 
+        {/* ── Akun Diarsip ────────────────────────────────────────── */}
+        {(() => {
+          const archived = (wallets || []).filter(w => w.isArchived)
+          if (archived.length === 0) return null
+          return (
+            <section className="mt-4 px-4">
+              <h2 className="mb-2 text-[15px] font-bold text-fg" style={{ fontFamily: 'var(--font-display)' }}>
+                Akun Diarsip ({archived.length})
+              </h2>
+              <div className="space-y-2">
+                {archived.map(w => (
+                  <button
+                    key={w.id}
+                    onClick={() => navigate(`/wallet/${w.id}`)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-left hover:bg-[var(--panel)] transition active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[var(--panel-strong)] flex items-center justify-center font-bold text-xs text-[var(--fg)] border border-[var(--border)] overflow-hidden">
+                        {w.logoUrl ? (
+                          <img src={w.logoUrl} alt={w.name} className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          w.name?.substring(0, 2).toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-bold text-[var(--fg)]">{w.name}</p>
+                        <p className="text-[11px] text-amber-500 font-semibold">Diarsipkan</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-[var(--muted)]">Lihat / Buka</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )
+        })()}
+
         {/* ── Empty State ──────────────────────────────────────── */}
         {filteredData.length === 0 && search && (
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center">

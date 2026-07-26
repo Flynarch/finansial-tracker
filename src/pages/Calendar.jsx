@@ -299,7 +299,7 @@ function Calendar() {
             style={{ height: 480 }}
             onSelectSlot={({ start }) => {
               setSelectedDate(start)
-              setDayTab('items')
+              setDayTab('add')
               setIsDayModalOpen(true)
             }}
             onSelectEvent={(event) => {

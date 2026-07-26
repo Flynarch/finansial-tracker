@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Search } from 'lucide-react'
+import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Search, Archive, ArchiveRestore } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
@@ -29,8 +29,14 @@ export default function WalletDetailPage() {
       .where('walletId').equals(walletId)
       .or('targetWalletId').equals(walletId)
       .toArray()
-    return txs.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    return txs.sort((a, b) => new Date(b.date) - new Date(a.date))
   }, [walletId])
+
+  const handleToggleArchive = async () => {
+    if (!wallet) return
+    const nextArchived = !wallet.isArchived
+    await db.wallets.update(walletId, { isArchived: nextArchived })
+  }
 
   const deleteWallet = useWalletStore(state => state.deleteWallet)
   const addTransaction = useTransactionStore(state => state.addTransaction)
@@ -307,14 +313,28 @@ export default function WalletDetailPage() {
               {wallet.name}
             </h2>
 
-            <button 
-              onClick={() => setIsDeleteModalOpen(true)} 
-              className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
-              title="Hapus Akun"
-              aria-label="Hapus Akun"
-            >
-              <Trash2 size={18} strokeWidth={2} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={handleToggleArchive} 
+                className={`flex items-center justify-center w-9 h-9 rounded-full transition active:scale-95 ${
+                  wallet.isArchived
+                    ? 'text-amber-500 bg-amber-500/10'
+                    : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
+                }`}
+                title={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
+                aria-label={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
+              >
+                {wallet.isArchived ? <ArchiveRestore size={18} strokeWidth={2} /> : <Archive size={18} strokeWidth={2} />}
+              </button>
+              <button 
+                onClick={() => setIsDeleteModalOpen(true)} 
+                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                title="Hapus Akun"
+                aria-label="Hapus Akun"
+              >
+                <Trash2 size={18} strokeWidth={2} />
+              </button>
+            </div>
           </div>
 
           {/* Centered Circular Logo */}

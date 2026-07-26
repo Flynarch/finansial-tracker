@@ -1410,3 +1410,23 @@ section,
     -webkit-backdrop-filter: none !important;
   }
 }
+
+/* ── Professional PDF Print Styles ─────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, nav, footer, .no-print, [role="navigation"] {
+    display: none !important;
+  }
+  .ft-motion-page {
+    transform: none !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  div, section {
+    box-shadow: none !important;
+  }
+}

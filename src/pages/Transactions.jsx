@@ -241,8 +241,48 @@ function Transactions() {
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
   const [pendingFocusTransactionId, setPendingFocusTransactionId] = useState(null)
-  const [highlightedTransactionId, setHighlightedTransactionId] = useState(null)
   const listScrollRef = useRef(null)
+
+  const [isBulkMode, setIsBulkMode] = useState(false)
+  const [selectedTxIds, setSelectedTxIds] = useState(new Set())
+  const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false)
+
+  const toggleSelectTx = (id) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAllVisible = () => {
+    const allIds = filteredTransactions.map((t) => t.id)
+    setSelectedTxIds(new Set(allIds))
+  }
+
+  const clearBulkSelection = () => {
+    setSelectedTxIds(new Set())
+    setIsBulkMode(false)
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedTxIds.size === 0) return
+    if (!confirm(`Hapus ${selectedTxIds.size} transaksi terpilih?`)) return
+    const ids = Array.from(selectedTxIds)
+    for (const id of ids) {
+      await deleteTransaction(id)
+    }
+    clearBulkSelection()
+  }
+
+  const handleBatchCategoryChange = async (newCategory) => {
+    if (selectedTxIds.size === 0 || !newCategory) return
+    const ids = Array.from(selectedTxIds)
+    await db.transactions.where('id').anyOf(ids).modify({ category: newCategory })
+    setIsBatchCategoryModalOpen(false)
+    clearBulkSelection()
+  }
 
   const [isEntering, setIsEntering] = useState(false)
   const hasInitializedDefaultRange = useRef(false)
@@ -564,6 +604,16 @@ function Transactions() {
                   type="button"
                   className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--fg)] hover:bg-[var(--field-bg)]"
                   onClick={() => {
+                    setIsBulkMode(true)
+                    setIsMenuOpen(false)
+                  }}
+                >
+                  Edit Massal (Bulk)
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                  onClick={() => {
                     handleExportCsv()
                     setIsMenuOpen(false)
                   }}
@@ -701,30 +751,41 @@ function Transactions() {
                     </div>
                     <div className="space-y-2">
                       {group.items.map((transaction) => (
-                        <TransactionItemCard
-                          key={transaction.id}
-                          transaction={transaction}
-                          swipedTransactionId={swipedTransactionId}
-                          isSwipingId={isSwipingId}
-                          highlightedTransactionId={highlightedTransactionId}
-                          openEditTransaction={openEditTransaction}
-                          deleteTransaction={deleteTransaction}
-                          setSwipedTransactionId={setSwipedTransactionId}
-                          getSwipeHandlers={getSwipeHandlers}
-                          getCategoryColorClass={getCategoryColorClass}
-                          resolveTransactionIconKey={resolveTransactionIconKey}
-                          getTransactionCategoryLabels={getTransactionCategoryLabels}
-                          format={format}
-                          t={t}
-                          locale={locale}
-                          defaultCurrency={defaultCurrency}
-                          formatCurrency={formatCurrency}
-                          convertCurrency={convertCurrency}
-                          rates={rates}
-                          setApiError={setApiError}
-                          setApiErrorTone={setApiErrorTone}
-                          wallets={allWallets}
-                        />
+                        <div key={transaction.id} className="flex items-center gap-2">
+                          {isBulkMode && (
+                            <input
+                              type="checkbox"
+                              checked={selectedTxIds.has(transaction.id)}
+                              onChange={() => toggleSelectTx(transaction.id)}
+                              className="h-5 w-5 shrink-0 rounded-md border-[var(--border)] text-[var(--accent)] accent-[var(--accent)] cursor-pointer"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <TransactionItemCard
+                              transaction={transaction}
+                              swipedTransactionId={swipedTransactionId}
+                              isSwipingId={isSwipingId}
+                              highlightedTransactionId={highlightedTransactionId}
+                              openEditTransaction={openEditTransaction}
+                              deleteTransaction={deleteTransaction}
+                              setSwipedTransactionId={setSwipedTransactionId}
+                              getSwipeHandlers={getSwipeHandlers}
+                              getCategoryColorClass={getCategoryColorClass}
+                              resolveTransactionIconKey={resolveTransactionIconKey}
+                              getTransactionCategoryLabels={getTransactionCategoryLabels}
+                              format={format}
+                              t={t}
+                              locale={locale}
+                              defaultCurrency={defaultCurrency}
+                              formatCurrency={formatCurrency}
+                              convertCurrency={convertCurrency}
+                              rates={rates}
+                              setApiError={setApiError}
+                              setApiErrorTone={setApiErrorTone}
+                              wallets={allWallets}
+                            />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -893,6 +954,58 @@ function Transactions() {
           </div>
         </div>
       </div>
+
+      {/* ── Bulk Actions Floating Bar ────────────────────────── */}
+      {isBulkMode && (
+        <div className="fixed bottom-16 left-4 right-4 z-40 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--fg)]">{selectedTxIds.size} Dipilih</span>
+            <button
+              type="button"
+              onClick={selectAllVisible}
+              className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)]"
+            >
+              Semua ({filteredTransactions.length})
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBatchCategoryModalOpen(true)}
+              disabled={selectedTxIds.size === 0}
+              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40"
+            >
+              Ubah Kategori
+            </button>
+            <button
+              type="button"
+              onClick={handleBatchDelete}
+              disabled={selectedTxIds.size === 0}
+              className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40"
+            >
+              Hapus ({selectedTxIds.size})
+            </button>
+            <button
+              type="button"
+              onClick={clearBulkSelection}
+              className="rounded-full p-1.5 text-[var(--muted)] hover:text-[var(--fg)] text-xs font-bold"
+              title="Batal"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Category Picker Modal for Batch Category ────────────── */}
+      <CategoryPickerModal
+        isOpen={isBatchCategoryModalOpen}
+        type="expense"
+        onClose={() => setIsBatchCategoryModalOpen(false)}
+        onSelectCategory={(categoryKey) => {
+          handleBatchCategoryChange(categoryKey)
+        }}
+      />
     </div>
   )
 }

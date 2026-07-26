@@ -184,7 +184,7 @@ export default function WalletCarousel({
 
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
           <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
-            {wallets.map(w => (
+            {wallets.filter(w => !w.isArchived).map(w => (
               <button 
                 key={w.id}
                 onClick={() => navigate(`/wallet/${w.id}`)}
