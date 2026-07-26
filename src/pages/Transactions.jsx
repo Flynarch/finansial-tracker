@@ -382,20 +382,92 @@ function Transactions() {
 
   const [activeFilterSection, setActiveFilterSection] = useState('type')
 
+  const ALL_TYPES = useMemo(() => ['income', 'expense', 'transfer'], [])
+
+  const toggleTypeFilter = (typeKey) => {
+    const currentTypes = draftFilters?.types ?? filters.types ?? ALL_TYPES
+    let nextTypes = []
+    const isCurrentlyAll = currentTypes.length === 0 || currentTypes.length === ALL_TYPES.length
+
+    if (typeKey === 'all') {
+      nextTypes = isCurrentlyAll ? [] : [...ALL_TYPES]
+    } else {
+      const set = new Set(isCurrentlyAll ? ALL_TYPES : currentTypes)
+      if (set.has(typeKey)) set.delete(typeKey)
+      else set.add(typeKey)
+      nextTypes = Array.from(set)
+      if (nextTypes.length === ALL_TYPES.length) {
+        nextTypes = [...ALL_TYPES]
+      }
+    }
+    setDraftFilters((p) => ({ ...(p || filters), types: nextTypes }))
+  }
+
+  const toggleWalletFilter = (walletIdKey) => {
+    const allIds = userWallets.map((w) => String(w.id))
+    const currentWallets = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+    let nextWallets = []
+    const isCurrentlyAll = currentWallets.length === 0 || currentWallets.length === allIds.length
+
+    if (walletIdKey === 'all') {
+      nextWallets = isCurrentlyAll ? [] : [...allIds]
+    } else {
+      const set = new Set(isCurrentlyAll ? allIds : currentWallets)
+      const targetStr = String(walletIdKey)
+      if (set.has(targetStr)) set.delete(targetStr)
+      else set.add(targetStr)
+      nextWallets = Array.from(set)
+      if (nextWallets.length === allIds.length) {
+        nextWallets = [...allIds]
+      }
+    }
+    setDraftFilters((p) => ({ ...(p || filters), walletIds: nextWallets }))
+  }
+
+  const toggleCategoryFilter = (catKey) => {
+    const currentCats = draftFilters?.categories ?? filters.categories ?? usedCategories
+    let nextCats = []
+    const isCurrentlyAll = currentCats.length === 0 || currentCats.length === usedCategories.length
+
+    if (catKey === 'all') {
+      nextCats = isCurrentlyAll ? [] : [...usedCategories]
+    } else {
+      const set = new Set(isCurrentlyAll ? usedCategories : currentCats)
+      if (set.has(catKey)) set.delete(catKey)
+      else set.add(catKey)
+      nextCats = Array.from(set)
+      if (nextCats.length === usedCategories.length) {
+        nextCats = [...usedCategories]
+      }
+    }
+    setDraftFilters((p) => ({ ...(p || filters), categories: nextCats }))
+  }
+
   const filteredTransactions = useMemo(() => {
+    const activeTypes = filters.types ?? ALL_TYPES
+    const isAllTypes = activeTypes.length === 0 || activeTypes.length === ALL_TYPES.length
+
+    const allWalletIds = userWallets.map((w) => String(w.id))
+    const activeWalletIds = (filters.walletIds ?? allWalletIds).map(String)
+    const isAllWallets = activeWalletIds.length === 0 || activeWalletIds.length === allWalletIds.length
+
+    const activeCategories = filters.categories ?? usedCategories
+    const isAllCategories = activeCategories.length === 0 || activeCategories.length === usedCategories.length
+
     return transactions.filter((item) => {
       const searchTarget = `${item.notes ?? ''} ${item.category ?? ''}`.toLowerCase()
       const searchPass = searchTarget.includes(filters.search.toLowerCase())
       
-      const typePass = !filters.type || filters.type === 'all' ? true : item.type === filters.type
+      const typePass = isAllTypes ? true : activeTypes.includes(item.type)
       
-      const walletPass = !filters.walletId || filters.walletId === 'all'
+      const walletPass = isAllWallets
         ? true
-        : String(item.walletId) === String(filters.walletId) || String(item.targetWalletId) === String(filters.walletId)
+        : activeWalletIds.includes(String(item.walletId)) || activeWalletIds.includes(String(item.targetWalletId))
 
-      const categoryPass = !filters.category || filters.category === 'all'
+      const itemParentCat = item.category ? (String(item.category).includes('/') ? String(item.category).split('/')[0].trim() : String(item.category).trim()) : ''
+      const categoryPass = isAllCategories
         ? true
-        : (item.category === filters.category || String(item.category || '').startsWith(filters.category + '/'))
+        : activeCategories.includes(itemParentCat)
 
       const startPass = filters.startDate ? item.date >= filters.startDate : true
       const endPass = filters.endDate ? item.date <= filters.endDate : true
@@ -408,7 +480,7 @@ function Transactions() {
       if (byCreatedAt !== 0) return byCreatedAt
       return String(b.id || '').localeCompare(String(a.id || ''))
     })
-  }, [filters, transactions])
+  }, [filters, transactions, userWallets, usedCategories, ALL_TYPES])
 
   const applyQuickRange = (nextRange) => {
     const now = new Date()
@@ -943,7 +1015,7 @@ function Transactions() {
               </div>
             </div>
 
-            {/* 2. Jenis Transaksi (Checklist Accordion: Semua, Pemasukan, Pengeluaran, Transfer) */}
+            {/* 2. Jenis Transaksi (Checklist Accordion Multi-Select) */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
               <button
                 type="button"
@@ -954,11 +1026,12 @@ function Transactions() {
                   <span>Jenis Transaksi</span>
                   <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full">
                     {(() => {
-                      const tVal = draftFilters?.type ?? filters.type ?? 'all'
-                      if (tVal === 'income') return 'Pemasukan'
-                      if (tVal === 'expense') return 'Pengeluaran'
-                      if (tVal === 'transfer') return 'Transfer'
-                      return 'Semua'
+                      const list = draftFilters?.types ?? filters.types ?? ALL_TYPES
+                      if (list.length === 0 || list.length === ALL_TYPES.length) return 'Semua'
+                      if (list.length === 1) {
+                        return list[0] === 'income' ? 'Pemasukan' : list[0] === 'expense' ? 'Pengeluaran' : 'Transfer'
+                      }
+                      return `${list.length} Dipilih`
                     })()}
                   </span>
                 </div>
@@ -966,36 +1039,61 @@ function Transactions() {
               </button>
               {activeFilterSection === 'type' && (
                 <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)]">
-                  {[
-                    { id: 'all', label: 'Semua Jenis Transaksi' },
-                    { id: 'income', label: 'Pemasukan' },
-                    { id: 'expense', label: 'Pengeluaran' },
-                    { id: 'transfer', label: 'Transfer (Pindah Saldo)' },
-                  ].map((item) => {
-                    const isChecked = (draftFilters?.type ?? filters.type ?? 'all') === item.id
+                  {(() => {
+                    const list = draftFilters?.types ?? filters.types ?? ALL_TYPES
+                    const isAllChecked = list.length === ALL_TYPES.length || list.length === 0
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setDraftFilters((p) => ({ ...(p || filters), type: item.id }))}
-                        className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                          isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
-                          isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                        }`}>
-                          {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                        </div>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleTypeFilter('all')}
+                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                            isAllChecked
+                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                          }`}
+                        >
+                          <span>Semua Jenis Transaksi</span>
+                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                          }`}>
+                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                          </div>
+                        </button>
+                        {[
+                          { id: 'income', label: 'Pemasukan' },
+                          { id: 'expense', label: 'Pengeluaran' },
+                          { id: 'transfer', label: 'Transfer (Pindah Saldo)' },
+                        ].map((item) => {
+                          const isChecked = isAllChecked || list.includes(item.id)
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => toggleTypeFilter(item.id)}
+                              className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                                isChecked
+                                  ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                  : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              }`}
+                            >
+                              <span>{item.label}</span>
+                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                              }`}>
+                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </>
                     )
-                  })}
+                  })()}
                 </div>
               )}
             </div>
 
-            {/* 3. Akun / Dompet (Checklist Accordion: Semua + HANYA AKUN YANG SUDAH DIBUAT) */}
+            {/* 3. Akun / Dompet (Checklist Accordion Multi-Select) */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
               <button
                 type="button"
@@ -1006,10 +1104,14 @@ function Transactions() {
                   <span>Akun / Dompet</span>
                   <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
                     {(() => {
-                      const selectedId = draftFilters?.walletId ?? filters.walletId ?? 'all'
-                      if (selectedId === 'all') return 'Semua Akun'
-                      const found = userWallets.find((w) => String(w.id) === String(selectedId))
-                      return found ? found.name : 'Semua Akun'
+                      const allIds = userWallets.map((w) => String(w.id))
+                      const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+                      if (list.length === 0 || list.length === allIds.length) return 'Semua Akun'
+                      if (list.length === 1) {
+                        const found = userWallets.find((w) => String(w.id) === list[0])
+                        return found ? found.name : '1 Dipilih'
+                      }
+                      return `${list.length} Dipilih`
                     })()}
                   </span>
                 </div>
@@ -1017,56 +1119,65 @@ function Transactions() {
               </button>
               {activeFilterSection === 'wallet' && (
                 <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => setDraftFilters((p) => ({ ...(p || filters), walletId: 'all' }))}
-                    className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                      (draftFilters?.walletId ?? filters.walletId ?? 'all') === 'all'
-                        ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                        : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                    }`}
-                  >
-                    <span>Semua Akun</span>
-                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
-                      (draftFilters?.walletId ?? filters.walletId ?? 'all') === 'all' ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                    }`}>
-                      {(draftFilters?.walletId ?? filters.walletId ?? 'all') === 'all' && <Check className="h-3 w-3" strokeWidth={3} />}
-                    </div>
-                  </button>
-                  {userWallets.map((wallet) => {
-                    const isChecked = String(draftFilters?.walletId ?? filters.walletId) === String(wallet.id)
+                  {(() => {
+                    const allIds = userWallets.map((w) => String(w.id))
+                    const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+                    const isAllChecked = list.length === allIds.length || list.length === 0
                     return (
-                      <button
-                        key={wallet.id}
-                        type="button"
-                        onClick={() => setDraftFilters((p) => ({ ...(p || filters), walletId: wallet.id }))}
-                        className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                          isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-5 h-5 rounded-full bg-[var(--panel-strong)] flex items-center justify-center text-[9px] font-black border border-[var(--border)] overflow-hidden shrink-0">
-                            {wallet.logoUrl ? (
-                              <img src={wallet.logoUrl} alt={wallet.name} className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                              wallet.name?.substring(0, 2).toUpperCase()
-                            )}
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleWalletFilter('all')}
+                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                            isAllChecked
+                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                          }`}
+                        >
+                          <span>Semua Akun</span>
+                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                          }`}>
+                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
                           </div>
-                          <span className="truncate">{wallet.name}</span>
-                        </div>
-                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
-                          isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                        }`}>
-                          {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                        </div>
-                      </button>
+                        </button>
+                        {userWallets.map((wallet) => {
+                          const isChecked = isAllChecked || list.includes(String(wallet.id))
+                          return (
+                            <button
+                              key={wallet.id}
+                              type="button"
+                              onClick={() => toggleWalletFilter(wallet.id)}
+                              className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                                isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-5 h-5 rounded-full bg-[var(--panel-strong)] flex items-center justify-center text-[9px] font-black border border-[var(--border)] overflow-hidden shrink-0">
+                                  {wallet.logoUrl ? (
+                                    <img src={wallet.logoUrl} alt={wallet.name} className="w-full h-full object-cover rounded-full" />
+                                  ) : (
+                                    wallet.name?.substring(0, 2).toUpperCase()
+                                  )}
+                                </div>
+                                <span className="truncate">{wallet.name}</span>
+                              </div>
+                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                              }`}>
+                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </>
                     )
-                  })}
+                  })()}
                 </div>
               )}
             </div>
 
-            {/* 4. Kategori Utama (Checklist Accordion: Semua + HANYA KATEGORI UTAMA YANG DAH PERNAH DIBUAT/DIGUNAKAN) */}
+            {/* 4. Kategori Utama (Checklist Accordion Multi-Select) */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
               <button
                 type="button"
@@ -1077,8 +1188,10 @@ function Transactions() {
                   <span>Kategori Utama</span>
                   <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
                     {(() => {
-                      const cat = draftFilters?.category ?? filters.category ?? 'all'
-                      return cat === 'all' ? 'Semua Kategori' : cat
+                      const list = draftFilters?.categories ?? filters.categories ?? usedCategories
+                      if (list.length === 0 || list.length === usedCategories.length) return 'Semua Kategori'
+                      if (list.length === 1) return list[0]
+                      return `${list.length} Dipilih`
                     })()}
                   </span>
                 </div>
@@ -1086,42 +1199,50 @@ function Transactions() {
               </button>
               {activeFilterSection === 'category' && (
                 <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => setDraftFilters((p) => ({ ...(p || filters), category: 'all' }))}
-                    className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                      (draftFilters?.category ?? filters.category ?? 'all') === 'all'
-                        ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                        : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                    }`}
-                  >
-                    <span>Semua Kategori</span>
-                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
-                      (draftFilters?.category ?? filters.category ?? 'all') === 'all' ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                    }`}>
-                      {(draftFilters?.category ?? filters.category ?? 'all') === 'all' && <Check className="h-3 w-3" strokeWidth={3} />}
-                    </div>
-                  </button>
-                  {usedCategories.map((category) => {
-                    const isChecked = (draftFilters?.category ?? filters.category) === category
+                  {(() => {
+                    const list = draftFilters?.categories ?? filters.categories ?? usedCategories
+                    const isAllChecked = list.length === usedCategories.length || list.length === 0
                     return (
-                      <button
-                        key={category}
-                        type="button"
-                        onClick={() => setDraftFilters((p) => ({ ...(p || filters), category }))}
-                        className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
-                          isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                        }`}
-                      >
-                        <span className="truncate">{category}</span>
-                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
-                          isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                        }`}>
-                          {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                        </div>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryFilter('all')}
+                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                            isAllChecked
+                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                          }`}
+                        >
+                          <span>Semua Kategori</span>
+                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                          }`}>
+                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                          </div>
+                        </button>
+                        {usedCategories.map((category) => {
+                          const isChecked = isAllChecked || list.includes(category)
+                          return (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => toggleCategoryFilter(category)}
+                              className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                                isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              }`}
+                            >
+                              <span className="truncate">{category}</span>
+                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                              }`}>
+                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </>
                     )
-                  })}
+                  })()}
                 </div>
               )}
             </div>
@@ -1132,7 +1253,14 @@ function Transactions() {
               type="button"
               className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
               onClick={() => {
-                const resetValues = { search: filters.search, type: 'all', walletId: 'all', category: 'all', startDate: '', endDate: '' }
+                const resetValues = {
+                  search: filters.search,
+                  types: [...ALL_TYPES],
+                  walletIds: userWallets.map((w) => String(w.id)),
+                  categories: [...usedCategories],
+                  startDate: '',
+                  endDate: '',
+                }
                 setDraftFilters(resetValues)
                 setFilters(resetValues)
                 setIsFilterOpen(false)
