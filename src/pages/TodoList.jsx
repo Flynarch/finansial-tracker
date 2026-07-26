@@ -624,8 +624,8 @@ function TodoList() {
   }
 
   const pillClass = (active) =>
-    `flex-shrink-0 rounded-full px-4 py-2 text-[13px] font-bold transition-all duration-300 ${
-      active ? 'bg-[var(--fg)] text-[var(--bg)] shadow-md scale-105' : 'bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'
+    `flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-bold transition-all duration-300 ${
+      active ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'
     }`
 
   return (
@@ -677,8 +677,8 @@ function TodoList() {
         {activeTab === 'habits' && <HabitsView />}
         {activeTab === 'todo' && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2 pb-2 pt-1 pl-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 pl-0.5 min-w-0 flex-1 whitespace-nowrap">
                 <button type="button" className={pillClass(filter === 'all')} onClick={() => setFilter('all')}>
                   {t('todo.filter.all')} <span className="ml-1 opacity-60">({todoCounts.all})</span>
                 </button>

@@ -121,7 +121,7 @@ function BottomNav() {
           Kartu nav: lebar penuh, tinggi = lebar×72/400 → skala SVG seragam.
           Notch pakai kurva bezier bertahap (lebih halus di bahu kiri/kanan, tidak tajam saat masuk-keluar lengkungan).
         */}
-        <div className="relative isolate mx-auto w-full max-w-md overflow-visible pt-9">
+        <div className="relative isolate mx-auto w-full max-w-[393px] overflow-visible pt-9">
           <div className="relative w-full [aspect-ratio:400/72]">
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
