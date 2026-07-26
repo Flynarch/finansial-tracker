@@ -1,29 +1,54 @@
 import React from 'react'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Bot, User as UserIcon } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { format } from 'date-fns'
 
-export function UserBubble({ content }) {
+function getCurrentTimeStr(timestamp) {
+  try {
+    return format(timestamp ? new Date(timestamp) : new Date(), 'HH:mm')
+  } catch {
+    return format(new Date(), 'HH:mm')
+  }
+}
+
+export function UserBubble({ content, timestamp }) {
+  const timeStr = getCurrentTimeStr(timestamp)
   return (
-    <div className="ft-chat-user ft-swush-in">
-      {content}
+    <div className="flex flex-col items-end gap-1 ft-swush-in max-w-[85%] ml-auto">
+      <div className="ft-chat-user shadow-xs">
+        {content}
+      </div>
+      <span className="text-[10px] font-medium text-[var(--muted)] px-1">
+        {timeStr}
+      </span>
     </div>
   )
 }
 
-export function AiBubble({ content }) {
+export function AiBubble({ content, timestamp }) {
+  const timeStr = getCurrentTimeStr(timestamp)
   return (
-    <div className="ft-chat-ai ft-swush-in flex gap-2">
-      <div className="shrink-0 mt-0.5 text-[var(--accent)]">
-        <Sparkles size={16} />
+    <div className="ft-chat-ai ft-swush-in flex gap-2.5 max-w-[92%]">
+      {/* Sleek AI Avatar Badge */}
+      <div className="shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xs">
+        <Sparkles size={14} />
       </div>
-      <div className="flex-1 w-full overflow-hidden ft-md-prose">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {content}
-        </ReactMarkdown>
+      
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="ft-md-prose leading-relaxed">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {content}
+          </ReactMarkdown>
+        </div>
+        <div className="mt-1 flex items-center justify-end">
+          <span className="text-[10px] font-medium text-[var(--muted)]">
+            {timeStr}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -32,29 +57,30 @@ export function AiBubble({ content }) {
 export function TypingIndicator() {
   const locale = useSettingsStore(s => s.locale)
   return (
-    <div className="ft-chat-ai flex items-center gap-3">
-      <div className="shrink-0 text-[var(--accent)] flex items-center">
-        <Sparkles size={16} />
+    <div className="ft-chat-ai flex items-center gap-3 max-w-[80%]">
+      <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xs">
+        <Sparkles size={14} className="animate-spin duration-3000" />
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         <span className="ft-typing-dot"></span>
         <span className="ft-typing-dot"></span>
         <span className="ft-typing-dot"></span>
       </div>
-      <span className="text-xs text-[var(--muted)] ml-1">
+      <span className="text-xs font-semibold text-[var(--muted)] ml-1">
         {translate(locale, 'aiChat.thinking')}
       </span>
     </div>
   )
 }
 
-import { formatExpenseCategory, parseExpenseCategoryPath } from '../../lib/expenseCategories'
+import { parseExpenseCategoryPath } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 
 const ELEGANT_PIE_COLORS = ['#818cf8', '#34d399', '#fbbf24', '#fb7185', '#38bdf8', '#a78bfa']
 
-export function ChartBubble({ data, chartType = 'expense' }) {
+export function ChartBubble({ data, chartType = 'expense', timestamp }) {
   const locale = useSettingsStore(s => s.locale)
+  const timeStr = getCurrentTimeStr(timestamp)
   
   const groupedData = {}
   Object.keys(data).forEach(key => {
@@ -64,7 +90,6 @@ export function ChartBubble({ data, chartType = 'expense' }) {
     }
     const lang = locale === 'en' ? 'en' : 'id'
     
-    // Default fallback if not found in tree
     let parentName = key
     let childName = ''
     
@@ -76,7 +101,6 @@ export function ChartBubble({ data, chartType = 'expense' }) {
     } else if (chartType === 'income') {
       parentName = formatIncomeCategory(key, locale) || key
     } else {
-       // If it's something like "makanan/jajan" but not in tree
        const parts = key.split('/')
        if (parts.length > 1) {
          parentName = parts[0].replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -127,16 +151,19 @@ export function ChartBubble({ data, chartType = 'expense' }) {
   }
 
   return (
-    <div className="ft-chat-ai ft-swush-in flex gap-2 w-full">
-      <div className="shrink-0 mt-0.5 text-[var(--accent)]">
-        <Sparkles size={16} />
+    <div className="ft-chat-ai ft-swush-in flex gap-2.5 w-full">
+      <div className="shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xs">
+        <Sparkles size={14} />
       </div>
-      <div className="flex-1 w-full flex flex-col gap-2 overflow-hidden bg-white/5 p-3 rounded-lg border border-[var(--border)]">
-        <span className="text-sm font-semibold text-[var(--text)]">
-          {chartType === 'income' ? 'Distribusi Pemasukan' : 'Distribusi Pengeluaran'}
-        </span>
+      <div className="flex-1 w-full flex flex-col gap-2 overflow-hidden bg-[var(--field-bg)]/60 p-3.5 rounded-2xl border border-[var(--border)]">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+            {chartType === 'income' ? 'Distribusi Pemasukan' : 'Distribusi Pengeluaran'}
+          </span>
+          <span className="text-[10px] font-medium text-[var(--muted)]">{timeStr}</span>
+        </div>
         {chartData.length > 0 ? (
-          <div className="h-64 w-full mt-2">
+          <div className="h-60 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -163,7 +190,7 @@ export function ChartBubble({ data, chartType = 'expense' }) {
                   verticalAlign="bottom" 
                   align="center"
                   iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', color: 'var(--muted)', paddingTop: '10px' }}
+                  wrapperStyle={{ fontSize: '11px', color: 'var(--muted)', paddingTop: '8px' }}
                 />
               </PieChart>
             </ResponsiveContainer>
