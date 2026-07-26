@@ -389,6 +389,15 @@ function Transactions() {
     const today = `${yyyy}-${mm}-${dd}`
 
     setQuickRange(nextRange)
+    if (nextRange === 'all') {
+      setFilters({ startDate: '', endDate: '' })
+      return
+    }
+    if (nextRange === 'yearly') {
+      const startKey = `${yyyy}-01-01`
+      setFilters({ startDate: startKey, endDate: today })
+      return
+    }
     if (nextRange === 'today') {
       setFilters({ startDate: today, endDate: today })
       return
@@ -572,8 +581,10 @@ function Transactions() {
         <section className="relative z-30 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+            <div className="flex max-w-full overflow-x-auto ft-hide-scrollbar gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 shrink-0" style={{ scrollbarWidth: 'none' }}>
               {[
+                { id: 'all', label: locale === 'en' ? 'All' : 'Semua' },
+                { id: 'yearly', label: locale === 'en' ? 'Yearly' : 'Tahunan' },
                 { id: 'monthly', label: t('tx.range.monthly') },
                 { id: 'weekly', label: t('tx.range.weekly') },
                 { id: 'today', label: t('tx.range.today') },
@@ -582,7 +593,7 @@ function Transactions() {
                   key={item.id}
                   type="button"
                   onClick={() => applyQuickRange(item.id)}
-                  className={`rounded-lg px-3 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition ${
                     quickRange === item.id ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                   }`}
                 >
