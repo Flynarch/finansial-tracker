@@ -433,7 +433,14 @@ export default function HabitsView() {
     setEditOpen(false)
   }
 
-  if (!habits) return <div className="p-4 text-center text-sm text-[var(--muted)]">Loading habits...</div>
+  if (!habits) {
+    return (
+      <div className="space-y-3 p-1 animate-pulse">
+        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
+        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
+      </div>
+    )
+  }
 
   const todayHabits = []
   const otherHabits = []
