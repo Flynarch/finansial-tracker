@@ -1432,7 +1432,7 @@ function Transactions() {
                         {option.badge}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-[var(--muted)] truncate">{option.desc}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--muted)] leading-normal whitespace-normal">{option.desc}</p>
                   </div>
                 </div>
                 <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
