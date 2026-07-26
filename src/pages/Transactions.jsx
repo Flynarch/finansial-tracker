@@ -13,7 +13,7 @@ import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useBackButton from '../hooks/useBackButton'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
+import { formatCategoryName, getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import {
@@ -1190,7 +1190,7 @@ function Transactions() {
                     {(() => {
                       const list = draftFilters?.categories ?? filters.categories ?? usedCategories
                       if (list.length === 0 || list.length === usedCategories.length) return 'Semua Kategori'
-                      if (list.length === 1) return list[0]
+                      if (list.length === 1) return formatCategoryName(list[0], locale)
                       return `${list.length} Dipilih`
                     })()}
                   </span>
@@ -1231,7 +1231,7 @@ function Transactions() {
                                 isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
                               }`}
                             >
-                              <span className="truncate">{category}</span>
+                              <span className="truncate">{formatCategoryName(category, locale)}</span>
                               <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
                                 isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                               }`}>

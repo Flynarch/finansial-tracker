@@ -254,3 +254,22 @@ export function getTransactionCategoryLabels(rawCategory, txType, locale = 'id')
     sub: parts.length > 1 ? formatFallback(parts[1]) : null 
   }
 }
+
+export function formatCategoryName(rawCategory, locale = 'id') {
+  if (!rawCategory) return ''
+  const lang = locale === 'en' ? 'en' : 'id'
+  const parentId = String(rawCategory).split('/')[0].trim()
+  
+  const expenseParsed = parseExpenseCategoryPath(parentId)
+  if (expenseParsed?.parent?.names?.[lang]) {
+    return expenseParsed.parent.names[lang]
+  }
+  const incomeParsed = parseIncomeCategoryPath(parentId)
+  if (incomeParsed?.parent?.names?.[lang]) {
+    return incomeParsed.parent.names[lang]
+  }
+
+  return parentId
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (l) => l.toUpperCase())
+}
