@@ -39,6 +39,14 @@ import {
   ZoomTab,
 } from '../components/dashboard/DashboardStatComponents'
 
+const getSavedNetWorthRange = () => {
+  try {
+    return localStorage.getItem('ft_networth_range') || 'weekly'
+  } catch {
+    return 'weekly'
+  }
+}
+
 // Persistent cache for total wallet balances & recent transactions across tab switches
 let cachedWalletsWithBalance = null
 let cachedTotalWalletBalance = null
@@ -75,6 +83,25 @@ function Dashboard() {
 
   // null = still loading. Wallets balance loading also waits for allTransactionsForBalance.
   const isDbLoading = transactions === null || wallets === null || allTransactionsForBalance === null
+
+  const [zoomRevenueRange, setZoomRevenueRangeState] = useState(() => getSavedNetWorthRange())
+  const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
+
+  const setZoomRevenueRange = useCallback((range) => {
+    setZoomRevenueRangeState(range)
+    setMiniRevenueRangeState(range)
+    try {
+      localStorage.setItem('ft_networth_range', range)
+    } catch {}
+  }, [])
+
+  const setMiniRevenueRange = useCallback((range) => {
+    setMiniRevenueRangeState(range)
+    setZoomRevenueRangeState(range)
+    try {
+      localStorage.setItem('ft_networth_range', range)
+    } catch {}
+  }, [])
   
   const walletsWithBalance = useMemo(() => {
     if (wallets === null || wallets === undefined || allTransactionsForBalance === null || allTransactionsForBalance === undefined) {
@@ -428,8 +455,6 @@ function Dashboard() {
     }
   }, [budgets, goals, transactions, currentMonthKey, defaultCurrency, rates])
 
-  const [miniRevenueRange, setMiniRevenueRange] = useState('weekly')
-  const [zoomRevenueRange, setZoomRevenueRange] = useState('weekly')
   const [miniRevenueSnapshot, setMiniRevenueSnapshot] = useState([])
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
