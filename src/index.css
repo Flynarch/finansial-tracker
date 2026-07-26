@@ -609,7 +609,7 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 
   /* ── Settings: grouped list pattern ──────────────────────────────── */
   .ft-settings-page {
-    @apply mx-auto max-w-lg px-3;
+    @apply mx-auto w-full max-w-full sm:max-w-lg px-3;
     padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
   }
 

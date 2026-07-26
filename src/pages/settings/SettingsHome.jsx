@@ -1,4 +1,4 @@
-import { useNavigate } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
