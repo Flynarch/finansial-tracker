@@ -285,6 +285,17 @@ function Transactions() {
     clearBulkSelection()
   }
 
+  useEffect(() => {
+    if (isBulkMode) {
+      document.body.classList.add('hide-bottom-nav')
+    } else {
+      document.body.classList.remove('hide-bottom-nav')
+    }
+    return () => {
+      document.body.classList.remove('hide-bottom-nav')
+    }
+  }, [isBulkMode])
+
   const [isEntering, setIsEntering] = useState(false)
   const hasInitializedDefaultRange = useRef(false)
 

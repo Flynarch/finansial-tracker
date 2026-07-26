@@ -1430,3 +1430,11 @@ section,
     box-shadow: none !important;
   }
 }
+
+/* ── Hide Global Bottom Nav, FAB & AI Bar during Bulk Mode ──── */
+body.hide-bottom-nav nav,
+body.hide-bottom-nav .ft-app-shell nav,
+body.hide-bottom-nav [aria-label="Tambah Transaksi"],
+body.hide-bottom-nav .ft-ai-trigger-bar {
+  display: none !important;
+}
