@@ -117,32 +117,48 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         {...(getSwipeHandlers ? getSwipeHandlers(transaction.id) : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold ${colorClass}`}
-          >
-            {transaction.type === 'transfer' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
-            ) : (
-              <CategoryIcon icon={iconKey} className="h-5 w-5" />
-            )}
+          <div className="relative shrink-0">
+            <div
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold ${colorClass}`}
+            >
+              {transaction.type === 'transfer' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
+              ) : (
+                <CategoryIcon icon={iconKey} className="h-5 w-5" />
+              )}
+            </div>
+
+            {/* Micro-Avatar Wallet Badge */}
+            {(() => {
+              const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
+              if (!walletObj) return null
+              return (
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-1.5 border-[var(--field-bg)] bg-[var(--panel-strong)] shadow-2xs"
+                  title={walletObj.name}
+                >
+                  {walletObj.logoUrl ? (
+                    <img src={walletObj.logoUrl} alt={walletObj.name} className="h-full w-full object-cover rounded-full" />
+                  ) : (
+                    <span className="text-[7px] font-black leading-none text-[var(--fg)]">
+                      {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
           </div>
+
           <div className="min-w-0 flex-1">
             {createdTime ? (
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
             <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
-            {(sub || walletName) && (
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium leading-tight text-[var(--muted)]">
-                {sub && <span className="truncate font-medium">{sub}</span>}
-                {sub && walletName && <span className="opacity-40 text-[8px]">•</span>}
-                {walletName && (
-                  <span className="flex items-center gap-1 rounded-[4px] bg-[var(--border)]/60 px-1.5 py-0.5 text-[10px] text-[var(--fg)]/80">
-                    <Wallet size={10} className="opacity-70" />
-                    <span className="truncate max-w-[90px]">{walletName}</span>
-                  </span>
-                )}
-              </div>
-            )}
+            {sub ? (
+              <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
+                {sub}
+              </p>
+            ) : null}
             {noteStr ? (
               <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
                 {noteStr}
