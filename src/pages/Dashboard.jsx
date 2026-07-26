@@ -68,11 +68,16 @@ function Dashboard() {
   const isDbLoading = transactions === null || wallets === null || allTransactionsForBalance === null
   
   const walletsWithBalance = useMemo(() => {
-    if (wallets === null || wallets === undefined) return undefined
-    if (!wallets) return []
+    if (wallets === null || wallets === undefined || allTransactionsForBalance === null || allTransactionsForBalance === undefined) {
+      return cachedWalletsWithBalance || undefined
+    }
+    if (!wallets) {
+      cachedWalletsWithBalance = []
+      return []
+    }
     // Use full transaction history so balances include transactions older than 13 months
     const txs = allTransactionsForBalance || []
-    return wallets.map(w => {
+    const computed = wallets.map(w => {
       let bal = Number(w.balance) || 0
       for (const tx of txs) {
         const amount = Number(tx.amount) || 0
@@ -88,9 +93,19 @@ function Dashboard() {
       }
       return { ...w, currentBalance: bal }
     })
+    cachedWalletsWithBalance = computed
+    return computed
   }, [wallets, allTransactionsForBalance])
 
-  const totalWalletBalance = useMemo(() => (walletsWithBalance || []).reduce((s, w) => s + w.currentBalance, 0), [walletsWithBalance])
+  const totalWalletBalance = useMemo(() => {
+    if (walletsWithBalance === undefined || walletsWithBalance === null) {
+      return cachedTotalWalletBalance !== null ? cachedTotalWalletBalance : 0
+    }
+    const total = walletsWithBalance.reduce((s, w) => s + w.currentBalance, 0)
+    cachedTotalWalletBalance = total
+    return total
+  }, [walletsWithBalance])
+  
   const [isEntering, setIsEntering] = useState(false)
   const [budgetTab, setBudgetTab] = useState('budget')
   const [isOpenQuickBudget, setIsOpenQuickBudget] = useState(false)
