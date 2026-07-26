@@ -958,15 +958,15 @@ function Transactions() {
         </div>
       </div>
 
-      {/* ── Bulk Actions Floating Bar ────────────────────────── */}
+      {/* ── Bulk Actions Floating Bar (Replaces Bottom FAB/Nav) ────────────────────────── */}
       {isBulkMode && (
-        <div className="fixed bottom-16 left-4 right-4 z-40 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-2xl backdrop-blur-md">
+        <div className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-50 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-[var(--fg)]">{selectedTxIds.size} Dipilih</span>
             <button
               type="button"
               onClick={selectAllVisible}
-              className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)]"
+              className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
             >
               Semua ({filteredTransactions.length})
             </button>
@@ -976,7 +976,7 @@ function Transactions() {
               type="button"
               onClick={() => setIsBatchCategoryModalOpen(true)}
               disabled={selectedTxIds.size === 0}
-              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40"
+              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40 transition active:scale-95"
             >
               Ubah Kategori
             </button>
@@ -984,14 +984,14 @@ function Transactions() {
               type="button"
               onClick={handleBatchDelete}
               disabled={selectedTxIds.size === 0}
-              className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40"
+              className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40 transition active:scale-95"
             >
               Hapus ({selectedTxIds.size})
             </button>
             <button
               type="button"
               onClick={clearBulkSelection}
-              className="rounded-full p-1.5 text-[var(--muted)] hover:text-[var(--fg)] text-xs font-bold"
+              className="rounded-full p-2 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 text-xs font-bold"
               title="Batal"
             >
               ✕
