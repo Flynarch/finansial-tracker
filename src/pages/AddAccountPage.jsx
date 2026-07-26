@@ -198,46 +198,62 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
           </section>
         )}
 
-        {/* ── Divider ──────────────────────────────────────────── */}
-        {recommended.length > 0 && others.length > 0 && (
-          <div className="mx-4 my-4 border-t border-[var(--border)]" />
-        )}
+        {/* ── Grouped Category Sections (Idea 4) ────────────────────── */}
+        {(() => {
+          const SECTION_MAP = [
+            { id: 'bank', title: 'Bank Digital & Nasional' },
+            { id: 'ewallet', title: 'E-Wallet & Transaksi' },
+            { id: 'investasi', title: 'Platform Investasi & Crypto' },
+            { id: 'lainnya', title: 'Kas & Lainnya' },
+          ]
 
-        {/* ── Lainnya (list) ────────────────────────────────────── */}
-        {others.length > 0 && (
-          <section>
-            <h2 className="px-4 mb-2 text-[15px] font-bold text-fg" style={{ fontFamily: 'var(--font-display)' }}>
-              Lainnya
-            </h2>
-            <div>
-              {others.map(inst => {
-                const added = isInstitutionAdded(inst)
-                return (
-                <button
-                  key={inst.id}
-                  onClick={() => {
-                    if (!added) setSelectedInst(inst)
-                  }}
-                  disabled={added}
-                  className={`w-full flex items-center gap-4 px-4 py-3.5 text-left transition group ${added ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:bg-[var(--panel)] active:bg-[var(--field-bg)]'}`}
-                >
-                  <div className="relative">
-                    <InstitutionLogo inst={inst} size="md" />
-                  </div>
-                  <div className="flex-1 min-w-0 border-b border-[var(--border)] pb-3.5 -mb-3.5 group-last:border-b-0 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-bold text-[var(--fg)] truncate">{inst.name}</p>
-                      <p className="text-[12px] text-[var(--muted)] mt-0.5">{inst.subtitle || 'Indonesian Rupiah'}</p>
-                    </div>
-                    {added && (
-                      <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wide bg-rose-500/10 px-2 py-1 rounded-md">Terdaftar</span>
-                    )}
-                  </div>
-                </button>
-              )})}
-            </div>
-          </section>
-        )}
+          return SECTION_MAP.map((sec) => {
+            const secItems = filteredData.filter((i) => i.type === sec.id)
+            if (secItems.length === 0) return null
+
+            return (
+              <section key={sec.id} className="mt-5">
+                <div className="flex items-center justify-between px-4 mb-2">
+                  <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                    {sec.title} ({secItems.length})
+                  </h2>
+                </div>
+                <div className="divide-y divide-[var(--border)] border-y border-[var(--border)] bg-[var(--field-bg)]">
+                  {secItems.map((inst) => {
+                    const added = isInstitutionAdded(inst)
+                    return (
+                      <button
+                        key={inst.id}
+                        onClick={() => {
+                          if (!added) setSelectedInst(inst)
+                        }}
+                        disabled={added}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 text-left transition group ${
+                          added
+                            ? 'opacity-50 grayscale cursor-not-allowed'
+                            : 'hover:bg-[var(--panel)] active:scale-[0.99]'
+                        }`}
+                      >
+                        <InstitutionLogo inst={inst} size="md" />
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-[var(--fg)] truncate">{inst.name}</p>
+                            <p className="text-[11px] text-[var(--muted)] mt-0.5 truncate">{inst.subtitle || 'Indonesian Rupiah'}</p>
+                          </div>
+                          {added && (
+                            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              Terdaftar
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })
+        })()}
 
         {/* ── All as list when searching ────────────────────────── */}
         {recommended.length > 0 && others.length === 0 && search && (
