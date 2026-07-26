@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { formatCurrency } from '../../lib/utils'
 import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
+import { getWalletLogoUrl } from '../../data/walletInstitutions'
 
 export default function WalletCarousel({ 
   monthIncome, 
@@ -197,11 +198,11 @@ export default function WalletCarousel({
                     <div className="w-full h-full flex items-center justify-center text-amber-500">
                       <MoneyBagIcon size={18} strokeWidth={2.5} />
                     </div>
-                  ) : w.logoUrl ? (
+                  ) : getWalletLogoUrl(w) ? (
                     <img 
-                      src={w.logoUrl} 
+                      src={getWalletLogoUrl(w)} 
                       alt={w.name} 
-                      className="w-full h-full object-cover rounded-full" 
+                      className="w-full h-full object-contain p-[1px] rounded-full" 
                       onError={(e) => {
                         e.target.style.display = 'none'
                         if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -210,7 +211,7 @@ export default function WalletCarousel({
                   ) : null}
                   <span 
                     className="text-[11px] font-bold text-[var(--fg)]"
-                    style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || w.logoUrl ? 'none' : 'flex' }}
+                    style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || getWalletLogoUrl(w) ? 'none' : 'flex' }}
                   >
                     {w.name?.substring(0,2).toUpperCase()}
                   </span>

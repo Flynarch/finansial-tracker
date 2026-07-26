@@ -6,6 +6,7 @@ import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { ChevronLeft, Edit2, Trash2, Plus, Receipt, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, Search, Archive, ArchiveRestore } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
+import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
@@ -29,7 +30,7 @@ export default function WalletDetailPage() {
       .where('walletId').equals(walletId)
       .or('targetWalletId').equals(walletId)
       .toArray()
-    return txs.sort((a, b) => new Date(b.date) - new Date(a.date))
+    return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
   }, [walletId])
 
   const handleToggleArchive = async () => {
@@ -343,11 +344,11 @@ export default function WalletDetailPage() {
               <div className="w-full h-full flex items-center justify-center text-amber-500">
                 <MoneyBagIcon size={30} strokeWidth={2.5} />
               </div>
-            ) : wallet.logoUrl ? (
+            ) : getWalletLogoUrl(wallet) ? (
               <img 
-                src={wallet.logoUrl} 
+                src={getWalletLogoUrl(wallet)} 
                 alt={wallet.name} 
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-contain p-[2px] rounded-full"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
@@ -356,7 +357,7 @@ export default function WalletDetailPage() {
             ) : null}
             <div 
               className="w-full h-full flex items-center justify-center font-black text-xl text-[var(--fg)]"
-              style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || wallet.logoUrl ? 'none' : 'flex' }}
+              style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
             >
               {getInitials(wallet.name)}
             </div>

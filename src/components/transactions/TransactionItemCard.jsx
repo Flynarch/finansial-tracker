@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Wallet } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
+import { getWalletLogoUrl } from '../../data/walletInstitutions'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -132,13 +133,14 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             {(() => {
               const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
               if (!walletObj) return null
+              const logo = getWalletLogoUrl(walletObj)
               return (
                 <div
                   className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-1.5 border-[var(--field-bg)] bg-[var(--panel-strong)] shadow-2xs"
                   title={walletObj.name}
                 >
-                  {walletObj.logoUrl ? (
-                    <img src={walletObj.logoUrl} alt={walletObj.name} className="h-full w-full object-cover rounded-full" />
+                  {logo ? (
+                    <img src={logo} alt={walletObj.name} className="h-full w-full object-contain p-[1px] rounded-full" />
                   ) : (
                     <span className="text-[7px] font-black leading-none text-[var(--fg)]">
                       {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}

@@ -1,5 +1,16 @@
-const LOGO_DEV_TOKEN = import.meta.env.VITE_LOGO_DEV_TOKEN
-const getLogoUrl = (domain) => `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`
+export const BRI_CUSTOM_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/BRI_2020.svg/512px-BRI_2020.svg.png'
+
+export function getWalletLogoUrl(wallet) {
+  if (!wallet) return ''
+  const name = String(wallet.name || '').toLowerCase()
+  const inst = String(wallet.institutionType || wallet.id || '').toLowerCase()
+  const url = String(wallet.logoUrl || '')
+
+  if (name.includes('bri') || inst.includes('bri') || url.includes('bri.co.id')) {
+    return BRI_CUSTOM_LOGO
+  }
+  return wallet.logoUrl || ''
+}
 
 export const walletInstitutions = [
   // Bank - Recommended
@@ -8,7 +19,7 @@ export const walletInstitutions = [
   { id: 'bni', name: 'BNI', type: 'bank', logoUrl: getLogoUrl('bni.co.id'), isRecommended: true },
   
   // Bank - Others
-  { id: 'bri', name: 'BRI', type: 'bank', logoUrl: getLogoUrl('bri.co.id'), isRecommended: false },
+  { id: 'bri', name: 'BRI', type: 'bank', logoUrl: BRI_CUSTOM_LOGO, isRecommended: true },
   { id: 'bsi', name: 'BSI', type: 'bank', logoUrl: getLogoUrl('bankbsi.co.id'), isRecommended: false },
   { id: 'cimb', name: 'CIMB Niaga', type: 'bank', logoUrl: getLogoUrl('cimbniaga.co.id'), isRecommended: false },
   { id: 'jago', name: 'Bank Jago', type: 'bank', logoUrl: getLogoUrl('jago.com'), isRecommended: false },

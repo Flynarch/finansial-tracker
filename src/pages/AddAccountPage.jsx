@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { walletInstitutions } from '../data/walletInstitutions'
+import { walletInstitutions, getWalletLogoUrl } from '../data/walletInstitutions'
 import AddAccountForm from '../components/wallet/AddAccountForm'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 
@@ -43,11 +43,11 @@ function InstitutionLogo({ inst, size = 'md' }) {
         <div className={`w-full h-full flex items-center justify-center bg-[var(--field-bg)] text-amber-500 drop-shadow-sm`}>
           <MoneyBagIcon size={size === 'lg' ? 24 : 20} strokeWidth={2.5} />
         </div>
-      ) : inst.logoUrl ? (
+      ) : getWalletLogoUrl(inst) ? (
         <img
-          src={inst.logoUrl}
+          src={getWalletLogoUrl(inst)}
           alt={inst.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain p-[2px]"
           onError={(e) => {
             e.target.style.display = 'none'
             e.target.nextSibling.style.display = 'flex'
@@ -57,7 +57,7 @@ function InstitutionLogo({ inst, size = 'md' }) {
       ) : null}
       <div
         className={`w-full h-full items-center justify-center font-bold ${getAvatarColor(inst.name)}`}
-        style={{ display: inst.customIcon || inst.logoUrl ? 'none' : 'flex' }}
+        style={{ display: inst.customIcon || getWalletLogoUrl(inst) ? 'none' : 'flex' }}
       >
         {inst.name.substring(0, 2).toUpperCase()}
       </div>
@@ -288,8 +288,8 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--panel-strong)] flex items-center justify-center font-bold text-xs text-[var(--fg)] border border-[var(--border)] overflow-hidden">
-                        {w.logoUrl ? (
-                          <img src={w.logoUrl} alt={w.name} className="w-full h-full object-cover rounded-full" />
+                        {getWalletLogoUrl(w) ? (
+                          <img src={getWalletLogoUrl(w)} alt={w.name} className="w-full h-full object-contain p-[2px] rounded-full" />
                         ) : (
                           w.name?.substring(0, 2).toUpperCase()
                         )}
