@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { X, TrendingUp } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { db } from '../lib/db'
@@ -679,6 +680,31 @@ function Dashboard() {
     }
   }, [])
 
+  // Derive contextual summary stats based on active range
+  const rangedSummaryStats = useMemo(() => {
+    const range = zoomRevenueRange
+    if (range === 'today') {
+      return { income: todayIncome, expense: todayIncome - (todayStats?.todayNet ?? 0), net: todayStats?.todayNet ?? 0 }
+    }
+    if (range === 'weekly') {
+      return { income: weeklyIncome, expense: weeklyExpense, net: weeklyNet }
+    }
+    if (range === 'monthly') {
+      return { income: monthIncome, expense: monthExpense, net: monthDelta }
+    }
+    // yearly — sum all 12 months
+    const safeTx = transactions ?? []
+    const yearKey = format(new Date(), 'yyyy')
+    const yearly = safeTx.reduce((acc, tx) => {
+      if (!String(tx?.date || '').startsWith(yearKey)) return acc
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      if (tx.type === 'income') acc.income += amount
+      if (tx.type === 'expense') acc.expense += amount
+      return acc
+    }, { income: 0, expense: 0 })
+    return { income: yearly.income, expense: yearly.expense, net: yearly.income - yearly.expense }
+  }, [zoomRevenueRange, todayIncome, todayStats, weeklyIncome, weeklyExpense, weeklyNet, monthIncome, monthExpense, monthDelta, transactions, defaultCurrency, rates])
+
   const RevenueCard = ({ interactive = false }) => {
     const containerProps = interactive
       ? {
@@ -691,6 +717,14 @@ function Dashboard() {
         }
       : {}
 
+    // Compact labels for mini card on dashboard
+    const compactItems = [
+      { id: 'yearly', label: 'Tahun' },
+      { id: 'monthly', label: 'Bulan' },
+      { id: 'weekly', label: 'Minggu' },
+      { id: 'today', label: 'Hari' },
+    ]
+
     return (
       <div
         {...containerProps}
@@ -701,37 +735,32 @@ function Dashboard() {
             <ChartToggle
               value={zoomRevenueRange}
               onChange={setZoomRevenueRange}
-              items={[
-                { id: 'yearly', label: t('dashboard.range.yearly') },
-                { id: 'monthly', label: t('dashboard.range.monthly') },
-                { id: 'weekly', label: t('dashboard.range.weekly') },
-                { id: 'today', label: t('dashboard.range.today') },
-              ]}
+              items={compactItems}
             />
-            <div className="text-right">
-              <p className="text-xs text-[var(--muted)]">
-                {zoomRevenueRange === 'yearly'
-                  ? t('dashboard.range.yearly')
-                  : zoomRevenueRange === 'monthly'
-                    ? t('dashboard.range.monthly')
-                    : zoomRevenueRange === 'today'
-                      ? t('dashboard.range.today')
-                      : t('dashboard.range.weekly')}
+            <div className="shrink-0 text-right pl-2">
+              <p className="text-[11px] text-[var(--muted)] leading-tight">
+                {compactItems.find(i => i.id === zoomRevenueRange)?.label}
               </p>
-              <p className="text-sm font-semibold text-[var(--fg)]">
+              <p className="text-sm font-bold text-[var(--fg)] tabular-nums">
                 {formatCurrency(zoomRevenueValue, defaultCurrency)}
               </p>
             </div>
           </div>
 
-          <div className="h-60 w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] p-2 text-[var(--fg)]">
+          <div className="h-56 w-full text-[var(--fg)]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={zoomRevenueSeries} margin={{ top: 10, right: 4, bottom: 4, left: 4 }}>
+              <AreaChart data={zoomRevenueSeries} margin={{ top: 12, right: defaultCurrency === 'IDR' ? 88 : 68, bottom: 4, left: 0 }}>
+                <defs>
+                  <linearGradient id="nwGradMini" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-ink)" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="var(--chart-ink)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <XAxis type="number" dataKey="time" scale="time" domain={['dataMin', 'dataMax']} hide />
                 <YAxis
                   domain={zoomRevenueChartDomain}
                   orientation="right"
-                  stroke="#64748b"
+                  tick={{ fill: 'var(--muted)', fontSize: 10 }}
                   tickFormatter={(v) => formatCurrency(v, defaultCurrency)}
                   ticks={zoomRevenueAxisTicks}
                   interval={0}
@@ -739,7 +768,6 @@ function Dashboard() {
                   axisLine={false}
                   tickLine={false}
                   width={defaultCurrency === 'IDR' ? 84 : 64}
-                  fontSize={11}
                 />
                 <Tooltip
                   formatter={(value) => formatCurrency(value, defaultCurrency)}
@@ -762,11 +790,10 @@ function Dashboard() {
                   type="monotone"
                   dataKey="value"
                   stroke="var(--chart-ink)"
-                  fill="var(--chart-ink)"
-                  fillOpacity={0.1}
-                  strokeWidth={1.8}
+                  fill="url(#nwGradMini)"
+                  strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 3 }}
+                  activeDot={{ r: 3, strokeWidth: 0, fill: 'var(--chart-ink)' }}
                   isAnimationActive={!reduceMotion}
                   animationDuration={700}
                   animationEasing="ease"
@@ -774,12 +801,8 @@ function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="ft-muted mt-3 min-h-[16px] text-xs">
-            {t('dashboard.revenue.quickSummary', {
-              net: formatCurrency(weeklyNet, defaultCurrency),
-              income: formatCurrency(weeklyIncome, defaultCurrency),
-              expense: formatCurrency(weeklyExpense, defaultCurrency),
-            })}
+          <p className="mt-2 min-h-[16px] text-xs text-[var(--muted-2)]">
+            {`Masuk ${formatCurrency(rangedSummaryStats.income, defaultCurrency)} · Keluar ${formatCurrency(rangedSummaryStats.expense, defaultCurrency)} · Selisih ${formatCurrency(rangedSummaryStats.net, defaultCurrency)}`}
           </p>
         </Card>
       </div>
@@ -1288,22 +1311,123 @@ function Dashboard() {
                 </>
               ) : (
                 <>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex flex-1 gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
-                      <ZoomTab id="revenue" active={zoomedChart === 'revenue'} label={t('dashboard.zoom.tabRevenue')} onSelect={setZoomedChart} />
+                  {/* — Net Worth Modal Header — */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent)]/15">
+                        <TrendingUp className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.5} />
+                      </div>
+                      <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">{t('dashboard.netWorthHistory')}</h3>
                     </div>
-
                     <button
                       type="button"
                       onClick={closeZoom}
-                      className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      aria-label={t('dashboard.zoom.close')}
+                      className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
                     >
-                      {t('dashboard.zoom.close')}
+                      <X className="h-4 w-4" strokeWidth={2.5} />
                     </button>
                   </div>
 
-                  <div className="max-h-[80dvh] overflow-hidden overscroll-none">
-                    <RevenueCard />
+                  {/* — Hero Balance — */}
+                  <div className="mb-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      {zoomRevenueRange === 'yearly' ? 'Kekayaan Bersih · Tahunan'
+                        : zoomRevenueRange === 'monthly' ? 'Kekayaan Bersih · Bulanan'
+                        : zoomRevenueRange === 'today' ? 'Kekayaan Bersih · Hari Ini'
+                        : 'Kekayaan Bersih · Mingguan'}
+                    </p>
+                    <p className="mt-0.5 text-[28px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
+                      {formatCurrency(zoomRevenueValue, defaultCurrency)}
+                    </p>
+                  </div>
+
+                  {/* — Compact Full-Width Filter — */}
+                  <div className="mb-4">
+                    <ChartToggle
+                      value={zoomRevenueRange}
+                      onChange={setZoomRevenueRange}
+                      items={[
+                        { id: 'yearly', label: 'Tahun' },
+                        { id: 'monthly', label: 'Bulan' },
+                        { id: 'weekly', label: 'Minggu' },
+                        { id: 'today', label: 'Hari' },
+                      ]}
+                    />
+                  </div>
+
+                  {/* — Borderless Chart — */}
+                  <div className="h-56 w-full text-[var(--fg)]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={zoomRevenueSeries} margin={{ top: 14, right: defaultCurrency === 'IDR' ? 88 : 68, bottom: 4, left: 0 }}>
+                        <defs>
+                          <linearGradient id="nwGradZoom" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--chart-ink)" stopOpacity={0.28} />
+                            <stop offset="100%" stopColor="var(--chart-ink)" stopOpacity={0.01} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis type="number" dataKey="time" scale="time" domain={['dataMin', 'dataMax']} hide />
+                        <YAxis
+                          domain={zoomRevenueChartDomain}
+                          orientation="right"
+                          tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                          tickFormatter={(v) => formatCurrency(v, defaultCurrency)}
+                          ticks={zoomRevenueAxisTicks}
+                          interval={0}
+                          tickCount={undefined}
+                          axisLine={false}
+                          tickLine={false}
+                          width={defaultCurrency === 'IDR' ? 84 : 64}
+                        />
+                        <Tooltip
+                          formatter={(value) => formatCurrency(value, defaultCurrency)}
+                          labelFormatter={(label, payload) => {
+                            const ts = Number(payload?.[0]?.payload?.time ?? label)
+                            if (!Number.isFinite(ts) || ts <= 0) return '-'
+                            return format(new Date(ts), 'dd MMM yyyy, HH:mm')
+                          }}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: '1px solid var(--border)',
+                            background: 'var(--panel-strong)',
+                            color: 'var(--fg)',
+                            fontSize: 12,
+                            boxShadow: 'var(--shadow-soft)',
+                          }}
+                        />
+                        <Area
+                          key={`zoom-${zoomRevenueSeries?.map((d) => d?.value).join('-')}`}
+                          type="monotone"
+                          dataKey="value"
+                          stroke="var(--chart-ink)"
+                          fill="url(#nwGradZoom)"
+                          strokeWidth={2.2}
+                          dot={false}
+                          activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--chart-ink)' }}
+                          isAnimationActive={!reduceMotion}
+                          animationDuration={700}
+                          animationEasing="ease"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* — Contextual Summary — */}
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Masuk', value: rangedSummaryStats.income, positive: true },
+                      { label: 'Keluar', value: rangedSummaryStats.expense, positive: false },
+                      { label: 'Selisih', value: rangedSummaryStats.net, positive: rangedSummaryStats.net >= 0 },
+                    ].map(({ label, value, positive }) => (
+                      <div key={label} className="rounded-xl bg-[var(--field-bg)] px-3 py-2.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{label}</p>
+                        <p className={`mt-0.5 text-[13px] font-black tabular-nums leading-tight ${
+                          label === 'Selisih' ? (positive ? 'text-emerald-500' : 'text-rose-500') : 'text-[var(--fg)]'
+                        }`}>
+                          {label === 'Selisih' && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency)}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </>
               )}

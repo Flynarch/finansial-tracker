@@ -1,4 +1,4 @@
-﻿import { memo, useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { clampPercent } from './DashboardChartHelpers'
@@ -137,10 +137,10 @@ export const MiniChartCard = memo(function MiniChartCard({
 })
 
 /** Chart range tab button */
-export const ChartToggle = memo(function ChartToggle({ value, onChange, items }) {
+export const ChartToggle = memo(function ChartToggle({ value, onChange, items, className = '' }) {
   return (
     <div
-      className="grid gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1"
+      className={`grid w-full gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 ${className}`}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((item) => (
@@ -148,8 +148,8 @@ export const ChartToggle = memo(function ChartToggle({ value, onChange, items })
           key={item.id}
           type="button"
           onClick={() => onChange?.(item.id)}
-          className={`flex-1 rounded-lg px-3 py-2 text-center text-[12px] font-semibold transition ${
-            value === item.id ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+          className={`flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-center text-[12px] font-bold transition-all ${
+            value === item.id ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
           }`}
         >
           {item.label}
