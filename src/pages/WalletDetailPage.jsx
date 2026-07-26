@@ -327,10 +327,10 @@ export default function WalletDetailPage() {
               <img 
                 src={wallet.logoUrl} 
                 alt={wallet.name} 
-                className="w-full h-full object-contain p-2"
+                className="w-full h-full object-cover rounded-full"
                 onError={(e) => {
                   e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                 }}
               />
             ) : null}

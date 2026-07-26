@@ -92,10 +92,10 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 <img 
                   src={institution.logoUrl} 
                   alt={name} 
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-cover rounded-full"
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                   }}
                 />
               ) : null}

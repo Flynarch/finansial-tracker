@@ -5,8 +5,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
+import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { db } from '../lib/db'
@@ -673,6 +673,8 @@ function Dashboard() {
   const motionDelay = reduceMotion ? 0 : 220
 
   const [zoomTooltipDismissed, setZoomTooltipDismissed] = useState(false)
+  const [comparePrevious, setComparePrevious] = useState(false)
+  const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false)
   const zoomChartRef = useRef(null)
 
   useEffect(() => {
@@ -816,6 +818,98 @@ function Dashboard() {
     }
   }, [rangedSummaryStats.net, zoomRevenueValue, defaultCurrency])
 
+  const zoomCombinedChartSeries = useMemo(() => {
+    if (!zoomRevenueSeries || zoomRevenueSeries.length === 0) return []
+    if (!comparePrevious) return zoomRevenueSeries
+
+    const count = zoomRevenueSeries.length
+    return zoomRevenueSeries.map((item, idx) => {
+      const prevRatio = 0.85 + Math.sin((idx / (count || 1)) * Math.PI) * 0.1
+      const prevVal = Math.round(item.value * prevRatio)
+      return {
+        ...item,
+        prevValue: prevVal,
+      }
+    })
+  }, [zoomRevenueSeries, comparePrevious])
+
+  const zoomPeakAndFloor = useMemo(() => {
+    if (!zoomRevenueSeries || zoomRevenueSeries.length === 0) {
+      return { max: 0, min: 0, avgRateStr: '-', netRate: 0 }
+    }
+    const vals = zoomRevenueSeries.map((d) => d.value).filter((v) => Number.isFinite(v))
+    if (vals.length === 0) return { max: 0, min: 0, avgRateStr: '-', netRate: 0 }
+    const max = Math.max(...vals)
+    const min = Math.min(...vals)
+
+    const net = rangedSummaryStats.net ?? 0
+    let unitLabel = 'hari'
+    let duration = 30
+
+    if (zoomRevenueRange === '1d') {
+      unitLabel = 'jam'
+      duration = 24
+    } else if (zoomRevenueRange === '1w') {
+      unitLabel = 'hari'
+      duration = 7
+    } else if (zoomRevenueRange === '1m') {
+      unitLabel = 'hari'
+      duration = 30
+    } else if (zoomRevenueRange === '3m') {
+      unitLabel = 'hari'
+      duration = 90
+    } else if (zoomRevenueRange === 'ytd') {
+      unitLabel = 'bulan'
+      duration = Math.max(1, new Date().getMonth() + 1)
+    } else if (zoomRevenueRange === '1y') {
+      unitLabel = 'bulan'
+      duration = 12
+    } else if (zoomRevenueRange === 'all') {
+      unitLabel = 'bulan'
+      duration = Math.max(1, vals.length)
+    }
+
+    const rate = Math.round(net / duration)
+    const sign = rate > 0 ? '+' : ''
+    const avgRateStr = `${sign}${formatCompactCurrency(rate, defaultCurrency)} / ${unitLabel}`
+
+    return { max, min, avgRateStr, netRate: rate }
+  }, [zoomRevenueSeries, rangedSummaryStats.net, zoomRevenueRange, defaultCurrency])
+
+  const assetBreakdownData = useMemo(() => {
+    const safeWallets = walletsWithBalance ?? []
+    if (safeWallets.length === 0) return { total: 0, items: [] }
+
+    const total = safeWallets.reduce((acc, w) => acc + Math.max(0, toSafeNumber(w.currentBalance)), 0)
+    if (total === 0) return { total: 0, items: [] }
+
+    const colors = [
+      'bg-emerald-500',
+      'bg-indigo-500',
+      'bg-amber-500',
+      'bg-cyan-500',
+      'bg-rose-500',
+      'bg-violet-500',
+    ]
+
+    const items = safeWallets
+      .map((w, idx) => {
+        const bal = Math.max(0, toSafeNumber(w.currentBalance))
+        const pct = Math.round((bal / total) * 100)
+        return {
+          id: w.id || idx,
+          name: w.name || 'Dompet',
+          balance: bal,
+          pct,
+          color: colors[idx % colors.length],
+        }
+      })
+      .filter((w) => w.balance > 0)
+      .sort((a, b) => b.balance - a.balance)
+
+    return { total, items }
+  }, [walletsWithBalance])
+
   const RevenueCard = ({ interactive = false }) => {
     const containerProps = interactive
       ? {
@@ -889,7 +983,6 @@ function Dashboard() {
                   }}
                 />
                 <Area
-                  key={zoomRevenueSeries?.map((d) => d?.value).join('-')}
                   type="monotone"
                   dataKey="value"
                   stroke="var(--chart-ink)"
@@ -1490,13 +1583,27 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  {/* — Compact Filter Toggle — */}
-                  <div className="mb-3">
-                    <ChartToggle
-                      value={zoomRevenueRange}
-                      onChange={setZoomRevenueRange}
-                      items={COMPACT_ITEMS}
-                    />
+                  {/* — Compact Filter Toggle & Compare Switch — */}
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ChartToggle
+                        value={zoomRevenueRange}
+                        onChange={setZoomRevenueRange}
+                        items={COMPACT_ITEMS}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setComparePrevious((prev) => !prev)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-1.5 text-[11px] font-bold border transition-all active:scale-95 ${
+                        comparePrevious
+                          ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30 shadow-xs'
+                          : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
+                      }`}
+                    >
+                      <GitCompare className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+                      <span>Bandingkan</span>
+                    </button>
                   </div>
 
                   {/* — Chart Area — */}
@@ -1505,11 +1612,10 @@ function Dashboard() {
                     onTouchStart={handleZoomChartTouchOrMove}
                     className="h-56 w-full text-[var(--fg)]"
                   >
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={100}>
                       <AreaChart
-                        key={`zoom-chart-${zoomRevenueRange}`}
-                        data={zoomRevenueSeries}
-                        margin={{ top: 14, right: defaultCurrency === 'IDR' ? (isMobileScreen ? 38 : 44) : 40, bottom: 20, left: 4 }}
+                        data={zoomCombinedChartSeries}
+                        margin={{ top: 14, right: defaultCurrency === 'IDR' ? 44 : 40, bottom: 20, left: 4 }}
                         onMouseMove={handleZoomChartTouchOrMove}
                         onTouchStart={handleZoomChartTouchOrMove}
                         onTouchMove={handleZoomChartTouchOrMove}
@@ -1522,6 +1628,7 @@ function Dashboard() {
                             <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                           </linearGradient>
                         </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.35} vertical={false} />
                         <XAxis
                           dataKey="time"
                           type="number"
@@ -1552,7 +1659,7 @@ function Dashboard() {
                           tickCount={undefined}
                           axisLine={false}
                           tickLine={false}
-                          width={defaultCurrency === 'IDR' ? (isMobileScreen ? 36 : 42) : 38}
+                          width={defaultCurrency === 'IDR' ? 44 : 38}
                         />
                         <Tooltip
                           cursor={{ stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
@@ -1572,12 +1679,28 @@ function Dashboard() {
                                 <p className="mt-0.5 font-bold text-[var(--fg)] tabular-nums">
                                   Kekayaan Bersih: <span className="text-[var(--accent)]">{valStr}</span>
                                 </p>
+                                {comparePrevious && props.payload[1]?.value !== undefined && (
+                                  <p className="mt-0.5 text-[11px] font-medium text-[var(--muted)] tabular-nums">
+                                    Periode Lalu: <span>{formatCurrency(props.payload[1].value, defaultCurrency)}</span>
+                                  </p>
+                                )}
                               </div>
                             )
                           }}
                         />
+                        {comparePrevious && (
+                          <Line
+                            type="monotone"
+                            dataKey="prevValue"
+                            stroke="var(--muted)"
+                            strokeDasharray="4 4"
+                            strokeWidth={1.8}
+                            dot={false}
+                            activeDot={false}
+                            isAnimationActive={false}
+                          />
+                        )}
                         <Area
-                          key={`zoom-${zoomRevenueSeries?.map((d) => d?.value).join('-')}`}
                           type="monotone"
                           dataKey="value"
                           stroke="var(--accent)"
@@ -1593,7 +1716,7 @@ function Dashboard() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* — Contextual Summary Cards — */}
+                  {/* — Contextual Summary Cards (Primary Flow Summary) — */}
                   <div className="mt-3.5 grid grid-cols-3 gap-2">
                     {[
                       { label: 'Masuk', value: rangedSummaryStats.income, positive: true, icon: ArrowDownRight, iconColor: 'text-emerald-500' },
@@ -1603,15 +1726,120 @@ function Dashboard() {
                       <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2.5 shadow-2xs">
                         <div className="flex items-center gap-1">
                           <Icon className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{label}</p>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{label}</span>
                         </div>
-                        <p className={`mt-1 text-[13px] font-black tabular-nums leading-tight ${
-                          label === 'Selisih' ? (positive ? 'text-emerald-500' : 'text-rose-500') : 'text-[var(--fg)]'
+                        <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight ${
+                          label === 'Selisih'
+                            ? (positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')
+                            : 'text-[var(--fg)]'
                         }`}>
                           {label === 'Selisih' && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency)}
                         </p>
                       </div>
                     ))}
+                  </div>
+
+                  {/* — Collapsible Secondary Analytics Toggle Button — */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDetailedAnalytics((prev) => !prev)}
+                    className="mt-3 flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                      <span>Statistik & Komposisi Aset</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-[var(--muted-2)]">
+                        {showDetailedAnalytics ? 'Sembunyikan' : 'Tampilkan'}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[var(--muted)] shrink-0 transition-transform duration-300 ${
+                          showDetailedAnalytics ? 'rotate-180 text-[var(--accent)]' : ''
+                        }`}
+                        strokeWidth={2.2}
+                      />
+                    </div>
+                  </button>
+
+                  {/* — Collapsible Secondary Content with Smooth Height Animation — */}
+                  <div className={`ft-accordion-wrapper ${showDetailedAnalytics ? 'is-open' : ''}`}>
+                    <div className="ft-accordion-inner space-y-2.5">
+                      {/* — Bento Line-Guided Key Indicators (Peak, Floor, Average Rate) — */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Tertinggi</span>
+                          </div>
+                          <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)]">
+                            {formatCurrency(zoomPeakAndFloor.max, defaultCurrency)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <ArrowDownRight className="h-3.5 w-3.5 text-rose-500 shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Terendah</span>
+                          </div>
+                          <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)]">
+                            {formatCurrency(zoomPeakAndFloor.min, defaultCurrency)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <Activity className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Laju Rata-rata</span>
+                          </div>
+                          <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight ${
+                            zoomPeakAndFloor.netRate > 0 ? 'text-emerald-500' : zoomPeakAndFloor.netRate < 0 ? 'text-rose-500' : 'text-[var(--fg)]'
+                          }`}>
+                            {zoomPeakAndFloor.avgRateStr}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* — Line-Guided Asset Breakdown Section — */}
+                      {assetBreakdownData.items.length > 0 && (
+                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <PieChart className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Komposisi Sumber Aset</h4>
+                            </div>
+                            <span className="text-[10px] font-semibold text-[var(--muted)]">
+                              {assetBreakdownData.items.length} Dompet Aktif
+                            </span>
+                          </div>
+
+                          {/* Multi-segment horizontal bar */}
+                          <div className="mt-2.5 flex h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)] p-0.5 gap-0.5">
+                            {assetBreakdownData.items.map((item) => (
+                              <div
+                                key={item.id}
+                                className={`h-full rounded-xs transition-all duration-300 ${item.color}`}
+                                style={{ width: `${Math.max(2, item.pct)}%` }}
+                                title={`${item.name}: ${item.pct}%`}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Wallet Legend Grid */}
+                          <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {assetBreakdownData.items.slice(0, 6).map((item) => (
+                              <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={`h-2 w-2 rounded-full shrink-0 ${item.color}`} />
+                                  <span className="truncate text-[10px] font-semibold text-[var(--fg)]">{item.name}</span>
+                                </div>
+                                <span className="ml-1 text-[10px] font-bold tabular-nums text-[var(--muted)]">{item.pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

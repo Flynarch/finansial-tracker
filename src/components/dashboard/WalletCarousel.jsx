@@ -192,16 +192,28 @@ export default function WalletCarousel({
                 title={`${w.name} - ${formatCurrency(w.currentBalance, defaultCurrency)}`}
               >
                 {/* Logo (prominent) */}
-                <div className="ft-wallet-mini-logo">
+                <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
                   {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' ? (
                     <div className="w-full h-full flex items-center justify-center text-amber-500">
                       <MoneyBagIcon size={18} strokeWidth={2.5} />
                     </div>
                   ) : w.logoUrl ? (
-                    <img src={w.logoUrl} alt={w.name} className="w-full h-full object-contain p-1" />
-                  ) : (
-                    <span className="text-[11px] font-bold text-[var(--fg)]">{w.name?.substring(0,2).toUpperCase()}</span>
-                  )}
+                    <img 
+                      src={w.logoUrl} 
+                      alt={w.name} 
+                      className="w-full h-full object-cover rounded-full" 
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <span 
+                    className="text-[11px] font-bold text-[var(--fg)]"
+                    style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || w.logoUrl ? 'none' : 'flex' }}
+                  >
+                    {w.name?.substring(0,2).toUpperCase()}
+                  </span>
                 </div>
                 {/* Name + Saldo Uang */}
                 <div className="min-w-0 flex flex-col text-left">

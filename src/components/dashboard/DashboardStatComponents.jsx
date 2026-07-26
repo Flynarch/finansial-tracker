@@ -142,7 +142,6 @@ export const MiniChartCard = memo(function MiniChartCard({
               <YAxis hide domain={yDomain} />
             )}
             <Area
-              key={data?.map((d) => d?.value).join('-')}
               type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill="url(#miniGradFade)"
               strokeWidth={2} dot={false}
               isAnimationActive={animate} animationBegin={24}
@@ -176,9 +175,9 @@ export const ChartToggle = memo(function ChartToggle({ value, onChange, items, c
             key={item.id}
             type="button"
             onClick={() => onChange?.(item.id)}
-            className={`relative flex h-8 items-center justify-center rounded-xl text-[11px] font-bold tracking-tight transition-all duration-150 active:scale-95 ${
+            className={`relative flex h-8 items-center justify-center rounded-xl text-[11px] font-bold tracking-tight transition-colors duration-150 active:scale-95 ${
               isActive
-                ? 'bg-[var(--accent)] text-white shadow-xs font-extrabold'
+                ? 'bg-[var(--accent)] text-white shadow-xs'
                 : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--border)]/40'
             }`}
           >
