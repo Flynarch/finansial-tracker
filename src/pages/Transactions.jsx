@@ -583,7 +583,7 @@ function Transactions() {
               {isMenuOpen ? (
                 <button
                   type="button"
-                  className="fixed inset-0 z-40 cursor-default bg-black/20 backdrop-blur-[1px]"
+                  className="fixed inset-0 z-40 cursor-default bg-transparent"
                   aria-label={t('tx.menu.closeOverlay')}
                   onClick={() => setIsMenuOpen(false)}
                 />
