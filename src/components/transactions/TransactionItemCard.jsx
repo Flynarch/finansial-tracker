@@ -140,12 +140,22 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                   title={walletObj.name}
                 >
                   {logo ? (
-                    <img src={logo} alt={walletObj.name} className="h-full w-full object-contain p-[1px] rounded-full" />
-                  ) : (
-                    <span className="text-[7px] font-black leading-none text-[var(--fg)]">
-                      {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}
-                    </span>
-                  )}
+                    <img
+                      src={logo}
+                      alt={walletObj.name}
+                      className="h-full w-full object-contain p-[1px] rounded-full"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    className="text-[7px] font-black leading-none text-[var(--fg)] flex items-center justify-center"
+                    style={{ display: logo ? 'none' : 'flex' }}
+                  >
+                    {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}
+                  </span>
                 </div>
               )
             })()}

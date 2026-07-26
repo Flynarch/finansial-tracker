@@ -1,4 +1,4 @@
-export const BRI_CUSTOM_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/BRI_2020.svg/512px-BRI_2020.svg.png'
+export const BRI_CUSTOM_LOGO = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%2300529C"/><path d="M22 68 V32 H48 C58 32 64 37 64 43 C64 47 61 50 56 52 C63 54 67 58 67 63 C67 70 60 75 48 75 H22 Z M35 48 H46 C51 48 54 46 54 43 C54 40 51 38 46 38 H35 V48 Z M35 68 H48 C53 68 57 66 57 62 C57 58 53 56 48 56 H35 V68 Z" fill="white"/><path d="M72 32 H80 V75 H72 Z" fill="%23F37021"/></svg>`
 
 export function getWalletLogoUrl(wallet) {
   if (!wallet) return ''
