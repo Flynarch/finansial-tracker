@@ -301,20 +301,20 @@ export default function WalletDetailPage() {
           style={heroAmbientStyle}
         >
           {/* Top Nav Bar */}
-          <div className="relative z-10 flex items-center justify-between mb-2">
+          <div className="relative z-10 flex items-center justify-between mb-2 min-h-[40px]">
             <button 
               onClick={() => navigate('/dashboard')} 
-              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
+              className="relative z-10 flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
               aria-label="Kembali"
             >
               <ChevronLeft size={24} strokeWidth={2.5} />
             </button>
 
-            <h2 className="ft-display text-lg font-black tracking-tight text-[var(--fg)] uppercase">
+            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[55%] truncate text-center text-sm font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
               {wallet.name}
             </h2>
 
-            <div className="flex items-center gap-1">
+            <div className="relative z-10 flex items-center gap-1">
               <button 
                 onClick={handleToggleArchive} 
                 className={`flex items-center justify-center w-9 h-9 rounded-full transition active:scale-95 ${
