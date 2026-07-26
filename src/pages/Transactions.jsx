@@ -1,12 +1,13 @@
-import { format, subDays } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar as CalendarIcon, ChevronDown, Check } from 'lucide-react'
+import { Calendar as CalendarIcon, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import Modal from '../components/ui/Modal'
+import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
@@ -249,6 +250,7 @@ function Transactions() {
   const [selectedTxIds, setSelectedTxIds] = useState(new Set())
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false)
   const [isRangeModalOpen, setIsRangeModalOpen] = useState(false)
+  const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false)
 
   const toggleSelectTx = (id) => {
     setSelectedTxIds((prev) => {
@@ -990,29 +992,43 @@ function Transactions() {
           <div className="space-y-3.5 mt-2">
             {/* 1. Setting Tanggal (Dari - Sampai) */}
             <div className="space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3">
-              <label className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
-                Setting Tanggal
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-[10px] font-bold text-[var(--muted)]">Dari Tanggal</span>
-                  <input
-                    type="date"
-                    value={draftFilters?.startDate ?? filters.startDate ?? ''}
-                    onChange={(event) => setDraftFilters((p) => ({ ...(p || filters), startDate: event.target.value }))}
-                    className="ft-field mt-1 py-1.5 px-2 text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-[var(--muted)]">Sampai Tanggal</span>
-                  <input
-                    type="date"
-                    value={draftFilters?.endDate ?? filters.endDate ?? ''}
-                    onChange={(event) => setDraftFilters((p) => ({ ...(p || filters), endDate: event.target.value }))}
-                    className="ft-field mt-1 py-1.5 px-2 text-xs font-bold"
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
+                  Setting Tanggal
+                </label>
+                {(draftFilters?.startDate || draftFilters?.endDate || filters.startDate || filters.endDate) ? (
+                  <button
+                    type="button"
+                    onClick={() => setDraftFilters((p) => ({ ...(p || filters), startDate: '', endDate: '' }))}
+                    className="text-[10px] font-bold text-rose-500 hover:underline"
+                  >
+                    Hapus Tanggal
+                  </button>
+                ) : null}
               </div>
+              <button
+                type="button"
+                onClick={() => setIsDatePickerModalOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarIcon className="h-4 w-4 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                  <div className="flex items-center gap-1.5 min-w-0 text-left">
+                    <span className="truncate">
+                      {(draftFilters?.startDate || filters.startDate)
+                        ? format(parseISO(draftFilters?.startDate || filters.startDate), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
+                        : 'Dari Tanggal'}
+                    </span>
+                    <span className="text-[var(--muted)]">-</span>
+                    <span className="truncate">
+                      {(draftFilters?.endDate || filters.endDate)
+                        ? format(parseISO(draftFilters?.endDate || filters.endDate), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
+                        : 'Sampai Tanggal'}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-[var(--muted)] shrink-0" />
+              </button>
             </div>
 
             {/* 2. Jenis Transaksi (Checklist Accordion Multi-Select) */}
@@ -1381,6 +1397,18 @@ function Transactions() {
           })}
         </div>
       </Modal>
+
+      {/* ── Custom Date Picker Modal ───────────────────────────── */}
+      <CustomDatePickerModal
+        isOpen={isDatePickerModalOpen}
+        onClose={() => setIsDatePickerModalOpen(false)}
+        startDate={draftFilters?.startDate ?? filters.startDate ?? ''}
+        endDate={draftFilters?.endDate ?? filters.endDate ?? ''}
+        locale={locale}
+        onSelectRange={({ startDate, endDate }) => {
+          setDraftFilters((p) => ({ ...(p || filters), startDate, endDate }))
+        }}
+      />
     </div>
   )
 }
