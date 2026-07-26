@@ -470,17 +470,13 @@ export default function WalletDetailPage() {
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group) => (
                 <div key={group.dateKey} className="space-y-1.5">
-                  {/* Timeline Date Header with High-Contrast Recap Badge (Point 3) */}
-                  <div className="flex items-center justify-between px-2 py-1 rounded-lg border border-[var(--border)]/60 bg-[var(--field-bg)]/80">
-                    <span className="text-[10px] font-black tracking-wider text-[var(--fg)] uppercase">
+                  {/* Timeline Date Header */}
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
+                    <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (
-                      <span className={`text-[10.5px] font-black tabular-nums ${
-                        group.isPositive
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-rose-600 dark:text-rose-400'
-                      }`}>
+                      <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
                         {group.dailySummaryText}
                       </span>
                     ) : null}
