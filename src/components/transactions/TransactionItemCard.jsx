@@ -154,11 +154,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
             <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
-            {sub ? (
+            {(sub || walletName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
-                {sub}
+                {sub ? <span>{sub}</span> : null}
+                {sub && walletName ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                {walletName ? <span className="font-semibold text-[var(--fg)]/80">{walletName}</span> : null}
               </p>
-            ) : null}
+            )}
             {noteStr ? (
               <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
                 {noteStr}
