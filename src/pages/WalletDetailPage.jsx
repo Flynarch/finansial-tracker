@@ -295,29 +295,29 @@ export default function WalletDetailPage() {
   return (
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-32 relative">
-        {/* ── 1. Hero Header Banner (Centered Identity Stack) ───────── */}
+        {/* ── 1. Curved Hero Section with Wallet Icon & Accent Glow ────────────── */}
         <div 
-          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-14 pt-4 px-4 text-center relative overflow-hidden"
+          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-9 pt-3 px-4 text-center relative overflow-hidden"
           style={heroAmbientStyle}
         >
           {/* Top Nav Bar */}
-          <div className="relative z-10 flex items-center justify-between mb-2 min-h-[40px]">
+          <div className="relative z-10 flex items-center justify-between mb-1 min-h-[36px]">
             <button 
               onClick={() => navigate('/dashboard')} 
-              className="relative z-10 flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
+              className="relative z-10 flex items-center justify-center w-9 h-9 -ml-1 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
               aria-label="Kembali"
             >
-              <ChevronLeft size={24} strokeWidth={2.5} />
+              <ChevronLeft size={22} strokeWidth={2.5} />
             </button>
 
-            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
+            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-base sm:text-lg font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
               {wallet.name}
             </h2>
 
             <div className="relative z-10 flex items-center gap-1">
               <button 
                 onClick={handleToggleArchive} 
-                className={`flex items-center justify-center w-9 h-9 rounded-full transition active:scale-95 ${
+                className={`flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 ${
                   wallet.isArchived
                     ? 'text-amber-500 bg-amber-500/10'
                     : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
@@ -325,24 +325,24 @@ export default function WalletDetailPage() {
                 title={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
                 aria-label={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
               >
-                {wallet.isArchived ? <ArchiveRestore size={18} strokeWidth={2} /> : <Archive size={18} strokeWidth={2} />}
+                {wallet.isArchived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
               </button>
               <button 
                 onClick={() => setIsDeleteModalOpen(true)} 
-                className="flex items-center justify-center w-9 h-9 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                className="flex items-center justify-center w-8 h-8 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
                 title="Hapus Akun"
                 aria-label="Hapus Akun"
               >
-                <Trash2 size={18} strokeWidth={2} />
+                <Trash2 size={16} strokeWidth={2} />
               </button>
             </div>
           </div>
 
           {/* Centered Circular Logo */}
-          <div className="relative z-10 w-16 h-16 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto my-3">
+          <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto my-1.5">
             {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
               <div className="w-full h-full flex items-center justify-center text-amber-500">
-                <MoneyBagIcon size={30} strokeWidth={2.5} />
+                <MoneyBagIcon size={24} strokeWidth={2.5} />
               </div>
             ) : getWalletLogoUrl(wallet) ? (
               <img 
@@ -356,7 +356,7 @@ export default function WalletDetailPage() {
               />
             ) : null}
             <div 
-              className="w-full h-full flex items-center justify-center font-black text-xl text-[var(--fg)]"
+              className="w-full h-full flex items-center justify-center font-black text-sm text-[var(--fg)]"
               style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
             >
               {getInitials(wallet.name)}
@@ -364,22 +364,19 @@ export default function WalletDetailPage() {
           </div>
 
           {/* Subtitles: Account Type Pill Badge */}
-          <div className="relative z-10 space-y-1.5 flex flex-col items-center">
-            <h3 className="ft-display text-xs font-bold tracking-tight text-[var(--muted)]">
-              {wallet.name}
-            </h3>
-            <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-3 py-0.5 text-[10.5px] font-extrabold text-[var(--muted)] shadow-xs">
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
               <span>{formatAccountType(wallet.institutionType, wallet.name)}</span>
             </div>
           </div>
         </div>
 
-        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Wide & Compact) ─────── */}
-        <div className="px-4 -mt-8 relative z-20">
-          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-3 sm:p-3.5 shadow-md space-y-1.5">
+        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Compact) ─────── */}
+        <div className="px-4 -mt-5 relative z-20">
+          <div className="-mx-3.5 sm:mx-0 rounded-xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-md space-y-1">
             {/* Top Row: Label Caption & Edit Pencil Button */}
             <div className="flex items-center justify-between">
-              <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-[var(--muted-2)]">
+              <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-[var(--muted-2)]">
                 Saldo Akun Saat Ini
               </span>
 
@@ -389,24 +386,24 @@ export default function WalletDetailPage() {
                   setNewBalanceRaw(currentBalance.toString())
                   setIsEditBalanceModalOpen(true)
                 }}
-                className="w-6.5 h-6.5 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
+                className="w-6 h-6 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
                 title="Penyesuaian Saldo"
                 aria-label="Penyesuaian Saldo"
               >
-                <Edit2 size={12} strokeWidth={2} />
+                <Edit2 size={11} strokeWidth={2} />
               </button>
             </div>
 
             {/* Middle Row: Crisp Bold Balance Display */}
             <div>
-              <p className="ft-display text-xl sm:text-2xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
+              <p className="ft-display text-lg sm:text-xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
                 {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
               </p>
             </div>
 
             {/* Bottom Row: Timestamp Sub-info & Currency Badge */}
-            <div className="pt-1 border-t border-[var(--border)]/30 flex items-center justify-between text-[9.5px] sm:text-[10px] text-[var(--muted-2)]">
-              <span>Terakhir update {updatedAt}</span>
+            <div className="pt-1 border-t border-[var(--border)]/30 flex items-center justify-between text-[9px] text-[var(--muted-2)]">
+              <span>Update {updatedAt}</span>
               <span className="font-extrabold text-[var(--muted)] uppercase tracking-wider">
                 {wallet.currency || defaultCurrency}
               </span>
@@ -415,70 +412,75 @@ export default function WalletDetailPage() {
         </div>
 
         {/* ── 3. Content Section: Unified Transaction Feed Card ─────── */}
-        <div className="px-4 mt-3">
+        <div className="px-4 mt-2.5">
           {/* Transactions Feed Card Wrapper with Integrated Controls */}
-          <div className="mt-2 -mx-3.5 sm:mx-0 rounded-2xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-3 sm:p-4 shadow-sm space-y-3.5">
+          <div className="mt-1.5 -mx-3.5 sm:mx-0 rounded-xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-sm space-y-2.5">
             {/* Unified Card Header & Control Section */}
-            <div className="space-y-2.5 pb-3 border-b border-[var(--border)]/40">
-              <div className="flex items-center justify-between px-1">
-                <h3 className="ft-display text-sm font-extrabold text-[var(--fg)] tracking-tight">
+            <div className="space-y-2 pb-2 border-b border-[var(--border)]/40">
+              <div className="flex items-center justify-between px-0.5">
+                <h3 className="ft-display text-xs font-extrabold text-[var(--fg)] tracking-tight">
                   Riwayat Transaksi
                 </h3>
-                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
+                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9.5px] font-extrabold tabular-nums text-[var(--muted)]">
                   {filteredTransactions?.length || 0} transaksi
                 </span>
               </div>
 
-              {/* Integrated Search Input */}
-              <div className="relative">
-                <Search size={14} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari transaksi (catatan, kategori, nominal)..."
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 pl-8 pr-8 text-xs text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)]"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              {/* Compact Search & Filter Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="relative sm:col-span-6">
+                  <Search size={13} strokeWidth={2} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari transaksi..."
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-1 pl-7 pr-6 text-[11px] text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--muted)] hover:text-[var(--fg)]"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-              {/* Integrated Left-Aligned Inline Filter Pills */}
-              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-xl px-3 py-1.5 text-[10.5px] sm:text-xs font-extrabold transition flex items-center gap-1 shrink-0 ${
-                      activeTab === tab.id
-                        ? 'bg-[var(--fg)] text-[var(--bg)] shadow-sm'
-                        : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
-                    }`}
-                  >
-                    <span>{tab.label}</span>
-                    <span className="text-[9.5px] opacity-75">({tab.count})</span>
-                  </button>
-                ))}
+                <div className="flex items-center gap-1 overflow-x-auto ft-hide-scrollbar sm:col-span-6">
+                  {TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition flex items-center gap-1 shrink-0 ${
+                        activeTab === tab.id
+                          ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs'
+                          : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-[9px] opacity-75">({tab.count})</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group) => (
-                <div key={group.dateKey} className="space-y-2">
-                  {/* Timeline Date Header */}
-                  <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
-                    <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
+                <div key={group.dateKey} className="space-y-1.5">
+                  {/* Timeline Date Header with High-Contrast Recap Badge (Point 3) */}
+                  <div className="flex items-center justify-between px-2 py-1 rounded-lg border border-[var(--border)]/60 bg-[var(--field-bg)]/80">
+                    <span className="text-[10px] font-black tracking-wider text-[var(--fg)] uppercase">
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (
-                      <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
+                      <span className={`text-[10.5px] font-black tabular-nums ${
+                        group.isPositive
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}>
                         {group.dailySummaryText}
                       </span>
                     ) : null}

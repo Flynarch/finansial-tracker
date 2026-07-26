@@ -70,6 +70,8 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   const sub = labels.sub || null
   const noteStr = transaction.notes ? String(transaction.notes).trim() : ''
   const walletName = transaction.type !== 'transfer' ? getWalletName(transaction.walletId) : null
+  const isContextWalletMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))
+  const displayWalletName = isContextWalletMatch ? null : walletName
 
   return (
     <div
@@ -129,8 +131,9 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               )}
             </div>
 
-            {/* Micro-Avatar Wallet Badge */}
+            {/* Micro-Avatar Wallet Badge (Hidden when viewing dedicated context wallet) */}
             {(() => {
+              if (isContextWalletMatch) return null
               const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
               if (!walletObj) return null
               const logo = getWalletLogoUrl(walletObj)
@@ -166,11 +169,11 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
             <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
-            {(sub || walletName) && (
+            {(sub || displayWalletName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
                 {sub ? <span>{sub}</span> : null}
-                {sub && walletName ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                {walletName ? <span className="font-semibold text-[var(--fg)]/80">{walletName}</span> : null}
+                {sub && displayWalletName ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                {displayWalletName ? <span className="font-semibold text-[var(--fg)]/80">{displayWalletName}</span> : null}
               </p>
             )}
             {noteStr ? (
