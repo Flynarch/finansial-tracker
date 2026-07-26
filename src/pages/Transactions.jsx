@@ -2,6 +2,7 @@ import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Calendar as CalendarIcon, ChevronDown, Check } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
@@ -247,6 +248,7 @@ function Transactions() {
   const [isBulkMode, setIsBulkMode] = useState(false)
   const [selectedTxIds, setSelectedTxIds] = useState(new Set())
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false)
+  const [isRangeModalOpen, setIsRangeModalOpen] = useState(false)
 
   const toggleSelectTx = (id) => {
     setSelectedTxIds((prev) => {
@@ -581,26 +583,27 @@ function Transactions() {
         <section className="relative z-30 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="flex max-w-full overflow-x-auto ft-hide-scrollbar gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 shrink-0" style={{ scrollbarWidth: 'none' }}>
-              {[
-                { id: 'all', label: locale === 'en' ? 'All' : 'Semua' },
-                { id: 'yearly', label: locale === 'en' ? 'Yearly' : 'Tahunan' },
-                { id: 'monthly', label: t('tx.range.monthly') },
-                { id: 'weekly', label: t('tx.range.weekly') },
-                { id: 'today', label: t('tx.range.today') },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => applyQuickRange(item.id)}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition ${
-                    quickRange === item.id ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsRangeModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 shadow-2xs"
+            >
+              <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.2} />
+              <span>
+                {quickRange === 'all'
+                  ? 'Semua Transaksi'
+                  : quickRange === 'yearly'
+                  ? 'Tahun Ini'
+                  : quickRange === 'monthly'
+                  ? 'Bulan Ini'
+                  : quickRange === 'weekly'
+                  ? '7 Hari Terakhir'
+                  : quickRange === 'today'
+                  ? 'Hari Ini'
+                  : 'Periode Kustom'}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" strokeWidth={2.2} />
+            </button>
             <div className="relative z-50">
               {isMenuOpen ? (
                 <button
@@ -1031,6 +1034,52 @@ function Transactions() {
           handleBatchCategoryChange(categoryKey)
         }}
       />
+
+      {/* ── Period Selector Modal ───────────────────────────────── */}
+      <Modal
+        isOpen={isRangeModalOpen}
+        title="Pilih Periode Transaksi"
+        onClose={() => setIsRangeModalOpen(false)}
+      >
+        <div className="space-y-2 py-1">
+          {[
+            { id: 'monthly', title: 'Bulan Ini (Bulanan)', desc: 'Menampilkan transaksi dari tanggal 1 bulan berjalan' },
+            { id: 'weekly', title: '7 Hari Terakhir (Mingguan)', desc: 'Menampilkan transaksi dalam seminggu terakhir' },
+            { id: 'today', title: 'Hari Ini', desc: 'Menampilkan transaksi khusus hari ini saja' },
+            { id: 'yearly', title: 'Tahun Ini (Tahunan)', desc: 'Menampilkan transaksi dari 1 Januari tahun berjalan' },
+            { id: 'all', title: 'Semua Transaksi', desc: 'Menampilkan seluruh riwayat transaksi tanpa batasan' },
+          ].map((option) => {
+            const isSelected = quickRange === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  applyQuickRange(option.id)
+                  setIsRangeModalOpen(false)
+                }}
+                className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+                  isSelected
+                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))]'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)]'
+                }`}
+              >
+                <div>
+                  <p className={`text-xs font-bold ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--fg)]'}`}>
+                    {option.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{option.desc}</p>
+                </div>
+                {isSelected && (
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-xs">
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </Modal>
     </div>
   )
 }
