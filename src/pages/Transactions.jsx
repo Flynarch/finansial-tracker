@@ -2,7 +2,7 @@ import { format, parseISO, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar as CalendarIcon, ChevronDown, ChevronRight, Check } from 'lucide-react'
+import { Calendar as CalendarIcon, CalendarDays, Clock, Sparkles, TrendingUp, Layers, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
@@ -1358,15 +1358,51 @@ function Transactions() {
         title="Pilih Periode Transaksi"
         onClose={() => setIsRangeModalOpen(false)}
       >
-        <div className="space-y-2 py-1">
+        <div className="space-y-2.5 py-1">
           {[
-            { id: 'monthly', title: 'Bulan Ini (Bulanan)', desc: 'Menampilkan transaksi dari tanggal 1 bulan berjalan' },
-            { id: 'weekly', title: '7 Hari Terakhir (Mingguan)', desc: 'Menampilkan transaksi dalam seminggu terakhir' },
-            { id: 'today', title: 'Hari Ini', desc: 'Menampilkan transaksi khusus hari ini saja' },
-            { id: 'yearly', title: 'Tahun Ini (Tahunan)', desc: 'Menampilkan transaksi dari 1 Januari tahun berjalan' },
-            { id: 'all', title: 'Semua Transaksi', desc: 'Menampilkan seluruh riwayat transaksi tanpa batasan' },
+            {
+              id: 'monthly',
+              title: 'Bulan Ini',
+              badge: 'Bulanan',
+              desc: 'Menampilkan transaksi dari tanggal 1 bulan berjalan',
+              Icon: CalendarDays,
+              color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
+            },
+            {
+              id: 'weekly',
+              title: '7 Hari Terakhir',
+              badge: 'Mingguan',
+              desc: 'Menampilkan transaksi dalam seminggu terakhir',
+              Icon: Clock,
+              color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+            },
+            {
+              id: 'today',
+              title: 'Hari Ini',
+              badge: 'Harian',
+              desc: 'Menampilkan transaksi khusus hari ini saja',
+              Icon: Sparkles,
+              color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+            },
+            {
+              id: 'yearly',
+              title: 'Tahun Ini',
+              badge: 'Tahunan',
+              desc: 'Menampilkan transaksi dari 1 Januari tahun berjalan',
+              Icon: TrendingUp,
+              color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
+            },
+            {
+              id: 'all',
+              title: 'Semua Transaksi',
+              badge: 'Semua',
+              desc: 'Menampilkan seluruh riwayat transaksi tanpa batasan',
+              Icon: Layers,
+              color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+            },
           ].map((option) => {
             const isSelected = quickRange === option.id
+            const Icon = option.Icon
             return (
               <button
                 key={option.id}
@@ -1375,23 +1411,35 @@ function Transactions() {
                   applyQuickRange(option.id)
                   setIsRangeModalOpen(false)
                 }}
-                className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+                className={`group relative flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 active:scale-[0.98] ${
                   isSelected
-                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))]'
-                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)]'
+                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] shadow-xs'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)] hover:border-[var(--border-strong)]'
                 }`}
               >
-                <div>
-                  <p className={`text-xs font-bold ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--fg)]'}`}>
-                    {option.title}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{option.desc}</p>
-                </div>
-                {isSelected && (
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-xs">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${option.color} transition-transform group-hover:scale-105`}>
+                    <Icon className="h-5 w-5" strokeWidth={2.2} />
                   </div>
-                )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-xs font-black truncate ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--fg)]'}`}>
+                        {option.title}
+                      </p>
+                      <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                        isSelected ? 'bg-[var(--accent)] text-white' : 'bg-[var(--panel)] text-[var(--muted)] border border-[var(--border)]'
+                      }`}>
+                        {option.badge}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-[var(--muted)] truncate">{option.desc}</p>
+                  </div>
+                </div>
+                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
+                  isSelected ? 'bg-[var(--accent)] text-white shadow-xs' : 'border border-[var(--border)] bg-[var(--panel-strong)] text-transparent'
+                }`}>
+                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                </div>
               </button>
             )
           })}
