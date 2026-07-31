@@ -583,7 +583,7 @@ function Transactions() {
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
     return groupedEntries.map(([dateKey, items]) => {
-      let dateLabel = ''
+      let dateLabel
       if (dateKey === todayStr) {
         dateLabel = 'HARI INI'
       } else if (dateKey === yesterdayStr) {

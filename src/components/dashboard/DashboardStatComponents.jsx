@@ -1,6 +1,6 @@
-import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { memo, useMemo } from 'react'
 import { format } from 'date-fns'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { clampPercent } from './DashboardChartHelpers'
 
 /** Compact progress bar used in MetricCard */
@@ -56,10 +56,10 @@ export function MetricCard({ title, value, rightLabel, progress = 0, showProgres
 
 /** Mini chart card with area chart */
 export const MiniChartCard = memo(function MiniChartCard({
-  title, value, data, stroke, fill, onOpen, formatValue, rangeLabel, rangeId,
+  title, value, data, stroke, onOpen, formatValue, rangeLabel, rangeId,
   xKey = 'day', yDomain, lowHigh, t: tMini, trendBadge, showXAxisDate = false,
   showRightAxis = false, rightAxisTickFormatter, rightAxisWidth = 56,
-  rightAxisTicks, animate = false, premium = false,
+  rightAxisTicks, animate = false,
   animationDuration = 900, animationEasing = 'ease',
 }) {
   const lowHighText = useMemo(() => {

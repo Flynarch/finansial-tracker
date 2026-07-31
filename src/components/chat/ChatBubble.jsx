@@ -1,7 +1,6 @@
-import React from 'react'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
-import { Sparkles, Bot, User as UserIcon } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -78,6 +77,32 @@ import { formatIncomeCategory } from '../../lib/incomeCategories'
 
 const ELEGANT_PIE_COLORS = ['#818cf8', '#34d399', '#fbbf24', '#fb7185', '#38bdf8', '#a78bfa']
 
+function CustomTooltip({ active, payload }) {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload
+    return (
+      <div className="bg-[var(--panel-strong)] border border-[var(--border)] p-3 rounded-xl shadow-lg min-w-[180px] z-50 relative">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span>
+          <span className="font-bold text-[var(--fg)] text-sm">{d.name}</span>
+          <span className="ml-auto font-bold text-[var(--fg)] text-sm">Rp {d.value.toLocaleString('id-ID')}</span>
+        </div>
+        {d.children && d.children.length > 0 && (
+          <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/60 pt-2.5 mt-1.5">
+            {d.children.map((child, i) => (
+              <div key={i} className="flex justify-between items-center gap-4 text-[12px] text-[var(--muted)]">
+                <span className="truncate">{child.name}</span>
+                <span className="font-medium shrink-0">Rp {child.value.toLocaleString('id-ID')}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+  return null
+}
+
 export function ChartBubble({ data, chartType = 'expense', timestamp }) {
   const locale = useSettingsStore(s => s.locale)
   const timeStr = getCurrentTimeStr(timestamp)
@@ -90,7 +115,7 @@ export function ChartBubble({ data, chartType = 'expense', timestamp }) {
     }
     const lang = locale === 'en' ? 'en' : 'id'
     
-    let parentName = key
+    let parentName
     let childName = ''
     
     if (parsed) {
@@ -123,32 +148,6 @@ export function ChartBubble({ data, chartType = 'expense', timestamp }) {
     ...group,
     color: ELEGANT_PIE_COLORS[index % ELEGANT_PIE_COLORS.length]
   }))
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const d = payload[0].payload
-      return (
-        <div className="bg-[var(--panel-strong)] border border-[var(--border)] p-3 rounded-xl shadow-lg min-w-[180px] z-50 relative">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span>
-            <span className="font-bold text-[var(--fg)] text-sm">{d.name}</span>
-            <span className="ml-auto font-bold text-[var(--fg)] text-sm">Rp {d.value.toLocaleString('id-ID')}</span>
-          </div>
-          {d.children && d.children.length > 0 && (
-            <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/60 pt-2.5 mt-1.5">
-              {d.children.map((child, i) => (
-                <div key={i} className="flex justify-between items-center gap-4 text-[12px] text-[var(--muted)]">
-                  <span className="truncate">{child.name}</span>
-                  <span className="font-medium shrink-0">Rp {child.value.toLocaleString('id-ID')}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )
-    }
-    return null
-  }
 
   return (
     <div className="ft-chat-ai ft-swush-in flex gap-2.5 w-full">

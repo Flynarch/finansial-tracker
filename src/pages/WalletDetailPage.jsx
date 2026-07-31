@@ -114,7 +114,7 @@ export default function WalletDetailPage() {
     }
 
     return Array.from(groupsMap.values()).map(group => {
-      let dateLabel = ''
+      let dateLabel
       if (group.dateKey === todayStr) {
         dateLabel = 'HARI INI'
       } else if (group.dateKey === yesterdayStr) {

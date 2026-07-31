@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { useNavigate } from 'react-router-dom'
 import { Check, ListChecks, PiggyBank, Flame, CalendarCheck, CircleDollarSign, Target, PlusCircle, Trash2, ArrowRight } from 'lucide-react'
 

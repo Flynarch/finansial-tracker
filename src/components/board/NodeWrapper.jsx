@@ -93,7 +93,7 @@ export default function NodeWrapper({
       if (dist < 20 && duration < 600) {
         if (onSelect) onSelect(idea.id)
       }
-      try { e.target.releasePointerCapture(e.pointerId) } catch(err) {}
+      try { e.target.releasePointerCapture(e.pointerId) } catch {}
       return
     }
     

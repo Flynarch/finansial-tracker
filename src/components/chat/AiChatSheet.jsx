@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -9,7 +9,6 @@ import { parseTransactionFromText } from '../../lib/gemini'
 import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
-import TransactionCard from './TransactionCard'
 import TransactionSuccess from './TransactionSuccess'
 import ActionSuccessCard from './ActionSuccessCard'
 import QuickChips from './QuickChips'
@@ -26,12 +25,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [editingId, setEditingId] = useState(null)
   const [consecutiveErrors, setConsecutiveErrors] = useState(0)
   
   const [shouldRender, setShouldRender] = useState(false)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
-  const [undoState, setUndoState] = useState(null)
   
   const [selectedImage, setSelectedImage] = useState(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -473,7 +470,6 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       content: translate(locale, 'aiChat.welcome')
     }])
     setConsecutiveErrors(0)
-    setUndoState(null)
   }
 
   if (!shouldRender) return null
@@ -520,7 +516,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
-          {messages.filter(m => m.type !== 'hidden').map((msg, idx) => {
+          {messages.filter(m => m.type !== 'hidden').map((msg) => {
             const visibleMessages = messages.filter(m => m.type !== 'hidden')
             const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
             return (

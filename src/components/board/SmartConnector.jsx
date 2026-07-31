@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 export default function SmartConnector({ source, target, isConnecting, onDelete, label, onLabelChange }) {
   const [editing, setEditing] = useState(false)
@@ -18,8 +18,8 @@ export default function SmartConnector({ source, target, isConnecting, onDelete,
   const dy = ty - sy
   const angle = Math.atan2(dy, dx)
 
-  let endX = tx
-  let endY = ty
+  let endX
+  let endY
 
   if (target.shapeType === 'circle') {
     const radius = Math.min(tw, th)

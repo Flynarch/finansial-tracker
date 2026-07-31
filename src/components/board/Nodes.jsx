@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const COLOR_PALETTE = ['#fbbf24', '#f87171', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#38bdf8', '#facc15', '#4ade80']
 
 function ColorPicker({ currentColor, onColorChange }) {
@@ -146,7 +147,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
   )
 }
 
-export function NoteNode({ idea, size, isDragging, isSelected, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock }) {
+export function NoteNode({ idea, isSelected, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock }) {
   return (
     <div 
       className={`flex flex-col h-full w-full rounded-xl overflow-hidden shadow-md ${idea.locked ? 'ring-1 ring-amber-500/40' : ''}`}
@@ -167,7 +168,7 @@ export function NoteNode({ idea, size, isDragging, isSelected, onContentChange, 
   )
 }
 
-export function ShapeNode({ idea, size, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock, isSelected }) {
+export function ShapeNode({ idea, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock, isSelected }) {
   const isCircle = idea.shapeType === 'circle'
   return (
     <div 
@@ -191,7 +192,7 @@ export function ShapeNode({ idea, size, onContentChange, onDelete, onConnect, on
   )
 }
 
-export function FrameNode({ idea, size, onContentChange, onDelete, isSelected }) {
+export function FrameNode({ idea, onContentChange, onDelete }) {
   return (
     <div className="h-full w-full border-2 border-dashed border-[var(--muted)]/40 bg-transparent rounded-2xl relative">
       <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
@@ -262,7 +263,7 @@ export function DrawNode({ idea, size, onDelete, onDuplicate, onToggleLock, isSe
   )
 }
 
-export function ImageNode({ idea, size, onDelete, onDuplicate, onToggleLock, isSelected }) {
+export function ImageNode({ idea, onDelete, onDuplicate, onToggleLock, isSelected }) {
   return (
     <div className={`h-full w-full relative ${idea.locked ? 'ring-1 ring-amber-500/40 rounded-lg' : ''}`}>
       <img 
@@ -279,7 +280,7 @@ export function ImageNode({ idea, size, onDelete, onDuplicate, onToggleLock, isS
 }
 
 // Emoji/Sticker Node
-export function EmojiNode({ idea, size, onDelete, onContentChange, onDuplicate, onToggleLock, isSelected }) {
+export function EmojiNode({ idea, onDelete, onContentChange, onDuplicate, onToggleLock, isSelected }) {
   const [editing, setEditing] = useState(false)
   
   return (
@@ -311,13 +312,13 @@ export function EmojiNode({ idea, size, onDelete, onContentChange, onDuplicate, 
 }
 
 // Checklist Node
-export function ChecklistNode({ idea, size, onDelete, onUpdate, onContentChange, onColorChange, onDuplicate, onToggleLock, isSelected }) {
+export function ChecklistNode({ idea, onDelete, onUpdate, onContentChange, onColorChange, onDuplicate, onToggleLock, isSelected }) {
   let items = []
   try {
     items = typeof idea.content === 'string' && idea.content.startsWith('[') 
       ? JSON.parse(idea.content) 
       : (idea.items || [])
-  } catch (e) {
+  } catch {
     items = idea.items || []
   }
   

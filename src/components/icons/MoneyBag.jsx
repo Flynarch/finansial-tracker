@@ -1,4 +1,4 @@
-import React from 'react'
+
 
 export default function MoneyBag({ size = 24, className = '', strokeWidth = 2, color = 'currentColor' }) {
   return (

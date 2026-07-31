@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'

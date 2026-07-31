@@ -11,7 +11,6 @@ import {
   getEffectiveCategoryTone,
   getEffectiveIncomeCategoryTone,
   resolveExpenseParentIconKey,
-  resolveIncomeCategoryIconKey,
   resolveIncomeParentIconKey,
 } from '../../lib/categoryIcon'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -22,30 +21,20 @@ import {
   EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT,
   formatExpenseCategory,
   getDefaultExpenseCategoryPath,
-  getExpenseCategoryColor,
   getMergedExpenseTree,
-  isBuiltinExpenseChild,
   isValidExpenseCategoryPath,
   removeExpenseSubcategory,
   setExpenseCategoryColor,
-  updateExpenseCategoryName,
 } from '../../lib/expenseCategories'
 import {
   addIncomeParentCategory,
   addIncomeSubcategory,
   formatIncomeCategory,
-  getDefaultIncomeCategoryId,
-  getIncomeCategoryColor,
-  getMergedIncomeCategories,
   getMergedIncomeTree,
   INCOME_CATEGORY_CUSTOM_CHANGED_EVENT,
-  isBuiltinIncomeChild,
   isValidIncomeCategoryPath,
-  removeIncomeCategory,
-  removeIncomeParentCategory,
   removeIncomeSubcategory,
   setIncomeCategoryColor,
-  updateIncomeCategoryName,
 } from '../../lib/incomeCategories'
 import { fetchGoldPricePerGramIDR, getGoldPriceHistory } from '../../lib/api'
 import { db } from '../../lib/db'
@@ -107,7 +96,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const [incomeEditMode, setIncomeEditMode] = useState(false)
   const [newSubName, setNewSubName] = useState('')
   const [newParentName, setNewParentName] = useState('')
-  const [newIncomeCatName, setNewIncomeCatName] = useState('')
+  const [, setNewIncomeCatName] = useState('')
   const [categoryCustomVersion, setCategoryCustomVersion] = useState(0)
   const [submitError, setSubmitError] = useState('')
   const [goldAutoPrice, setGoldAutoPrice] = useState(0)
@@ -187,7 +176,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   useEffect(() => {
     if (isOpen) {
       setTxType('expense')
-      const nextPath = getDefaultExpenseCategoryPath()
       setForm((prev) => ({
         ...prev,
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -203,7 +191,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       setExpenseParentId(null)
       setIncomeParentId(null)
     }
-  }, [isOpen, defaultCurrency, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
+  }, [isOpen, defaultCurrency, initialWalletId, wallets, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
 
   useEffect(() => {
     if (txType !== 'investment') return
@@ -273,12 +261,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     if (txType === 'expense') syncExpenseParentFromCategory(maybePath)
     else syncIncomeParentFromCategory(maybePath)
   }, [txType, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
-
-  const categoryButtonLabel = !form.category || !form.category.trim()
-    ? t('addTx.selectCategory', 'Pilih Kategori...')
-    : txType === 'expense'
-      ? formatExpenseCategory(form.category, locale)
-      : formatIncomeCategory(form.category, locale)
+  const lang = locale === 'en' ? 'en' : 'id'
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -446,52 +429,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
       setSubmitError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
     }
-  }
-
-  const expenseParent =
-    mergedExpenseTree.find((p) => p.id === expenseParentId) || null
-  const lang = locale === 'en' ? 'en' : 'id'
-
-  const handleAddSubcategory = () => {
-    if (!expenseParent) return
-    const name = newSubName.trim()
-    if (!name) return
-    addExpenseSubcategory(expenseParent.id, name, name)
-    setNewSubName('')
-  }
-
-  const handleRemoveSubcategory = (childId) => {
-    if (!expenseParent) return
-    const msg = isBuiltinExpenseChild(expenseParent.id, childId)
-      ? t('addTx.confirmHideBuiltin')
-      : t('addTx.confirmRemoveCustom')
-    if (!window.confirm(msg)) return
-    const path = `${expenseParent.id}/${childId}`
-    removeExpenseSubcategory(expenseParent.id, childId)
-    if (form.category === path) {
-      setForm((p) => ({ ...p, category: getDefaultExpenseCategoryPath() }))
-    }
-  }
-
-  const handleAddIncomeCategory = () => {
-    const name = newIncomeCatName.trim()
-    if (!name) return
-    addIncomeCategory(name, name)
-    setNewIncomeCatName('')
-  }
-
-  const handleRemoveIncomeCategory = (id) => {
-    const msg = isBuiltinIncomeCategory(id)
-      ? t('addTx.confirmHideBuiltin')
-      : t('addTx.confirmRemoveCustom')
-    if (!window.confirm(msg)) return
-    removeIncomeCategory(id)
-    const nextCats = getMergedIncomeCategories()
-    const nextDefault = nextCats[0]?.id ?? 'lainnya'
-    setForm((p) => {
-      if (p.category !== id && nextCats.some((c) => c.id === p.category)) return p
-      return { ...p, category: nextDefault }
-    })
   }
 
   return (

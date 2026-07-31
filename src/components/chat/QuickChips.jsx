@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { Sparkles, DollarSign, ListChecks, TrendingUp, Target, Flame } from 'lucide-react'
 

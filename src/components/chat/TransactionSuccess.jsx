@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'

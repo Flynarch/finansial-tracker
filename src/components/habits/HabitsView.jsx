@@ -6,8 +6,6 @@ import { Capacitor } from '@capacitor/core'
 import Modal from '../ui/Modal'
 import HabitStatsModal from './HabitStatsModal'
 import { db } from '../../lib/db'
-import { calculateHabitStats } from '../../lib/habitStats'
-import useTranslation from '../../hooks/useTranslation'
 import useSwipeAction from '../../hooks/useSwipeAction'
 
 const HABIT_COLORS = ['#34d399', '#38bdf8', '#a855f7', '#fb7185', '#fcd34d', '#fb923c']
@@ -81,7 +79,6 @@ const HabitItemCard = memo(function HabitItemCard({
   isDone,
   isTodayList,
   isSwiping,
-  isConfirmingDelete,
   setSwipeHabitId,
   swipeHabitIdRef,
   swipeStartXRef,
@@ -107,6 +104,7 @@ const HabitItemCard = memo(function HabitItemCard({
       <div
         className={`relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer`}
         style={{ 
+          // eslint-disable-next-line react-hooks/refs
           transform: `translateX(${isSwiping ? swipeDxRef.current : 0}px)`, 
           transition: isSwiping ? 'none' : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
           willChange: isSwiping ? 'transform' : 'auto',
@@ -272,7 +270,6 @@ const HabitItemCard = memo(function HabitItemCard({
 })
 
 export default function HabitsView() {
-  const { t } = useTranslation()
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState({ title: '', notes: '', color: HABIT_COLORS[0], category: 'Lainnya', frequencyType: 'daily', frequencyValue: [], reminderEnabled: false, reminderTime: '08:00' })
 
