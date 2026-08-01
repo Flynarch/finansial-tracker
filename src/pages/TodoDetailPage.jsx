@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
 import {
   ChevronLeft,
+  ChevronRight,
   Trash2,
   CheckCircle2,
   Circle,

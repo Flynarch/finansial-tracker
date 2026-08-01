@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'

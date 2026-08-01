@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { createPortal } from 'react-dom'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -16,7 +15,6 @@ import {
   toSafeNumber,
 } from '../lib/utils'
 import { ChevronLeft, Target, Plus, Minus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
-import MoneyBag from '../components/icons/MoneyBag'
 import { format, differenceInMonths } from 'date-fns'
 import { getSavingsPrediction } from '../lib/gemini'
 
@@ -34,7 +32,7 @@ export default function SavingsDetail() {
     return data.sort((a, b) => String(b.date).localeCompare(String(a.date)))
   }, [goalId])
 
-  const { isOpen: sheetOpen, isVisible: sheetVisible, openSheet, closeSheet } = useBottomSheet(false)
+  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [amountInput, setAmountInput] = useState('')
   const [dateInput, setDateInput] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notesInput, setNotesInput] = useState('')
