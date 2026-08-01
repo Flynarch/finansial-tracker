@@ -1,6 +1,8 @@
 
 import { useNavigate } from 'react-router-dom'
 import { Check, ListChecks, PiggyBank, Flame, CalendarCheck, CircleDollarSign, Target, PlusCircle, Trash2, ArrowRight } from 'lucide-react'
+import useChatStore from '../../store/useChatStore'
+import useSettingsStore from '../../store/useSettingsStore'
 
 const CONFIG = {
   habit: {
@@ -134,9 +136,13 @@ const CONFIG = {
   },
 }
 
-export default function ActionSuccessCard({ type, action, title, subtitle, onClose }) {
+export default function ActionSuccessCard({ type = 'todo', action = 'create', title = '', subtitle = '', embedded = false }) {
   const navigate = useNavigate()
-  const cfg = CONFIG[type]?.[action] || CONFIG.habit.create
+  const onClose = useChatStore((s) => s.closeChat)
+  const locale = useSettingsStore((s) => s.locale)
+  const isId = locale === 'id'
+
+  const cfg = CONFIG[type]?.[action] || CONFIG.todo?.create || CONFIG.habit.create
   const IconComp = cfg.Icon
 
   const handleActionClick = () => {
@@ -146,8 +152,12 @@ export default function ActionSuccessCard({ type, action, title, subtitle, onClo
     }
   }
 
+  const containerClasses = embedded
+    ? "ft-action-card rounded-xl border border-[var(--border)]/60 bg-[var(--bg)]/50 overflow-hidden mt-1"
+    : "ft-action-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] overflow-hidden shadow-xs"
+
   return (
-    <div className="ft-action-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] overflow-hidden shadow-xs">
+    <div className={containerClasses}>
       {/* Banner */}
       <div className="ft-action-banner flex items-center justify-between p-3" style={{ background: cfg.gradient }}>
         <div className="flex items-center gap-2.5">
@@ -159,8 +169,10 @@ export default function ActionSuccessCard({ type, action, title, subtitle, onClo
             <span className="text-[10px] text-white/80 font-medium">{cfg.desc}</span>
           </div>
         </div>
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-          <Check size={13} strokeWidth={3} color="white" />
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs">
+          <svg className="w-3.5 h-3.5 stroke-white" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" className="ft-check-animated" />
+          </svg>
         </div>
       </div>
 

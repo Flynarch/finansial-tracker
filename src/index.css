@@ -924,7 +924,9 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   opacity: 0;
   transition: opacity var(--motion-duration) var(--motion-ease);
 }
@@ -932,13 +934,28 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 /* Markdown styling inside AI bubble */
 .ft-md-prose p { margin-bottom: 0.5rem; }
 .ft-md-prose p:last-child { margin-bottom: 0; }
-.ft-md-prose strong { font-weight: 600; color: var(--text); }
+.ft-md-prose strong { font-weight: 600; color: var(--fg); }
+.ft-md-prose code { 
+  font-family: monospace; 
+  background: rgba(255, 255, 255, 0.08); 
+  padding: 2px 6px; 
+  border-radius: 4px; 
+  font-size: 0.85em; 
+  color: var(--accent); 
+}
+.ft-md-prose blockquote { 
+  border-left: 3px solid var(--accent); 
+  padding-left: 0.75rem; 
+  margin: 0.5rem 0; 
+  color: var(--muted); 
+  font-style: italic; 
+}
 .ft-md-prose ul { list-style: disc; margin-left: 1.25rem; margin-bottom: 0.5rem; }
 .ft-md-prose ol { list-style: decimal; margin-left: 1.25rem; margin-bottom: 0.5rem; }
 .ft-md-prose li { margin-bottom: 0.25rem; }
 .ft-md-prose table { width: 100%; border-collapse: collapse; margin-bottom: 0.5rem; font-size: 0.85rem; }
-.ft-md-prose th { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 500; }
-.ft-md-prose td { padding: 4px; border-bottom: 1px solid var(--border-light); }
+.ft-md-prose th { text-align: left; padding: 6px; border-bottom: 1px solid var(--border-strong); color: var(--muted); font-weight: 600; }
+.ft-md-prose td { padding: 6px; border-bottom: 1px solid var(--border); }
 .ft-chat-backdrop.ft-chat-backdrop--visible {
   opacity: 1;
 }
@@ -976,13 +993,14 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 .ft-chat-user {
   background: var(--accent);
   color: var(--bg);
-  border-radius: 18px 18px 4px 18px;
-  max-width: 80%;
+  border-radius: 20px 20px 4px 20px;
+  max-width: 82%;
   margin-left: auto;
-  padding: 10px 14px;
+  padding: 11px 16px;
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   animation: ft-fade-up var(--motion-duration) var(--motion-ease);
 }
 
@@ -990,12 +1008,38 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   background: var(--panel-strong);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 18px 18px 18px 4px;
-  max-width: 88%;
-  padding: 12px 14px;
+  border-radius: 20px 20px 20px 4px;
+  max-width: 90%;
+  padding: 13px 16px;
   font-size: 14px;
   line-height: 1.5;
   animation: ft-fade-up var(--motion-duration) var(--motion-ease);
+  position: relative;
+}
+
+/* Shimmer border animation for AI message */
+@keyframes ft-shimmer {
+  0% { border-color: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+  100% { border-color: var(--border); box-shadow: none; }
+}
+
+.ft-chat-ai--shimmer {
+  animation: ft-shimmer 2s ease-out forwards;
+}
+
+/* Blinking cursor for streaming text */
+@keyframes ft-blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.ft-chat-caret {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background-color: var(--accent);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: ft-blink-caret 0.8s infinite;
 }
 
 .ft-tx-preview {
@@ -1009,6 +1053,7 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   max-height: 500px;
 }
 
+/* Quick Chips Container & Grid Layout */
 .ft-chat-chips {
   display: flex;
   gap: 8px;
@@ -1018,6 +1063,40 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 }
 .ft-chat-chips::-webkit-scrollbar {
   display: none;
+}
+
+.ft-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0;
+}
+@media (min-width: 640px) {
+  .ft-chip-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ft-chip-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ft-chip-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  background: var(--panel);
+}
+.ft-chip-card:active {
+  transform: scale(0.97);
 }
 
 .ft-chip {
@@ -1101,15 +1180,50 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 }
 .ft-typing-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--muted);
-  margin: 0 2.5px;
+  background: var(--accent);
+  margin: 0 2px;
   animation: ft-typing-bounce 1.4s ease-in-out infinite;
 }
 .ft-typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .ft-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* Audio Waveform Animation for Typing & Recording */
+@keyframes ft-waveform-bar {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+.ft-waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+}
+.ft-waveform-bar {
+  width: 3px;
+  height: 4px;
+  border-radius: 99px;
+  background-color: var(--accent);
+  animation: ft-waveform-bar 0.8s ease-in-out infinite;
+}
+.ft-waveform-bar:nth-child(1) { animation-delay: 0.0s; }
+.ft-waveform-bar:nth-child(2) { animation-delay: 0.2s; }
+.ft-waveform-bar:nth-child(3) { animation-delay: 0.4s; }
+.ft-waveform-bar:nth-child(4) { animation-delay: 0.1s; }
+
+/* Animated Checkmark SVG */
+@keyframes ft-draw-check {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+.ft-check-animated {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: ft-draw-check 0.4s ease-out 0.15s forwards;
+}
 
 
 /* ── Action Success Card (Habit / Todo / Budget) ────────────────────── */

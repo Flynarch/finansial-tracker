@@ -1,7 +1,7 @@
 import { format } from 'date-fns'
 import { getMergedExpenseTree } from './expenseCategories'
 import { getMergedIncomeTree } from './incomeCategories'
-import { queryTransactions } from './aiDatabaseQueries'
+import { queryTransactions, getMonthSummaryForPrompt } from './aiDatabaseQueries'
 import useSettingsStore from '../store/useSettingsStore'
 
 function getEffectiveApiKey() {
@@ -156,8 +156,8 @@ const getTools = () => ([
             reminderTime: { type: "STRING", description: "Waktu pengingat (format HH:mm, misal: '15:30')" },
             priority: { type: "STRING", enum: ["low", "medium", "high"], description: "Prioritas tugas" },
             subTasks: { type: "ARRAY", items: { type: "STRING" }, description: "Daftar sub-tugas/checklist. Pecah tugas besar menjadi langkah-langkah kecil agar mudah dieksekusi. Contoh: ['Cek tagihan', 'Siapkan dana', 'Bayar via app']" },
-            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            replyMessage: { type: "STRING", description: "Pesan balasan meyakinkan." },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
           required: ["action", "title"]
         }
@@ -172,7 +172,7 @@ const getTools = () => ([
             category: { type: "STRING", description: "Kategori budget (misal: 'Makanan')" },
             limit: { type: "NUMBER", description: "Batas nominal budget (angka)" },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
           required: ["action", "category", "limit"]
         }
@@ -187,7 +187,7 @@ const getTools = () => ([
             name: { type: "STRING", description: "Nama tabungan/goal (misal: 'Beli Laptop')" },
             amount: { type: "NUMBER", description: "Target dana (jika create) atau Jumlah uang yang ditambahkan (jika add_funds)" },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
         }
       },
@@ -203,7 +203,7 @@ const getTools = () => ([
             category: { type: "STRING", description: "Kategori (misal: 'Hiburan', 'Tagihan')" },
             frequency: { type: "STRING", enum: ["daily", "weekly", "monthly", "yearly"], description: "Frekuensi tagihan" },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
           required: ["action", "title"]
         }
@@ -216,7 +216,7 @@ const getTools = () => ([
           properties: {
             month: { type: "STRING", description: "Bulan yang ingin diekspor (YYYY-MM). Kosongkan untuk semua data." },
             replyMessage: { type: "STRING", description: "Pesan balasan (contoh: 'Laporan sedang diunduh...')" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           }
         }
       }
@@ -237,7 +237,14 @@ export async function parseTransactionFromText(userMessage, context) {
   const now = new Date()
   const today = format(now, 'yyyy-MM-dd')
   const currentTime = format(now, 'HH:mm')
-  const sysPrompt = `Kamu adalah AI Asisten Finansial FinTrack yang sangat cerdas, minimalis, dan andal (Proactive Advisor). Hari ini adalah tanggal: ${today} dan waktu saat ini adalah jam ${currentTime} waktu lokal. Gunakan waktu ini sebagai acuan untuk mendeteksi transaksi (misal: membedakan antara sarapan, makan siang, atau makan malam). Default currency: ${defaultCurrency}.
+  const monthSummary = await getMonthSummaryForPrompt()
+
+  const sysPrompt = `Kamu adalah AI Financial Companion FinTrack yang sangat cerdas, responsif, dan empathic (Proactive Smart Advisor).
+Hari ini adalah tanggal: ${today} dan waktu saat ini adalah jam ${currentTime} (Waktu Lokal).
+Gunakan waktu ini sebagai acuan konteks (pagi/siang/malam/sarapan/makan siang/makan malam). Default currency: ${defaultCurrency}.
+
+RINGKASAN REAL-TIME PENGGUNA SAAT INI:
+${monthSummary}
 
 DILARANG KERAS MENJALANKAN KODE PYTHON ATAU MENGGUNAKAN TOOL LAIN SELAIN YANG DISEDIAKAN.
 
@@ -249,8 +256,9 @@ ATURAN UTAMA:
    - JIKA user mengirim "Saya ingin membuat target tabungan" / "I want to create a savings goal", JANGAN PANGGIL FUNGSI! Jawab: "Target tabungan apa yang ingin Anda wujudkan? Sebutkan nama tujuan dan target nominalnya." Lalu WAJIB sertakan format: <chips>Beli Laptop 10 juta|Dana darurat 5 juta|Liburan 3 juta</chips>.
    - JIKA user mengirim "Saya ingin membuat habit harian" / "I want to create a daily habit", JANGAN PANGGIL FUNGSI! Jawab: "Habit harian apa yang ingin Anda bangun? Sebutkan nama kebiasaan dan jadwal pengingatnya." Lalu WAJIB sertakan format: <chips>Lari pagi jam 06:00|Baca buku jam 21:00|Minum air 8 gelas</chips>.
 
-1. TRANSAKSI (PENTING):
-   - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya: "Berapa harga makannya?".
+1. TRANSAKSI (PENTING & DETAIL):
+   - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya dengan ramah: "Berapa harga makannya?".
+   - Jika user menyebutkan BANYAK transaksi sekaligus (misal: "beli kopi 25rb dan bensin 50rb"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
    - Jika kategori tidak ditemukan, gunakan "Lainnya" atau kategori induk terdekat.
    - Panggil 'record_transactions' HANYA jika data sudah lengkap (nama & harga).
    - JIKA user menyebutkan dompet/akun (contoh: "pakai BCA", "dari cash", "ke Gopay"), isi 'walletId' (dan 'targetWalletId' jika transfer) menggunakan ID dari Daftar Dompet di bawah.
@@ -258,22 +266,26 @@ ATURAN UTAMA:
      a. Jika mencatat PENGELUARAN dan TIDAK menyebutkan dompet: Cek saldo tiap dompet. Jika HANYA 1 dompet yang saldonya cukup (>= harga), LANGSUNG gunakan dompet tersebut. Jika >1 dompet cukup (atau semua kurang), JANGAN panggil fungsi! Tanyalah: "Dompet mana yang mau dipakai? [Sebutkan opsi yang cukup]".
      b. Jika mencatat PEMASUKAN dan TIDAK menyebutkan dompet: JANGAN panggil fungsi! Tanyalah: "Masuk ke dompet mana?".
      c. Pengecualian: Jika total dompet hanya 1, langsung gunakan dompet tersebut tanpa bertanya.
+
 2. TO-DO, HABIT, & LANGGANAN BARU: Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
    - To-Do kurang jelas: "Kapan tenggat waktunya? Mau diingatkan jam berapa?"
    - Habit kurang jelas: "Mau warna apa? Seberapa sering?"
    - Langganan kurang jelas: "Berapa harganya? Bayar bulanan atau tahunan?"
    TAPI JIKA user SUDAH memberikan informasi tersebut secara lengkap di awal (misal: "Catat langganan Spotify 50rb tiap bulan"), LANGSUNG panggil fungsi create tanpa perlu bertanya lagi!
+
 3. HABIT LOG & TODO COMPLETE: Jika user bilang "Aku sudah lari pagi" atau "Tugas bayar listrik sudah beres", langsung panggil fungsi tanpa banyak tanya.
+
 4. EKSPOR LAPORAN: Jika user minta unduh/ekspor laporan atau data ke CSV/Excel/PDF, panggil 'export_report'.
-6. DISKUSI, TANYA JAWAB & ADVICE: 
-   - Jika user hanya menyapa ("Halo") atau membahas [KONTEKS SISTEM], JAWAB LANGSUNG DENGAN TEKS.
+
+5. DISKUSI, TANYA JAWAB & ADVICE: 
+   - Jika user hanya menyapa ("Halo") atau membahas [KONTEKS SISTEM], JAWAB LANGSUNG DENGAN TEKS ramah & kontekstual jam (pagi/siang/malam).
    - JIKA user meminta evaluasi keuangannya atau nasihat pengeluaran pribadinya (misal: "aku kurangi apa biar ga boros?", "cek pengeluaranku", "analisa keuanganku"), PANGGIL 'query_database' (set renderChart: false jika user tidak minta grafik) agar kamu bisa memberikan nasihat spesifik berdasarkan data riil pengguna! JANGAN hanya memberi saran umum.
    - Jika Anda hanya merespons dengan teks biasa (tidak memanggil fungsi/tool), WAJIB tambahkan rekomendasi aksi/pertanyaan di akhir pesan menggunakan format: <chips>Rekomendasi 1|Rekomendasi 2</chips>.
 
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
-- Berikan peringatan halus atau tips keuangan jika pengeluaran tampak impulsif.
-- Jawab langsung ke inti. Dilarang menggunakan "Tentu", "Baiklah".
-- Tebalkan nominal uang (contoh: **Rp 50.000**).
+- Berikan peringatan halus jika pengeluaran tampak terburu-buru atau besar.
+- Jawab langsung, jelas, dan solutif. Dilarang kata pembuka klise seperti "Tentu", "Baiklah", "Tentu saja".
+- SELALU tebalkan nominal uang (contoh: **Rp 50.000**).
 
 Daftar Dompet (Wallets):
 ${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
@@ -281,7 +293,7 @@ ${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Saldo
 Daftar Kategori:
 ${buildCategoryContext(locale)}`
 
-  let contents = [{ role: 'user', parts: [{ text: sysPrompt }] }, { role: 'model', parts: [{ text: 'Paham.' }] }]
+  let contents = [{ role: 'user', parts: [{ text: sysPrompt }] }, { role: 'model', parts: [{ text: 'Paham. Saya siap membantu FinTrack.' }] }]
   
   let lastRole = 'model'
   

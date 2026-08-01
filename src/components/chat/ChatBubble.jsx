@@ -28,22 +28,39 @@ export function UserBubble({ content, timestamp }) {
   )
 }
 
-export function AiBubble({ content, timestamp }) {
+export function AiAvatarBadge({ isThinking = false }) {
+  return (
+    <div className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-[var(--accent)] to-teal-300 text-[var(--bg)] shadow-sm relative ${isThinking ? 'ring-2 ring-[var(--accent)]/40 animate-pulse' : ''}`}>
+      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+      </svg>
+    </div>
+  )
+}
+
+export function AiBubble({ content, timestamp, isStreaming = false, isNew = false, embeddedWidget = null }) {
   const timeStr = getCurrentTimeStr(timestamp)
   return (
-    <div className="ft-chat-ai ft-swush-in flex gap-2.5 max-w-[92%]">
-      {/* Sleek AI Avatar Badge */}
-      <div className="shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xs">
-        <Sparkles size={14} />
-      </div>
+    <div className={`ft-chat-ai ft-swush-in flex gap-3 max-w-[92%] ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
+      <AiAvatarBadge />
       
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="ft-md-prose leading-relaxed">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {content}
-          </ReactMarkdown>
-        </div>
-        <div className="mt-1 flex items-center justify-end">
+      <div className="flex-1 min-w-0 overflow-hidden flex flex-col gap-2">
+        {content && (
+          <div className="ft-md-prose leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content}
+            </ReactMarkdown>
+            {isStreaming && <span className="ft-chat-caret" />}
+          </div>
+        )}
+
+        {embeddedWidget && (
+          <div className="mt-1 pt-2 border-t border-[var(--border)]/40 w-full">
+            {embeddedWidget}
+          </div>
+        )}
+
+        <div className="mt-0.5 flex items-center justify-end">
           <span className="text-[10px] font-medium text-[var(--muted)]">
             {timeStr}
           </span>
@@ -56,18 +73,19 @@ export function AiBubble({ content, timestamp }) {
 export function TypingIndicator() {
   const locale = useSettingsStore(s => s.locale)
   return (
-    <div className="ft-chat-ai flex items-center gap-3 max-w-[80%]">
-      <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fg)] text-[var(--bg)] shadow-xs">
-        <Sparkles size={14} className="animate-spin duration-3000" />
+    <div className="ft-chat-ai flex items-center gap-3 max-w-[80%] border border-[var(--accent)]/30">
+      <AiAvatarBadge isThinking={true} />
+      <div className="flex items-center gap-2">
+        <div className="ft-waveform">
+          <div className="ft-waveform-bar" />
+          <div className="ft-waveform-bar" />
+          <div className="ft-waveform-bar" />
+          <div className="ft-waveform-bar" />
+        </div>
+        <span className="text-xs font-semibold text-[var(--muted)] ml-1">
+          {translate(locale, 'aiChat.thinking')}
+        </span>
       </div>
-      <div className="flex items-center gap-1">
-        <span className="ft-typing-dot"></span>
-        <span className="ft-typing-dot"></span>
-        <span className="ft-typing-dot"></span>
-      </div>
-      <span className="text-xs font-semibold text-[var(--muted)] ml-1">
-        {translate(locale, 'aiChat.thinking')}
-      </span>
     </div>
   )
 }

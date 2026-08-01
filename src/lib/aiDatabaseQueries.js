@@ -76,3 +76,44 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     }))
   }
 }
+
+/**
+ * Fetches a lightweight financial & task summary for current month to inject into AI System Prompt.
+ */
+export async function getMonthSummaryForPrompt() {
+  try {
+    const now = new Date()
+    const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
+    const allTxs = await db.transactions.toArray()
+    const monthTxs = allTxs.filter(t => t.date && t.date.startsWith(currentMonthPrefix))
+    
+    let totalIncome = 0
+    let totalExpense = 0
+    const catMap = {}
+    
+    monthTxs.forEach(t => {
+      if (t.type === 'income') totalIncome += (t.amount || 0)
+      if (t.type === 'expense') {
+        totalExpense += (t.amount || 0)
+        catMap[t.category] = (catMap[t.category] || 0) + (t.amount || 0)
+      }
+    })
+    
+    const topCategories = Object.entries(catMap)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([cat, val]) => `${cat}: Rp ${val.toLocaleString('id-ID')}`)
+      .join(', ')
+
+    const habits = await db.habits.toArray()
+    const activeTodos = await db.todos.where('completed').equals(0).toArray().catch(() => [])
+
+    return `
+- Transaksi Bulan Ini (${currentMonthPrefix}): Pemasukan Rp ${totalIncome.toLocaleString('id-ID')} | Pengeluaran Rp ${totalExpense.toLocaleString('id-ID')}
+- Top Kategori Pengeluaran: ${topCategories || 'Belum ada'}
+- Total Habits Aktif: ${habits.length} | Tugas Belum Selesai: ${activeTodos.length}`
+  } catch {
+    return 'Gagal memuat ringkasan bulan ini.'
+  }
+}

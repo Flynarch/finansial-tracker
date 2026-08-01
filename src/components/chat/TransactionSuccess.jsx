@@ -10,7 +10,7 @@ import { id as idLocale, enUS } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import useChatStore from '../../store/useChatStore'
 
-export default function TransactionSuccess({ data, onUndo }) {
+export default function TransactionSuccess({ data, onUndo, embedded = false }) {
   const locale = useSettingsStore((s) => s.locale)
   const isArray = Array.isArray(data)
   const txs = isArray ? data : [data]
@@ -48,13 +48,19 @@ export default function TransactionSuccess({ data, onUndo }) {
     setIsOpen(false)
   }
   
+  const containerClasses = embedded 
+    ? "flex flex-col gap-2.5 rounded-xl border border-[var(--border)]/60 bg-[var(--bg)]/50 p-3 mt-1"
+    : "ft-swush-in flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 shadow-sm"
+
   return (
-    <div className="ft-swush-in flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 shadow-sm">
+    <div className={containerClasses}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-            <Check size={14} strokeWidth={3} />
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            <svg className="w-3.5 h-3.5 stroke-emerald-400" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" className="ft-check-animated" />
+            </svg>
           </div>
           <span className="text-[13px] font-bold text-[var(--fg)]">
             {txs.length > 1 

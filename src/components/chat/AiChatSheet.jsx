@@ -186,12 +186,6 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         throw new Error(result.message)
       }
 
-      if (result.text) {
-         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
-      } else {
-         setMessages(prev => prev.filter(m => m.id !== aiMsgId))
-      }
-
       const newMsgs = []
 
       if (result.type === 'transactions') {
@@ -450,10 +444,36 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       if (newMsgs.length > 0) {
-         if (result.chips && result.chips.length > 0) {
-           newMsgs[newMsgs.length - 1].chips = result.chips
+         const firstSuccessMsg = newMsgs.find(m => m.type === 'success' || m.type === 'action_success')
+         if (firstSuccessMsg) {
+            // Merge response text into the action success message so it renders inside a single AiBubble
+            firstSuccessMsg.content = result.text || firstSuccessMsg.customMsg || ''
+            if (result.chips && result.chips.length > 0) {
+               firstSuccessMsg.chips = result.chips
+            }
+            // Replace temporary streaming aiMsgId with the unified success message
+            setMessages(prev => {
+               const exists = prev.some(m => m.id === aiMsgId)
+               if (exists) {
+                  return prev.map(m => m.id === aiMsgId ? firstSuccessMsg : m)
+               }
+               return [...prev, firstSuccessMsg]
+            })
+         } else {
+            if (result.text) {
+               setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
+            } else {
+               setMessages(prev => prev.filter(m => m.id !== aiMsgId))
+            }
+            if (result.chips && result.chips.length > 0) {
+               newMsgs[newMsgs.length - 1].chips = result.chips
+            }
+            setMessages(prev => [...prev, ...newMsgs])
          }
-         setMessages(prev => [...prev, ...newMsgs])
+      } else if (result.text) {
+         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
+      } else {
+         setMessages(prev => prev.filter(m => m.id !== aiMsgId))
       }
       
       setConsecutiveErrors(0)
@@ -501,13 +521,20 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         
         {/* Header */}
         <div className="flex items-center justify-between px-4 pb-3 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)]/12">
-              <Sparkles size={14} className="text-[var(--accent)]" />
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)]">
+              <Sparkles size={15} />
+              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
             </div>
-            <span className="font-bold text-[15px] text-[var(--fg)] tracking-tight">
-              {translate(locale, 'aiChat.title')}
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-[15px] text-[var(--fg)] tracking-tight leading-tight">
+                {translate(locale, 'aiChat.title')}
+              </span>
+              <span className="text-[10px] font-semibold text-[var(--muted)] flex items-center gap-1">
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${isLoading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                {isLoading ? (locale === 'en' ? 'Thinking...' : 'Berpikir...') : (locale === 'en' ? 'Proactive Advisor' : 'Financial Advisor')}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -528,9 +555,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
-          {messages.filter(m => m.type !== 'hidden').map((msg) => {
+          {messages.filter(m => m.type !== 'hidden').map((msg, index) => {
             const visibleMessages = messages.filter(m => m.type !== 'hidden')
             const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
+            const isLatestMessage = index === visibleMessages.length - 1
             return (
             <div key={msg.id} className="flex flex-col gap-2">
               {msg.role === 'user' && (
@@ -542,7 +570,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               
               {msg.role === 'ai' && msg.type === 'text' && (
                  <>
-                   {msg.content && <AiBubble content={msg.content} />}
+                   {msg.content && <AiBubble content={msg.content} isNew={isLatestMessage} isStreaming={isLoading && isLatestMessage} />}
                    {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
                  </>
               )}
@@ -562,31 +590,51 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               )}
               
               {msg.role === 'ai' && msg.type === 'success' && (
-                <div className="ml-8">
-                  <TransactionSuccess 
-                    data={msg.data}
-                    onUndo={() => {
-                      if (Array.isArray(msg.data)) {
-                        msg.data.forEach(tx => deleteTransaction(tx.id))
-                      } else {
-                        deleteTransaction(msg.data.id)
-                      }
-                      setMessages(prev => prev.filter(m => m.id !== msg.id))
-                    }}
-                    contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
+                <>
+                  <AiBubble 
+                    content={msg.content || msg.customMsg} 
+                    timestamp={msg.timestamp}
+                    isNew={isLatestMessage}
+                    isStreaming={isLoading && isLatestMessage}
+                    embeddedWidget={
+                      <TransactionSuccess 
+                        data={msg.data}
+                        embedded={true}
+                        onUndo={() => {
+                          if (Array.isArray(msg.data)) {
+                            msg.data.forEach(tx => deleteTransaction(tx.id))
+                          } else {
+                            deleteTransaction(msg.data.id)
+                          }
+                          setMessages(prev => prev.filter(m => m.id !== msg.id))
+                        }}
+                        contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
+                      />
+                    }
                   />
-                </div>
+                  {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
+                </>
               )}
 
               {msg.role === 'ai' && msg.type === 'action_success' && (
-                <div className="ml-8">
-                  <ActionSuccessCard 
-                    type={msg.data.type}
-                    action={msg.data.action}
-                    title={msg.data.title}
-                    subtitle={msg.data.subtitle}
+                <>
+                  <AiBubble 
+                    content={msg.content} 
+                    timestamp={msg.timestamp}
+                    isNew={isLatestMessage}
+                    isStreaming={isLoading && isLatestMessage}
+                    embeddedWidget={
+                      <ActionSuccessCard 
+                        type={msg.data.type}
+                        action={msg.data.action}
+                        title={msg.data.title}
+                        subtitle={msg.data.subtitle}
+                        embedded={true}
+                      />
+                    }
                   />
-                </div>
+                  {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
+                </>
               )}
 
               {/* Show QuickChips only after the very last AI message (except welcome which has its own) */}
@@ -626,8 +674,22 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                </button>
              </div>
           )}
+
+          {isRecording && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold animate-fade-in">
+              <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+              <span>{locale === 'en' ? 'Listening...' : 'Mendengarkan ucapan Anda...'}</span>
+              <div className="ml-auto ft-waveform">
+                <div className="ft-waveform-bar bg-rose-500" />
+                <div className="ft-waveform-bar bg-rose-500" />
+                <div className="ft-waveform-bar bg-rose-500" />
+                <div className="ft-waveform-bar bg-rose-500" />
+              </div>
+            </div>
+          )}
+
           <form
-            className="flex items-end gap-2 bg-[var(--field-bg)] rounded-2xl px-3 py-2.5 transition-all focus-within:ring-2 ring-[var(--accent)]"
+            className="flex items-end gap-2 bg-[var(--field-bg)] rounded-2xl px-3 py-2.5 transition-all focus-within:ring-2 ring-[var(--accent)] border border-[var(--field-border)]"
             onSubmit={(e) => {
               e.preventDefault()
               handleSend()
@@ -644,7 +706,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               ref={inputRef}
               rows={1}
               className="flex-1 bg-transparent border-none text-[14px] text-[var(--fg)] focus:outline-none px-1 py-1.5 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
-              placeholder={isRecording ? 'Mendengarkan...' : 'Ketik sesuatu...'}
+              placeholder={isRecording ? (locale === 'en' ? 'Listening...' : 'Bicara sekarang...') : (locale === 'en' ? 'Ask or record anything...' : 'Ketik transaksi, tugas, atau pertanyaan...')}
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value)
@@ -662,10 +724,14 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             />
             <button
               type="submit"
-              className={`p-2 rounded-full shrink-0 mb-0.5 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-transparent text-[var(--muted)]'}`}
+              className={`p-2 rounded-full shrink-0 mb-0.5 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-[var(--bg)] shadow-md' : 'bg-transparent text-[var(--muted)]'}`}
               disabled={isLoading || (!inputValue.trim() && !selectedImage)}
             >
-              <Send size={16} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
+              {isLoading ? (
+                <Sparkles size={16} className="animate-spin text-[var(--accent)]" />
+              ) : (
+                <Send size={16} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
+              )}
             </button>
           </form>
         </div>
