@@ -20,8 +20,9 @@ export default function WalletCarousel({
   const isRestoring = useRef(activeSlide > 0)
   const hasRestored = useRef(false)
 
+  const activeWallets = wallets?.filter(w => !w.isArchived) || []
   const sisaKeuangan = monthIncome - monthExpense
-  const totalSaldo = wallets?.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0) || 0
+  const totalSaldo = activeWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0)
 
   const scrollTo = (index) => {
     if (!scrollRef.current) return
@@ -173,7 +174,7 @@ export default function WalletCarousel({
                 Total Saldo
               </p>
               <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-                {wallets.length} Akun
+                {activeWallets.length} Akun
               </span>
             </div>
 
@@ -185,7 +186,7 @@ export default function WalletCarousel({
 
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
           <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
-            {wallets.filter(w => !w.isArchived).map(w => (
+            {activeWallets.map(w => (
               <button 
                 key={w.id}
                 onClick={() => navigate(`/wallet/${w.id}`)}

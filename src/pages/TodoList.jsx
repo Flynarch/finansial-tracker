@@ -7,6 +7,24 @@ import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
+import BottomSheet from '../components/ui/BottomSheet'
+import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import CustomDateTimePicker from '../components/ui/CustomDateTimePicker'
+import {
+  ChevronRight,
+  Receipt,
+  TrendingUp,
+  ShoppingBag,
+  Landmark,
+  Briefcase,
+  User,
+  HeartPulse,
+  GraduationCap,
+  Home,
+  Car,
+  Folder,
+  Check,
+} from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -14,6 +32,20 @@ import HabitsView from '../components/habits/HabitsView'
 import useSwipeAction from '../hooks/useSwipeAction'
 
 const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
+
+const TODO_CATEGORY_META = {
+  tagihan: { icon: Receipt, color: 'text-amber-500', bg: 'bg-amber-500/15' },
+  investasi: { icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/15' },
+  belanja: { icon: ShoppingBag, color: 'text-sky-500', bg: 'bg-sky-500/15' },
+  tabungan: { icon: Landmark, color: 'text-indigo-500', bg: 'bg-indigo-500/15' },
+  pekerjaan: { icon: Briefcase, color: 'text-violet-500', bg: 'bg-violet-500/15' },
+  pribadi: { icon: User, color: 'text-pink-500', bg: 'bg-pink-500/15' },
+  kesehatan: { icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-500/15' },
+  pendidikan: { icon: GraduationCap, color: 'text-cyan-500', bg: 'bg-cyan-500/15' },
+  rumah: { icon: Home, color: 'text-orange-500', bg: 'bg-orange-500/15' },
+  transportasi: { icon: Car, color: 'text-teal-500', bg: 'bg-teal-500/15' },
+  lainnya: { icon: Folder, color: 'text-slate-400', bg: 'bg-slate-500/15' },
+}
 const PRIORITIES = ['low', 'medium', 'high']
 const TODO_SORT_PREF_KEY = 'todo_sort_pref'
 const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'
@@ -558,6 +590,7 @@ function TodoList() {
       description: '',
       category: 'tagihan',
       dueDate: '',
+      reminderTime: '',
       priority: 'medium',
     })
     setAddCategoryOpen(false)
@@ -574,17 +607,22 @@ function TodoList() {
     event.preventDefault()
     const title = String(addForm.title || '').trim()
     if (!title) return
+    const dueDate = addForm.dueDate || ''
+    const reminderTime = dueDate ? (addForm.reminderTime || '09:00') : ''
     const id = await db.todos.add({
       title,
       description: String(addForm.description || '').trim(),
       category: addForm.category,
-      dueDate: addForm.dueDate || '',
+      dueDate,
+      reminderTime,
       priority: addForm.priority,
       completed: false,
       createdAt: Date.now(),
     })
     // Schedule notifications if due date exists (best-effort).
-    void scheduleTodoDueNotifications({ id, ...addForm, title })
+    if (dueDate) {
+      void scheduleTodoDueNotifications({ id, ...addForm, title, dueDate, reminderTime })
+    }
     resetAddForm()
     setAddOpen(false)
   }
@@ -818,21 +856,22 @@ function TodoList() {
       </div>
 
       <Modal isOpen={addOpen} title={t('todo.addModalTitle')} onClose={() => setAddOpen(false)}>
-        <form className="grid max-h-[min(70vh,28rem)] gap-2.5 overflow-y-auto pr-1" onSubmit={handleAddTodo}>
-          <label className="ft-label">
+        <form className="space-y-3" onSubmit={handleAddTodo}>
+          <label className="ft-label block">
             {t('todo.field.title')}
             <input
-              className="ft-field appearance-none text-base md:text-sm"
+              className="ft-field mt-1 appearance-none text-sm"
               value={addForm.title}
               onChange={(e) => setAddForm((p) => ({ ...p, title: e.target.value }))}
               required
               maxLength={200}
             />
           </label>
-          <label className="ft-label">
+          <label className="ft-label block">
             {t('todo.field.description')}
             <textarea
-              className="ft-field min-h-[4rem] resize-y text-base md:text-sm"
+              className="ft-field mt-1 rows-2 text-sm resize-none"
+              rows={2}
               value={addForm.description}
               onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))}
               maxLength={2000}
@@ -840,61 +879,85 @@ function TodoList() {
           </label>
           <div className="ft-label block">
             {t('todo.field.category')}
-            <div className="relative mt-1" data-todo-popover="add-category">
-              <button
-                type="button"
-                className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm cursor-pointer"
-                onClick={() => setAddCategoryOpen((v) => !v)}
-                aria-expanded={addCategoryOpen}
-              >
-                <span>{t(`todo.cat.${addForm.category}`)}</span>
-                <span className={`text-xs text-[var(--muted)] transition-transform ${addCategoryOpen ? 'rotate-180' : ''}`}>⌄</span>
-              </button>
-              <div
-                className={`absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 origin-top transition-all duration-200 ${
-                  addCategoryOpen ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
-                }`}
-              >
-                <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-[var(--shadow-card)]">
-                  {TODO_CATEGORIES.map((c) => (
+            <button
+              type="button"
+              className="mt-1 flex w-full items-center justify-between gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2 text-left text-sm font-semibold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all shadow-2xs cursor-pointer"
+              onClick={() => setAddCategoryOpen(true)}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {(() => {
+                  const meta = TODO_CATEGORY_META[addForm.category] || TODO_CATEGORY_META.lainnya
+                  const Icon = meta.icon
+                  return (
+                    <div className={`flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-xl ${meta.bg} ${meta.color}`}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </div>
+                  )
+                })()}
+                <span className="truncate font-bold text-[var(--fg)]">
+                  {t(`todo.cat.${addForm.category}`)}
+                </span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[var(--muted)]" />
+            </button>
+
+            <BottomSheet
+              isOpen={addCategoryOpen}
+              onClose={() => setAddCategoryOpen(false)}
+              title={t('todo.field.category') || 'Pilih Kategori'}
+            >
+              <div className="grid grid-cols-2 gap-2.5 pt-1 pb-4">
+                {TODO_CATEGORIES.map((c) => {
+                  const meta = TODO_CATEGORY_META[c] || TODO_CATEGORY_META.lainnya
+                  const Icon = meta.icon
+                  const isSelected = addForm.category === c
+                  return (
                     <button
                       key={c}
                       type="button"
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition cursor-pointer ${
-                        addForm.category === c ? 'bg-[var(--fg)] text-[var(--bg)]' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
+                      className={`flex items-center justify-between rounded-2xl border p-3 text-left transition-all active:scale-95 cursor-pointer ${
+                        isSelected
+                          ? `border-[var(--fg)] bg-[var(--panel-strong)] shadow-md ring-1 ring-[var(--fg)]`
+                          : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)]'
                       }`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
+                      onClick={() => {
                         setAddForm((p) => ({ ...p, category: c }))
                         setAddCategoryOpen(false)
                       }}
                     >
-                      {t(`todo.cat.${c}`)}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${meta.bg} ${meta.color}`}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className={`truncate text-xs font-bold ${isSelected ? 'text-[var(--fg)]' : 'text-[var(--muted)]'}`}>
+                          {t(`todo.cat.${c}`)}
+                        </span>
+                      </div>
+                      {isSelected && <Check className="h-4 w-4 shrink-0 text-[var(--fg)]" strokeWidth={3} />}
                     </button>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
-            </div>
+            </BottomSheet>
           </div>
-          <label className="ft-label">
-            {t('todo.field.due')}
-            <input
-              type="date"
-              className="ft-field text-base md:text-sm"
-              value={addForm.dueDate}
-              onChange={(e) => setAddForm((p) => ({ ...p, dueDate: e.target.value }))}
+          <div className="ft-label block">
+            <CustomDateTimePicker
+              label={t('todo.field.due')}
+              dateValue={addForm.dueDate}
+              timeValue={addForm.dueDate ? (addForm.reminderTime || '09:00') : ''}
+              onChangeDate={(d) => setAddForm((p) => ({ ...p, dueDate: d, reminderTime: d ? (p.reminderTime || '09:00') : '' }))}
+              onChangeTime={(t) => setAddForm((p) => ({ ...p, reminderTime: t }))}
             />
-          </label>
-          <label className="ft-label">
+          </div>
+          <label className="ft-label block">
             {t('todo.field.priority')}
             <div className="mt-1 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
               {PRIORITIES.map((p) => (
                 <button
                   key={p}
                   type="button"
-                  className={`rounded-lg px-2 py-2 text-xs font-semibold ${
-                    addForm.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : 'text-[var(--muted)]'
+                  className={`rounded-lg px-2 py-1.5 text-xs font-bold transition-colors ${
+                    addForm.priority === p ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                   }`}
                   onClick={() => setAddForm((s) => ({ ...s, priority: p }))}
                 >
@@ -903,7 +966,7 @@ function TodoList() {
               ))}
             </div>
           </label>
-          <div className="sticky bottom-0 mt-1 flex justify-end gap-2 border-t border-[var(--border)] bg-[var(--panel-strong)] pt-3">
+          <div className="pt-3 flex justify-end gap-2 border-t border-[var(--border)]">
             <Button
               type="button"
               className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
@@ -916,35 +979,16 @@ function TodoList() {
         </form>
       </Modal>
 
-      <Modal
+      <ConfirmDeleteModal
         isOpen={deleteConfirmOpen}
-        title={t('todo.delete')}
         onClose={() => {
           setDeleteConfirmOpen(false)
           setDeleteTodoId(null)
         }}
-      >
-        <p className="text-sm text-[var(--muted)]">{t('todo.deleteConfirm')}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            type="button"
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-            onClick={() => {
-              setDeleteConfirmOpen(false)
-              setDeleteTodoId(null)
-            }}
-          >
-            {t('common.close')}
-          </Button>
-          <Button
-            type="button"
-            className="!bg-rose-600 hover:!bg-rose-700"
-            onClick={() => void removeTodo()}
-          >
-            {t('todo.delete')}
-          </Button>
-        </div>
-      </Modal>
+        onConfirm={() => void removeTodo()}
+        title={t('todo.delete') || 'Hapus To-Do'}
+        message={t('todo.deleteConfirm') || 'Apakah Anda yakin ingin menghapus to-do ini beserta semua sub-task?'}
+      />
     </div>
   )
 }

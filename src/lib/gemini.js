@@ -2,8 +2,19 @@ import { format } from 'date-fns'
 import { getMergedExpenseTree } from './expenseCategories'
 import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions } from './aiDatabaseQueries'
+import useSettingsStore from '../store/useSettingsStore'
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+function getEffectiveApiKey() {
+  try {
+    const userKey = useSettingsStore.getState().geminiApiKey
+    if (userKey && userKey.trim().length > 0) {
+      return userKey.trim()
+    }
+  } catch {
+    // ignore
+  }
+  return import.meta.env.VITE_GEMINI_API_KEY || ''
+}
 
 const GEMINI_MODELS = [
   'gemini-3.1-flash-lite',
@@ -220,7 +231,8 @@ export async function parseTransactionFromText(userMessage, context) {
     return { error: true, message: 'Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.' }
   }
 
-  if (!GEMINI_API_KEY) return { error: true, message: 'API Key Gemini belum diset.' }
+  const apiKey = getEffectiveApiKey()
+  if (!apiKey) return { error: true, message: 'API Key Gemini belum diset.' }
 
   const now = new Date()
   const today = format(now, 'yyyy-MM-dd')
@@ -322,11 +334,12 @@ ${buildCategoryContext(locale)}`
 
   const callApiStreamWithFallback = async (reqContents) => {
     let lastError = null
+    const apiKey = getEffectiveApiKey()
 
     for (const model of GEMINI_MODELS) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`
-        const res = await fetch(`${url}?key=${GEMINI_API_KEY}&alt=sse`, {
+        const res = await fetch(`${url}?key=${apiKey}&alt=sse`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
@@ -496,7 +509,8 @@ export async function getFinancialAdvice(monthData, context = {}) {
   if (!navigator.onLine) {
     throw new Error('Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.')
   }
-  if (!GEMINI_API_KEY) {
+  const apiKey = getEffectiveApiKey()
+  if (!apiKey) {
     throw new Error('API Key Gemini belum diset.')
   }
 
@@ -552,10 +566,11 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
 
   const callApiWithFallback = async (reqContents) => {
     let lastError = null
+    const apiKey = getEffectiveApiKey()
     for (const model of GEMINI_MODELS) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-        const res = await fetch(`${url}?key=${GEMINI_API_KEY}`, {
+        const res = await fetch(`${url}?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -617,10 +632,11 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
 `
   const callApiWithFallback = async (reqContents) => {
     let lastError = null
+    const apiKey = getEffectiveApiKey()
     for (const model of GEMINI_MODELS) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-        const res = await fetch(`${url}?key=${GEMINI_API_KEY}`, {
+        const res = await fetch(`${url}?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

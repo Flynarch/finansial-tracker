@@ -331,24 +331,27 @@ export function parseExpenseCategoryPath(value) {
 
 export function formatExpenseCategory(value, locale) {
   if (!value) return ''
+  const cleanWord = (s) =>
+    String(s ?? '')
+      .replace(/[_-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+
   const parsed = parseExpenseCategoryPath(value)
   if (!parsed) {
     return String(value)
       .split('/')
-      .map((part) =>
-        part
-          .replace(/[_-]/g, ' ')
-          .trim()
-          .replace(/\b\w/g, (l) => l.toUpperCase())
-      )
+      .map(cleanWord)
+      .filter(Boolean)
       .join(' · ')
   }
   const lang = locale === 'en' ? 'en' : 'id'
-  const parentName = parsed.parent?.names?.[lang] || parsed.parent?.id || ''
+  const parentName = cleanWord(parsed.parent?.names?.[lang] || parsed.parent?.names?.id || parsed.parent?.id || '')
   if (!parsed.child) {
     return parentName
   }
-  const childName = parsed.child?.names?.[lang] || parsed.child?.id || ''
+  const childName = cleanWord(parsed.child?.names?.[lang] || parsed.child?.names?.id || parsed.child?.id || '')
   return `${parentName} · ${childName}`
 }
 

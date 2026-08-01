@@ -247,63 +247,42 @@ db.version(14).stores({
  *   - SUM(transfer-out: walletId = id AND type=transfer)  -> -amount
  *   + SUM(balance_adjustment where walletId = id)         -> +amount (already signed)
  */
-export async function getWalletCurrentBalance(walletId) {
-  const wallet = await db.wallets.get(walletId)
+/**
+ * Compute the current balance of a single wallet given its initial balance and transaction list.
+ * Single source of truth formula for computing a wallet's current balance.
+ */
+export function computeWalletBalance(wallet, transactions = []) {
   if (!wallet) return 0
+  let bal = Number(wallet.balance) || 0
+  const walletId = wallet.id
 
-  const initialBalance = Number(wallet.balance) || 0
-
-  // All transactions where this wallet is the primary wallet
-  const primaryTxs = await db.transactions
-    .where('walletId').equals(walletId)
-    .toArray()
-
-  // All transactions where this wallet is the transfer target
-  const targetTxs = await db.transactions
-    .where('targetWalletId').equals(walletId)
-    .toArray()
-
-  let delta = 0
-
-  for (const tx of primaryTxs) {
+  for (const tx of transactions) {
     const amount = Number(tx.amount) || 0
-    if (tx.type === 'income') {
-      delta += amount
-    } else if (tx.type === 'expense') {
-      delta -= amount
-    } else if (tx.type === 'transfer') {
-      // Transfer out from this wallet
-      delta -= amount
-    } else if (tx.type === 'balance_adjustment') {
-      // Amount is already the signed diff
-      delta += amount
+    if (tx.walletId === walletId) {
+      if (tx.type === 'income') bal += amount
+      else if (tx.type === 'expense') bal -= amount
+      else if (tx.type === 'transfer') bal -= amount
+      else if (tx.type === 'balance_adjustment') bal += amount
+    }
+    if (tx.targetWalletId === walletId) {
+      if (tx.type === 'transfer') bal += amount
     }
   }
-
-  for (const tx of targetTxs) {
-    const amount = Number(tx.amount) || 0
-    // Transfer in to this wallet
-    delta += amount
-  }
-
-  return initialBalance + delta
+  return bal
 }
 
 /**
- * Compute current balances for ALL wallets at once (batch).
- * Returns a Map<walletId, currentBalance>.
+ * Compute current balances for ALL wallets given wallet list and transaction list.
+ * Returns a List of wallets with currentBalance property attached.
  */
-export async function getAllWalletBalances() {
-  const wallets = await db.wallets.toArray()
-  const allTxs = await db.transactions.toArray()
-
+export function computeAllWalletBalances(wallets = [], transactions = []) {
   const balanceMap = new Map()
 
   for (const w of wallets) {
     balanceMap.set(w.id, Number(w.balance) || 0)
   }
 
-  for (const tx of allTxs) {
+  for (const tx of transactions) {
     const amount = Number(tx.amount) || 0
     const wId = tx.walletId
     const tId = tx.targetWalletId
@@ -325,5 +304,26 @@ export async function getAllWalletBalances() {
     }
   }
 
-  return balanceMap
+  return wallets.map(w => ({
+    ...w,
+    currentBalance: balanceMap.get(w.id) ?? (Number(w.balance) || 0),
+  }))
+}
+
+export async function getWalletCurrentBalance(walletId) {
+  const wallet = await db.wallets.get(walletId)
+  if (!wallet) return 0
+
+  const allTxs = await db.transactions
+    .where('walletId').equals(walletId)
+    .or('targetWalletId').equals(walletId)
+    .toArray()
+
+  return computeWalletBalance(wallet, allTxs)
+}
+
+export async function getAllWalletBalances() {
+  const wallets = await db.wallets.toArray()
+  const allTxs = await db.transactions.toArray()
+  return computeAllWalletBalances(wallets, allTxs)
 }

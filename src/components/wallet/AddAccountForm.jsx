@@ -166,8 +166,8 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
             <label className="text-[12px] font-extrabold text-[var(--muted)] uppercase tracking-[0.1em] pl-1">
               Saldo saat ini
             </label>
-            <div className="relative flex items-center bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl focus-within:border-[var(--fg)] transition-all shadow-sm hover:border-[var(--border)]">
-              <span className="pl-5 text-[var(--muted)] font-bold text-lg pointer-events-none">
+            <div className="relative flex items-center bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent)]/15 transition-all shadow-xs hover:border-[var(--border-strong)] overflow-hidden">
+              <span className="pl-5 pr-1.5 text-[var(--fg)] font-black text-xl shrink-0 pointer-events-none select-none">
                 Rp
               </span>
               <input
@@ -176,7 +176,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 value={displayBalance}
                 onChange={handleBalanceChange}
                 placeholder="0"
-                className="w-full bg-transparent py-3.5 pl-3 pr-14 font-extrabold text-[22px] text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight"
+                className="w-full bg-transparent py-4 pr-12 font-black text-[24px] sm:text-[28px] text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight leading-none"
               />
               {displayBalance && (
                 <button 

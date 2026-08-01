@@ -44,7 +44,13 @@ const useWalletStore = create((set, get) => ({
 
   deleteWallet: async (id) => {
     try {
-      await db.wallets.delete(id)
+      const walletId = Number(id)
+      const txsToDelete = await db.transactions
+        .filter(tx => tx.walletId === walletId || tx.targetWalletId === walletId)
+        .primaryKeys()
+
+      await db.transactions.bulkDelete(txsToDelete)
+      await db.wallets.delete(walletId)
       await get().loadWallets()
     } catch (error) {
       console.error('Failed to delete wallet:', error)

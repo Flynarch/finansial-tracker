@@ -1,6 +1,7 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import CategoryIcon from '../ui/CategoryIcon'
+import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import { db } from '../../lib/db'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 
@@ -28,6 +29,21 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   contextWalletId,
   wallets: walletsProp,
 }) {
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+
+  const handleConfirmDelete = async () => {
+    try {
+      if (setApiError) setApiError('')
+      if (setApiErrorTone) setApiErrorTone('error')
+      await deleteTransaction(transaction.id)
+      if (setSwipedTransactionId) setSwipedTransactionId((prev) => (prev === transaction.id ? null : prev))
+      setIsDeleteModalOpen(false)
+    } catch {
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false
+      if (setApiError) setApiError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
+      if (setApiErrorTone) setApiErrorTone('error')
+    }
+  }
   const walletsInternal = useLiveQuery(() => (walletsProp ? undefined : db.wallets.toArray()), [walletsProp])
   const wallets = walletsProp || walletsInternal
 
@@ -39,7 +55,25 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   let amountPrefix = transaction.type === 'income' ? '+' : '-'
   let amountColorClass = transaction.type === 'income' ? 'ft-income-text' : 'ft-expense-text'
 
-  if (transaction.type === 'transfer') {
+  if (transaction.type === 'balance_adjustment') {
+    iconKey = 'adjustment'
+    colorClass = 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/25'
+    labels = {
+      main: locale === 'en' ? 'Balance Adjustment' : 'Penyesuaian Saldo',
+      sub: locale === 'en' ? 'System' : 'Sistem',
+    }
+    const val = Number(transaction.amount || 0)
+    if (val > 0) {
+      amountPrefix = '+'
+      amountColorClass = 'ft-income-text'
+    } else if (val < 0) {
+      amountPrefix = '-'
+      amountColorClass = 'ft-expense-text'
+    } else {
+      amountPrefix = ''
+      amountColorClass = 'text-[var(--fg)]'
+    }
+  } else if (transaction.type === 'transfer') {
     iconKey = 'arrow-right-left'
     if (contextWalletId && contextWalletId === transaction.targetWalletId) {
       colorClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
@@ -89,20 +123,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         <button
           type="button"
           className="rounded-lg border border-rose-500/30 bg-rose-500/12 px-3 py-1.5 text-xs font-semibold text-rose-400"
-          onClick={async () => {
-            const ok = window.confirm(t('tx.item.deleteConfirm'))
-            if (!ok) return
-            try {
-              if(setApiError) setApiError('')
-              if(setApiErrorTone) setApiErrorTone('error')
-              await deleteTransaction(transaction.id)
-              if(setSwipedTransactionId) setSwipedTransactionId((prev) => (prev === transaction.id ? null : prev))
-            } catch {
-              const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-              if(setApiError) setApiError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
-              if(setApiErrorTone) setApiErrorTone('error')
-            }
-          }}
+          onClick={() => setIsDeleteModalOpen(true)}
         >
           {t('tx.item.delete')}
         </button>
@@ -206,6 +227,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           ) : null}
         </div>
       </article>
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={t('tx.item.delete') || 'Hapus Transaksi'}
+        message={t('tx.item.deleteConfirm') || 'Apakah Anda yakin ingin menghapus transaksi ini?'}
+      />
     </div>
   )
 }, (prevProps, nextProps) => {

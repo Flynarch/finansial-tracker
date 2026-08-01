@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import Modal from '../ui/Modal'
+import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import useTranslation from '../../hooks/useTranslation'
@@ -104,15 +105,21 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
     setNewSubName('')
   }
 
+  const [deleteTarget, setDeleteTarget] = useState(null)
+
   const handleRemoveSub = (childId) => {
     if (!activeParent) return
     const isBuiltin = isBuiltinChild(activeParent.id, childId)
     const msg = isBuiltin
       ? t('addTx.confirmHideBuiltin') || 'Sembunyikan subkategori ini?'
       : t('addTx.confirmRemoveCustom') || 'Hapus subkategori ini?'
-    if (!window.confirm(msg)) return
-    if (txType === 'expense') removeExpenseSubcategory(activeParent.id, childId)
-    else removeIncomeSubcategory(activeParent.id, childId)
+    setDeleteTarget({
+      type: 'sub',
+      parentId: activeParent.id,
+      childId,
+      title: isBuiltin ? 'Sembunyikan Subkategori' : 'Hapus Subkategori',
+      message: msg,
+    })
   }
 
   const handleAddParent = () => {
@@ -125,10 +132,25 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
 
   const handleRemoveParent = (parentId) => {
     const msg = t('addTx.confirmRemoveCustom') || 'Hapus kategori utama ini?'
-    if (!window.confirm(msg)) return
-    if (txType === 'expense') removeExpenseParentCategory(parentId)
-    else removeIncomeParentCategory(parentId)
-    if (activeParentId === parentId) setActiveParentId(null)
+    setDeleteTarget({
+      type: 'parent',
+      parentId,
+      title: 'Hapus Kategori Utama',
+      message: msg,
+    })
+  }
+
+  const confirmDeleteCategory = () => {
+    if (!deleteTarget) return
+    if (deleteTarget.type === 'sub') {
+      if (txType === 'expense') removeExpenseSubcategory(deleteTarget.parentId, deleteTarget.childId)
+      else removeIncomeSubcategory(deleteTarget.parentId, deleteTarget.childId)
+    } else if (deleteTarget.type === 'parent') {
+      if (txType === 'expense') removeExpenseParentCategory(deleteTarget.parentId)
+      else removeIncomeParentCategory(deleteTarget.parentId)
+      if (activeParentId === deleteTarget.parentId) setActiveParentId(null)
+    }
+    setDeleteTarget(null)
   }
 
   const handleRenameParent = () => {
@@ -203,23 +225,8 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
               })}
             </ul>
             {editMode ? (
-              <div className="border-t border-[var(--border)]/70 p-2 bg-[var(--field-bg)]/40">
-                <input
-                  type="text"
-                  value={newParentName}
-                  onChange={(e) => setNewParentName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleAddParent()
-                    }
-                  }}
-                  placeholder={lang === 'id' ? '+ Kategori Utama' : '+ Main Category'}
-                  className="ft-field w-full text-xs px-2 py-1.5 mb-1"
-                />
-                <Button type="button" size="sm" className="w-full text-xs py-1" onClick={handleAddParent}>
-                  {lang === 'id' ? 'Tambah Utama' : 'Add Main'}
-                </Button>
+              <div className="border-t border-[var(--border)]/70 p-2 bg-[var(--field-bg)]/40 text-[10px] text-[var(--muted)] text-center">
+                <span>{lang === 'id' ? 'Pilih kategori utama di atas untuk mengelola subkategori' : 'Select a main category above to manage subcategories'}</span>
               </div>
             ) : null}
           </div>
@@ -345,6 +352,13 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
           )}
         </div>
       </div>
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDeleteCategory}
+        title={deleteTarget?.title || 'Hapus Kategori'}
+        message={deleteTarget?.message || 'Apakah Anda yakin?'}
+      />
     </Modal>
   )
 }

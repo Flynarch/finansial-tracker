@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoadingScreen from './components/ui/LoadingScreen'
+import ProductTourOverlay from './components/onboarding/ProductTourOverlay'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
@@ -27,6 +28,7 @@ const TodoDetailPage = lazy(() => import('./pages/TodoDetailPage'))
 function App() {
   return (
     <Suspense fallback={<LoadingScreen />}>
+      <ProductTourOverlay />
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />

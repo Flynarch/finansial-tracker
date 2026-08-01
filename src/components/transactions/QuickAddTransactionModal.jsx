@@ -804,8 +804,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
             <label className="ft-label">
               {t('addTx.amount')}
-              <div className="ft-money-input mt-1">
-                <span className="ft-money-currency">{form.currency}</span>
+              <div className="mt-1 flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent)]/15 transition-all overflow-hidden">
+                <span className="text-sm font-bold text-[var(--fg)] shrink-0 pr-2 select-none">{form.currency}</span>
                 <input
                   ref={amountInputRef}
                   type="text"
@@ -824,7 +824,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                     })
                   }}
                   required
-                  className="ft-field outline-none"
+                  placeholder="0"
+                  className="w-full bg-transparent py-3 text-base font-bold text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]"
                 />
               </div>
             </label>
@@ -835,9 +836,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 <button
                   type="button"
                   onClick={openCategorySheet}
-                  className="ft-field mt-1 flex w-full items-center justify-between gap-2 text-left"
+                  className="ft-field mt-1 flex w-full items-center justify-between gap-2 text-left min-w-0"
                 >
-                  <span className={`min-w-0 flex-1 leading-snug ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted)]' : 'font-medium text-[var(--fg)]'}`}>
+                  <span className={`min-w-0 flex-1 leading-snug truncate ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted)]' : 'font-medium text-[var(--fg)]'}`}>
                     {txType === 'expense' ? (
                       form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
                     ) : (

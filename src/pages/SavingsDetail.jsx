@@ -6,6 +6,7 @@ import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useBottomSheet from '../hooks/useBottomSheet'
+import BottomSheet from '../components/ui/BottomSheet'
 import {
   clampPercent,
   formatCurrency,
@@ -47,24 +48,57 @@ export default function SavingsDetail() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [])
 
-  const handleAddFunds = async () => {
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const [selectedWalletId, setSelectedWalletId] = useState('')
+  const [fundActionType, setFundActionType] = useState('add') // 'add' | 'withdraw'
+
+  const handleFundTransaction = async () => {
     const val = parseMoneyInput(amountInput)
     if (val <= 0) return
-    
-    await db.goals.update(goalId, {
-      currentAmount: (goal.currentAmount || 0) + val
-    })
-    
+
+    const isWithdraw = fundActionType === 'withdraw'
+    const newGoalAmount = isWithdraw
+      ? Math.max(0, (goal.currentAmount || 0) - val)
+      : (goal.currentAmount || 0) + val
+
+    await db.goals.update(goalId, { currentAmount: newGoalAmount })
+
+    const walletIdNum = Number(selectedWalletId)
+    if (walletIdNum) {
+      const wallet = await db.wallets.get(walletIdNum)
+      if (wallet) {
+        const newWalletBal = isWithdraw
+          ? (wallet.balance || 0) + val
+          : Math.max(0, (wallet.balance || 0) - val)
+        await db.wallets.update(walletIdNum, { balance: newWalletBal })
+      }
+    }
+
     const now = new Date()
     const selectedDate = new Date(dateInput)
     selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
 
     await db.goalLogs.add({
       goalId,
-      amount: val,
-      notes: notesInput.trim(),
-      date: format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
+      amount: isWithdraw ? -val : val,
+      notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
+      date: formattedDate
     })
+
+    if (walletIdNum) {
+      await db.transactions.add({
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        amount: val,
+        type: isWithdraw ? 'income' : 'expense',
+        category: 'tabungan',
+        notes: `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+        currency: goal.currency || defaultCurrency,
+        walletId: walletIdNum,
+        createdAt: Date.now()
+      })
+    }
+
     closeSheet()
   }
 
@@ -253,83 +287,114 @@ export default function SavingsDetail() {
       </div>
 
       {/* Add Funds Bottom Sheet */}
-      {sheetOpen && typeof document !== 'undefined'
-        ? createPortal(
-        <div className="fixed inset-0 z-50 ft-motion-overlay">
+      <BottomSheet
+        isOpen={sheetOpen}
+        onClose={closeSheet}
+        showCloseButton={false}
+      >
+        {/* Tab Setor vs Tarik */}
+        <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
           <button
             type="button"
-            className={`ft-motion-overlay absolute inset-0 bg-black/40 backdrop-blur-sm ${
-              sheetVisible ? 'opacity-100' : 'opacity-0'
+            onClick={() => setFundActionType('add')}
+            className={`rounded-xl py-2 text-xs font-extrabold transition-all ${
+              fundActionType === 'add'
+                ? 'bg-emerald-500 text-white shadow-xs'
+                : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
-            onClick={closeSheet}
+          >
+            Setor (Tambah)
+          </button>
+          <button
+            type="button"
+            onClick={() => setFundActionType('withdraw')}
+            className={`rounded-xl py-2 text-xs font-extrabold transition-all ${
+              fundActionType === 'withdraw'
+                ? 'bg-rose-500 text-white shadow-xs'
+                : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
+          >
+            Tarik (Kurangi)
+          </button>
+        </div>
+
+        <div className="mb-5 relative">
+          <p className="text-center text-[var(--muted)] text-xs font-bold uppercase tracking-wider mb-1">
+            {fundActionType === 'withdraw' ? 'Jumlah yang Ditarik' : 'Jumlah yang Ditabung'}
+          </p>
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            className="w-full bg-transparent text-center text-3xl sm:text-4xl font-black text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/30"
+            placeholder="0"
+            value={amountInput}
+            onChange={(e) => {
+              const selStart = e.target.selectionStart
+              const oldVal = amountInput
+              const newVal = formatMoneyInput(e.target.value, goal.currency || defaultCurrency)
+              setAmountInput(newVal)
+              window.requestAnimationFrame(() => {
+                if (inputRef.current) {
+                  const newPos = getMoneyInputCaret(e.target.value, oldVal, newVal, selStart)
+                  inputRef.current.setSelectionRange(newPos, newPos)
+                }
+              })
+            }}
           />
-          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <div
-              className={`ft-motion-panel overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl ${
-                sheetVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-              }`}
-            >
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
-              <h3 className="text-lg font-bold text-[var(--fg)] mb-4 text-center">Tambah Tabungan</h3>
-              
-              <div className="mb-6 relative">
-                <p className="text-center text-[var(--muted)] text-sm mb-2">Berapa yang ingin ditabung?</p>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  inputMode="numeric"
-                  className="w-full bg-transparent text-center text-4xl font-black text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/30"
-                  placeholder="0"
-                  value={amountInput}
-                  onChange={(e) => {
-                    const selStart = e.target.selectionStart
-                    const oldVal = amountInput
-                    const newVal = formatMoneyInput(e.target.value, goal.currency || defaultCurrency)
-                    setAmountInput(newVal)
-                    window.requestAnimationFrame(() => {
-                      if (inputRef.current) {
-                        const newPos = getMoneyInputCaret(e.target.value, oldVal, newVal, selStart)
-                        inputRef.current.setSelectionRange(newPos, newPos)
-                      }
-                    })
-                  }}
-                />
-              </div>
+        </div>
 
-              <div className="mb-4">
-                <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">Tanggal</label>
-                <input 
-                  type="date" 
-                  value={dateInput} 
-                  onChange={e => setDateInput(e.target.value)} 
-                  className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3.5 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
-                />
-              </div>
+        {/* Wallet Select (Integrasi Transaksi) */}
+        <div className="mb-3">
+          <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">
+            {fundActionType === 'withdraw' ? 'Masuk ke Wallet (Opsional)' : 'Sumber Wallet (Opsional)'}
+          </label>
+          <select
+            value={selectedWalletId}
+            onChange={(e) => setSelectedWalletId(e.target.value)}
+            className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
+          >
+            <option value="">Tanpa Potong Wallet (Manual Log)</option>
+            {wallets?.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name} (Saldo: {formatCurrency(w.balance, w.currency || defaultCurrency)})
+              </option>
+            ))}
+          </select>
+        </div>
 
-              <div className="mb-6">
-                <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">Catatan (Opsional)</label>
-                <input 
-                  type="text" 
-                  placeholder="Misal: Uang sisa jajan" 
-                  value={notesInput} 
-                  onChange={e => setNotesInput(e.target.value)} 
-                  className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3.5 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
-                />
-              </div>
+        <div className="mb-3">
+          <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">Tanggal</label>
+          <input 
+            type="date" 
+            value={dateInput} 
+            onChange={e => setDateInput(e.target.value)} 
+            className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
+          />
+        </div>
 
-              <button
-                type="button"
-                className="w-full bg-blue-500 text-white font-bold py-4 rounded-2xl hover:bg-blue-600 transition disabled:opacity-50 disabled:pointer-events-none"
-                disabled={!amountInput || parseMoneyInput(amountInput) <= 0}
-                onClick={handleAddFunds}
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      ) : null}
+        <div className="mb-5">
+          <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">Catatan (Opsional)</label>
+          <input 
+            type="text" 
+            placeholder={fundActionType === 'withdraw' ? 'Misal: Keperluan mendadak' : 'Misal: Uang sisa jajan'} 
+            value={notesInput} 
+            onChange={e => setNotesInput(e.target.value)} 
+            className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
+          />
+        </div>
+
+        <button
+          type="button"
+          className={`w-full text-white font-bold py-3.5 rounded-2xl transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none ${
+            fundActionType === 'withdraw' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'
+          }`}
+          disabled={!amountInput || parseMoneyInput(amountInput) <= 0}
+          onClick={handleFundTransaction}
+        >
+          {fundActionType === 'withdraw' ? 'Simpan Penarikan' : 'Simpan Setoran'}
+        </button>
+      </BottomSheet>
 
       {/* AI Prediction Modal */}
       {isAiModalOpen && (

@@ -76,10 +76,14 @@ function KpiCard({ title, value, tone = 'neutral', meta, icon }) {
         </div>
         <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--muted-2)]">{title}</p>
       </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight sm:text-[1.75rem]" style={{ color: toneConfig.color }}>
+      <p
+        className="mt-3 text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate min-w-0"
+        style={{ color: toneConfig.color }}
+        title={typeof value === 'string' ? value : ''}
+      >
         {value}
       </p>
-      <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted)]">{meta}</p>
+      <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted)] truncate">{meta}</p>
     </div>
   )
 }
@@ -238,6 +242,26 @@ function Reports() {
 
   const transactions = useLiveQuery(() => db.transactions.toArray(), [], [])
   const investments = useLiveQuery(() => db.investments.toArray(), [], [])
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+
+  const walletStats = useMemo(() => {
+    if (!wallets || wallets.length === 0) return []
+    const safeTx = transactions || []
+    return wallets.map((w) => {
+      const txs = safeTx.filter((t) => Number(t.walletId) === Number(w.id))
+      const totalExpense = txs.filter((t) => t.type === 'expense').reduce((sum, t) => sum + toSafeNumber(t.amount), 0)
+      const totalIncome = txs.filter((t) => t.type === 'income').reduce((sum, t) => sum + toSafeNumber(t.amount), 0)
+      return {
+        id: w.id,
+        name: w.name,
+        currency: w.currency || defaultCurrency,
+        balance: w.balance || 0,
+        txCount: txs.length,
+        totalExpense,
+        totalIncome,
+      }
+    }).sort((a, b) => b.txCount - a.txCount)
+  }, [wallets, transactions, defaultCurrency])
 
   const handleGetAiAdvice = async () => {
     try {
@@ -255,6 +279,14 @@ function Reports() {
     }
   }
 
+  const [selectedWalletFilter, setSelectedWalletFilter] = useState('all')
+
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return []
+    if (selectedWalletFilter === 'all') return transactions
+    return transactions.filter(t => Number(t.walletId) === Number(selectedWalletFilter))
+  }, [transactions, selectedWalletFilter])
+
   const monthlyIncomeExpense = useMemo(() => {
     const monthMap = new Map()
     for (let i = rangeMonths - 1; i >= 0; i -= 1) {
@@ -263,7 +295,7 @@ function Reports() {
       monthMap.set(key, { month: format(month, 'MMM yy'), income: 0, expense: 0 })
     }
 
-    transactions.forEach((tx) => {
+    filteredTransactions.forEach((tx) => {
       const key = safeMonthKey(tx?.date)
       if (!monthMap.has(key)) return
       const row = monthMap.get(key)
@@ -275,11 +307,11 @@ function Reports() {
       if (tx.type === 'expense') row.expense += val
     })
     return [...monthMap.values()]
-  }, [rangeMonths, transactions, defaultCurrency, rates])
+  }, [rangeMonths, filteredTransactions, defaultCurrency, rates])
 
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map()
-    transactions.forEach((tx) => {
+    filteredTransactions.forEach((tx) => {
       if (tx.type !== 'expense') return
       const parsed = parseExpenseCategoryPath(tx.category)
       let key
@@ -310,7 +342,7 @@ function Reports() {
       categoryMap.set(key, current)
     })
     return [...categoryMap.values()].sort((a, b) => b.value - a.value)
-  }, [locale, transactions, selectedDrilldownParent, defaultCurrency, rates])
+  }, [locale, filteredTransactions, selectedDrilldownParent, defaultCurrency, rates])
 
   const incomeByCategory = useMemo(() => {
     const categoryMap = new Map()
@@ -587,6 +619,23 @@ function Reports() {
             </button>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--muted)] hidden sm:inline">Filter Wallet:</span>
+            <select
+              value={selectedWalletFilter}
+              onChange={(e) => setSelectedWalletFilter(e.target.value)}
+              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] transition-all cursor-pointer shadow-2xs"
+            >
+              <option value="all">Semua Wallet</option>
+              {wallets?.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
           {selectedDrilldownParent && donutKind === 'expense' ? (
             <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 shadow-sm">
               <button
@@ -602,9 +651,8 @@ function Reports() {
               </span>
             </div>
           ) : null}
-        </div>
 
-        <div className="grid gap-5 md:grid-cols-1">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
           {/* Pie Chart */}
           <div className="h-80 rounded-2xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_40%,transparent)] p-4 shadow-inner">
             <ResponsiveContainer width="100%" height="100%">
@@ -735,6 +783,39 @@ function Reports() {
                 <span className="font-bold text-[var(--fg)] tracking-tight">{formatCurrency(averageExpense, 'IDR')}</span>
               </p>
             </div>
+          </div>
+        </div>
+      </PremiumSection>
+
+      {/* ── Wallet Statistics Breakdown ── */}
+      <PremiumSection title="Statistik & Aktivitas Wallet">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--field-bg)] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted-2)]">Wallet Paling Aktif</p>
+            <p className="mt-1 text-base font-black text-[var(--fg)] truncate">
+              {walletStats?.[0]?.name || 'Belum Ada Data'}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[var(--accent)]">
+              {walletStats?.[0] ? `${walletStats[0].txCount} Transaksi` : '-'}
+            </p>
+          </div>
+          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--field-bg)] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted-2)]">Pengeluaran Terbesar</p>
+            <p className="mt-1 text-base font-black text-rose-500 truncate">
+              {[...(walletStats || [])].sort((a,b) => b.totalExpense - a.totalExpense)[0]?.name || 'Belum Ada Data'}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+              {formatCurrency(([...(walletStats || [])].sort((a,b) => b.totalExpense - a.totalExpense)[0]?.totalExpense || 0), defaultCurrency)}
+            </p>
+          </div>
+          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--field-bg)] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted-2)]">Total Wallet Aktif</p>
+            <p className="mt-1 text-base font-black text-[var(--fg)]">
+              {wallets?.length || 0} Dompet
+            </p>
+            <p className="mt-1 text-xs font-semibold text-emerald-500">
+              Tersambung & Sinkron
+            </p>
           </div>
         </div>
       </PremiumSection>

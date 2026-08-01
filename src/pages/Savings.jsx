@@ -6,6 +6,8 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
+import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -44,6 +46,7 @@ function Savings() {
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const { isOpen: sheetOpen, isVisible: sheetVisible, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
+  const [deletingGoal, setDeletingGoal] = useState(null)
   const { swipedId, setSwipedId, getSwipeHandlers } = useSwipeAction()
   const [sheetError, setSheetError] = useState('')
   const targetAmountInputRef = useRef(null)
@@ -243,11 +246,7 @@ function Savings() {
                   <button
                     type="button"
                     className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-3 py-2 text-[11px] font-semibold text-rose-400"
-                    onClick={() => {
-                      const confirmed = window.confirm(t('savings.deleteConfirm'))
-                      if (!confirmed) return
-                      void db.goals.delete(g.id)
-                    }}
+                    onClick={() => setDeletingGoal(g)}
                   >
                     {t('savings.delete')}
                   </button>
@@ -281,157 +280,23 @@ function Savings() {
 
       </div>
 
-      {sheetOpen && typeof document !== 'undefined'
-        ? createPortal(
-        <div className="fixed inset-0 z-50 ft-motion-overlay">
-          <button
-            type="button"
-            className={`ft-motion-overlay absolute inset-0 bg-black/40 backdrop-blur-sm ${
-              sheetVisible ? 'opacity-100' : 'opacity-0'
-            }`}
-            onClick={closeSheet}
-            aria-label={t('savings.sheet.close')}
-          />
-          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <div
-              className={`ft-motion-panel max-h-[min(78dvh,40rem)] overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl ${
-                sheetVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-              }`}
-            >
-              <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-[var(--fg)]">
-                  {editingId ? t('savings.sheet.editTitle') : t('savings.sheet.addTitle')}
-                </p>
-                <button
-                  type="button"
-                  className="rounded-xl px-3 py-1 text-sm text-[var(--muted)] hover:bg-[var(--field-bg)]"
-                  onClick={closeSheet}
-                >
-                  {t('savings.sheet.close')}
-                </button>
-              </div>
-              {sheetError ? <ToastBanner message={sheetError} /> : null}
-
-              <div className="grid gap-3">
-                <label className="ft-label text-xs">
-                  {t('savings.goalName')}
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                    className="ft-field"
-                  />
-                </label>
-                <div className={`grid gap-3 ${editingId ? 'sm:grid-cols-2' : ''}`}>
-                  <label className="ft-label text-xs">
-                    {t('savings.target')}
-                    <input
-                      ref={targetAmountInputRef}
-                      type="text"
-                      inputMode="numeric"
-                      value={form.targetAmount}
-                      onChange={(e) => {
-                        const rawValue = e.target.value
-                        const currency = form.currency
-                        const formatted = formatMoneyInput(rawValue, currency)
-                        const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-                        setForm((p) => ({ ...p, targetAmount: formatted }))
-                        window.requestAnimationFrame(() => {
-                          const el = targetAmountInputRef.current
-                          if (!el) return
-                          el.setSelectionRange(caret, caret)
-                        })
-                      }}
-                      className="ft-field"
-                    />
-                  </label>
-                  {editingId && (
-                    <label className="ft-label text-xs">
-                      {t('savings.current')}
-                      <input
-                        ref={currentAmountInputRef}
-                        type="text"
-                        inputMode="numeric"
-                        value={form.currentAmount}
-                        onChange={(e) => {
-                          const rawValue = e.target.value
-                          const currency = form.currency
-                          const formatted = formatMoneyInput(rawValue, currency)
-                          const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-                          setForm((p) => ({ ...p, currentAmount: formatted }))
-                          window.requestAnimationFrame(() => {
-                            const el = currentAmountInputRef.current
-                            if (!el) return
-                            el.setSelectionRange(caret, caret)
-                          })
-                        }}
-                        className="ft-field"
-                      />
-                    </label>
-                  )}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="ft-label text-xs">
-                    {t('savings.currency')}
-                    <select
-                      value={form.currency}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          currency: e.target.value,
-                          targetAmount: formatMoneyInput(p.targetAmount, e.target.value),
-                          currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
-                        }))
-                      }
-                      className="ft-field"
-                    >
-                      {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="ft-label text-xs">
-                    Batas Waktu (Opsional)
-                    <input
-                      type="date"
-                      value={form.deadline || ''}
-                      onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))}
-                      className="ft-field"
-                    />
-                  </label>
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    type="button"
-                    onClick={save}
-                    disabled={
-                      !String(form.name || '').trim() ||
-                      parseMoneyInput(form.targetAmount, form.currency) <= 0 ||
-                      parseMoneyInput(form.currentAmount, form.currency) < 0
-                    }
-                  >
-                    {t('savings.save')}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                    onClick={closeSheet}
-                  >
-                    {t('savings.cancel')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-          ,
-          document.body,
-        )
-        : null}
+      <SavingsSheetModal
+        isOpen={sheetOpen}
+        onClose={closeSheet}
+        editingGoal={goals?.find((g) => g.id === editingId)}
+      />
+      <ConfirmDeleteModal
+        isOpen={!!deletingGoal}
+        onClose={() => setDeletingGoal(null)}
+        onConfirm={async () => {
+          if (deletingGoal) {
+            await db.goals.delete(deletingGoal.id)
+            setDeletingGoal(null)
+          }
+        }}
+        title={t('savings.delete') || 'Hapus Tabungan'}
+        message={t('savings.deleteConfirm') || 'Apakah Anda yakin ingin menghapus tujuan tabungan ini?'}
+      />
     </div>
   )
 }

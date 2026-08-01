@@ -175,7 +175,9 @@ function BottomNav() {
                   )}
                 </NavLink>
               ))}
+
               <div aria-hidden="true" />
+
               {rightItems.map((item) => (
                 <NavLink key={item.path} to={item.path} className={linkClassName}>
                   {({ isActive }) => (
@@ -194,8 +196,8 @@ function BottomNav() {
               ))}
             </div>
 
-            {/* FAB with glow */}
             <button
+              data-tour="quick-add-btn"
               type="button"
               className="absolute left-1/2 top-0 z-40 h-[3.625rem] w-[3.625rem] -translate-x-1/2 -translate-y-[51%] rounded-full bg-[var(--nav-fab-bg)] text-[var(--nav-fab-fg)] ring-1 ring-[var(--nav-fab-ring)] transition-all duration-200 hover:-translate-y-[53%] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               style={{

@@ -7,6 +7,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import Modal from '../components/ui/Modal'
+import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
@@ -243,10 +244,10 @@ function Transactions() {
   const [pendingFocusTransactionId, setPendingFocusTransactionId] = useState(null)
   const [highlightedTransactionId, setHighlightedTransactionId] = useState(null)
   const listScrollRef = useRef(null)
-
   const [isBulkMode, setIsBulkMode] = useState(false)
   const [selectedTxIds, setSelectedTxIds] = useState(new Set())
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false)
+  const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false)
   const [isRangeModalOpen, setIsRangeModalOpen] = useState(false)
   const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false)
 
@@ -271,12 +272,12 @@ function Transactions() {
 
   const handleBatchDelete = async () => {
     if (selectedTxIds.size === 0) return
-    if (!confirm(`Hapus ${selectedTxIds.size} transaksi terpilih?`)) return
     const ids = Array.from(selectedTxIds)
     for (const id of ids) {
       await deleteTransaction(id)
     }
     clearBulkSelection()
+    setIsBatchDeleteModalOpen(false)
   }
 
   const handleBatchCategoryChange = async (newCategory) => {
@@ -1323,7 +1324,7 @@ function Transactions() {
             </button>
             <button
               type="button"
-              onClick={handleBatchDelete}
+              onClick={() => setIsBatchDeleteModalOpen(true)}
               disabled={selectedTxIds.size === 0}
               className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40 transition active:scale-95"
             >
@@ -1340,6 +1341,15 @@ function Transactions() {
           </div>
         </div>
       )}
+
+      {/* ── Batch Delete Confirm Modal ──────────────────────────── */}
+      <ConfirmDeleteModal
+        isOpen={isBatchDeleteModalOpen}
+        onClose={() => setIsBatchDeleteModalOpen(false)}
+        onConfirm={handleBatchDelete}
+        title="Hapus Transaksi Terpilih"
+        message={`Apakah Anda yakin ingin menghapus ${selectedTxIds.size} transaksi yang dipilih? Tindakan ini tidak dapat dibatalkan.`}
+      />
 
       {/* ── Category Picker Modal for Batch Category ────────────── */}
       <CategoryPickerModal

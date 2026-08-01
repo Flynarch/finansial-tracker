@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
+import BottomSheet from '../ui/BottomSheet'
 import MonthPicker from '../ui/MonthPicker'
 import ToastBanner from '../ui/ToastBanner'
 import { resolveExpenseParentIconKey } from '../../lib/categoryIcon'
@@ -245,153 +246,126 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
     }
   }
 
-  if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
+  return (
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title={editingBudget ? t('budget.sheet.editTitle') : t('budget.sheet.addTitle')}
+      closeAriaLabel={t('budget.sheet.close')}
+    >
+      {sheetError ? <ToastBanner message={sheetError} /> : null}
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 ft-motion-overlay">
-      <button
-        type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
-          sheetVisible ? 'opacity-100' : 'opacity-0'
-        }`}
-        onClick={closeSheet}
-        aria-label={t('budget.sheet.close')}
-      />
-      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <div
-          className={`ft-motion-panel max-h-[min(78dvh,40rem)] overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl transition-all duration-200 ${
-            sheetVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          }`}
-        >
-          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-[var(--fg)]">
-              {editingBudget ? t('budget.sheet.editTitle') : t('budget.sheet.addTitle')}
-            </p>
+      <div className="grid gap-3">
+        <label className="ft-label text-xs">
+          {t('budget.month')}
+          <MonthPicker
+            value={form.month}
+            onChange={(val) => setForm((p) => ({ ...p, month: val }))}
+            className="mt-1"
+          />
+        </label>
+
+        <label className="ft-label text-xs">
+          {t('budget.category')}
+          <div
+            className="mt-1 overflow-hidden rounded-xl border border-[var(--field-border)] bg-[var(--field-bg)]"
+            data-budget-category
+          >
             <button
               type="button"
-              className="rounded-xl px-3 py-1 text-sm text-[var(--muted)] hover:bg-[var(--field-bg)]"
-              onClick={closeSheet}
+              onClick={() => setIsCategoryOpen((v) => !v)}
+              className="flex h-11 w-full items-center justify-between gap-3 px-3 text-left"
+              aria-expanded={isCategoryOpen}
             >
-              {t('budget.sheet.close')}
+              <span className="text-[13px] font-medium text-[var(--fg)]">
+                {(() => {
+                  if (!form.categoryPath) return t('budget.category.placeholder')
+                  if (parsedCategoryPath) {
+                    const parentName = parsedCategoryPath.parent?.names?.[lang] || parsedCategoryPath.parent?.id || ''
+                    const childName = parsedCategoryPath.child?.names?.[lang] || parsedCategoryPath.child?.id || ''
+                    return childName ? `${parentName} · ${childName}` : parentName
+                  }
+                  return String(form.categoryPath || '').trim()
+                })()}
+              </span>
+              <span className="text-[var(--muted)]">{isCategoryOpen ? '▾' : '▸'}</span>
             </button>
-          </div>
-          {sheetError ? <ToastBanner message={sheetError} /> : null}
 
-          <div className="grid gap-3">
-            <label className="ft-label text-xs">
-              {t('budget.month')}
-              <MonthPicker
-                value={form.month}
-                onChange={(val) => setForm((p) => ({ ...p, month: val }))}
-                className="mt-1"
-              />
-            </label>
-
-            <label className="ft-label text-xs">
-              {t('budget.category')}
-              <div
-                className="mt-1 overflow-hidden rounded-xl border border-[var(--field-border)] bg-[var(--field-bg)]"
-                data-budget-category
-              >
-                <button
-                  type="button"
-                  onClick={() => setIsCategoryOpen((v) => !v)}
-                  className="flex h-11 w-full items-center justify-between gap-3 px-3 text-left"
-                  aria-expanded={isCategoryOpen}
+            {isCategoryOpen ? (
+              <div className="border-t border-[var(--border)]/40 animate-collapse-in">
+                <ul
+                  className="ft-hide-scrollbar max-h-[420px] min-w-0 overflow-y-auto"
+                  style={{ touchAction: 'pan-y' }}
                 >
-                  <span className="text-[13px] font-medium text-[var(--fg)]">
-                    {(() => {
-                      if (!form.categoryPath) return t('budget.category.placeholder')
-                      if (parsedCategoryPath) {
-                        const parentName = parsedCategoryPath.parent?.names?.[lang] || parsedCategoryPath.parent?.id || ''
-                        const childName = parsedCategoryPath.child?.names?.[lang] || parsedCategoryPath.child?.id || ''
-                        return childName ? `${parentName} · ${childName}` : parentName
-                      }
-                      return String(form.categoryPath || '').trim()
-                    })()}
-                  </span>
-                  <span className="text-[var(--muted)]">{isCategoryOpen ? '▾' : '▸'}</span>
-                </button>
+                  {tree.map((parent) => {
+                    const expanded = expandedParentId === parent.id
+                    const activeMain = selectedParentId === parent.id && !String(form.categoryPath || '').includes('/')
+                    const hasSub = (parent.children || []).length > 0
 
-                {isCategoryOpen ? (
-                  <div className="border-t border-[var(--border)]/40 animate-collapse-in">
-                    <ul
-                      className="ft-hide-scrollbar max-h-[420px] min-w-0 overflow-y-auto"
-                      style={{ scrollbarGutter: 'stable' }}
-                    >
-                      {tree.map((parent) => {
-                        const expanded = expandedParentId === parent.id
-                        const activeMain = selectedParentId === parent.id && !String(form.categoryPath || '').includes('/')
-                        const hasSub = (parent.children || []).length > 0
-
-                        return (
-                          <BudgetParentCategoryItem
-                            key={parent.id}
-                            parent={parent}
-                            expanded={expanded}
-                            activeMain={activeMain}
-                            hasSub={hasSub}
-                            lang={lang}
-                            currentCategoryPath={form.categoryPath}
-                            onSelectParent={handleSelectParent}
-                            onToggleExpand={handleToggleExpand}
-                            onSelectChild={handleSelectChild}
-                            t={t}
-                          />
-                        )
-                      })}
-                    </ul>
-                  </div>
-                ) : null}
+                    return (
+                      <BudgetParentCategoryItem
+                        key={parent.id}
+                        parent={parent}
+                        expanded={expanded}
+                        activeMain={activeMain}
+                        hasSub={hasSub}
+                        lang={lang}
+                        currentCategoryPath={form.categoryPath}
+                        onSelectParent={handleSelectParent}
+                        onToggleExpand={handleToggleExpand}
+                        onSelectChild={handleSelectChild}
+                        t={t}
+                      />
+                    )
+                  })}
+                </ul>
               </div>
-            </label>
-
-            <label className="ft-label text-xs">
-              {t('budget.limit')}
-              <input
-                ref={limitInputRef}
-                type="text"
-                inputMode="numeric"
-                value={limitInput}
-                onChange={(e) => {
-                  const rawValue = e.target.value
-                  const formatted = formatGroupedIntegerInput(rawValue)
-                  const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart)
-                  const numericOnly = formatted.replace(/[^0-9]/g, '')
-                  setForm((p) => ({ ...p, limit: numericOnly }))
-                  setLimitInput(formatted)
-                  window.requestAnimationFrame(() => {
-                    const el = limitInputRef.current
-                    if (!el) return
-                    el.setSelectionRange(caret, caret)
-                  })
-                }}
-                className="ft-field mt-1 w-full font-semibold tabular-nums"
-                placeholder={t('budget.limit.placeholder')}
-              />
-            </label>
-
-            <div className="flex gap-2 pt-1">
-              <Button
-                type="button"
-                onClick={save}
-                disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
-              >
-                {t('budget.save')}
-              </Button>
-              <Button
-                type="button"
-                className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                onClick={closeSheet}
-              >
-                {t('budget.cancel')}
-              </Button>
-            </div>
+            ) : null}
           </div>
+        </label>
+
+        <label className="ft-label text-xs">
+          {t('budget.limit')}
+          <input
+            ref={limitInputRef}
+            type="text"
+            inputMode="numeric"
+            value={limitInput}
+            onChange={(e) => {
+              const rawValue = e.target.value
+              const formatted = formatGroupedIntegerInput(rawValue)
+              const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart)
+              const numericOnly = formatted.replace(/[^0-9]/g, '')
+              setForm((p) => ({ ...p, limit: numericOnly }))
+              setLimitInput(formatted)
+              window.requestAnimationFrame(() => {
+                const el = limitInputRef.current
+                if (!el) return
+                el.setSelectionRange(caret, caret)
+              })
+            }}
+            className="ft-field mt-1 w-full font-semibold tabular-nums"
+            placeholder={t('budget.limit.placeholder')}
+          />
+        </label>
+
+        <div className="flex gap-2 pt-1">
+          <Button
+            type="button"
+            onClick={save}
+            disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
+          >
+            {t('budget.save')}
+          </Button>
+          <Button
+            type="button"
+            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
+            onClick={closeSheet}
+          >
+            {t('budget.cancel')}
+          </Button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   )
 }

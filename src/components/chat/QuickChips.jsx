@@ -14,24 +14,29 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
         triggerText: isId ? 'Saya ingin mencatat pengeluaran baru' : 'I want to record a new expense',
       },
       {
-        icon: <ListChecks size={13} className="text-amber-500" />,
-        label: isId ? 'Buat To-Do' : 'Create To-Do',
-        triggerText: isId ? 'Saya ingin membuat tugas baru' : 'I want to create a new task',
-      },
-      {
         icon: <TrendingUp size={13} className="text-sky-500" />,
         label: isId ? 'Analisis Keuangan' : 'Financial Insights',
-        triggerText: isId ? 'Saya ingin menganalisis keuangan' : 'I want to analyze my finances',
+        triggerText: isId ? 'Analisis pengeluaran dan pemasukan saya bulan ini' : 'Analyze my income and expenses this month',
       },
       {
         icon: <Target size={13} className="text-indigo-500" />,
         label: isId ? 'Target Tabungan' : 'Savings Goal',
-        triggerText: isId ? 'Saya ingin membuat target tabungan' : 'I want to create a savings goal',
+        triggerText: isId ? 'Bagaimana progres target tabungan saya saat ini?' : 'How is my savings goal progress?',
+      },
+      {
+        icon: <ListChecks size={13} className="text-amber-500" />,
+        label: isId ? 'Buat Tugas Baru' : 'Create To-Do',
+        triggerText: isId ? 'Saya ingin membuat tugas baru' : 'I want to create a new task',
       },
       {
         icon: <Flame size={13} className="text-rose-500" />,
-        label: isId ? 'Habit Harian' : 'Daily Habit',
-        triggerText: isId ? 'Saya ingin membuat habit harian' : 'I want to create a daily habit',
+        label: isId ? 'Habit Hari Ini' : 'Daily Habit',
+        triggerText: isId ? 'Bagaimana status habit harian saya hari ini?' : 'What is my habit status today?',
+      },
+      {
+        icon: <Sparkles size={13} className="text-purple-500" />,
+        label: isId ? 'Tips Hemat AI' : 'AI Saving Tips',
+        triggerText: isId ? 'Berikan tips hemat berdasarkan riwayat transaksi saya' : 'Give me saving tips based on my transaction history',
       },
     ]
   }, [isId])

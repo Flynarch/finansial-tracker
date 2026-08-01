@@ -3,8 +3,11 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
+import { Clock } from 'lucide-react'
 import Modal from '../ui/Modal'
+import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import HabitStatsModal from './HabitStatsModal'
+import HabitColorPicker from './HabitColorPicker'
 import { db } from '../../lib/db'
 import useSwipeAction from '../../hooks/useSwipeAction'
 
@@ -247,6 +250,12 @@ const HabitItemCard = memo(function HabitItemCard({
               {habit.frequencyType === 'specific_days' && Array.isArray(habit.frequencyValue) && (
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
                   {habit.frequencyValue.map(dayIdx => ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'][dayIdx]).join(', ')}
+                </span>
+              )}
+              {habit.reminderEnabled && habit.reminderTime && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-500 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20 shrink-0">
+                  <Clock size={11} />
+                  <span>{habit.reminderTime}</span>
                 </span>
               )}
             </div>
@@ -614,54 +623,49 @@ export default function HabitsView() {
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</label>
-            <button
-              type="button"
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${addForm.reminderEnabled ? 'bg-sky-500' : 'bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)]'}`}
-              onClick={() => {
-                const newValue = !addForm.reminderEnabled
-                setAddForm({ ...addForm, reminderEnabled: newValue })
-                if (newValue) {
-                  requestNotificationPermission()
-                }
-              }}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${addForm.reminderEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
-          {addForm.reminderEnabled && (
-            <div className="animate-dropdown">
-              <input 
-                type="time" 
-                value={addForm.reminderTime || '08:00'} 
-                onChange={e => setAddForm({ ...addForm, reminderTime: e.target.value })} 
-                className="ft-field mt-0 w-full font-bold text-center" 
-                required 
-              />
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-sky-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</span>
+              </div>
+              <button
+                type="button"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${addForm.reminderEnabled ? 'bg-sky-500' : 'bg-[var(--border)]'}`}
+                onClick={() => {
+                  const newValue = !addForm.reminderEnabled
+                  setAddForm({ ...addForm, reminderEnabled: newValue })
+                  if (newValue) {
+                    requestNotificationPermission()
+                  }
+                }}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${addForm.reminderEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
-          )}
-
-          <div>
-            <label className="mb-2 mt-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Tema Warna</label>
-            <div className="flex gap-2">
-              {HABIT_COLORS.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setAddForm({ ...addForm, color })}
-                  className={`h-8 w-8 rounded-full border-2 transition-transform ${addForm.color === color ? 'scale-110 border-[var(--fg)]' : 'border-transparent hover:scale-105'}`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Select color ${color}`}
+            {addForm.reminderEnabled && (
+              <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 animate-dropdown">
+                <span className="text-xs font-medium text-[var(--muted)]">Waktu Notifikasi</span>
+                <input 
+                  type="time" 
+                  value={addForm.reminderTime || '08:00'} 
+                  onChange={e => setAddForm({ ...addForm, reminderTime: e.target.value })} 
+                  className="rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3 py-1.5 text-xs font-bold tabular-nums text-[var(--fg)] outline-none focus:border-[var(--accent)] cursor-pointer" 
+                  required 
                 />
-              ))}
-            </div>
+              </div>
+            )}
           </div>
+
+          <HabitColorPicker
+            selectedColor={addForm.color || '#10b981'}
+            onChangeColor={(color) => setAddForm({ ...addForm, color })}
+          />
           <div className="pt-2">
             <button
               type="submit"
               disabled={!addForm.title.trim()}
-              className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50"
+              className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               Simpan Habit
             </button>
@@ -752,54 +756,49 @@ export default function HabitsView() {
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</label>
-            <button
-              type="button"
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editForm.reminderEnabled ? 'bg-sky-500' : 'bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)]'}`}
-              onClick={() => {
-                const newValue = !editForm.reminderEnabled
-                setEditForm({ ...editForm, reminderEnabled: newValue })
-                if (newValue) {
-                  requestNotificationPermission()
-                }
-              }}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.reminderEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
-          {editForm.reminderEnabled && (
-            <div className="animate-dropdown">
-              <input 
-                type="time" 
-                value={editForm.reminderTime || '08:00'} 
-                onChange={e => setEditForm({ ...editForm, reminderTime: e.target.value })} 
-                className="ft-field mt-0 w-full font-bold text-center" 
-                required 
-              />
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-sky-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</span>
+              </div>
+              <button
+                type="button"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${editForm.reminderEnabled ? 'bg-sky-500' : 'bg-[var(--border)]'}`}
+                onClick={() => {
+                  const newValue = !editForm.reminderEnabled
+                  setEditForm({ ...editForm, reminderEnabled: newValue })
+                  if (newValue) {
+                    requestNotificationPermission()
+                  }
+                }}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.reminderEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
-          )}
-
-          <div>
-            <label className="mb-2 mt-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Tema Warna</label>
-            <div className="flex gap-2">
-              {HABIT_COLORS.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setEditForm({ ...editForm, color })}
-                  className={`h-8 w-8 rounded-full border-2 transition-transform ${editForm.color === color ? 'scale-110 border-[var(--fg)]' : 'border-transparent hover:scale-105'}`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Select color ${color}`}
+            {editForm.reminderEnabled && (
+              <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 animate-dropdown">
+                <span className="text-xs font-medium text-[var(--muted)]">Waktu Notifikasi</span>
+                <input 
+                  type="time" 
+                  value={editForm.reminderTime || '08:00'} 
+                  onChange={e => setEditForm({ ...editForm, reminderTime: e.target.value })} 
+                  className="rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3 py-1.5 text-xs font-bold tabular-nums text-[var(--fg)] outline-none focus:border-[var(--accent)] cursor-pointer" 
+                  required 
                 />
-              ))}
-            </div>
+              </div>
+            )}
           </div>
+
+          <HabitColorPicker
+            selectedColor={editForm.color || '#10b981'}
+            onChangeColor={(color) => setEditForm({ ...editForm, color })}
+          />
           <div className="pt-2">
             <button
               type="submit"
               disabled={!editForm.title.trim()}
-              className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50"
+              className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               Simpan Perubahan
             </button>
@@ -808,15 +807,16 @@ export default function HabitsView() {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={!!confirmDeleteId} title="Hapus Habit?" onClose={() => setConfirmDeleteId(null)}>
-        <div className="space-y-4">
-          <p className="text-[14px] text-[var(--fg)] text-center">Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen.</p>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setConfirmDeleteId(null)} className="flex-1 rounded-xl bg-[var(--field-bg)] py-3 font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition-colors">Batal</button>
-            <button type="button" onClick={() => { handleDeleteHabit(confirmDeleteId); setConfirmDeleteId(null) }} className="flex-1 rounded-xl bg-rose-500 py-3 font-bold text-white hover:bg-rose-600 shadow-md transition-colors">Hapus</button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          handleDeleteHabit(confirmDeleteId)
+          setConfirmDeleteId(null)
+        }}
+        title="Hapus Habit?"
+        message="Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen."
+      />
 
       {/* Stats Modal */}
       <HabitStatsModal

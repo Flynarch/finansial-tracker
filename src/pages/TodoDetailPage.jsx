@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, isToday, isTomorrow, isBefore, startOfDay } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import CustomDateTimePicker from '../components/ui/CustomDateTimePicker'
+import PageHeader from '../components/ui/PageHeader'
+import BottomSheet from '../components/ui/BottomSheet'
 import {
   ChevronLeft,
   Trash2,
@@ -26,6 +29,7 @@ import {
   GraduationCap,
   Home,
   Car,
+  Check,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -34,6 +38,20 @@ import Button from '../components/ui/Button'
 
 const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
 const PRIORITIES = ['low', 'medium', 'high']
+
+const TODO_CATEGORY_META = {
+  tagihan: { icon: Receipt, color: 'text-amber-500', bg: 'bg-amber-500/15' },
+  investasi: { icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/15' },
+  belanja: { icon: ShoppingBag, color: 'text-sky-500', bg: 'bg-sky-500/15' },
+  tabungan: { icon: Landmark, color: 'text-indigo-500', bg: 'bg-indigo-500/15' },
+  pekerjaan: { icon: Briefcase, color: 'text-violet-500', bg: 'bg-violet-500/15' },
+  pribadi: { icon: User, color: 'text-pink-500', bg: 'bg-pink-500/15' },
+  kesehatan: { icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-500/15' },
+  pendidikan: { icon: GraduationCap, color: 'text-cyan-500', bg: 'bg-cyan-500/15' },
+  rumah: { icon: Home, color: 'text-orange-500', bg: 'bg-orange-500/15' },
+  transportasi: { icon: Car, color: 'text-teal-500', bg: 'bg-teal-500/15' },
+  lainnya: { icon: Folder, color: 'text-slate-400', bg: 'bg-slate-500/15' },
+}
 
 function getCategoryIcon(cat) {
   switch (cat) {
@@ -171,6 +189,7 @@ export default function TodoDetailPage() {
       description: todo.description || '',
       category: todo.category || 'lainnya',
       dueDate: todo.dueDate || '',
+      reminderTime: todo.reminderTime || '',
       priority: todo.priority || 'medium',
     })
     setEditError('')
@@ -196,11 +215,13 @@ export default function TodoDetailPage() {
       }
 
       const dueDate = editDraft.dueDate || ''
+      const reminderTime = dueDate ? (editDraft.reminderTime || '09:00') : ''
       await db.todos.update(todoId, {
         title,
         description: String(editDraft.description || '').trim(),
         category: editDraft.category,
         dueDate,
+        reminderTime,
         priority: editDraft.priority,
       })
 
@@ -289,41 +310,34 @@ export default function TodoDetailPage() {
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
 
   return (
-    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-12 sm:pb-8">
+    <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-28">
       {/* ── Sleek Top Navigation Header ───────────────────────────────── */}
       <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-4 sm:px-6">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 py-2">
-          {/* Back Button */}
-          <button
-            type="button"
-            onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs hover:border-[var(--border-strong)] transition-all active:scale-95"
-            aria-label={t('common.back')}
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          {/* Page Action / Title */}
-          <div className="flex items-center gap-2">
-            {!isEditing ? (
-              <button
-                type="button"
-                onClick={startEditing}
-                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs hover:border-[var(--border-strong)] transition-all active:scale-95"
-              >
-                <Edit3 size={13} />
-                <span>{t('todo.edit')}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={cancelEditing}
-                className="rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] shadow-xs transition-all active:scale-95"
-              >
-                {t('todo.editCancel')}
-              </button>
-            )}
-          </div>
+        <div className="mx-auto max-w-2xl py-2">
+          <PageHeader
+            onBack={() => (isEditing ? cancelEditing() : navigate('/todos'))}
+            backAriaLabel={t('common.back')}
+            rightAction={
+              !isEditing ? (
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs hover:border-[var(--border-strong)] transition-all active:scale-95"
+                >
+                  <Edit3 size={13} />
+                  <span>{t('todo.edit')}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] shadow-xs transition-all active:scale-95"
+                >
+                  <span>{t('common.cancel')}</span>
+                </button>
+              )
+            }
+          />
         </div>
       </div>
 
@@ -364,11 +378,21 @@ export default function TodoDetailPage() {
                   )}
                 </div>
 
-                {todo.dueDate && (
-                  <p className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
-                    <Calendar size={13} />
-                    <span>Tenggat: {formattedDue}</span>
-                  </p>
+                {(todo.dueDate || todo.reminderTime) && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs font-semibold text-[var(--muted)]">
+                    {todo.dueDate && (
+                      <span className="flex items-center gap-1.5">
+                        <Calendar size={13} />
+                        <span>Tenggat: {formattedDue}</span>
+                      </span>
+                    )}
+                    {todo.reminderTime && (
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} />
+                        <span>Pengingat: {todo.reminderTime}</span>
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -578,55 +602,75 @@ export default function TodoDetailPage() {
 
             <div className="block">
               <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.category')}</span>
-              <div className="relative mt-1.5" data-todo-popover="detail-category">
-                <button
-                  type="button"
-                  className="ft-field mt-0 flex items-center justify-between text-left text-base md:text-sm cursor-pointer"
-                  onClick={() => setCategoryOpen((v) => !v)}
-                  aria-expanded={categoryOpen}
-                >
-                  <span className="flex items-center gap-2">
-                    {getCategoryIcon(editDraft.category)}
-                    <span>{t(`todo.cat.${editDraft.category}`)}</span>
+              <button
+                type="button"
+                className="mt-1.5 flex w-full items-center justify-between gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-left text-sm font-semibold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all shadow-2xs cursor-pointer"
+                onClick={() => setCategoryOpen(true)}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {(() => {
+                    const meta = TODO_CATEGORY_META[editDraft.category] || TODO_CATEGORY_META.lainnya
+                    const Icon = meta.icon
+                    return (
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl ${meta.bg} ${meta.color}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                    )
+                  })()}
+                  <span className="truncate font-bold text-[var(--fg)]">
+                    {t(`todo.cat.${editDraft.category}`)}
                   </span>
-                  <span className={`text-xs text-[var(--muted)] transition-transform duration-200 ${categoryOpen ? 'rotate-180' : ''}`}>⌄</span>
-                </button>
-                <div
-                  className={`absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 origin-top transition-all duration-200 ${
-                    categoryOpen ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
-                  }`}
-                >
-                  <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl">
-                    {TODO_CATEGORIES.map((c) => (
+                </div>
+                <ChevronRight className="h-4 w-4 text-[var(--muted)]" />
+              </button>
+
+              <BottomSheet
+                isOpen={categoryOpen}
+                onClose={() => setCategoryOpen(false)}
+                title={t('todo.field.category') || 'Pilih Kategori'}
+              >
+                <div className="grid grid-cols-2 gap-2.5 pt-1 pb-4">
+                  {TODO_CATEGORIES.map((c) => {
+                    const meta = TODO_CATEGORY_META[c] || TODO_CATEGORY_META.lainnya
+                    const Icon = meta.icon
+                    const isSelected = editDraft.category === c
+                    return (
                       <button
                         key={c}
                         type="button"
-                        className={`flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
-                          editDraft.category === c ? 'bg-[var(--fg)] text-[var(--bg)] font-bold' : 'text-[var(--fg)] hover:bg-[var(--panel)]'
+                        className={`flex items-center justify-between rounded-2xl border p-3 text-left transition-all active:scale-95 cursor-pointer ${
+                          isSelected
+                            ? `border-[var(--fg)] bg-[var(--panel-strong)] shadow-md ring-1 ring-[var(--fg)]`
+                            : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)]'
                         }`}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
+                        onClick={() => {
                           setEditDraft((p) => ({ ...p, category: c }))
                           setCategoryOpen(false)
                         }}
                       >
-                        {getCategoryIcon(c)}
-                        <span>{t(`todo.cat.${c}`)}</span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${meta.bg} ${meta.color}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <span className={`truncate text-xs font-bold ${isSelected ? 'text-[var(--fg)]' : 'text-[var(--muted)]'}`}>
+                            {t(`todo.cat.${c}`)}
+                          </span>
+                        </div>
+                        {isSelected && <Check className="h-4 w-4 shrink-0 text-[var(--fg)]" strokeWidth={3} />}
                       </button>
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
-              </div>
+              </BottomSheet>
             </div>
 
             <div className="block">
-              <span className="text-xs font-bold text-[var(--fg)] uppercase tracking-wider">{t('todo.field.due')}</span>
-              <input
-                type="date"
-                className="ft-field text-base md:text-sm mt-1.5"
-                value={editDraft.dueDate}
-                onChange={(e) => setEditDraft((p) => ({ ...p, dueDate: e.target.value }))}
+              <CustomDateTimePicker
+                label={t('todo.field.due')}
+                dateValue={editDraft.dueDate}
+                timeValue={editDraft.dueDate ? (editDraft.reminderTime || '09:00') : ''}
+                onChangeDate={(d) => setEditDraft((p) => ({ ...p, dueDate: d, reminderTime: d ? (p.reminderTime || '09:00') : '' }))}
+                onChangeTime={(t) => setEditDraft((p) => ({ ...p, reminderTime: t }))}
               />
             </div>
 
@@ -638,7 +682,7 @@ export default function TodoDetailPage() {
                     key={p}
                     type="button"
                     className={`rounded-lg px-2 py-2 text-xs font-bold transition active:scale-95 cursor-pointer ${
-                      editDraft.priority === p ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+                      editDraft.priority === p ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs' : 'text-[var(--muted)] hover:text-[var(--fg)]'
                     }`}
                     onClick={() => setEditDraft((s) => ({ ...s, priority: p }))}
                   >

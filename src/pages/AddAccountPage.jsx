@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { walletInstitutions, getWalletLogoUrl } from '../data/walletInstitutions'
 import AddAccountForm from '../components/wallet/AddAccountForm'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
+import PageHeader from '../components/ui/PageHeader'
 
 const TABS = [
   { id: 'all', label: 'Semua' },
@@ -108,19 +109,12 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   return (
     <div className={`ft-page-enter flex flex-col ${isOnboarding ? 'h-full w-full' : 'min-h-screen bg-[var(--bg)]'}`}>
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[var(--bg)]/90 backdrop-blur-md pb-1 border-b border-[var(--border)]">
-        <div className="flex items-center px-4 pt-4 pb-3">
-          <button
-            onClick={() => isOnboarding && onBack ? onBack() : navigate(-1)}
-            className="p-2 -ml-2 rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition shrink-0"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="flex-1 text-center text-base font-bold text-[var(--fg)] tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-            Tambah Akun
-          </h1>
-          {/* Spacer to center title */}
-          <div className="w-9" />
+      <div className="sticky top-0 z-30 bg-[var(--panel-strong)] pb-1 border-b border-[var(--border)] shadow-xs">
+        <div className="px-4 pt-4 pb-3">
+          <PageHeader
+            title="Tambah Akun"
+            onBack={() => (isOnboarding && onBack ? onBack() : navigate(-1))}
+          />
         </div>
 
         {/* ── Search ──────────────────────────────────────────── */}
@@ -342,10 +336,10 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
       >
         <button
           onClick={() => setSelectedInst('custom')}
-          className="relative w-full flex items-center justify-center py-4 rounded-xl bg-gray-100 border border-black/5 text-gray-800 font-bold text-[15px] transition hover:bg-gray-200 active:scale-[0.98]"
+          className="relative w-full flex items-center justify-center py-4 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-[15px] transition hover:bg-[var(--panel)] active:scale-[0.98]"
         >
           <span>Tambah Akun Lain</span>
-          <div className="absolute right-3 bg-white shadow-sm border border-black/5 text-gray-700 rounded-lg p-1.5 flex items-center justify-center">
+          <div className="absolute right-3 bg-[var(--panel-strong)] shadow-sm border border-[var(--border)] text-[var(--fg)] rounded-lg p-1.5 flex items-center justify-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>

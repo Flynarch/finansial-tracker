@@ -15,6 +15,7 @@ const useSettingsStore = create((set, get) => ({
   securityEnabled: false,
   securityMethod: 'pin',
   lockSecret: '',
+  geminiApiKey: '',
   isUnlocked: true,
   isLoaded: false,
   persist: async (updates) => {
@@ -31,6 +32,7 @@ const useSettingsStore = create((set, get) => ({
       securityEnabled: next.securityEnabled,
       securityMethod: next.securityMethod,
       lockSecret: next.lockSecret,
+      geminiApiKey: next.geminiApiKey,
     })
   },
   setTheme: async (theme) => {
@@ -59,6 +61,11 @@ const useSettingsStore = create((set, get) => ({
   setInitialBalance: async (initialBalance) => {
     set({ initialBalance: Number(initialBalance) || 0 })
     await get().persist({ initialBalance: Number(initialBalance) || 0 })
+  },
+  setGeminiApiKey: async (geminiApiKey) => {
+    const next = String(geminiApiKey || '').trim()
+    set({ geminiApiKey: next })
+    await get().persist({ geminiApiKey: next })
   },
   setReduceMotion: (reduceMotion) => {
     set({ reduceMotion: Boolean(reduceMotion) })
@@ -105,6 +112,7 @@ const useSettingsStore = create((set, get) => ({
       securityEnabled,
       securityMethod: record.securityMethod || 'pin',
       lockSecret: record.lockSecret || '',
+      geminiApiKey: record.geminiApiKey || '',
       isUnlocked: !securityEnabled,
       isLoaded: true,
     })

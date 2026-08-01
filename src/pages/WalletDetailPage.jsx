@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../lib/db'
+import { db, computeWalletBalance } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { ChevronLeft, Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-react'
@@ -11,7 +11,9 @@ import { TransactionItemCard } from '../components/transactions/TransactionItemC
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
 import Modal from '../components/ui/Modal'
+import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
+import PageHeader from '../components/ui/PageHeader'
 import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -153,32 +155,12 @@ export default function WalletDetailPage() {
 
   const currentBalance = useMemo(() => {
     if (!wallet) return 0
-    let bal = Number(wallet.balance) || 0
-    if (!allTransactions) return bal
-    for (const tx of allTransactions) {
-      const amount = Number(tx.amount) || 0
-      if (tx.walletId === walletId) {
-        if (tx.type === 'income') bal += amount
-        else if (tx.type === 'expense') bal -= amount
-        else if (tx.type === 'transfer') bal -= amount
-        else if (tx.type === 'balance_adjustment') bal += amount
-      }
-      if (tx.targetWalletId === walletId) {
-        if (tx.type === 'transfer') bal += amount
-      }
-    }
-    return bal
-  }, [wallet, allTransactions, walletId])
+    return computeWalletBalance(wallet, allTransactions || [])
+  }, [wallet, allTransactions])
 
   const handleDeleteWallet = async () => {
     try {
-      const txsToDelete = await db.transactions
-        .filter(tx => tx.walletId === walletId || tx.targetWalletId === walletId)
-        .primaryKeys()
-      
-      await db.transactions.bulkDelete(txsToDelete)
       await deleteWallet(walletId)
-      
       navigate('/dashboard', { replace: true })
     } catch (err) {
       console.error('Failed to delete wallet', err)
@@ -196,7 +178,7 @@ export default function WalletDetailPage() {
       await addTransaction({
         date: format(new Date(), 'yyyy-MM-dd'),
         type: 'balance_adjustment',
-        category: 'Lainnya',
+        category: 'Penyesuaian Saldo',
         notes: 'Edit Saldo',
         amount: diff,
         currency: wallet.currency,
@@ -275,49 +257,42 @@ export default function WalletDetailPage() {
 
   return (
     <>
-      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-32 relative">
+      <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-28 relative">
         {/* ── 1. Curved Hero Section with Wallet Icon & Accent Glow ────────────── */}
         <div 
           className="ft-wallet-detail-hero -mx-4 -mt-4 pb-9 pt-3 px-4 text-center relative overflow-hidden"
           style={heroAmbientStyle}
         >
           {/* Top Nav Bar */}
-          <div className="relative z-10 flex items-center justify-between mb-1 min-h-[36px]">
-            <button 
-              onClick={() => navigate('/dashboard')} 
-              className="relative z-10 flex items-center justify-center w-9 h-9 -ml-1 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95"
-              aria-label="Kembali"
-            >
-              <ChevronLeft size={22} strokeWidth={2.5} />
-            </button>
-
-            <h2 className="absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-base sm:text-lg font-black tracking-tight text-[var(--fg)] uppercase pointer-events-none">
-              {wallet.name}
-            </h2>
-
-            <div className="relative z-10 flex items-center gap-1">
-              <button 
-                onClick={handleToggleArchive} 
-                className={`flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 ${
-                  wallet.isArchived
-                    ? 'text-amber-500 bg-amber-500/10'
-                    : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
-                }`}
-                title={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
-                aria-label={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
-              >
-                {wallet.isArchived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
-              </button>
-              <button 
-                onClick={() => setIsDeleteModalOpen(true)} 
-                className="flex items-center justify-center w-8 h-8 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
-                title="Hapus Akun"
-                aria-label="Hapus Akun"
-              >
-                <Trash2 size={16} strokeWidth={2} />
-              </button>
-            </div>
-          </div>
+          <PageHeader
+            title={wallet.name}
+            titleUppercase={true}
+            onBack={() => navigate('/dashboard')}
+            rightAction={
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={handleToggleArchive} 
+                  className={`flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 ${
+                    wallet.isArchived
+                      ? 'text-amber-500 bg-amber-500/10'
+                      : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
+                  }`}
+                  title={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
+                  aria-label={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
+                >
+                  {wallet.isArchived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
+                </button>
+                <button 
+                  onClick={() => setIsDeleteModalOpen(true)} 
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                  title="Hapus Akun"
+                  aria-label="Hapus Akun"
+                >
+                  <Trash2 size={16} strokeWidth={2} />
+                </button>
+              </div>
+            }
+          />
 
           {/* Centered Circular Logo */}
           <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto mt-2.5 mb-2">
@@ -346,7 +321,7 @@ export default function WalletDetailPage() {
 
           {/* Subtitles: Account Type Pill Badge */}
           <div className="relative z-10 flex flex-col items-center mb-1">
-            <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 dark:border-[var(--border)] bg-white/80 dark:bg-[var(--panel-strong)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
+            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-strong)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
               <span>{formatAccountType(wallet.institutionType, wallet.name)}</span>
             </div>
           </div>
@@ -354,7 +329,7 @@ export default function WalletDetailPage() {
 
         {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Compact) ─────── */}
         <div className="px-4 -mt-3 relative z-20">
-          <div className="-mx-3.5 sm:mx-0 rounded-xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-md space-y-1">
+          <div className="-mx-3.5 sm:mx-0 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-md space-y-1">
             {/* Top Row: Label Caption & Edit Pencil Button */}
             <div className="flex items-center justify-between">
               <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-[var(--muted-2)]">
@@ -395,7 +370,7 @@ export default function WalletDetailPage() {
         {/* ── 3. Content Section: Unified Transaction Feed Card ─────── */}
         <div className="px-4 mt-2.5">
           {/* Transactions Feed Card Wrapper with Integrated Controls */}
-          <div className="mt-1.5 -mx-3.5 sm:mx-0 rounded-xl border border-slate-200/90 dark:border-[var(--border)] bg-white dark:bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-sm space-y-2.5">
+          <div className="mt-1.5 -mx-3.5 sm:mx-0 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-sm space-y-2.5">
             {/* Unified Card Header & Control Section */}
             <div className="space-y-2 pb-2 border-b border-[var(--border)]/40">
               <div className="flex items-center justify-between px-0.5">
@@ -511,27 +486,17 @@ export default function WalletDetailPage() {
         initialWalletId={walletId}
       />
 
-      <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Hapus Dompet">
-        <div className="pt-1">
-          <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-5">
-            Apakah Anda yakin ingin menghapus dompet <strong className="text-[var(--fg)]">{wallet.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
-          </p>
-          <div className="flex gap-2.5">
-            <button 
-              onClick={() => setIsDeleteModalOpen(false)}
-              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98]"
-            >
-              Batal
-            </button>
-            <button 
-              onClick={handleDeleteWallet}
-              className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold text-[13px] shadow-sm transition hover:bg-rose-600 active:scale-[0.98]"
-            >
-              Hapus
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteWallet}
+        title="Hapus Dompet"
+        message={
+          <>
+            Apakah Anda yakin ingin menghapus dompet <strong className="text-[var(--fg)]">{wallet?.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
+          </>
+        }
+      />
 
       <Modal isOpen={isEditBalanceModalOpen} onClose={() => setIsEditBalanceModalOpen(false)} title="Penyesuaian Saldo">
         <form onSubmit={handleEditBalance} className="pt-1">

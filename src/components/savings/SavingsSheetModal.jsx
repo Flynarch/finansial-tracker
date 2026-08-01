@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
+import BottomSheet from '../ui/BottomSheet'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -85,143 +86,116 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
     }
   }
 
-  if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
+  return (
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title={editingGoal ? t('savings.sheet.editTitle') : t('savings.sheet.addTitle')}
+      closeAriaLabel={t('savings.sheet.close')}
+    >
+      {sheetError ? <ToastBanner message={sheetError} /> : null}
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 ft-motion-overlay">
-      <button
-        type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
-          sheetVisible ? 'opacity-100' : 'opacity-0'
-        }`}
-        onClick={closeSheet}
-        aria-label={t('savings.sheet.close')}
-      />
-      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <div
-          className={`ft-motion-panel max-h-[min(78dvh,40rem)] overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl transition-all duration-200 ${
-            sheetVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          }`}
-        >
-          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-[var(--fg)]">
-              {editingGoal ? t('savings.sheet.editTitle') : t('savings.sheet.addTitle')}
-            </p>
-            <button
-              type="button"
-              className="rounded-xl px-3 py-1 text-sm text-[var(--muted)] hover:bg-[var(--field-bg)]"
-              onClick={closeSheet}
+      <div className="grid gap-3">
+        <label className="ft-label text-xs">
+          {t('savings.goalName')}
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            className="ft-field mt-1 w-full"
+          />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="ft-label text-xs">
+            {t('savings.target')}
+            <input
+              ref={targetAmountInputRef}
+              type="text"
+              inputMode="numeric"
+              value={form.targetAmount}
+              onChange={(e) => {
+                const rawValue = e.target.value
+                const currency = form.currency
+                const formatted = formatMoneyInput(rawValue, currency)
+                const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
+                setForm((p) => ({ ...p, targetAmount: formatted }))
+                window.requestAnimationFrame(() => {
+                  const el = targetAmountInputRef.current
+                  if (!el) return
+                  el.setSelectionRange(caret, caret)
+                })
+              }}
+              className="ft-field mt-1 w-full font-semibold tabular-nums"
+            />
+          </label>
+          <label className="ft-label text-xs">
+            {t('savings.current')}
+            <input
+              ref={currentAmountInputRef}
+              type="text"
+              inputMode="numeric"
+              value={form.currentAmount}
+              onChange={(e) => {
+                const rawValue = e.target.value
+                const currency = form.currency
+                const formatted = formatMoneyInput(rawValue, currency)
+                const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
+                setForm((p) => ({ ...p, currentAmount: formatted }))
+                window.requestAnimationFrame(() => {
+                  const el = currentAmountInputRef.current
+                  if (!el) return
+                  el.setSelectionRange(caret, caret)
+                })
+              }}
+              className="ft-field mt-1 w-full font-semibold tabular-nums"
+            />
+          </label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="ft-label text-xs">
+            {t('savings.currency')}
+            <select
+              value={form.currency}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  currency: e.target.value,
+                  targetAmount: formatMoneyInput(p.targetAmount, e.target.value),
+                  currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
+                }))
+              }
+              className="ft-field mt-1 w-full"
             >
-              {t('savings.sheet.close')}
-            </button>
-          </div>
-          {sheetError ? <ToastBanner message={sheetError} /> : null}
+              {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-          <div className="grid gap-3">
-            <label className="ft-label text-xs">
-              {t('savings.goalName')}
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                className="ft-field mt-1 w-full"
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="ft-label text-xs">
-                {t('savings.target')}
-                <input
-                  ref={targetAmountInputRef}
-                  type="text"
-                  inputMode="numeric"
-                  value={form.targetAmount}
-                  onChange={(e) => {
-                    const rawValue = e.target.value
-                    const currency = form.currency
-                    const formatted = formatMoneyInput(rawValue, currency)
-                    const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-                    setForm((p) => ({ ...p, targetAmount: formatted }))
-                    window.requestAnimationFrame(() => {
-                      const el = targetAmountInputRef.current
-                      if (!el) return
-                      el.setSelectionRange(caret, caret)
-                    })
-                  }}
-                  className="ft-field mt-1 w-full font-semibold tabular-nums"
-                />
-              </label>
-              <label className="ft-label text-xs">
-                {t('savings.current')}
-                <input
-                  ref={currentAmountInputRef}
-                  type="text"
-                  inputMode="numeric"
-                  value={form.currentAmount}
-                  onChange={(e) => {
-                    const rawValue = e.target.value
-                    const currency = form.currency
-                    const formatted = formatMoneyInput(rawValue, currency)
-                    const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart, currency)
-                    setForm((p) => ({ ...p, currentAmount: formatted }))
-                    window.requestAnimationFrame(() => {
-                      const el = currentAmountInputRef.current
-                      if (!el) return
-                      el.setSelectionRange(caret, caret)
-                    })
-                  }}
-                  className="ft-field mt-1 w-full font-semibold tabular-nums"
-                />
-              </label>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="ft-label text-xs">
-                {t('savings.currency')}
-                <select
-                  value={form.currency}
-                  onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      currency: e.target.value,
-                      targetAmount: formatMoneyInput(p.targetAmount, e.target.value),
-                      currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
-                    }))
-                  }
-                  className="ft-field mt-1 w-full"
-                >
-                  {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <Button
-                type="button"
-                onClick={save}
-                disabled={
-                  !String(form.name || '').trim() ||
-                  parseMoneyInput(form.targetAmount, form.currency) <= 0 ||
-                  parseMoneyInput(form.currentAmount, form.currency) < 0
-                }
-              >
-                {t('savings.save')}
-              </Button>
-              <Button
-                type="button"
-                className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-                onClick={closeSheet}
-              >
-                {t('savings.cancel')}
-              </Button>
-            </div>
-          </div>
+        <div className="flex gap-2 pt-1">
+          <Button
+            type="button"
+            onClick={save}
+            disabled={
+              !String(form.name || '').trim() ||
+              parseMoneyInput(form.targetAmount, form.currency) <= 0 ||
+              parseMoneyInput(form.currentAmount, form.currency) < 0
+            }
+          >
+            {t('savings.save')}
+          </Button>
+          <Button
+            type="button"
+            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
+            onClick={onClose}
+          >
+            {t('savings.cancel')}
+          </Button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   )
 }

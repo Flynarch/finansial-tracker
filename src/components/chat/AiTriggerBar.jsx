@@ -10,6 +10,7 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
 
   return (
     <button
+      data-tour="ai-chat-btn"
       className="ft-ai-bar md:hidden flex items-center justify-center group relative overflow-hidden p-[1.5px] shadow-md shadow-[var(--accent)]/15 active:scale-95 transition-transform whitespace-nowrap shrink-0"
       onClick={onOpen}
       aria-label="Open AI Chat"

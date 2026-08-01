@@ -19,8 +19,9 @@ export function SettingsSplitRow({ label, children }) {
   )
 }
 
-export function SettingsLinkRow({ to, title, subtitle }) {
+export function SettingsLinkRow({ to, title, label, subtitle }) {
   const navigate = useNavigate()
+  const displayTitle = title || label
   return (
     <button
       type="button"
@@ -28,7 +29,7 @@ export function SettingsLinkRow({ to, title, subtitle }) {
       className="ft-settings-cell flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent text-left transition hover:bg-[var(--field-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-inset"
     >
       <div className="min-w-0">
-        <span className="block text-[15px] font-medium leading-snug text-[var(--fg)]">{title}</span>
+        <span className="block text-[15px] font-medium leading-snug text-[var(--fg)]">{displayTitle}</span>
         {subtitle ? (
           <span className="mt-0.5 block text-xs leading-snug text-[var(--muted)]">{subtitle}</span>
         ) : null}
