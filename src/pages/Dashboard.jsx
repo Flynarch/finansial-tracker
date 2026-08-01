@@ -23,6 +23,8 @@ import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
+import MoneyBagIcon from '../components/ui/MoneyBagIcon'
+import { getWalletLogoUrl } from '../data/walletInstitutions'
 import {
   clampPercent,
   buildCenteredDomain,
@@ -1571,6 +1573,193 @@ function Dashboard() {
                 <span>Bandingkan</span>
               </button>
             </div>
+
+            {/* — Interactive Chart — */}
+            <div className="h-56 w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={zoomCombinedChartSeries} margin={{ top: 12, right: defaultCurrency === 'IDR' ? 70 : 54, bottom: 4, left: 0 }}>
+                  <defs>
+                    <linearGradient id="nwGradModal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="time"
+                    scale="time"
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                    tickFormatter={(ts) => format(new Date(ts), 'dd MMM')}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={zoomRevenueChartDomain}
+                    orientation="right"
+                    tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                    tickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
+                    ticks={zoomRevenueAxisTicks}
+                    axisLine={false}
+                    tickLine={false}
+                    width={defaultCurrency === 'IDR' ? 68 : 50}
+                  />
+                  <Tooltip
+                    formatter={(val, name) => [
+                      formatCurrency(val, defaultCurrency),
+                      name === 'prevValue' ? 'Periode Sebelumnya' : 'Kekayaan Bersih',
+                    ]}
+                    labelFormatter={(label, payload) => {
+                      const ts = Number(payload?.[0]?.payload?.time ?? label)
+                      if (!Number.isFinite(ts) || ts <= 0) return '-'
+                      return format(new Date(ts), 'dd MMMM yyyy, HH:mm', { locale: idLocale })
+                    }}
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel-strong)',
+                      color: 'var(--fg)',
+                      fontSize: 12,
+                      boxShadow: 'var(--shadow-soft)',
+                    }}
+                  />
+                  {comparePrevious && (
+                    <Line
+                      type="monotone"
+                      dataKey="prevValue"
+                      stroke="var(--muted-2)"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      dot={false}
+                      isAnimationActive={!reduceMotion}
+                    />
+                  )}
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="var(--accent)"
+                    fill="url(#nwGradModal)"
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--accent)' }}
+                    isAnimationActive={!reduceMotion}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* — Peak & Floor Highlights — */}
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2">
+                <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Tertinggi</p>
+                <p className="mt-0.5 text-xs font-black tabular-nums text-[var(--fg)] truncate">
+                  {formatCompactCurrency(zoomPeakAndFloor.max, defaultCurrency)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2">
+                <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Terendah</p>
+                <p className="mt-0.5 text-xs font-black tabular-nums text-[var(--fg)] truncate">
+                  {formatCompactCurrency(zoomPeakAndFloor.min, defaultCurrency)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2">
+                <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Laju Rata-Rata</p>
+                <p className={`mt-0.5 text-xs font-black tabular-nums truncate ${
+                  zoomPeakAndFloor.netRate > 0 ? 'text-emerald-500' : zoomPeakAndFloor.netRate < 0 ? 'text-rose-500' : 'text-[var(--fg)]'
+                }`}>
+                  {zoomPeakAndFloor.avgRateStr}
+                </p>
+              </div>
+            </div>
+
+            {/* — Mini Wallet Cards / Asset Breakdown Section — */}
+            {assetBreakdownData.items.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-[var(--border)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+                    Alokasi Aset & Akun Dompet ({assetBreakdownData.items.length})
+                  </h4>
+                  <span className="text-xs font-black text-[var(--accent)] tabular-nums">
+                    {formatCurrency(assetBreakdownData.total, defaultCurrency)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1 ft-hide-scrollbar">
+                  {assetBreakdownData.items.map((w) => {
+                    const fullWallet = (walletsWithBalance || []).find((x) => x.id === w.id)
+                    const logoUrl = fullWallet ? getWalletLogoUrl(fullWallet) : null
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => {
+                          closeZoom()
+                          navigate(`/wallet/${w.id}`)
+                        }}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-left hover:border-[var(--border-strong)] transition-all cursor-pointer group active:scale-[0.98]"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Wallet Logo */}
+                          <div className="h-9 w-9 shrink-0 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] overflow-hidden flex items-center justify-center p-0.5">
+                            {fullWallet && (fullWallet.customIcon === 'dollar' || fullWallet.name?.toLowerCase() === 'cash') ? (
+                              <div className="w-full h-full flex items-center justify-center text-amber-500">
+                                <MoneyBagIcon size={18} strokeWidth={2.5} />
+                              </div>
+                            ) : logoUrl ? (
+                              <img
+                                src={logoUrl}
+                                alt={w.name}
+                                className="w-full h-full object-contain rounded-full"
+                                onError={(e) => {
+                                  e.target.style.display = 'none'
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className="text-[11px] font-bold text-[var(--fg)]"
+                              style={{
+                                display:
+                                  fullWallet && (fullWallet.customIcon === 'dollar' || fullWallet.name?.toLowerCase() === 'cash' || logoUrl)
+                                    ? 'none'
+                                    : 'flex',
+                              }}
+                            >
+                              {w.name?.substring(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+
+                          {/* Name + Progress Bar */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="truncate text-xs font-bold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">
+                                {w.name}
+                              </p>
+                              <span className="text-[10px] font-extrabold text-[var(--muted)] shrink-0">
+                                {w.pct}%
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]/40">
+                              <div
+                                className={`h-full rounded-full ${w.color} transition-all duration-300`}
+                                style={{ width: `${w.pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Balance Amount */}
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-black tabular-nums text-[var(--fg)]">
+                            {formatCompactCurrency(w.balance, defaultCurrency)}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </BottomSheet>
