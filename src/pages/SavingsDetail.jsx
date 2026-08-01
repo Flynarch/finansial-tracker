@@ -15,7 +15,7 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../lib/utils'
-import { ChevronLeft, Target, Plus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Target, Plus, Minus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import MoneyBag from '../components/icons/MoneyBag'
 import { format, differenceInMonths } from 'date-fns'
 import { getSavingsPrediction } from '../lib/gemini'
