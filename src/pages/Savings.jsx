@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { createPortal } from 'react-dom'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
-import ToastBanner from '../components/ui/ToastBanner'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
+import SavingsFundSheetModal from '../components/savings/SavingsFundSheetModal'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -17,12 +16,10 @@ import {
   clampPercent,
   convertCurrency,
   formatCurrency,
-  formatMoneyInput,
-  formatMoneyValueForInput,
-  getMoneyInputCaret,
-  parseMoneyInput,
   toSafeNumber,
 } from '../lib/utils'
+import { Plus, Minus, Target, ArrowRight, Edit2, Trash2, Sparkles, ChevronLeft } from 'lucide-react'
+import { differenceInDays } from 'date-fns'
 
 function Savings() {
   const { t } = useTranslation()
@@ -36,34 +33,50 @@ function Savings() {
   const [isLeaving, setIsLeaving] = useState(false)
 
   useEffect(() => {
-    // Pastikan saat halaman dibuka selalu mulai dari paling atas
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-
     const id = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(id)
   }, [])
 
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
-  const { isOpen: sheetOpen, isVisible: sheetVisible, openSheet, closeSheet } = useBottomSheet(false)
+  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingGoal, setDeletingGoal] = useState(null)
-  const { swipedId, setSwipedId, getSwipeHandlers } = useSwipeAction()
-  const [sheetError, setSheetError] = useState('')
-  const targetAmountInputRef = useRef(null)
-  const currentAmountInputRef = useRef(null)
-  const [form, setForm] = useState({
-    name: '',
-    targetAmount: '',
-    currentAmount: '',
-    currency: defaultCurrency,
-  })
+  const { setSwipedId } = useSwipeAction()
+
+  const [fundGoal, setFundGoal] = useState(null)
+  const [fundActionType, setFundActionType] = useState('add')
+  const [isFundOpen, setIsFundOpen] = useState(false)
+
+  const openFundModal = (goal, actionType = 'add', e) => {
+    e?.stopPropagation()
+    setFundGoal(goal)
+    setFundActionType(actionType)
+    setIsFundOpen(true)
+  }
 
   const rows = useMemo(() => {
     return (goals ?? []).map((g) => {
       const target = toSafeNumber(g.targetAmount)
       const current = toSafeNumber(g.currentAmount)
       const pct = target > 0 ? clampPercent((current / target) * 100) : 0
-      return { ...g, target, current, pct }
+      const remaining = Math.max(0, target - current)
+
+      let deadlineText = null
+      let isOverdue = false
+      if (g.deadline) {
+        const daysLeft = differenceInDays(new Date(g.deadline), new Date())
+        if (daysLeft < 0) {
+          deadlineText = 'Lewat Tenggat'
+          isOverdue = true
+        } else if (daysLeft === 0) {
+          deadlineText = 'Hari Ini'
+        } else {
+          deadlineText = `${daysLeft} Hari Lagi`
+        }
+      }
+
+      return { ...g, target, current, pct, remaining, deadlineText, isOverdue }
     })
   }, [goals])
 
@@ -81,77 +94,16 @@ function Savings() {
   }, [defaultCurrency, goals])
 
   const openAdd = useCallback(() => {
-    setSheetError('')
     setEditingId(null)
     setSwipedId(null)
-    setForm({
-      name: '',
-      targetAmount: '',
-      currentAmount: '',
-      currency: defaultCurrency,
-      deadline: '',
-    })
     openSheet()
-  }, [defaultCurrency, openSheet, setSwipedId])
+  }, [openSheet, setSwipedId])
 
-  const openEdit = (goal) => {
-    setSheetError('')
+  const openEdit = (goal, e) => {
+    e?.stopPropagation()
     setEditingId(goal.id)
     setSwipedId(null)
-    setForm({
-      name: goal.name || '',
-      targetAmount: formatMoneyValueForInput(goal.targetAmount, goal.currency || defaultCurrency),
-      currentAmount: formatMoneyValueForInput(goal.currentAmount, goal.currency || defaultCurrency),
-      currency: goal.currency || defaultCurrency,
-      deadline: goal.deadline || '',
-    })
     openSheet()
-  }
-
-
-
-  const save = async () => {
-    const payload = {
-      name: String(form.name || '').trim(),
-      targetAmount: parseMoneyInput(form.targetAmount, form.currency),
-      currentAmount: parseMoneyInput(form.currentAmount, form.currency),
-      currency: form.currency || defaultCurrency,
-      deadline: form.deadline || null,
-    }
-    if (!payload.name) {
-      setSheetError(t('savings.validation.name'))
-      return
-    }
-    if (payload.targetAmount <= 0) {
-      setSheetError(t('savings.validation.target'))
-      return
-    }
-    if (payload.currentAmount < 0) {
-      setSheetError(t('savings.validation.current'))
-      return
-    }
-    try {
-      setSheetError('')
-      const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19)
-      if (editingId) {
-        const oldGoal = await db.goals.get(editingId)
-        await db.goals.update(editingId, payload)
-        if (oldGoal && payload.currentAmount > oldGoal.currentAmount) {
-          const diff = payload.currentAmount - oldGoal.currentAmount
-          await db.goalLogs.add({ goalId: editingId, amount: diff, date: nowStr })
-        }
-      } else {
-        const newId = await db.goals.add(payload)
-        if (payload.currentAmount > 0) {
-          await db.goalLogs.add({ goalId: newId, amount: payload.currentAmount, date: nowStr })
-        }
-      }
-      closeSheet()
-      setEditingId(null)
-    } catch {
-      const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-      setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
-    }
   }
 
   useEffect(() => {
@@ -160,8 +112,6 @@ function Savings() {
       navigate(location.pathname, { replace: true, state: null })
     }
   }, [location.pathname, location.state, navigate, openAdd])
-
-
 
   const handleBack = () => {
     if (isLeaving) return
@@ -173,7 +123,7 @@ function Savings() {
   }
 
   return (
-    <div className="bg-[var(--bg)]">
+    <div className="bg-[var(--bg)] min-h-[100dvh] pb-24">
       <div
         className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
           isLeaving
@@ -183,101 +133,180 @@ function Savings() {
               : 'translate-y-2 opacity-0'
         }`}
       >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
+              aria-label={t('savings.back')}
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-xl font-black tracking-tight text-[var(--fg)]">{t('savings.title')}</h2>
+              <p className="text-xs font-bold text-[var(--muted)] truncate">{t('savings.subtitle')}</p>
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={handleBack}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--fg)] hover:bg-[var(--field-bg)]"
-            aria-label={t('savings.back')}
+            onClick={openAdd}
+            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Target Baru
           </button>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold tracking-tight text-[var(--fg)]">{t('savings.title')}</h2>
-            <p className="ft-muted mt-0.5 text-xs">{t('savings.subtitle')}</p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3 relative z-10">
+            <div className="min-w-0">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                {t('savings.totalSaved')}
+              </span>
+              <p className="mt-0.5 text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+                {formatCurrency(totals.current, defaultCurrency)}
+              </p>
+              <p className="mt-1 text-xs font-extrabold text-[var(--muted)] tabular-nums">
+                {t('savings.of')} <span className="text-[var(--fg)]">{formatCurrency(totals.target, defaultCurrency)}</span>
+              </p>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)]/15 px-3 py-1 text-xs font-black text-[var(--accent)] border border-[var(--accent)]/30">
+                <Sparkles className="h-3.5 w-3.5" />
+                {Math.round(totals.pct)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative z-10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-emerald-500 transition-all duration-700 ease-out"
+              style={{ width: `${totals.pct}%` }}
+            />
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button type="button" onClick={openAdd}>
-            {t('savings.add')}
-          </Button>
-        </div>
-      </div>
 
-      <Card className="min-w-0">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] text-[var(--muted)]">{t('savings.totalSaved')}</p>
-            <p className="text-sm font-semibold tabular-nums text-[var(--fg)]">
-              {formatCurrency(totals.current, defaultCurrency)}
-            </p>
-            <p className="mt-0.5 text-[11px] tabular-nums text-[var(--muted)]">
-              {t('savings.of')} {formatCurrency(totals.target, defaultCurrency)}
-            </p>
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              Daftar Target ({rows.length})
+            </h3>
           </div>
-          <div className="text-right">
-            <p className="text-[11px] text-[var(--muted)]">{t('savings.progress')}</p>
-            <p className="text-sm font-semibold tabular-nums text-[var(--fg)]">{Math.round(totals.pct)}%</p>
-          </div>
-        </div>
-        <div className="mt-3 h-2 w-full rounded-full bg-[var(--border-strong)]/40">
-          <div className="h-2 rounded-full bg-[var(--accent)]/70" style={{ width: `${totals.pct}%` }} />
-        </div>
-      </Card>
 
-      <Card title={t('savings.listTitle', { count: rows.length })} withDivider>
-        {rows.length === 0 ? (
-          <EmptyState title={t('savings.emptyTitle')} description={t('savings.emptyDesc')} />
-        ) : (
-          <div className="space-y-2">
-            {rows.map((g) => (
-              <div key={g.id} className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
-                <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
-                  <button
-                    type="button"
-                    className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
-                    onClick={() => openEdit(g)}
-                  >
-                    {t('savings.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-3 py-2 text-[11px] font-semibold text-rose-400"
-                    onClick={() => setDeletingGoal(g)}
-                  >
-                    {t('savings.delete')}
-                  </button>
-                </div>
-
-                <article
-                  className={`relative bg-[var(--field-bg)] p-3 transition-all duration-200 ${
-                    swipedId === g.id ? '-translate-x-[124px]' : 'translate-x-0'
-                  } touch-pan-y cursor-pointer`}
-                  onClick={() => {
-                    if (swipedId === g.id) setSwipedId(null)
-                    else navigate(`/savings/${g.id}`)
-                  }}
-                  {...getSwipeHandlers(g.id)}
+          {rows.length === 0 ? (
+            <EmptyState title={t('savings.emptyTitle')} description={t('savings.emptyDesc')} />
+          ) : (
+            <div className="space-y-3">
+              {rows.map((g) => (
+                <div
+                  key={g.id}
+                  onClick={() => navigate(`/savings/${g.id}`)}
+                  className="group relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xs hover:border-[var(--border-strong)] transition-all cursor-pointer"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--fg)]">{g.name}</p>
-                    <p className="ft-muted mt-1 text-[11px] tabular-nums">
-                      {formatCurrency(g.current, g.currency || defaultCurrency)} / {formatCurrency(g.target, g.currency || defaultCurrency)}
-                    </p>
-                  </div>
-                  <div className="mt-2 h-2 w-full rounded-full bg-[var(--border-strong)]/40">
-                    <div className="h-2 rounded-full bg-[var(--accent)]/70" style={{ width: `${g.pct}%` }} />
-                  </div>
-                </article>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25">
+                        <Target className="h-5 w-5" strokeWidth={2.2} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="truncate text-base font-bold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">
+                          {g.name}
+                        </h4>
+                        <p className="mt-0.5 text-xs font-extrabold tabular-nums text-[var(--muted)]">
+                          {formatCurrency(g.current, g.currency || defaultCurrency)} /{' '}
+                          <span className="text-[var(--fg)]">{formatCurrency(g.target, g.currency || defaultCurrency)}</span>
+                        </p>
+                      </div>
+                    </div>
 
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 text-[11px] font-black text-[var(--accent)]">
+                        {Math.round(g.pct)}%
+                      </span>
+                      {g.deadlineText && (
+                        <span
+                          className={`text-[10px] font-extrabold ${
+                            g.isOverdue ? 'text-rose-500' : 'text-[var(--muted)]'
+                          }`}
+                        >
+                          {g.deadlineText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        g.pct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'
+                      }`}
+                      style={{ width: `${g.pct}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-[var(--muted)]">
+                      {g.remaining > 0 ? (
+                        <>Sisa <span className="text-[var(--fg)] font-black">{formatCurrency(g.remaining, g.currency || defaultCurrency)}</span> lagi</>
+                      ) : (
+                        <span className="text-emerald-500 font-extrabold">Tercapai!</span>
+                      )}
+                    </span>
+                    <span className="font-extrabold text-[var(--accent)] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                      Detail <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </div>
+
+                  <div className="mt-3.5 pt-3 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => openFundModal(g, 'add', e)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+                        Setor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => openFundModal(g, 'withdraw', e)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/25 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <Minus className="h-3.5 w-3.5" strokeWidth={3} />
+                        Tarik
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => openEdit(g, e)}
+                        className="p-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+                        title="Edit Target"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeletingGoal(g)
+                        }}
+                        className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                        title="Hapus Target"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <SavingsSheetModal
@@ -285,6 +314,14 @@ function Savings() {
         onClose={closeSheet}
         editingGoal={goals?.find((g) => g.id === editingId)}
       />
+
+      <SavingsFundSheetModal
+        isOpen={isFundOpen}
+        onClose={() => setIsFundOpen(false)}
+        goal={fundGoal}
+        initialAction={fundActionType}
+      />
+
       <ConfirmDeleteModal
         isOpen={!!deletingGoal}
         onClose={() => setDeletingGoal(null)}
@@ -302,4 +339,3 @@ function Savings() {
 }
 
 export default Savings
-

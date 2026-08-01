@@ -219,21 +219,50 @@ export default function SavingsDetail() {
           </div>
         </div>
 
+        {/* Dual Quick Action Buttons: Setor & Tarik */}
+        <div className="grid grid-cols-2 gap-2.5 mt-5">
+          <button 
+            onClick={() => {
+              setFundActionType('add')
+              setAmountInput('')
+              setDateInput(format(new Date(), 'yyyy-MM-dd'))
+              setNotesInput('')
+              openSheet()
+            }}
+            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-4 rounded-2xl shadow-md transition active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <Plus size={16} strokeWidth={3} /> Setor (Tambah)
+          </button>
+
+          <button 
+            onClick={() => {
+              setFundActionType('withdraw')
+              setAmountInput('')
+              setDateInput(format(new Date(), 'yyyy-MM-dd'))
+              setNotesInput('')
+              openSheet()
+            }}
+            className="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white font-black py-3.5 px-4 rounded-2xl shadow-md transition active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <Minus size={16} strokeWidth={3} /> Tarik (Kurangi)
+          </button>
+        </div>
+
         {/* Summary Grid */}
-        <div className="grid gap-3 mt-4">
-          <div className="bg-[var(--field-bg)] rounded-2xl p-4 flex justify-between items-center">
-            <span className="text-sm font-medium text-[var(--muted)]">Perlu ditabung</span>
-            <span className="font-semibold text-[var(--fg)]">{formatCurrency(remaining, goal.currency || defaultCurrency)}</span>
+        <div className="grid gap-2.5 mt-4">
+          <div className="bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl p-4 flex justify-between items-center">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Sisa yang Perlu Ditabung</span>
+            <span className="text-sm font-black text-[var(--fg)] tabular-nums">{formatCurrency(remaining, goal.currency || defaultCurrency)}</span>
           </div>
-          <div className="bg-[var(--field-bg)] rounded-2xl p-4 flex justify-between items-center">
-            <span className="text-sm font-medium text-[var(--muted)]">Target</span>
-            <span className="font-semibold text-[var(--fg)]">{formatCurrency(target, goal.currency || defaultCurrency)}</span>
+          <div className="bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl p-4 flex justify-between items-center">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Target Total</span>
+            <span className="text-sm font-black text-[var(--fg)] tabular-nums">{formatCurrency(target, goal.currency || defaultCurrency)}</span>
           </div>
           <button 
             onClick={handleGetPrediction}
-            className="w-full mt-2 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-[var(--accent)] font-bold py-3 px-4 rounded-xl transition"
+            className="w-full mt-1 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-[var(--accent)] font-extrabold py-3 px-4 rounded-2xl transition cursor-pointer text-xs"
           >
-            <Sparkles className="h-5 w-5" />
+            <Sparkles className="h-4 w-4" />
             Tanya Prediksi AI
           </button>
         </div>
@@ -243,45 +272,65 @@ export default function SavingsDetail() {
       <div className="px-4 mt-8">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <History size={16} className="text-blue-500" />
+            <div className="w-8 h-8 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-[var(--accent)]">
+              <History size={16} strokeWidth={2.2} />
             </div>
-            <h3 className="font-bold text-[var(--fg)] text-lg">Riwayat Tabungan</h3>
+            <h3 className="font-extrabold text-[var(--fg)] text-lg">Riwayat Transaksi Tabungan</h3>
           </div>
-          <button 
-            onClick={() => { 
-              setAmountInput(''); 
-              setDateInput(format(new Date(), 'yyyy-MM-dd'));
-              setNotesInput('');
-              openSheet(); 
-            }}
-            className="text-sm font-semibold text-blue-500 hover:text-blue-600 flex items-center gap-1 bg-blue-500/10 px-3 py-1.5 rounded-full"
-          >
-            <Plus size={14} strokeWidth={3} /> Tambah
-          </button>
+          <span className="text-xs font-bold text-[var(--muted)]">
+            {(logs || []).length} Transaksi
+          </span>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {(!logs || logs.length === 0) ? (
-            <p className="text-sm text-[var(--muted)] text-center py-6">Belum ada riwayat tabungan.</p>
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
+              <p className="text-xs font-bold text-[var(--muted)]">Belum ada riwayat setoran/penarikan tabungan.</p>
+            </div>
           ) : (
-            logs.map(log => (
-              <div key={log.id} className="bg-[var(--panel)] rounded-2xl p-4 border border-[var(--border)] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <MoneyBag size={20} className="text-emerald-500" />
+            logs.map(log => {
+              const isWithdraw = (log.amount || 0) < 0
+              const absAmount = Math.abs(log.amount || 0)
+              let logDateStr = ''
+              try {
+                logDateStr = format(new Date(log.date), 'dd MMM yyyy, HH:mm')
+              } catch {
+                logDateStr = String(log.date || '')
+              }
+
+              return (
+                <div key={log.id} className="bg-[var(--panel-strong)] rounded-2xl p-3.5 border border-[var(--border)] flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border ${
+                      isWithdraw
+                        ? 'bg-rose-500/15 text-rose-500 border-rose-500/20'
+                        : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20'
+                    }`}>
+                      {isWithdraw ? <Minus size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black text-[var(--fg)] truncate">
+                          {isWithdraw ? 'Penarikan' : 'Setoran'}
+                        </p>
+                        {log.walletName && (
+                          <span className="rounded-md bg-[var(--field-bg)] px-1.5 py-0.5 text-[9px] font-extrabold text-[var(--muted)] border border-[var(--border)]">
+                            {log.walletName}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-semibold text-[var(--muted)] mt-0.5">{logDateStr}</p>
+                      {log.notes && <p className="text-xs font-semibold text-[var(--fg)] mt-0.5 opacity-80 break-words leading-tight">{log.notes}</p>}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--fg)]">Tabungan</p>
-                    <p className="text-xs text-[var(--muted)]">{format(new Date(log.date), 'dd MMM yyyy')}</p>
-                    {log.notes && <p className="text-xs text-[var(--fg)] mt-1 opacity-70 break-words line-clamp-2">{log.notes}</p>}
-                  </div>
+                  <span className={`font-black text-xs tabular-nums shrink-0 ml-2 ${
+                    isWithdraw ? 'text-rose-500' : 'text-emerald-500'
+                  }`}>
+                    {isWithdraw ? '-' : '+'}{formatCurrency(absAmount, goal.currency || defaultCurrency)}
+                  </span>
                 </div>
-                <span className="font-bold text-blue-500">
-                  +{formatCurrency(log.amount, goal.currency || defaultCurrency)}
-                </span>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>
