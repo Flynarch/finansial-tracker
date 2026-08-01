@@ -9,7 +9,7 @@ import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAx
 import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
-import { db, computeAllWalletBalances } from '../lib/db'
+import { db } from '../lib/db'
 import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, toSafeNumber } from '../lib/utils'
@@ -39,7 +39,6 @@ import {
   ChartToggle,
   ZoomTab,
 } from '../components/dashboard/DashboardStatComponents'
-import BottomSheet from '../components/ui/BottomSheet'
 
 const getSavedNetWorthRange = () => {
   try {
@@ -77,15 +76,6 @@ function Dashboard() {
   const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const { t, locale } = useTranslation()
-  const compactItems = useMemo(() => [
-    { id: '1d', label: t('networth.range.1d') },
-    { id: '1w', label: t('networth.range.1w') },
-    { id: '1m', label: t('networth.range.1m') },
-    { id: '3m', label: t('networth.range.3m') },
-    { id: 'ytd', label: t('networth.range.ytd') },
-    { id: '1y', label: t('networth.range.1y') },
-    { id: 'all', label: t('networth.range.all') },
-  ], [t])
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const currentMonthKey = format(new Date(), 'yyyy-MM')
   const currentMonthLabel = format(new Date(), 'MMM yyyy', {
@@ -139,8 +129,24 @@ function Dashboard() {
       cachedWalletsWithBalance = []
       return []
     }
-    // Use canonical computeAllWalletBalances from db.js (single source of truth)
-    const computed = computeAllWalletBalances(wallets, allTransactionsForBalance || [])
+    // Use full transaction history so balances include transactions older than 13 months
+    const txs = allTransactionsForBalance || []
+    const computed = wallets.map(w => {
+      let bal = Number(w.balance) || 0
+      for (const tx of txs) {
+        const amount = Number(tx.amount) || 0
+        if (tx.walletId === w.id) {
+          if (tx.type === 'income') bal += amount
+          else if (tx.type === 'expense') bal -= amount
+          else if (tx.type === 'transfer') bal -= amount
+          else if (tx.type === 'balance_adjustment') bal += amount
+        }
+        if (tx.targetWalletId === w.id) {
+          if (tx.type === 'transfer') bal += amount
+        }
+      }
+      return { ...w, currentBalance: bal }
+    })
     cachedWalletsWithBalance = computed
     return computed
   }, [wallets, allTransactionsForBalance])
@@ -765,15 +771,14 @@ function Dashboard() {
     const n = Number(amount || 0)
     const sign = n < 0 ? '-' : ''
     const abs = Math.abs(n)
-    const fmt = (value, digits = 1) =>
+    const fmt = (value) =>
       value.toLocaleString('id-ID', {
         minimumFractionDigits: 0,
-        maximumFractionDigits: digits,
+        maximumFractionDigits: 1,
       })
-    if (abs >= 1_000_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000_000, 1)} T`
-    if (abs >= 1_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000, 1)} M`
-    if (abs >= 1_000_000) return `${sign}Rp ${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)} jt`
-    if (abs >= 1_000) return `${sign}Rp ${fmt(abs / 1_000, 0)} rb`
+    if (abs >= 1_000_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000_000)} T`
+    if (abs >= 1_000_000_000) return `${sign}Rp ${fmt(abs / 1_000_000_000)} M`
+    if (abs >= 1_000_000) return `${sign}Rp ${fmt(abs / 1_000_000)} jt`
     return formatCurrency(amount, currency)
   }
 
@@ -922,7 +927,7 @@ function Dashboard() {
         {...containerProps}
         className={`${interactive ? 'cursor-pointer select-none' : ''}`}
       >
-        <Card data-tour="networth-card" title={t('dashboard.netWorthHistory')} withDivider>
+        <Card title={t('dashboard.netWorthHistory')} withDivider>
           <div className="mb-3 flex min-h-[44px] items-center justify-between gap-2">
             <ChartToggle
               value={zoomRevenueRange}
@@ -1207,7 +1212,15 @@ function Dashboard() {
           rightAxisTickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
           rightAxisWidth={defaultCurrency === 'IDR' ? (isMobileScreen ? 36 : 42) : 38}
           rightAxisTicks={miniRevenueAxisTicks}
-          rangeLabel={t(`networth.label.${miniRevenueRange}`)}
+          rangeLabel={
+            miniRevenueRange === 'ytd' ? 'YTD'
+              : miniRevenueRange === '1y' ? '1 Tahun'
+              : miniRevenueRange === 'all' ? 'All Time'
+              : miniRevenueRange === '3m' ? '3 Bulan'
+              : miniRevenueRange === '1m' ? '1 Bulan'
+              : miniRevenueRange === '1d' ? '1 Hari'
+              : '1 Minggu'
+          }
         />
       </section>
 
@@ -1344,236 +1357,499 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* Zoom / Fullscreen Chart Modal */}
-      <BottomSheet
-        isOpen={Boolean(zoomedChart)}
-        onClose={closeZoom}
-        maxWidth="max-w-3xl"
-        showCloseButton={false}
-        showHandle={true}
-      >
-        {zoomedChart === 'habits' ? (
-          <>
-            <HabitHeatmapWidget />
-            <div className="mt-4">
-              <h4 className="mb-3 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Tren Penyelesaian Rata-Rata</h4>
-              <div className="h-40 rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 text-[var(--fg)]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={globalWeeklyTrend} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorGlobalRate" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} />
-                    <Tooltip 
-                      formatter={(val) => [`${val}%`, 'Rata-Rata Penyelesaian']}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: '1px solid var(--border)',
-                        background: 'var(--panel-strong)',
-                        color: 'var(--fg)',
-                        fontSize: 12,
-                        boxShadow: 'var(--shadow-soft)',
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="rate"
-                      stroke="var(--accent)"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorGlobalRate)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={closeZoom}
-                className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-5 py-2 text-[12px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors"
-              >
-                {t('dashboard.zoom.close')}
-              </button>
-            </div>
-          </>
-        ) : zoomedChart === 'savings' ? (
-          <>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight text-[var(--fg)]">{t('dashboard.savings')}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/savings')}
-                  className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
-                >
-                  + Target
-                </button>
-                <button
-                  type="button"
-                  onClick={closeZoom}
-                  className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
-                >
-                  {t('dashboard.zoom.close')}
-                </button>
-              </div>
-            </div>
-            <div className="max-h-[80dvh] overflow-y-auto overscroll-none pr-1">
-              {budgetGoalSummary.goalRows?.length ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {budgetGoalSummary.goalRows.map((row) => (
-                    <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-bold text-[var(--fg)]">{row.name}</p>
-                        <span className="text-[11px] font-bold text-[var(--muted)]">{Math.round(row.pct)}%</span>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
-                        {formatCurrency(row.current, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.target, defaultCurrency)}</span>
-                      </p>
-                      <ProgressBar value={row.pct} tone="savings" className="mt-2" />
+      
+
+      {zoomedChart && typeof document !== 'undefined'
+        ? createPortal(
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            onClick={closeZoom}
+            className={`ft-motion-overlay absolute inset-0 bg-black/40 ${
+              zoomVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+            aria-label={t('dashboard.zoom.close')}
+          />
+
+          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div
+              className={`ft-motion-panel origin-bottom rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-xl ${
+                zoomVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+              }`}
+              style={{ boxShadow: 'var(--shadow)' }}
+            >
+              <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
+              {zoomedChart === 'habits' ? (
+                <>
+                  <HabitHeatmapWidget />
+                  <div className="mt-4">
+                    <h4 className="mb-3 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Tren Penyelesaian Rata-Rata</h4>
+                    <div className="h-40 rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 text-[var(--fg)]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={globalWeeklyTrend} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorGlobalRate" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} />
+                          <Tooltip 
+                            formatter={(val) => [`${val}%`, 'Rata-Rata Penyelesaian']}
+                            contentStyle={{
+                              borderRadius: 12,
+                              border: '1px solid var(--border)',
+                              background: 'var(--panel-strong)',
+                              color: 'var(--fg)',
+                              fontSize: 12,
+                              boxShadow: 'var(--shadow-soft)',
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="rate"
+                            stroke="var(--accent)"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#colorGlobalRate)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={closeZoom}
+                      className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-5 py-2 text-[12px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors"
+                    >
+                      {t('dashboard.zoom.close')}
+                    </button>
+                  </div>
+                </>
+              ) : zoomedChart === 'savings' ? (
+                <>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold tracking-tight text-[var(--fg)]">{t('dashboard.savings')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/savings')}
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      >
+                        + Target
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeZoom}
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      >
+                        {t('dashboard.zoom.close')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-[80dvh] overflow-y-auto overscroll-none pr-1">
+                    {budgetGoalSummary.goalRows?.length ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {budgetGoalSummary.goalRows.map((row) => (
+                          <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-sm font-bold text-[var(--fg)]">{row.name}</p>
+                              <span className="text-[11px] font-bold text-[var(--muted)]">{Math.round(row.pct)}%</span>
+                            </div>
+                            <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
+                              {formatCurrency(row.current, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.target, defaultCurrency)}</span>
+                            </p>
+                            <ProgressBar value={row.pct} tone="savings" className="mt-2" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4">
+                        <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
+                        <p className="ft-muted mt-1 text-[12px]">{t('dashboard.savings.emptyDesc')}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : zoomedChart === 'budget' ? (
+                <>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold tracking-tight text-[var(--fg)]">{t('dashboard.budget')}</p>
+                      <p className="ft-muted mt-0.5 text-[11px]">{currentMonthLabel}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/budget')}
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      >
+                        {t('budget.add')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeZoom}
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      >
+                        {t('dashboard.zoom.close')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[80dvh] overflow-y-auto overscroll-none pr-1">
+                    {budgetGoalSummary.budgetRows?.length ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {budgetGoalSummary.budgetRows.map((row) => (
+                          <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-sm font-bold text-[var(--fg)]">{row.category}</p>
+                              <span className={`text-[11px] font-bold ${
+                                row.pct >= 100 ? 'text-rose-500 dark:text-rose-400' : row.pct >= 80 ? 'text-amber-500 dark:text-amber-400' : 'text-[var(--muted)]'
+                              }`}>{Math.round(row.pct)}%</span>
+                            </div>
+                            <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
+                              {formatCurrency(row.spent, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.limit, defaultCurrency)}</span>
+                            </p>
+                            <ProgressBar value={row.pct} tone="budget" className="mt-2" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
+                        <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.budget.empty')}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4">
-                  <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
-                  <p className="ft-muted mt-1 text-[12px]">{t('dashboard.savings.emptyDesc')}</p>
-                </div>
+                <>
+                  {/* — Net Worth Modal Header — */}
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent)]/15">
+                        <TrendingUp className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">Kekayaan Bersih</h3>
+                        <p className="text-[10px] font-semibold text-[var(--muted)]">Ringkasan & Fluktuasi Aset</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeZoom}
+                      aria-label={t('dashboard.zoom.close')}
+                      className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
+                    >
+                      <X className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  </div>
+
+                  {/* — Hero Balance & Growth Badge — */}
+                  <div className="mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      {zoomRevenueRange === '1d' ? 'Total Hari Ini'
+                        : zoomRevenueRange === '1w' ? 'Total 7 Hari'
+                        : zoomRevenueRange === '1m' ? 'Total 30 Hari'
+                        : zoomRevenueRange === '3m' ? 'Total 90 Hari'
+                        : zoomRevenueRange === 'ytd' ? 'Total Tahun Ini'
+                        : zoomRevenueRange === '1y' ? 'Total 1 Tahun'
+                        : zoomRevenueRange === 'all' ? 'Total Semua Waktu'
+                        : 'Total Mingguan'}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-2.5">
+                      <p className="text-[22px] sm:text-[30px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
+                        {formatCurrency(zoomRevenueValue, defaultCurrency)}
+                      </p>
+                      <span
+                        className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-colors ${
+                          netWorthGrowth.net > 0
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : netWorthGrowth.net < 0
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                            : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+                        }`}
+                      >
+                        {netWorthGrowth.net > 0 ? (
+                          <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
+                        ) : netWorthGrowth.net < 0 ? (
+                          <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" strokeWidth={2.5} />
+                        ) : null}
+                        <span>{netWorthGrowth.label}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* — Compact Filter Toggle & Compare Switch — */}
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ChartToggle
+                        value={zoomRevenueRange}
+                        onChange={setZoomRevenueRange}
+                        items={COMPACT_ITEMS}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setComparePrevious((prev) => !prev)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-1.5 text-[11px] font-bold border transition-all active:scale-95 ${
+                        comparePrevious
+                          ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30 shadow-xs'
+                          : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
+                      }`}
+                    >
+                      <GitCompare className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+                      <span>Bandingkan</span>
+                    </button>
+                  </div>
+
+                  {/* — Chart Area — */}
+                  <div
+                    ref={zoomChartRef}
+                    onTouchStart={handleZoomChartTouchOrMove}
+                    className="h-56 w-full text-[var(--fg)]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                      <AreaChart
+                        data={zoomCombinedChartSeries}
+                        margin={{ top: 14, right: defaultCurrency === 'IDR' ? 44 : 40, bottom: 20, left: 4 }}
+                        onMouseMove={handleZoomChartTouchOrMove}
+                        onTouchStart={handleZoomChartTouchOrMove}
+                        onTouchMove={handleZoomChartTouchOrMove}
+                        onMouseLeave={() => setZoomTooltipDismissed(true)}
+                      >
+                        <defs>
+                          <linearGradient id="nwGradZoom" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.38} />
+                            <stop offset="50%" stopColor="var(--accent)" stopOpacity={0.12} />
+                            <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.35} vertical={false} />
+                        <XAxis
+                          dataKey="time"
+                          type="number"
+                          scale="time"
+                          domain={['dataMin', 'dataMax']}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                          dy={6}
+                          tickFormatter={(timeMs) => {
+                            if (!timeMs || !Number.isFinite(timeMs)) return ''
+                            const d = new Date(timeMs)
+                            if (zoomRevenueRange === '1d') return format(d, 'HH:mm')
+                            if (zoomRevenueRange === 'all') return format(d, 'MMM yy')
+                            if (zoomRevenueRange === '1y' || zoomRevenueRange === 'ytd') return format(d, 'MMM')
+                            return format(d, 'd MMM')
+                          }}
+                          interval="preserveStartEnd"
+                          minTickGap={28}
+                        />
+                        <YAxis
+                          domain={zoomRevenueChartDomain}
+                          orientation="right"
+                          tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                          tickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
+                          ticks={zoomRevenueAxisTicks}
+                          interval={0}
+                          tickCount={undefined}
+                          axisLine={false}
+                          tickLine={false}
+                          width={defaultCurrency === 'IDR' ? 44 : 38}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+                          content={(props) => {
+                            if (zoomTooltipDismissed || !props.active || !props.payload || !props.payload.length) return null
+                            const rawVal = props.payload[0]?.value
+                            const valStr = formatCurrency(rawVal, defaultCurrency)
+                            const ts = Number(props.payload[0]?.payload?.time ?? props.label)
+                            const isMonthlyData = ['1y', 'ytd', 'all'].includes(zoomRevenueRange)
+                            const labelStr = Number.isFinite(ts) && ts > 0
+                              ? format(new Date(ts), isMonthlyData ? 'MMMM yyyy' : 'dd MMM yyyy, HH:mm')
+                              : '-'
+
+                            return (
+                              <div className="pointer-events-none rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3 py-2 text-xs shadow-[var(--shadow-soft)] text-[var(--fg)]">
+                                <p className="text-[10px] font-semibold text-[var(--muted)]">{labelStr}</p>
+                                <p className="mt-0.5 font-bold text-[var(--fg)] tabular-nums">
+                                  Kekayaan Bersih: <span className="text-[var(--accent)]">{valStr}</span>
+                                </p>
+                                {comparePrevious && props.payload[1]?.value !== undefined && (
+                                  <p className="mt-0.5 text-[11px] font-medium text-[var(--muted)] tabular-nums">
+                                    Periode Lalu: <span>{formatCurrency(props.payload[1].value, defaultCurrency)}</span>
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          }}
+                        />
+                        {comparePrevious && (
+                          <Line
+                            type="monotone"
+                            dataKey="prevValue"
+                            stroke="var(--muted)"
+                            strokeDasharray="4 4"
+                            strokeWidth={1.8}
+                            dot={false}
+                            activeDot={false}
+                            isAnimationActive={false}
+                          />
+                        )}
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          stroke="var(--accent)"
+                          fill="url(#nwGradZoom)"
+                          strokeWidth={2.5}
+                          dot={false}
+                          activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--panel-strong)', fill: 'var(--accent)' }}
+                          isAnimationActive={!reduceMotion}
+                          animationDuration={700}
+                          animationEasing="ease"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* — Contextual Summary Cards (Primary Flow Summary) — */}
+                  <div className="mt-3.5 grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Masuk', value: rangedSummaryStats.income, positive: true, icon: ArrowDownRight, iconColor: 'text-emerald-500' },
+                      { label: 'Keluar', value: rangedSummaryStats.expense, positive: false, icon: ArrowUpRight, iconColor: 'text-rose-500' },
+                      { label: 'Selisih', value: rangedSummaryStats.net, positive: rangedSummaryStats.net >= 0, icon: Wallet, iconColor: 'text-[var(--accent)]' },
+                    ].map(({ label, value, positive, icon: Icon, iconColor }) => (
+                      <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2.5 shadow-2xs">
+                        <div className="flex items-center gap-1">
+                          <Icon className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{label}</span>
+                        </div>
+                        <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight ${
+                          label === 'Selisih'
+                            ? (positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')
+                            : 'text-[var(--fg)]'
+                        }`}>
+                          {label === 'Selisih' && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* — Collapsible Secondary Analytics Toggle Button — */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDetailedAnalytics((prev) => !prev)}
+                    className="mt-3 flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                      <span>Statistik & Komposisi Aset</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-[var(--muted-2)]">
+                        {showDetailedAnalytics ? 'Sembunyikan' : 'Tampilkan'}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[var(--muted)] shrink-0 transition-transform duration-300 ${
+                          showDetailedAnalytics ? 'rotate-180 text-[var(--accent)]' : ''
+                        }`}
+                        strokeWidth={2.2}
+                      />
+                    </div>
+                  </button>
+
+                  {/* — Collapsible Secondary Content with Smooth Height Animation — */}
+                  <div className={`ft-accordion-wrapper ${showDetailedAnalytics ? 'is-open' : ''}`}>
+                    <div className="ft-accordion-inner space-y-2.5">
+                      {/* — Bento Line-Guided Key Indicators (Peak, Floor, Average Rate) — */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Tertinggi</span>
+                          </div>
+                          <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)]">
+                            {formatCurrency(zoomPeakAndFloor.max, defaultCurrency)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <ArrowDownRight className="h-3.5 w-3.5 text-rose-500 shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Terendah</span>
+                          </div>
+                          <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)]">
+                            {formatCurrency(zoomPeakAndFloor.min, defaultCurrency)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
+                          <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
+                            <Activity className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.5} />
+                            <span className="truncate">Laju Rata-rata</span>
+                          </div>
+                          <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight ${
+                            zoomPeakAndFloor.netRate > 0 ? 'text-emerald-500' : zoomPeakAndFloor.netRate < 0 ? 'text-rose-500' : 'text-[var(--fg)]'
+                          }`}>
+                            {zoomPeakAndFloor.avgRateStr}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* — Line-Guided Asset Breakdown Section — */}
+                      {assetBreakdownData.items.length > 0 && (
+                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <PieChart className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Komposisi Sumber Aset</h4>
+                            </div>
+                            <span className="text-[10px] font-semibold text-[var(--muted)]">
+                              {assetBreakdownData.items.length} Dompet Aktif
+                            </span>
+                          </div>
+
+                          {/* Multi-segment horizontal bar */}
+                          <div className="mt-2.5 flex h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)] p-0.5 gap-0.5">
+                            {assetBreakdownData.items.map((item) => (
+                              <div
+                                key={item.id}
+                                className={`h-full rounded-xs transition-all duration-300 ${item.color}`}
+                                style={{ width: `${Math.max(2, item.pct)}%` }}
+                                title={`${item.name}: ${item.pct}%`}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Wallet Legend Grid */}
+                          <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {assetBreakdownData.items.slice(0, 6).map((item) => (
+                              <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={`h-2 w-2 rounded-full shrink-0 ${item.color}`} />
+                                  <span className="truncate text-[10px] font-semibold text-[var(--fg)]">{item.name}</span>
+                                </div>
+                                <span className="ml-1 text-[10px] font-bold tabular-nums text-[var(--muted)]">{item.pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-          </>
-        ) : zoomedChart === 'budget' ? (
-          <>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight text-[var(--fg)]">{t('dashboard.budget')}</p>
-                <p className="ft-muted mt-0.5 text-[11px]">{currentMonthLabel}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/budget')}
-                  className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
-                >
-                  {t('budget.add')}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeZoom}
-                  className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
-                >
-                  {t('dashboard.zoom.close')}
-                </button>
-              </div>
-            </div>
-
-            <div className="max-h-[80dvh] overflow-y-auto overscroll-none pr-1">
-              {budgetGoalSummary.budgetRows?.length ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {budgetGoalSummary.budgetRows.map((row) => (
-                    <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-bold text-[var(--fg)]">{row.category}</p>
-                        <span className={`text-[11px] font-bold ${
-                          row.pct >= 100 ? 'text-rose-500 dark:text-rose-400' : row.pct >= 80 ? 'text-amber-500 dark:text-amber-400' : 'text-[var(--muted)]'
-                        }`}>{Math.round(row.pct)}%</span>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
-                        {formatCurrency(row.spent, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.limit, defaultCurrency)}</span>
-                      </p>
-                      <ProgressBar value={row.pct} tone="budget" className="mt-2" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-                  <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.budget.empty')}</p>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* — Net Worth Modal Header — */}
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent)]/15">
-                  <TrendingUp className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">Kekayaan Bersih</h3>
-                  <p className="text-[10px] font-semibold text-[var(--muted)]">Ringkasan & Fluktuasi Aset</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeZoom}
-                aria-label={t('dashboard.zoom.close')}
-                className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" strokeWidth={2.5} />
-              </button>
-            </div>
-
-            {/* — Hero Balance & Growth Badge — */}
-            <div className="mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                {t(`networth.hero.${zoomRevenueRange}`)}
-              </p>
-              <div className="mt-0.5 flex items-center gap-2.5">
-                <p className="text-[22px] sm:text-[30px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
-                  {formatCurrency(zoomRevenueValue, defaultCurrency)}
-                </p>
-                <span
-                  className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-colors ${
-                    netWorthGrowth.net > 0
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                      : netWorthGrowth.net < 0
-                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                      : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
-                  }`}
-                >
-                  {netWorthGrowth.net > 0 ? (
-                    <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
-                  ) : netWorthGrowth.net < 0 ? (
-                    <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" strokeWidth={2.5} />
-                  ) : null}
-                  <span>{netWorthGrowth.label}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* — Compact Filter Toggle & Compare Switch — */}
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <ChartToggle
-                  value={zoomRevenueRange}
-                  onChange={setZoomRevenueRange}
-                  items={compactItems}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setComparePrevious((prev) => !prev)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-1.5 text-[11px] font-bold border transition-all active:scale-95 ${
-                  comparePrevious
-                    ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30 shadow-xs'
-                    : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
-                }`}
-              >
-                <GitCompare className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
-                <span>Bandingkan</span>
-              </button>
-            </div>
-          </>
-        )}
-      </BottomSheet>
+          </div>
+        </div>
+          ,
+          document.body,
+        )
+        : null}
 
       <BudgetSheetModal
         isOpen={isOpenQuickBudget}
