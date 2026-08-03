@@ -9,6 +9,7 @@ import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
 import { seedComprehensiveDebugData } from '../../lib/seedDebugData'
+import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
@@ -219,6 +220,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
              
              const txToSave = {
                ...tx,
+               category: sanitizeCategoryPath(tx.category, tx.type),
                walletId: finalWalletId,
                id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
                createdAt: new Date().toISOString()

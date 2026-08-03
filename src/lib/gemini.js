@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { getMergedExpenseTree } from './expenseCategories'
 import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions, getMonthSummaryForPrompt } from './aiDatabaseQueries'
+import { sanitizeCategoryPath } from './categorySanitizer'
 import { db } from './db'
 import useSettingsStore from '../store/useSettingsStore'
 
@@ -532,7 +533,11 @@ ${buildCategoryContext(locale)}`
       const fnCall = response.functionCall
       
       if (fnCall.name === 'record_transactions') {
-        const txs = fnCall.args.transactions?.map(t => ({ ...t, currency: defaultCurrency })) || []
+        const txs = fnCall.args.transactions?.map(t => ({
+          ...t,
+          category: sanitizeCategoryPath(t.category, t.type),
+          currency: defaultCurrency,
+        })) || []
         return { type: 'transactions', action: 'create', transactions: txs, text: fnCall.args.replyMessage || "Berhasil dicatat!", chips: fnCall.args.suggestedChips }
       }
       
