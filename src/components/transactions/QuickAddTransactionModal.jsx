@@ -5,6 +5,8 @@ import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import Modal from '../ui/Modal'
 import ToastBanner from '../ui/ToastBanner'
+import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import useTranslation from '../../hooks/useTranslation'
 import {
   getCategoryToneClass,
@@ -87,6 +89,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }))
   const ownedInvestments = useLiveQuery(() => db.investments.toArray(), [], [])
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const [walletModalMode, setWalletModalMode] = useState(null) // null | 'walletId' | 'targetWalletId'
+  const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
+  const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
@@ -543,16 +548,16 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 </select>
               </label>
             ) : null}
-            <label className="ft-label">
-              {t('addTx.date')}
-              <input
-                type="date"
+            <div className="ft-label">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('addTx.date')}
+              </label>
+              <CustomDatePicker
                 value={investmentForm.date}
-                onChange={(e) => setInvestmentForm((p) => ({ ...p, date: e.target.value }))}
-                required
-                className="ft-field"
+                onChange={(val) => setInvestmentForm((p) => ({ ...p, date: val }))}
+                title="Pilih Tanggal Investasi"
               />
-            </label>
+            </div>
             {investmentForm.action === 'buy' ? (
               <label className="ft-label">
                 {t('invest.type')}
@@ -743,63 +748,51 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           </>
         ) : (
           <>
-            <label className="ft-label">
-              {t('addTx.date')}
-              <input
-                type="date"
+            <div className="ft-label">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('addTx.date')}
+              </label>
+              <CustomDatePicker
                 value={form.date}
-                onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-                required
-                className="ft-field"
+                onChange={(val) => setForm((p) => ({ ...p, date: val }))}
+                title="Pilih Tanggal Transaksi"
               />
-            </label>
+            </div>
 
             {txType === 'transfer' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <label className="ft-label">
-                  Dari Wallet
-                  <select
-                    value={form.walletId}
-                    onChange={(e) => setForm((p) => ({ ...p, walletId: Number(e.target.value) }))}
-                    className="ft-field mt-1"
-                    required
-                  >
-                    <option value="">Pilih Wallet</option>
-                    {wallets?.map(w => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ft-label">
-                  Ke Wallet
-                  <select
-                    value={form.targetWalletId}
-                    onChange={(e) => setForm((p) => ({ ...p, targetWalletId: Number(e.target.value) }))}
-                    className="ft-field mt-1"
-                    required
-                  >
-                    <option value="">Pilih Wallet</option>
-                    {wallets?.map(w => (
-                      <option key={w.id} value={w.id} disabled={w.id === form.walletId}>{w.name}</option>
-                    ))}
-                  </select>
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="ft-label block mb-1">
+                    Dari Wallet
+                  </label>
+                  <WalletSelectTrigger
+                    wallet={selectedWallet}
+                    placeholder="Pilih Dompet Asal"
+                    onClick={() => setWalletModalMode('walletId')}
+                  />
+                </div>
+                <div>
+                  <label className="ft-label block mb-1">
+                    Ke Wallet
+                  </label>
+                  <WalletSelectTrigger
+                    wallet={selectedTargetWallet}
+                    placeholder="Pilih Dompet Tujuan"
+                    onClick={() => setWalletModalMode('targetWalletId')}
+                  />
+                </div>
               </div>
             ) : (
-              <label className="ft-label">
-                Wallet
-                <select
-                  value={form.walletId}
-                  onChange={(e) => setForm((p) => ({ ...p, walletId: Number(e.target.value) }))}
-                  className="ft-field mt-1"
-                  required
-                >
-                  {wallets?.length === 0 ? <option value="">Tidak ada wallet</option> : <option value="">Pilih Wallet</option>}
-                  {wallets?.map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <label className="ft-label block mb-1">
+                  Wallet / Akun
+                </label>
+                <WalletSelectTrigger
+                  wallet={selectedWallet}
+                  placeholder="Pilih Dompet / Akun"
+                  onClick={() => setWalletModalMode('walletId')}
+                />
+              </div>
             )}
 
             <label className="ft-label">
@@ -1197,6 +1190,26 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           </div>
         </div>
       ) : null}
+      <WalletSelectModal
+        isOpen={Boolean(walletModalMode)}
+        onClose={() => setWalletModalMode(null)}
+        wallets={wallets}
+        selectedWalletId={walletModalMode === 'targetWalletId' ? form.targetWalletId : form.walletId}
+        onSelectWallet={(id) => {
+          if (walletModalMode === 'targetWalletId') {
+            setForm((p) => ({ ...p, targetWalletId: Number(id) }))
+          } else {
+            setForm((p) => ({ ...p, walletId: Number(id) }))
+          }
+        }}
+        title={
+          walletModalMode === 'targetWalletId'
+            ? 'Pilih Dompet Tujuan'
+            : txType === 'transfer'
+            ? 'Pilih Dompet Asal'
+            : 'Pilih Dompet / Akun'
+        }
+      />
     </Modal>
   )
 }

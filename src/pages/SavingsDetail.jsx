@@ -6,6 +6,7 @@ import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useBottomSheet from '../hooks/useBottomSheet'
 import BottomSheet from '../components/ui/BottomSheet'
+import CustomDatePicker from '../components/ui/CustomDatePicker'
 import {
   clampPercent,
   formatCurrency,
@@ -14,7 +15,7 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../lib/utils'
-import { ChevronLeft, Target, Plus, Minus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Plus, Minus, History, Sparkles, X, Loader2, Lightbulb, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import { format, differenceInMonths } from 'date-fns'
 import { getSavingsPrediction } from '../lib/gemini'
 
@@ -152,73 +153,64 @@ export default function SavingsDetail() {
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg)] pb-24">
-      {/* Decorative Header */}
-      <div className="relative pt-12 pb-24 px-4 overflow-hidden rounded-b-[2.5rem]" 
-           style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' }}>
-        
-        {/* Abstract shapes for premium look */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
-          <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-white blur-3xl" />
-          <div className="absolute bottom-[10%] -right-[20%] w-[80%] h-[80%] rounded-full bg-white blur-3xl" />
-        </div>
-
-        {/* Top Nav */}
-        <div className="relative z-10 flex items-center justify-between">
-          <button 
+      {/* Top Nav */}
+      <div className="flex items-center justify-between gap-3 pt-3 px-4 mb-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
+            aria-label="Kembali"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
           </button>
-          <h1 className="text-white font-black text-2xl tracking-wide">Target Kamu</h1>
-          <div className="w-10 h-10" /> {/* Spacer */}
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-tight text-[var(--fg)] truncate">{goal.name}</h2>
+            <p className="text-xs font-semibold text-[var(--muted)] truncate">
+              {goal.deadline ? `Target: ${format(new Date(goal.deadline), 'dd MMM yyyy')}` : 'Tanpa batas waktu'}
+            </p>
+          </div>
         </div>
 
-        {/* Illustration Area */}
-        <div className="relative z-10 mt-8 flex justify-center">
-          <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-white/20 backdrop-blur-md shadow-2xl border border-white/30">
-            <Target size={56} className="text-white drop-shadow-lg" />
-          </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-500 tabular-nums">
+            {Math.round(pct)}%
+          </span>
         </div>
       </div>
 
-      {/* Floating Info Card */}
-      <div className="relative z-20 -mt-16 mx-4">
-        <div className="bg-[var(--panel-strong)] rounded-3xl p-5 shadow-xl border border-[var(--border)]">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)]">{goal.name}</h2>
-              <p className="text-sm text-[var(--muted)] mt-1">
-                {goal.deadline ? `Target capaian ${format(new Date(goal.deadline), 'dd MMM yyyy')}` : 'Tanpa batas waktu'}
-              </p>
+      {/* Main Info Card */}
+      <div className="mx-4">
+        <div className="bg-[var(--panel-strong)] rounded-3xl p-5 shadow-xs border border-[var(--border)] space-y-4">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              Progres Tabungan Saat Ini
+            </span>
+            <h3 className="text-3xl sm:text-4xl font-black text-[var(--fg)] mt-0.5 tabular-nums">
+              {formatCurrency(current, goal.currency || defaultCurrency)}
+            </h3>
+            <p className="text-xs font-semibold text-[var(--muted)] mt-1 tabular-nums">
+              dari target <span className="text-[var(--fg)] font-bold">{formatCurrency(target, goal.currency || defaultCurrency)}</span>
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="h-3 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative">
+              <div 
+                className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+                style={{ width: `${pct}%` }}
+              />
             </div>
-            {/* Edit function placeholder (you can hook this to navigate or another sheet) */}
-            <button className="text-blue-500 font-semibold text-sm hover:underline" onClick={() => navigate(-1)}>Kembali</button>
+            <div className="flex justify-between items-center text-xs font-bold text-[var(--muted)]">
+              <span>Sisa: <strong className="text-[var(--fg)] tabular-nums">{formatCurrency(remaining, goal.currency || defaultCurrency)}</strong></span>
+              <span className="text-emerald-500 font-extrabold tabular-nums">{Math.round(pct)}% Tercapai</span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Progress Section */}
-      <div className="px-4 mt-8">
-        <p className="text-[var(--fg)] font-medium">Yay mantap! Tabunganmu</p>
-        <h3 className="text-4xl font-black text-[var(--fg)] mt-1">
-          {formatCurrency(current, goal.currency || defaultCurrency)}
-        </h3>
-
-        <div className="mt-6">
-          <div className="h-3 w-full rounded-full bg-[var(--border-strong)]/40 relative overflow-hidden">
-            <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-700 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="flex justify-end mt-2">
-            <span className="text-xs font-semibold text-[var(--muted)]">{Math.round(pct)}% tercapai</span>
-          </div>
-        </div>
 
         {/* Dual Quick Action Buttons: Setor & Tarik */}
-        <div className="grid grid-cols-2 gap-2.5 mt-5">
+        <div className="grid grid-cols-2 gap-2.5 px-4 mt-5">
           <button 
             onClick={() => {
               setFundActionType('add')
@@ -247,7 +239,7 @@ export default function SavingsDetail() {
         </div>
 
         {/* Summary Grid */}
-        <div className="grid gap-2.5 mt-4">
+        <div className="grid gap-2.5 px-4 mt-4">
           <div className="bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl p-4 flex justify-between items-center">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Sisa yang Perlu Ditabung</span>
             <span className="text-sm font-black text-[var(--fg)] tabular-nums">{formatCurrency(remaining, goal.currency || defaultCurrency)}</span>
@@ -264,7 +256,6 @@ export default function SavingsDetail() {
             Tanya Prediksi AI
           </button>
         </div>
-      </div>
 
       {/* History Section */}
       <div className="px-4 mt-8">
@@ -413,11 +404,10 @@ export default function SavingsDetail() {
 
         <div className="mb-3">
           <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5 block">Tanggal</label>
-          <input 
-            type="date" 
-            value={dateInput} 
-            onChange={e => setDateInput(e.target.value)} 
-            className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm text-[var(--fg)] font-medium outline-none focus:border-[var(--accent)] transition-colors"
+          <CustomDatePicker
+            value={dateInput}
+            onChange={(val) => setDateInput(val)}
+            title="Pilih Tanggal Tabungan"
           />
         </div>
 

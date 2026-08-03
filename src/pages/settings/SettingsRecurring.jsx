@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
+import CustomDatePicker from '../../components/ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import { SettingsSection } from './settingsComponents'
@@ -91,15 +92,14 @@ export default function SettingsRecurring() {
                 <option value="monthly">{t('settings.recurring.frequency.monthly')}</option>
               </select>
             </label>
-            <label className="block">
+            <div className="block">
               <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.nextDate')}</span>
-              <input
-                type="date"
+              <CustomDatePicker
                 value={recurringForm.nextDate}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, nextDate: event.target.value }))}
-                className="ft-settings-field-compact"
+                onChange={(val) => setRecurringForm((prev) => ({ ...prev, nextDate: val }))}
+                title="Pilih Tanggal Berikutnya"
               />
-            </label>
+            </div>
           </div>
           <Button type="button" className="w-full sm:w-auto" onClick={handleAddRecurring}>
             {t('settings.recurring.add')}

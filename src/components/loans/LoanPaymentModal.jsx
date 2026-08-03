@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -309,11 +310,10 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
                 <Calendar className="h-3 w-3 text-[var(--muted)]" />
                 Tanggal
               </label>
-              <input
-                type="date"
-                className="ft-input w-full text-xs font-semibold py-1.5"
+              <CustomDatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(val) => setDate(val)}
+                title="Pilih Tanggal Pembayaran"
               />
             </div>
 

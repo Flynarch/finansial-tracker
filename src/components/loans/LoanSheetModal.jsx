@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
+import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -23,6 +25,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   const totalAmountInputRef = useRef(null)
 
   const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [], [])
+  const [walletModalOpen, setWalletModalOpen] = useState(false)
 
   const [form, setForm] = useState({
     type: defaultType,
@@ -35,6 +38,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     walletId: '',
     currency: defaultCurrency,
   })
+
+  const selectedWallet = (wallets || []).find((w) => String(w.id) === String(form.walletId))
 
   const hasPaymentsRecorded = editingLoan
     ? (editingLoan.paymentTransactionIds?.length > 0 || editingLoan.remainingAmount < editingLoan.totalAmount)
@@ -150,13 +155,14 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     <BottomSheet
       isOpen={isOpen}
       onClose={closeSheet}
+      maxHeight="max-h-[88dvh]"
       title={editingLoan ? 'Edit Pinjaman' : isDebt ? 'Catat Hutang Saya' : 'Catat Piutang Saya'}
     >
-      <div className="space-y-4 pt-1 pb-3 transition-all duration-200 ease-in-out">
+      <div className="space-y-3.5">
         {sheetError ? <ToastBanner message={sheetError} type="error" onDismiss={() => setSheetError('')} /> : null}
 
         {/* Hutang / Piutang Toggle Cards */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <button
             type="button"
             disabled={hasPaymentsRecorded}
@@ -251,161 +257,142 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
 
         {/* Tier 1: Wallet Picker (Opsional) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-            <Wallet className="h-3 w-3 text-[var(--muted)]" />
+          <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1 mb-1">
+            <Wallet className="h-3.5 w-3.5 text-[var(--accent)]" />
             Pilih Wallet (Opsional)
           </label>
-          <select
-            value={form.walletId}
+          <WalletSelectTrigger
+            wallet={selectedWallet}
             disabled={!!editingLoan}
-            onChange={(e) => setForm((prev) => ({ ...prev, walletId: e.target.value }))}
-            className={`ft-input w-full text-xs font-semibold py-1.5 text-[var(--fg)] ${
-              editingLoan ? 'opacity-60 cursor-not-allowed' : ''
-            }`}
-          >
-            <option value="">Tanpa Wallet (Hanya Catatan Memo)</option>
-            {wallets?.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.currency || defaultCurrency})
-              </option>
-            ))}
-          </select>
-          {form.walletId && (
-            <p className="text-[10px] font-semibold text-[var(--accent)] pt-0.5">
-              {isDebt ? 'Akan mencatat saldo masuk di wallet terpilih.' : 'Akan memotong saldo wallet terpilih.'}
-            </p>
-          )}
+            placeholder="Tanpa Wallet (Hanya Catatan Memo)"
+            onClick={() => setWalletModalOpen(true)}
+          />
+          <WalletSelectModal
+            isOpen={walletModalOpen}
+            onClose={() => setWalletModalOpen(false)}
+            wallets={wallets}
+            selectedWalletId={form.walletId}
+            onSelectWallet={(id) => setForm((prev) => ({ ...prev, walletId: id }))}
+            allowNone
+            noneLabel="Tanpa Wallet (Hanya Catatan Memo)"
+            title="Pilih Dompet Utang / Piutang"
+          />
         </div>
 
-        {/* Section 1: Title & Person Name Grid */}
-        <div className="space-y-3 pt-1 border-t border-[var(--border)]/50">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-                <Tag className="h-3 w-3 text-[var(--muted)]" />
-                Judul Pinjaman
-              </label>
-              <input
-                type="text"
-                className="ft-input w-full text-xs font-semibold py-1.5 placeholder:text-[var(--muted)]/60 placeholder:font-normal text-[var(--fg)]"
-                placeholder={isDebt ? 'Motor, Laptop' : 'Pinjamkan ke Andi'}
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-                <User className="h-3 w-3 text-[var(--muted)]" />
-                {isDebt ? 'Pemberi Pinjaman' : 'Nama Peminjam'}
-              </label>
-              <input
-                type="text"
-                className="ft-input w-full text-xs font-semibold py-1.5 placeholder:text-[var(--muted)]/60 placeholder:font-normal text-[var(--fg)]"
-                placeholder={isDebt ? 'BCA, Budi' : 'Andi, Rina'}
-                value={form.personName}
-                onChange={(e) => setForm((prev) => ({ ...prev, personName: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Section 2: Dates & Presets */}
-          <div className="space-y-2 pt-2.5 border-t border-[var(--border)]/50">
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-[var(--muted)]" />
-                  Tanggal Pinjam
-                </label>
-                <input
-                  type="date"
-                  className="ft-input w-full text-xs font-semibold py-1.5 text-[var(--fg)]"
-                  value={form.startDate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-[var(--muted)]" />
-                  Jatuh Tempo
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="date"
-                    className={`ft-input w-full text-xs font-semibold py-1.5 ${
-                      !form.dueDate ? 'text-[var(--muted)]/70 font-normal' : 'text-[var(--fg)]'
-                    }`}
-                    value={form.dueDate}
-                    onChange={(e) => setForm((prev) => ({ ...prev, dueDate: e.target.value }))}
-                  />
-                  {!form.dueDate && (
-                    <span className="pointer-events-none absolute left-3 text-xs text-[var(--muted)]/60 font-normal">
-                      Pilih tanggal (opsional)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Due Date Presets */}
-            <div className="grid grid-cols-4 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDueDatePreset(7)}
-                className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-              >
-                +7 Hari
-              </button>
-              <button
-                type="button"
-                onClick={() => setDueDatePreset(14)}
-                className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-              >
-                +14 Hari
-              </button>
-              <button
-                type="button"
-                onClick={() => setDueDatePreset(30)}
-                className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-              >
-                +30 Hari
-              </button>
-              <button
-                type="button"
-                onClick={() => setDueDatePreset('endOfMonth')}
-                className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-              >
-                Akhir Bulan
-              </button>
-            </div>
-          </div>
-
-          {/* Section 3: Notes */}
-          <div className="space-y-1 pt-2.5 border-t border-[var(--border)]/50">
+        {/* Main Fields Grid: 2x2 */}
+        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-[var(--border)]/40">
+          <div className="space-y-1">
             <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-              <FileText className="h-2.5 w-2.5 text-[var(--muted)]/70" />
-              Catatan (Opsional)
+              <Tag className="h-3 w-3 text-[var(--muted)]" />
+              Judul Pinjaman
             </label>
             <input
               type="text"
-              className="ft-input w-full text-xs font-semibold py-1.5 placeholder:text-[var(--muted)]/60 placeholder:font-normal text-[var(--fg)]"
-              placeholder="Catatan, nomor rekening, dsb..."
-              value={form.notes}
-              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
+              placeholder={isDebt ? 'Motor, Laptop' : 'Pinjamkan ke Andi'}
+              value={form.title}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
+              <User className="h-3 w-3 text-[var(--muted)]" />
+              {isDebt ? 'Pemberi Pinjaman' : 'Nama Peminjam'}
+            </label>
+            <input
+              type="text"
+              className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
+              placeholder={isDebt ? 'BCA, Budi' : 'Andi, Rina'}
+              value={form.personName}
+              onChange={(e) => setForm((prev) => ({ ...prev, personName: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-[var(--muted)]" />
+              Tanggal Pinjam
+            </label>
+            <CustomDatePicker
+              value={form.startDate}
+              onChange={(val) => setForm((prev) => ({ ...prev, startDate: val }))}
+              title="Pilih Tanggal Pinjam"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
+              <Clock className="h-3 w-3 text-[var(--muted)]" />
+              Jatuh Tempo
+            </label>
+            <CustomDatePicker
+              value={form.dueDate}
+              onChange={(val) => setForm((prev) => ({ ...prev, dueDate: val }))}
+              allowClear
+              clearLabel="Tanpa Jatuh Tempo"
+              placeholder="Pilih Tanggal (Opsional)"
+              title="Pilih Jatuh Tempo"
             />
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="flex items-center justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={closeSheet} className="active:scale-95 transition-all">
+        {/* Quick Due Date Presets */}
+        <div className="grid grid-cols-4 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setDueDatePreset(7)}
+            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
+          >
+            +7 Hari
+          </button>
+          <button
+            type="button"
+            onClick={() => setDueDatePreset(14)}
+            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
+          >
+            +14 Hari
+          </button>
+          <button
+            type="button"
+            onClick={() => setDueDatePreset(30)}
+            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
+          >
+            +30 Hari
+          </button>
+          <button
+            type="button"
+            onClick={() => setDueDatePreset('endOfMonth')}
+            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
+          >
+            Akhir Bulan
+          </button>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
+            <FileText className="h-3 w-3 text-[var(--muted)]" />
+            Catatan (Opsional)
+          </label>
+          <input
+            type="text"
+            className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
+            placeholder="Catatan, nomor rekening, dsb..."
+            value={form.notes}
+            onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+          />
+        </div>
+
+        {/* Submit Buttons */}
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40">
+          <Button type="button" variant="secondary" onClick={closeSheet} className="!py-2.5 !px-4 text-xs active:scale-95 transition-all">
             Batal
           </Button>
           <Button
             type="button"
             onClick={save}
-            className={`active:scale-95 transition-all ${
+            className={`!py-2.5 !px-5 text-xs font-bold active:scale-95 transition-all ${
               isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'
             }`}
           >

@@ -1234,27 +1234,27 @@ function Dashboard() {
       <section data-tour="budget-chart-section" className="mb-4">
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
           {/* Header Row with Active Expandable Pill Dots */}
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)]/60 pb-3">
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold tracking-tight text-[var(--fg)] truncate">
-                {activeBudgetSlide === 0 ? 'Anggaran Bulan Ini' : 'Target & Progres Tabungan'}
+              <h3 className="text-sm font-black tracking-tight text-[var(--fg)] truncate">
+                {activeBudgetSlide === 0 ? 'Anggaran Bulan Ini' : 'Target & Tabungan'}
               </h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)] truncate">
+              <p className="mt-0.5 text-xs font-semibold leading-tight text-[var(--muted)] truncate">
                 {activeBudgetSlide === 0
-                  ? 'Pantau pengeluaran agar tetap dalam batas aman'
-                  : 'Progres akumulasi dana menuju tujuan finansialmu'}
+                  ? 'Pantau batas pengeluaran'
+                  : 'Progres tujuan finansial'}
               </p>
             </div>
 
             {/* Active Expandable Pill Dots + Actions */}
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0">
               {/* Expandable Pill Dots */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setActiveBudgetSlide(0)}
                   className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    activeBudgetSlide === 0 ? 'w-6 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
+                    activeBudgetSlide === 0 ? 'w-5 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
                   }`}
                   title="Anggaran Bulan Ini"
                   aria-label="Anggaran Bulan Ini"
@@ -1263,18 +1263,18 @@ function Dashboard() {
                   type="button"
                   onClick={() => setActiveBudgetSlide(1)}
                   className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    activeBudgetSlide === 1 ? 'w-6 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
+                    activeBudgetSlide === 1 ? 'w-5 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
                   }`}
-                  title="Target & Progres Tabungan"
-                  aria-label="Target & Progres Tabungan"
+                  title="Target Tabungan"
+                  aria-label="Target Tabungan"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => navigate(activeBudgetSlide === 0 ? '/budget' : '/savings')}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer hidden sm:inline-block"
+                  className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer hidden sm:inline-block"
                 >
                   Lihat Halaman
                 </button>
@@ -1284,10 +1284,10 @@ function Dashboard() {
                     if (activeBudgetSlide === 0) setIsOpenQuickBudget(true)
                     else setIsOpenQuickGoal(true)
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--fg)] px-2.5 py-1.5 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer"
                   aria-label={activeBudgetSlide === 0 ? t('dashboard.budget.add') : t('dashboard.savings.add')}
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                   <span>{activeBudgetSlide === 0 ? 'Anggaran' : 'Target'}</span>
                 </button>
               </div>
@@ -1309,59 +1309,79 @@ function Dashboard() {
               <div className="w-full shrink-0 pr-0.5">
                 {budgetGoalSummary.budgetRows?.length ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                    {budgetGoalSummary.budgetRows.slice(0, 6).map((row) => (
-                      <div
-                        key={row.id}
-                        onClick={() => navigate('/budget')}
-                        className="group rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 hover:border-[var(--border-strong)] transition-all active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${getCategoryColorClass(resolveTransactionIconKey(row.category, 'expense'), 'expense', row.category)}`}>
-                              <CategoryIcon iconKey={resolveTransactionIconKey(row.category, 'expense')} className="h-3.5 w-3.5" />
+                    {budgetGoalSummary.budgetRows.slice(0, 6).map((row) => {
+                      const remaining = Math.max(0, row.limit - row.spent)
+                      const isDanger = row.pct >= 100
+                      const isWarn = row.pct >= 80 && row.pct < 100
+                      return (
+                        <div
+                          key={row.id}
+                          onClick={() => navigate('/budget')}
+                          className={`group rounded-2xl border bg-[var(--field-bg)] p-3.5 transition-all duration-200 active:scale-[0.99] cursor-pointer space-y-3 shadow-2xs hover:shadow-xs ${
+                            isDanger
+                              ? 'border-rose-500/30 hover:border-rose-500/50'
+                              : isWarn
+                              ? 'border-amber-500/30 hover:border-amber-500/50'
+                              : 'border-[var(--border)] hover:border-[var(--border-strong)]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${getCategoryColorClass(resolveTransactionIconKey(row.category, 'expense'), 'expense', row.category)}`}>
+                                <CategoryIcon iconKey={resolveTransactionIconKey(row.category, 'expense')} className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="line-clamp-1 text-xs font-black text-[var(--fg)] truncate">
+                                  {formatExpenseCategory(row.category, locale)}
+                                </p>
+                                <p className="text-[10px] font-semibold text-[var(--muted)] truncate">
+                                  {isDanger ? 'Melebihi Anggaran' : `Sisa: ${formatCurrency(remaining, defaultCurrency)}`}
+                                </p>
+                              </div>
                             </div>
-                            <p className="line-clamp-1 text-xs sm:text-sm font-extrabold leading-tight text-[var(--fg)] truncate">
-                              {formatExpenseCategory(row.category, locale)}
-                            </p>
-                          </div>
 
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
-                              row.pct >= 100
-                                ? 'bg-rose-500/15 text-rose-500 border border-rose-500/25'
-                                : row.pct >= 80
-                                ? 'bg-amber-500/15 text-amber-500 border border-amber-500/25'
-                                : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
-                            }`}
-                          >
-                            {Math.round(row.pct)}%
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
-                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.spent, defaultCurrency)}</span>
-                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.limit, defaultCurrency)}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                row.pct >= 100 ? 'bg-rose-500' : row.pct >= 80 ? 'bg-amber-500' : 'bg-[var(--accent)]'
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wide ${
+                                isDanger
+                                  ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
+                                  : isWarn
+                                  ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
                               }`}
-                              style={{ width: `${Math.min(100, row.pct)}%` }}
-                            />
+                            >
+                              {Math.round(row.pct)}%
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
+                              <span className="text-[var(--fg)] font-black">{formatCurrency(row.spent, defaultCurrency)}</span>
+                              <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.limit, defaultCurrency)}</span>
+                            </div>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  isDanger
+                                    ? 'bg-gradient-to-r from-rose-500 to-pink-500'
+                                    : isWarn
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                }`}
+                                style={{ width: `${Math.min(100, row.pct)}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <button
                     type="button"
-                    className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center transition hover:bg-[var(--panel)] cursor-pointer"
+                    className="w-full rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center transition hover:bg-[var(--panel)] cursor-pointer"
                     onClick={() => navigate('/budget')}
                   >
-                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.budget.emptyCta')}</p>
+                    <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.budget.emptyCta')}</p>
                     <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.budget.emptyDesc')}</p>
                   </button>
                 )}
@@ -1371,51 +1391,60 @@ function Dashboard() {
               <div className="w-full shrink-0 pl-0.5">
                 {budgetGoalSummary.goalRows?.length ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                    {budgetGoalSummary.goalRows.slice(0, 6).map((row) => (
-                      <div
-                        key={row.id}
-                        onClick={() => navigate('/savings')}
-                        className="group rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 hover:border-[var(--border-strong)] transition-all active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
-                              <Target className="h-3.5 w-3.5" />
+                    {budgetGoalSummary.goalRows.slice(0, 6).map((row) => {
+                      const remaining = Math.max(0, row.target - row.current)
+                      const isComplete = row.pct >= 100
+                      return (
+                        <div
+                          key={row.id}
+                          onClick={() => navigate('/savings')}
+                          className="group rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 hover:border-[var(--border-strong)] transition-all duration-200 active:scale-[0.99] cursor-pointer space-y-3 shadow-2xs hover:shadow-xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                                <Target className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="line-clamp-1 text-xs font-black text-[var(--fg)] truncate">
+                                  {String(row.name || '').replace(/_/g, ' ')}
+                                </p>
+                                <p className="text-[10px] font-semibold text-[var(--muted)] truncate">
+                                  {isComplete ? 'Tercapai!' : `Kurang: ${formatCurrency(remaining, defaultCurrency)}`}
+                                </p>
+                              </div>
                             </div>
-                            <p className="line-clamp-1 text-xs sm:text-sm font-extrabold leading-tight text-[var(--fg)] truncate">
-                              {String(row.name || '').replace(/_/g, ' ')}
-                            </p>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wide ${
+                                isComplete
+                                  ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                                  : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
+                              }`}
+                            >
+                              {Math.round(row.pct)}%
+                            </span>
                           </div>
 
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
-                              row.pct >= 100
-                                ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
-                                : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
-                            }`}
-                          >
-                            {Math.round(row.pct)}%
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
-                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.current, defaultCurrency)}</span>
-                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.target, defaultCurrency)}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
-                            <div
-                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                              style={{ width: `${Math.min(100, row.pct)}%` }}
-                            />
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
+                              <span className="text-[var(--fg)] font-black">{formatCurrency(row.current, defaultCurrency)}</span>
+                              <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.target, defaultCurrency)}</span>
+                            </div>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                                style={{ width: `${Math.min(100, row.pct)}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
+                  <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
+                    <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
                     <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.savings.emptyDesc')}</p>
                   </div>
                 )}

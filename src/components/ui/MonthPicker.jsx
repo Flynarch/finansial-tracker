@@ -181,9 +181,11 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
 }
 
 /* ── MonthPicker ───────────────────────────────────────────────────── */
-export default function MonthPicker({ value, onChange, className = '' }) {
+export default function MonthPicker({ value, onChange, className = '', compact = false, size = 'md' }) {
   const { locale, t } = useTranslation()
   const { isOpen, isVisible: visible, openSheet, closeSheet: closePicker } = useBottomSheet(false)
+
+  const isCompact = compact || size === 'sm'
 
   const parsedValue = useMemo(() => {
     try {
@@ -225,22 +227,17 @@ export default function MonthPicker({ value, onChange, className = '' }) {
     closePicker()
   }, [onChange, closePicker])
 
-  const currentRealDate = useMemo(() => new Date(), [])
-  const currentRealYear = currentRealDate.getFullYear()
-  const currentRealMonth = currentRealDate.getMonth()
-
   const monthItems = useMemo(() => {
     const dateLocale = locale === 'en' ? enUS : idLocale
     return Array.from({ length: 12 }, (_, i) => {
       const d = new Date(2026, i, 1)
       const full = format(d, 'MMMM', { locale: dateLocale })
-      const isCurrent = currentRealMonth === i && selectedYear === currentRealYear
       return {
         key: i,
-        label: isCurrent ? `${full} ●` : full,
+        label: full,
       }
     })
-  }, [locale, currentRealMonth, currentRealYear, selectedYear])
+  }, [locale])
 
   const yearItems = useMemo(() => {
     const currentY = new Date().getFullYear()
@@ -250,11 +247,11 @@ export default function MonthPicker({ value, onChange, className = '' }) {
     for (let y = start; y <= end; y += 1) {
       arr.push({
         key: y,
-        label: y === currentRealYear ? `${y} ●` : String(y),
+        label: String(y),
       })
     }
     return arr
-  }, [currentRealYear])
+  }, [])
 
   const yearStartOffset = useMemo(() => {
     const currentY = new Date().getFullYear()
@@ -283,18 +280,22 @@ export default function MonthPicker({ value, onChange, className = '' }) {
       <button
         type="button"
         onClick={openSheet}
-        className={`flex h-11 w-full items-center justify-between rounded-xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3.5 text-left transition hover:border-[var(--fg)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${className}`}
+        className={`flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] transition hover:border-[var(--fg)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] cursor-pointer ${
+          isCompact
+            ? 'h-8.5 px-2.5 text-xs'
+            : 'h-11 px-3.5 text-sm'
+        } ${className}`}
       >
-        <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--fg)]">
-          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <span className={`flex items-center gap-2 font-bold text-[var(--fg)] ${isCompact ? 'text-xs' : 'text-sm'}`}>
+          <svg viewBox="0 0 24 24" className={`${isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-[var(--accent)]`} fill="none" stroke="currentColor" strokeWidth="2.2">
             <rect x="3" y="4" width="18" height="18" rx="3" ry="3" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
-          <span className="capitalize tracking-tight">{displayLabel}</span>
+          <span className="capitalize tracking-tight truncate">{displayLabel}</span>
         </span>
-        <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg viewBox="0 0 24 24" className={`${isCompact ? 'h-3.5 w-3.5 ml-1' : 'h-4 w-4 ml-2'} text-[var(--muted)] shrink-0`} fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>

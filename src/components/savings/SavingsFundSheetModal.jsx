@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import BottomSheet from '../ui/BottomSheet'
+import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
-import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../../lib/utils'
+import { formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../../lib/utils'
 import useSettingsStore from '../../store/useSettingsStore'
 import { Plus, Minus, Calendar, FileText, Wallet, Check } from 'lucide-react'
 
@@ -19,10 +21,12 @@ export default function SavingsFundSheetModal({
   const [dateInput, setDateInput] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notesInput, setNotesInput] = useState('')
   const [selectedWalletId, setSelectedWalletId] = useState('')
+  const [walletModalOpen, setWalletModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const inputRef = useRef(null)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const selectedWallet = useMemo(() => (wallets || []).find((w) => String(w.id) === String(selectedWalletId)), [wallets, selectedWalletId])
 
   useEffect(() => {
     if (isOpen) {
@@ -172,35 +176,37 @@ export default function SavingsFundSheetModal({
 
         {/* Wallet Integration Option */}
         <div className="space-y-1">
-          <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+          <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5 mb-1">
             <Wallet className="h-3.5 w-3.5 text-[var(--accent)]" />
             {fundActionType === 'withdraw' ? 'Masuk ke Dompet (Opsional)' : 'Sumber Dompet (Opsional)'}
           </label>
-          <select
-            value={selectedWalletId}
-            onChange={(e) => setSelectedWalletId(e.target.value)}
-            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
-          >
-            <option value="">Tanpa Potong Dompet (Manual Log)</option>
-            {(wallets || []).map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} (Saldo: {formatCurrency(w.balance || 0, w.currency || defaultCurrency)})
-              </option>
-            ))}
-          </select>
+          <WalletSelectTrigger
+            wallet={selectedWallet}
+            placeholder="Tanpa Potong Dompet (Manual Log)"
+            onClick={() => setWalletModalOpen(true)}
+          />
+          <WalletSelectModal
+            isOpen={walletModalOpen}
+            onClose={() => setWalletModalOpen(false)}
+            wallets={wallets}
+            selectedWalletId={selectedWalletId}
+            onSelectWallet={(id) => setSelectedWalletId(id)}
+            allowNone
+            noneLabel="Tanpa Potong Dompet (Manual Log)"
+            title={fundActionType === 'withdraw' ? 'Pilih Dompet Tujuan' : 'Pilih Sumber Dompet'}
+          />
         </div>
 
         {/* Date Input */}
         <div className="space-y-1">
-          <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+          <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5 mb-1">
             <Calendar className="h-3.5 w-3.5 text-[var(--accent)]" />
             Tanggal Transaksi
           </label>
-          <input
-            type="date"
+          <CustomDatePicker
             value={dateInput}
-            onChange={(e) => setDateInput(e.target.value)}
-            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
+            onChange={(val) => setDateInput(val)}
+            title="Pilih Tanggal Transaksi"
           />
         </div>
 

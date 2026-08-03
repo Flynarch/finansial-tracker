@@ -9,6 +9,7 @@ import CategoryIcon from '../components/ui/CategoryIcon'
 import Modal from '../components/ui/Modal'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
+import CustomDatePicker from '../components/ui/CustomDatePicker'
 import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
@@ -73,21 +74,21 @@ function TransactionForm({
         onSubmit()
       }}
     >
-      <label className="ft-label">
-        {t('tx.date')}
-        <input
-          type="date"
+      <div className="ft-label">
+        <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+          {t('tx.date')}
+        </label>
+        <CustomDatePicker
           value={formData.date}
-          onChange={(event) =>
+          onChange={(val) =>
             setFormData((prev) => ({
               ...prev,
-              date: event.target.value,
+              date: val,
             }))
           }
-          required
-          className="ft-field"
+          title="Pilih Tanggal Transaksi"
         />
-      </label>
+      </div>
       <label className="ft-label">
         {t('tx.amount')}
         <input
