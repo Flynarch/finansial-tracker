@@ -299,25 +299,22 @@ export default function ReportDonutSection({
                           : 'hover:bg-[var(--field-bg)]'
                       }`}
                     >
-                      <div className="relative z-10 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      {/* Row 1: Color dot + Name + Amount */}
+                      <div className="relative z-10 flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
                           <span
-                            className="h-2.5 w-2.5 rounded-full shadow-inner shrink-0"
+                            className="mt-1 h-2.5 w-2.5 rounded-full shadow-inner shrink-0"
                             style={{ background: ELEGANT_PIE_COLORS[index % ELEGANT_PIE_COLORS.length] }}
                           />
-                          <p className="truncate text-xs sm:text-sm font-semibold text-[var(--fg)]">{row.label || '-'}</p>
-                          {row.isParent ? (
-                            <span className="rounded bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition shrink-0">
-                              {locale === 'en' ? 'Sub ›' : 'Lihat Sub ›'}
-                            </span>
-                          ) : null}
+                          <p className="text-xs sm:text-sm font-semibold text-[var(--fg)] leading-snug break-words">{row.label || '-'}</p>
                         </div>
-                        <p className="text-xs sm:text-sm font-bold tabular-nums tracking-tight text-[var(--fg)] shrink-0">
+                        <p className="text-xs sm:text-sm font-bold tabular-nums tracking-tight text-[var(--fg)] shrink-0 mt-0.5">
                           {formatCurrency(row.value, 'IDR')}
                         </p>
                       </div>
-                      <div className="relative z-10 mt-2 flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-bold tabular-nums text-[var(--muted)]">{share.toFixed(1)}%</p>
+                      {/* Row 2: Share % + Progress bar + Sub badge */}
+                      <div className="relative z-10 mt-1.5 flex items-center gap-2">
+                        <p className="text-[10px] font-bold tabular-nums text-[var(--muted)] shrink-0">{share.toFixed(1)}%</p>
                         <div className="h-1 flex-1 rounded-full bg-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-500 ease-out"
@@ -327,6 +324,11 @@ export default function ReportDonutSection({
                             }}
                           />
                         </div>
+                        {row.isParent ? (
+                          <span className="rounded bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition shrink-0">
+                            {locale === 'en' ? 'Sub ›' : 'Lihat Sub ›'}
+                          </span>
+                        ) : null}
                       </div>
                     </li>
                   )
