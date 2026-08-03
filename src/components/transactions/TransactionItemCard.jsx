@@ -110,12 +110,12 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     <div
       key={transaction.id}
       data-transaction-id={transaction.id}
-      className="relative overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--field-bg)]"
+      className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] transition-transform active:scale-[0.995]"
     >
       <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
         <button
           type="button"
-          className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] cursor-pointer"
           onClick={() => {
             if (transaction.loanId) {
               if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
@@ -129,7 +129,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         </button>
         <button
           type="button"
-          className="rounded-lg border border-rose-500/30 bg-rose-500/12 px-3 py-1.5 text-xs font-semibold text-rose-400"
+          className="rounded-lg border border-rose-500/30 bg-rose-500/12 px-3 py-1.5 text-xs font-semibold text-rose-400 cursor-pointer"
           onClick={() => {
             if (transaction.loanId) {
               if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
@@ -144,7 +144,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       </div>
 
       <article
-        className={`relative flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3 transition-all duration-200 ${
+        className={`relative flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3.5 transition-all duration-200 ${
           swipedTransactionId === transaction.id ? '-translate-x-[118px]' : 'translate-x-0'
         } ${isSwipingId === transaction.id ? 'shadow-[0_6px_18px_rgba(15,23,42,0.08)]' : ''} ${
           highlightedTransactionId === String(transaction.id)
@@ -156,7 +156,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="relative shrink-0">
             <div
-              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold ${colorClass}`}
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-xs font-semibold ${colorClass}`}
             >
               {transaction.type === 'transfer' ? (
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
@@ -202,7 +202,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             {createdTime ? (
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
-            <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
+            <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
             {(sub || displayWalletName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
                 {sub ? <span>{sub}</span> : null}
@@ -220,7 +220,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
         <div className="shrink-0 max-w-[50%] pl-2 text-right">
           <p
-            className={`break-all text-sm font-semibold tabular-nums ${amountColorClass}`}
+            className={`break-all text-[15px] font-extrabold tabular-nums ${amountColorClass}`}
           >
             {isContextWalletMatch ? '' : amountPrefix}
             {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}

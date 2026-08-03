@@ -188,6 +188,19 @@ const dictionaries = {
     'tx.notes': 'Catatan',
     'tx.notes.placeholder': 'Catatan opsional',
     'tx.cancel': 'Batal',
+    'tx.date': 'Tanggal',
+    'tx.amount': 'Jumlah',
+    'tx.type': 'Jenis Transaksi',
+    'tx.type.income': 'Pemasukan',
+    'tx.type.expense': 'Pengeluaran',
+    'tx.category': 'Kategori',
+    'tx.change': 'Ubah',
+    'tx.currency': 'Mata Uang',
+    'tx.notes': 'Catatan',
+    'tx.notes.placeholder': 'Catatan (opsional)',
+    'tx.period.title': 'Pilih Periode Transaksi',
+    'tx.bulk.cancel': 'Batal',
+    'tx.bulk.deleteTitle': 'Hapus Transaksi Terpilih',
     'tx.pageTitle': 'Transaksi',
     'tx.menu.closeOverlay': 'Tutup overlay menu',
     'tx.menu.open': 'Buka menu',
@@ -773,6 +786,19 @@ const dictionaries = {
     'tx.notes': 'Notes',
     'tx.notes.placeholder': 'Optional notes',
     'tx.cancel': 'Cancel',
+    'tx.date': 'Date',
+    'tx.amount': 'Amount',
+    'tx.type': 'Transaction Type',
+    'tx.type.income': 'Income',
+    'tx.type.expense': 'Expense',
+    'tx.category': 'Category',
+    'tx.change': 'Change',
+    'tx.currency': 'Currency',
+    'tx.notes': 'Notes',
+    'tx.notes.placeholder': 'Notes (optional)',
+    'tx.period.title': 'Select Transaction Period',
+    'tx.bulk.cancel': 'Cancel',
+    'tx.bulk.deleteTitle': 'Delete Selected Transactions',
     'tx.pageTitle': 'Transactions',
     'tx.menu.closeOverlay': 'Close menu overlay',
     'tx.menu.open': 'Open menu',
@@ -1174,13 +1200,17 @@ const dictionaries = {
 /**
  * @param {'id' | 'en'} locale
  * @param {string} key
- * @param {Record<string, string | number>} [vars]
+ * @param {Record<string, string | number> | string} [vars]
  */
 export function translate(locale, key, vars = {}) {
   const lang = locale === 'en' ? 'en' : 'id'
-  let str = dictionaries[lang][key] ?? dictionaries.id[key] ?? key
-  Object.entries(vars).forEach(([k, v]) => {
-    str = str.replaceAll(`{{${k}}}`, String(v))
-  })
+  const fallback = typeof vars === 'string' ? vars : key
+  const varMap = typeof vars === 'object' && vars !== null ? vars : {}
+  let str = dictionaries[lang][key] ?? dictionaries.id[key] ?? fallback
+  if (typeof str === 'string') {
+    Object.entries(varMap).forEach(([k, v]) => {
+      str = str.replaceAll(`{{${k}}}`, String(v))
+    })
+  }
   return str
 }
