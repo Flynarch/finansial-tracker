@@ -8,7 +8,7 @@ const RANGE_OPTIONS = [
   { id: 12, label: '12M' },
 ]
 
-export default function ReportHeader({ rangeMonths, setRangeMonths, onSelectMonthIdx, monthlyIncomeExpense }) {
+export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncomeExpense }) {
   const { t, locale } = useTranslation()
 
   const handleOpenAiChat = () => {
@@ -82,7 +82,6 @@ export default function ReportHeader({ rangeMonths, setRangeMonths, onSelectMont
               type="button"
               onClick={() => {
                 setRangeMonths(opt.id)
-                onSelectMonthIdx(null)
               }}
               className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition ${
                 rangeMonths === opt.id

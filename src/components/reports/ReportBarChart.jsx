@@ -28,7 +28,7 @@ function formatIdrCompact(amount, { locale = 'id' } = {}) {
   return `${sign}${fmt(abs, 0)}`
 }
 
-export default function ReportBarChart({ monthlyIncomeExpense, onSelectMonthIdx }) {
+export default function ReportBarChart({ monthlyIncomeExpense }) {
   const { t, locale } = useTranslation()
 
   const yAxisTickFormatter = (value) => formatIdrCompact(value, { locale })
@@ -58,8 +58,8 @@ export default function ReportBarChart({ monthlyIncomeExpense, onSelectMonthIdx 
               <YAxis stroke="var(--muted-2)" tickLine={false} axisLine={false} width={48} tickFormatter={yAxisTickFormatter} fontSize={10} fontWeight={500} />
               <Tooltip content={<ChartTooltip />} cursor={false} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 600, color: 'var(--muted)', paddingTop: '4px' }} />
-              <Bar dataKey="income" name={t('reports.income')} fill="url(#incomeBar)" radius={[5, 5, 0, 0]} onClick={(_, idx) => onSelectMonthIdx(idx)} />
-              <Bar dataKey="expense" name={t('reports.expense')} fill="url(#expenseBar)" radius={[5, 5, 0, 0]} onClick={(_, idx) => onSelectMonthIdx(idx)} />
+              <Bar dataKey="income" name={t('reports.income')} fill="url(#incomeBar)" radius={[5, 5, 0, 0]} />
+              <Bar dataKey="expense" name={t('reports.expense')} fill="url(#expenseBar)" radius={[5, 5, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -28,7 +28,6 @@ export default function Reports() {
   const { t, locale } = useTranslation()
   const [isEntering, setIsEntering] = useState(false)
   const [rangeMonths, setRangeMonths] = useState(6)
-  const [selectedMonthIdx, setSelectedMonthIdx] = useState(null)
   const [activePieIdx, setActivePieIdx] = useState(0)
   const [donutKind, setDonutKind] = useState('expense')
   const [selectedDrilldownParent, setSelectedDrilldownParent] = useState(null)
@@ -216,7 +215,6 @@ export default function Reports() {
         <ReportHeader
           rangeMonths={rangeMonths}
           setRangeMonths={setRangeMonths}
-          onSelectMonthIdx={setSelectedMonthIdx}
           monthlyIncomeExpense={monthlyIncomeExpense}
         />
 
@@ -226,7 +224,6 @@ export default function Reports() {
         {/* Monthly Income vs Expense Bar Chart */}
         <ReportBarChart
           monthlyIncomeExpense={monthlyIncomeExpense}
-          onSelectMonthIdx={setSelectedMonthIdx}
         />
 
         {/* Donut Chart & Category Breakdown */}
