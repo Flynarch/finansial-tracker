@@ -8,6 +8,7 @@ import useLoanStore from '../../store/useLoanStore'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
+import { seedComprehensiveDebugData } from '../../lib/seedDebugData'
 import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
@@ -23,6 +24,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const updateTransaction = useTransactionStore((s) => s.updateTransaction)
   const deleteTransaction = useTransactionStore((s) => s.deleteTransaction)
   const transactions = useTransactionStore((s) => s.transactions)
+  const addLoan = useLoanStore((s) => s.addLoan)
+  const recordPayment = useLoanStore((s) => s.recordPayment)
+  const updateLoan = useLoanStore((s) => s.updateLoan)
+  const deleteLoan = useLoanStore((s) => s.deleteLoan)
   const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
   
   const [inputValue, setInputValue] = useState('')
@@ -187,6 +192,21 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       const newMsgs = []
+
+      if (result.type === 'seed_debug_data' || result.name === 'seed_debug_data') {
+        const counts = await seedComprehensiveDebugData({ wallets, defaultCurrency })
+        newMsgs.push({
+          id: Date.now() + 3,
+          role: 'ai',
+          type: 'action_success',
+          data: {
+            type: 'seed_debug',
+            action: 'create',
+            title: 'Data Dummy Debugging Berhasil Diisi',
+            subtitle: `${counts.transactions} Transaksi · ${counts.budgets} Anggaran · ${counts.goals} Tabungan · ${counts.habits} Habit · ${counts.todos} Todo · ${counts.loans} Utang-Piutang`,
+          },
+        })
+      }
 
       if (result.type === 'transactions') {
         if (result.action === 'create' && result.transactions?.length > 0) {
@@ -504,14 +524,18 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       if (result.type === 'loan') {
-        const { addLoan, recordPayment } = useLoanStore.getState()
         if (result.action === 'create') {
+          let selectedWalletId = result.walletId ? Number(result.walletId) : null
+          if (selectedWalletId && !wallets.find((w) => w.id === selectedWalletId)) {
+            selectedWalletId = wallets.length > 0 ? wallets[0].id : null
+          }
           await addLoan({
             type: result.loanType || 'debt',
             personName: result.personName || 'Pihak Terkait',
             title: result.title || 'Pinjaman Baru',
             totalAmount: result.amount,
             dueDate: result.dueDate || null,
+            walletId: selectedWalletId,
             currency: defaultCurrency,
           })
           newMsgs.push({
@@ -529,6 +553,13 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           const allLoans = await db.loans.toArray()
           const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()) && l.status !== 'paid')
           if (matched) {
+            let payWalletId = result.walletId ? Number(result.walletId) : matched.walletId
+            if (payWalletId && !wallets.find((w) => w.id === payWalletId)) {
+              payWalletId = matched.walletId || (wallets.length > 0 ? wallets[0].id : null)
+            }
+            if (payWalletId && matched.walletId !== payWalletId) {
+              await db.loans.update(matched.id, { walletId: payWalletId })
+            }
             await recordPayment(matched.id, result.amount, new Date().toISOString().split('T')[0], 'Dicatat via AI Assistant')
             newMsgs.push({
               id: Date.now() + 4,
@@ -538,7 +569,41 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                 type: 'loan',
                 action: 'pay',
                 title: matched.title,
-                subtitle: `Cicilan ${result.amount ? result.amount : ''} dicatat`,
+                subtitle: `Cicilan ${result.amount ? 'Rp ' + Number(result.amount).toLocaleString('id-ID') : ''} dicatat`,
+              },
+            })
+          }
+        } else if (result.action === 'mark_paid') {
+          const allLoans = await db.loans.toArray()
+          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()))
+          if (matched) {
+            await updateLoan(matched.id, { status: 'paid', remainingAmount: 0 })
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'loan',
+                action: 'update',
+                title: matched.title,
+                subtitle: 'Ditandai lunas',
+              },
+            })
+          }
+        } else if (result.action === 'delete') {
+          const allLoans = await db.loans.toArray()
+          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()))
+          if (matched) {
+            await deleteLoan(matched.id)
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'loan',
+                action: 'delete',
+                title: matched.title,
+                subtitle: 'Catatan pinjaman dihapus',
               },
             })
           }

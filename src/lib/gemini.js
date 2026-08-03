@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { getMergedExpenseTree } from './expenseCategories'
 import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions, getMonthSummaryForPrompt } from './aiDatabaseQueries'
+import { db } from './db'
 import useSettingsStore from '../store/useSettingsStore'
 
 function getEffectiveApiKey() {
@@ -240,21 +241,33 @@ const getTools = () => ([
         }
       },
       {
-        name: "manage_loans",
-        description: "Kelola catatan utang atau piutang pengguna (catat utang/piutang baru atau bayar cicilan).",
+        name: "seed_debug_data",
+        description: "GENERATE/POPULATE MOCK DATA UTK DEBUGGING. Panggil ini JIKA user meminta mengisi data dummy/sample/debug/testing data (misal: 'isi data dummy untuk debugging', 'generate test data', 'populate debug data', 'seed demo data'). Ini akan otomatis membuat transaksi, anggaran, tabungan, habit, todo, dan utang-piutang sekaligus secara instan.",
         parameters: {
           type: "OBJECT",
           properties: {
-            action: { type: "STRING", enum: ["create", "pay"], description: "create untuk pinjaman baru, pay untuk bayar cicilan" },
+            replyMessage: { type: "STRING", description: "Pesan balasan ramah bahwa data dummy debugging telah berhasil dibuat." },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" } }
+          }
+        }
+      },
+      {
+        name: "manage_loans",
+        description: "Kelola catatan utang atau piutang pengguna (catat utang/piutang baru, bayar cicilan, tandai lunas, hapus, atau query ringkasan utang/piutang).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "pay", "mark_paid", "delete", "query"], description: "create (tambah baru), pay (bayar cicilan), mark_paid (tandai lunas), delete (hapus), query (ringkasan/tanya jawab saldo)" },
             loanType: { type: "STRING", enum: ["debt", "receivable"], description: "debt = hutang saya, receivable = piutang saya" },
             title: { type: "STRING", description: "Judul pinjaman (misal: 'Pinjaman Motor', 'Pinjam ke Andi')" },
             personName: { type: "STRING", description: "Nama pihak terkait (pemberi pinjaman / peminjam)" },
             amount: { type: "NUMBER", description: "Total nominal pinjaman (action=create) atau nominal bayar (action=pay)" },
+            walletId: { type: "NUMBER", description: "ID dompet yang digunakan untuk transaksi ini." },
             dueDate: { type: "STRING", description: "Tanggal jatuh tempo (YYYY-MM-DD) - opsional" },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user. WAJIB DIISI!" }
           },
-          required: ["action", "title", "amount"]
+          required: ["action"]
         }
       }
     ]
@@ -263,6 +276,56 @@ const getTools = () => ([
 
 export async function parseTransactionFromText(userMessage, context) {
   const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null } = context
+
+  const normUserText = String(userMessage || '').toLowerCase()
+  if (
+    normUserText.includes('data dummy') ||
+    normUserText.includes('dummy data') ||
+    normUserText.includes('seed data') ||
+    normUserText.includes('data sample') ||
+    normUserText.includes('data sampel') ||
+    normUserText.includes('debug data') ||
+    normUserText.includes('test data') ||
+    normUserText.includes('isi data dummy')
+  ) {
+    return {
+      type: 'seed_debug_data',
+      text: 'Menyiapkan dan mengisi data dummy komprehensif (transaksi, anggaran, tabungan, habit, todo, dan utang-piutang) untuk debugging...',
+      chips: ['Analisis Keuangan', 'Catat Pengeluaran', 'Target Tabungan']
+    }
+  }
+
+  if (
+    normUserText.includes('utang piutang') ||
+    normUserText.includes('hutang piutang') ||
+    normUserText.includes('siapa yang utang') ||
+    normUserText.includes('siapa yang punya hutang') ||
+    normUserText.includes('daftar utang') ||
+    normUserText.includes('daftar piutang') ||
+    normUserText.includes('sisa piutang') ||
+    normUserText.includes('sisa utang')
+  ) {
+    const loans = await db.loans.toArray()
+    const activeLoans = loans.filter((l) => l.status !== 'paid' && (l.remainingAmount ?? l.totalAmount) > 0)
+    const totalDebt = activeLoans.filter((l) => l.type === 'debt').reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount), 0)
+    const totalReceivable = activeLoans.filter((l) => l.type === 'receivable').reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount), 0)
+    const activeCount = activeLoans.length
+
+    let textMsg = `Berikut ringkasan **Utang & Piutang** Anda saat ini:\n\n- **Total Piutang (Tagihan Anda)**: **Rp ${totalReceivable.toLocaleString('id-ID')}**\n- **Total Hutang (Kewajiban Anda)**: **Rp ${totalDebt.toLocaleString('id-ID')}**\n- **Pinjaman Aktif**: **${activeCount} item**`
+
+    if (activeLoans.length > 0) {
+      textMsg += '\n\nRincian Pinjaman Aktif:\n' + activeLoans.map((l) => `- ${l.type === 'debt' ? 'Hutang' : 'Piutang'}: **${l.title}** (${l.personName || '-'}) · Sisa **Rp ${(l.remainingAmount ?? l.totalAmount).toLocaleString('id-ID')}**`).join('\n')
+    } else {
+      textMsg += '\n\nSaat ini tidak ada catatan utang atau piutang yang aktif.'
+    }
+
+    return {
+      type: 'loan',
+      action: 'query',
+      text: textMsg,
+      chips: ['Catat Piutang Baru', 'Catat Hutang Baru', 'Bayar Cicilan', 'Analisis Keuangan'],
+    }
+  }
 
   if (!navigator.onLine) {
     return { error: true, message: 'Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.' }
@@ -292,6 +355,7 @@ ATURAN UTAMA:
    - JIKA user mengirim "Saya ingin menganalisis keuangan" / "I want to analyze my finances", PANGGIL 'query_database' (renderChart: true) atau jawab ramah dengan format: <chips>Total pengeluaran bulan ini|Pengeluaran kategori terbesar|Sisa anggaran bulanan</chips>.
    - JIKA user mengirim "Saya ingin membuat target tabungan" / "I want to create a savings goal", JANGAN PANGGIL FUNGSI! Jawab: "Target tabungan apa yang ingin Anda wujudkan? Sebutkan nama tujuan dan target nominalnya." Lalu WAJIB sertakan format: <chips>Beli Laptop 10 juta|Dana darurat 5 juta|Liburan 3 juta</chips>.
    - JIKA user mengirim "Saya ingin membuat habit harian" / "I want to create a daily habit", JANGAN PANGGIL FUNGSI! Jawab: "Habit harian apa yang ingin Anda bangun? Sebutkan nama kebiasaan dan jadwal pengingatnya." Lalu WAJIB sertakan format: <chips>Lari pagi jam 06:00|Baca buku jam 21:00|Minum air 8 gelas</chips>.
+   - JIKA user meminta mengisi data dummy / data sampel / data debugging / test data / seed data (misal: "Isi data dummy komprehensif untuk debugging dan testing fitur", "isi data dummy", "generate test data", "populate debug data"), LANGSUNG PANGGIL 'seed_debug_data' DENGAN SEGERA!
 
 1. TRANSAKSI (PENTING & DETAIL):
    - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya dengan ramah: "Berapa harga makannya?".
@@ -516,6 +580,14 @@ ${buildCategoryContext(locale)}`
           amount: fnCall.args.amount, 
           text: fnCall.args.replyMessage || "Memproses dompet...", 
           chips: fnCall.args.suggestedChips 
+        }
+      }
+
+      if (fnCall.name === 'seed_debug_data') {
+        return {
+          type: 'seed_debug_data',
+          text: fnCall.args.replyMessage || "Menyiapkan dan mengisi data dummy komprehensif untuk debugging...",
+          chips: fnCall.args.suggestedChips || ['Analisis Keuangan', 'Catat Pengeluaran']
         }
       }
 

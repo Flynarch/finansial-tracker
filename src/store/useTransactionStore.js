@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
+import { formatExpenseCategory } from '../lib/expenseCategories'
+import { isExcludeAnalyticsTx } from '../lib/utils'
 
 export const defaultCategories = [
   'Food',
@@ -62,7 +64,7 @@ const useTransactionStore = create((set) => ({
         const matchingBudgets = budgets.filter(b => b.category === txCategory || b.category === parentCategory)
         
         if (matchingBudgets.length > 0) {
-          const monthTxs = await db.transactions.filter(t => typeof t.date === 'string' && t.date.startsWith(txMonth) && t.type === 'expense').toArray()
+          const monthTxs = await db.transactions.filter(t => typeof t.date === 'string' && t.date.startsWith(txMonth) && t.type === 'expense' && !isExcludeAnalyticsTx(t)).toArray()
           
           for (const b of matchingBudgets) {
             let spent = 0
@@ -79,10 +81,11 @@ const useTransactionStore = create((set) => ({
               const pct = (spent / limit) * 100
               if (pct >= 80) {
                  const isDanger = pct >= 100
+                 const catLabel = formatExpenseCategory(b.category)
                  const title = isDanger ? 'Budget Jebol!' : 'Peringatan Budget'
                  const message = isDanger 
-                   ? `Pengeluaran kategori ${b.category} melebihi batas anggaran (${Math.round(pct)}%).`
-                   : `Pengeluaran kategori ${b.category} hampir habis (${Math.round(pct)}%).`
+                   ? `Pengeluaran kategori ${catLabel} melebihi batas anggaran (${Math.round(pct)}%).`
+                   : `Pengeluaran kategori ${catLabel} hampir habis (${Math.round(pct)}%).`
                  
                  const recentNotifs = await db.notifications
                     .orderBy('createdAt')

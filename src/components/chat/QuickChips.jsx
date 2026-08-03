@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import useSettingsStore from '../../store/useSettingsStore'
-import { Sparkles, DollarSign, ListChecks, TrendingUp, Target, Flame } from 'lucide-react'
+import { Sparkles, DollarSign, ListChecks, TrendingUp, Target, Flame, Bug, HandCoins } from 'lucide-react'
 
 export default function QuickChips({ chips: aiChips, onSelect }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -23,6 +23,13 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
         triggerText: isId ? 'Analisis pengeluaran dan pemasukan saya bulan ini' : 'Analyze my income and expenses this month',
       },
       {
+        icon: <HandCoins size={15} className="text-teal-500 shrink-0" />,
+        bgClass: 'bg-teal-500/10 border-teal-500/20',
+        label: isId ? 'Utang & Piutang' : 'Loans & Debts',
+        desc: isId ? 'Siapa yang berutang' : 'Summary & debts',
+        triggerText: isId ? 'Siapa saja yang punya utang ke saya dan berapa total utang saya?' : 'Who owes me money and what is my total debt?',
+      },
+      {
         icon: <Target size={15} className="text-indigo-500 shrink-0" />,
         bgClass: 'bg-indigo-500/10 border-indigo-500/20',
         label: isId ? 'Target Tabungan' : 'Savings Goal',
@@ -42,6 +49,13 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
         label: isId ? 'Habit Hari Ini' : 'Daily Habit',
         desc: isId ? 'Cek streak harian' : 'Daily streak',
         triggerText: isId ? 'Bagaimana status habit harian saya hari ini?' : 'What is my habit status today?',
+      },
+      {
+        icon: <Bug size={15} className="text-amber-500 shrink-0" />,
+        bgClass: 'bg-amber-500/10 border-amber-500/20',
+        label: isId ? 'Isi Data Dummy Debug' : 'Seed Debug Data',
+        desc: isId ? 'Populate transaksi, habit, budget, DLL' : 'Populate test data',
+        triggerText: isId ? 'Isi data dummy komprehensif untuk debugging dan testing fitur' : 'Seed comprehensive debug data for testing',
       },
       {
         icon: <Sparkles size={15} className="text-purple-500 shrink-0" />,

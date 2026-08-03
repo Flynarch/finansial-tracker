@@ -8,11 +8,14 @@ import EmptyState from '../components/ui/EmptyState'
 import MonthPicker from '../components/ui/MonthPicker'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
+import CategoryIcon from '../components/ui/CategoryIcon'
+import { getCategoryColorClass, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { formatCurrency, toSafeNumber } from '../lib/utils'
-import { parseExpenseCategoryPath } from '../lib/expenseCategories'
+import { formatExpenseCategory } from '../lib/expenseCategories'
+import { calculateBudgetSpent } from '../lib/budgetUtils'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
 
@@ -46,33 +49,12 @@ function Budget() {
   const [deletingBudget, setDeletingBudget] = useState(null)
   const { swipedId, setSwipedId, getSwipeHandlers } = useSwipeAction()
 
-  const lang = locale === 'en' ? 'en' : 'id'
-
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
   const monthExpenseTxs = useMemo(
     () => (transactions ?? []).filter((tx) => tx?.type === 'expense' && tx?.date?.startsWith(month)),
     [transactions, month]
   )
-
-  const spentByCategoryPath = useMemo(() => {
-    const map = {}
-    monthExpenseTxs.forEach((tx) => {
-      const cat = String(tx.category || '').trim()
-      if (!cat) return
-      map[cat] = (map[cat] ?? 0) + toSafeNumber(tx.amount)
-    })
-    return map
-  }, [monthExpenseTxs])
-
-  const getBudgetLabel = (path) => {
-    const parsed = parseExpenseCategoryPath(path)
-    if (!parsed) return { main: String(path || ''), sub: null }
-    return {
-      main: parsed.parent?.names?.[lang] || parsed.parent?.id || String(path || ''),
-      sub: parsed.child?.names?.[lang] || parsed.child?.id || null,
-    }
-  }
 
   const openAdd = useCallback(() => {
     setEditingId(null)
@@ -160,29 +142,38 @@ function Budget() {
         {monthBudgets.length === 0 ? (
           <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {monthBudgets.map((b) => {
-              const spent = toSafeNumber(spentByCategoryPath[String(b.category || '')] ?? 0)
+              const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
               const limit = toSafeNumber(b.limit)
               const pct = limit > 0 ? (spent / limit) * 100 : 0
-              const label = getBudgetLabel(b.category)
+              const iconKey = resolveTransactionIconKey(b.category, 'expense')
+              const displayLabel = formatExpenseCategory(b.category, locale)
+              const colorClass = getCategoryColorClass(iconKey, 'expense', b.category)
               
               const isDanger = pct >= 100
               const isWarn = pct >= 80 && pct < 100
+              const badgeClass = isDanger
+                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                : isWarn
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+
+              const barClass = isDanger ? 'bg-rose-500' : isWarn ? 'bg-amber-500' : 'bg-emerald-500'
               
               return (
-                <div key={b.id} className={`relative overflow-hidden rounded-2xl border transition-colors ${isDanger ? 'border-rose-500/50 shadow-[0_0_15px_-3px_rgba(244,63,94,0.15)]' : isWarn ? 'border-amber-500/50 shadow-[0_0_15px_-3px_rgba(245,158,11,0.15)]' : 'border-[var(--border)]'}`}>
-                  <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
+                <div key={b.id} className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${isDanger ? 'border-rose-500/40 bg-rose-500/5 shadow-[0_0_15px_-3px_rgba(244,63,94,0.12)]' : isWarn ? 'border-amber-500/40 bg-amber-500/5 shadow-[0_0_15px_-3px_rgba(245,158,11,0.12)]' : 'border-[var(--border)] bg-[var(--field-bg)]'}`}>
+                  <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-2.5 z-0">
                     <button
                       type="button"
-                      className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
+                      className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)]"
                       onClick={() => openEdit(b)}
                     >
                       {t('budget.edit')}
                     </button>
                     <button
                       type="button"
-                      className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-3 py-2 text-[11px] font-semibold text-rose-400"
+                      className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-2.5 py-1.5 text-[11px] font-semibold text-rose-400"
                       onClick={() => setDeletingBudget(b)}
                     >
                       {t('budget.delete')}
@@ -190,33 +181,33 @@ function Budget() {
                   </div>
 
                   <article
-                    className={`relative bg-[var(--field-bg)] p-3 transition-all duration-200 ${
-                      swipedId === b.id ? '-translate-x-[124px]' : 'translate-x-0'
+                    className={`relative z-10 bg-[var(--field-bg)] p-3.5 transition-all duration-200 ${
+                      swipedId === b.id ? '-translate-x-[120px]' : 'translate-x-0'
                     } touch-pan-y`}
                     {...getSwipeHandlers(b.id)}
                   >
-                    <div className="min-w-0 flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`line-clamp-3 break-words text-sm font-semibold ${isDanger ? 'text-rose-400' : isWarn ? 'text-amber-400' : 'text-[var(--fg)]'}`}>{label.main}</p>
-                        {label.sub ? (
-                          <p className="mt-0.5 line-clamp-3 break-words text-[11px] font-medium text-[var(--muted)]">{label.sub}</p>
-                        ) : null}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
+                          <CategoryIcon iconKey={iconKey} className="h-4.5 w-4.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-[var(--fg)]">{displayLabel}</p>
+                          <p className="text-[10px] font-medium text-[var(--muted)] truncate">
+                            {formatCurrency(spent, defaultCurrency)} / {formatCurrency(limit, defaultCurrency)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-xs font-bold tabular-nums ${isDanger ? 'text-rose-400' : isWarn ? 'text-amber-400' : 'text-[var(--fg)]'}`}>
+                      <div className="shrink-0 text-right">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums ${badgeClass}`}>
                           {Math.round(pct)}%
-                        </p>
+                        </span>
                       </div>
-                    </div>
-                    
-                    <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium text-[var(--muted)] tabular-nums">
-                       <span>{formatCurrency(spent, defaultCurrency)}</span>
-                       <span>{formatCurrency(limit, defaultCurrency)}</span>
                     </div>
 
-                    <div className="mt-2 h-2 w-full rounded-full bg-[var(--border-strong)]/40 overflow-hidden">
+                    <div className="mt-3 h-2 w-full rounded-full bg-[var(--border-strong)]/40 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${isDanger ? 'bg-rose-500' : isWarn ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${barClass}`}
                         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                       />
                     </div>

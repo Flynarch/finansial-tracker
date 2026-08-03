@@ -16,7 +16,7 @@ import {
   formatCurrency,
   toSafeNumber,
 } from '../lib/utils'
-import { Plus, Minus, Target, ArrowRight, Edit2, Trash2, Sparkles, ChevronLeft } from 'lucide-react'
+import { Plus, Minus, Target, Edit2, Trash2, Sparkles, ChevronLeft } from 'lucide-react'
 import { differenceInDays } from 'date-fns'
 
 function Savings() {
@@ -197,83 +197,71 @@ function Savings() {
           {rows.length === 0 ? (
             <EmptyState title={t('savings.emptyTitle')} description={t('savings.emptyDesc')} />
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map((g) => (
                 <div
                   key={g.id}
                   onClick={() => navigate(`/savings/${g.id}`)}
-                  className="group relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xs hover:border-[var(--border-strong)] transition-all cursor-pointer"
+                  className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 shadow-2xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25">
-                        <Target className="h-5 w-5" strokeWidth={2.2} />
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                          <Target className="h-4.5 w-4.5" strokeWidth={2.2} />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-xs font-bold text-[var(--fg)] group-hover:text-emerald-500 transition-colors">
+                            {g.name}
+                          </h4>
+                          <p className="mt-0.5 text-[10px] font-medium text-[var(--muted)] truncate tabular-nums">
+                            {formatCurrency(g.current, g.currency || defaultCurrency)} / {formatCurrency(g.target, g.currency || defaultCurrency)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="truncate text-base font-bold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">
-                          {g.name}
-                        </h4>
-                        <p className="mt-0.5 text-xs font-extrabold tabular-nums text-[var(--muted)]">
-                          {formatCurrency(g.current, g.currency || defaultCurrency)} /{' '}
-                          <span className="text-[var(--fg)]">{formatCurrency(g.target, g.currency || defaultCurrency)}</span>
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 text-[11px] font-black text-[var(--accent)]">
-                        {Math.round(g.pct)}%
-                      </span>
-                      {g.deadlineText && (
-                        <span
-                          className={`text-[10px] font-extrabold ${
-                            g.isOverdue ? 'text-rose-500' : 'text-[var(--muted)]'
-                          }`}
-                        >
-                          {g.deadlineText}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black text-emerald-500 tabular-nums">
+                          {Math.round(g.pct)}%
                         </span>
-                      )}
+                        {g.deadlineText && (
+                          <span
+                            className={`text-[9px] font-extrabold ${
+                              g.isOverdue ? 'text-rose-500' : 'text-[var(--muted)]'
+                            }`}
+                          >
+                            {g.deadlineText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 h-2 w-full rounded-full bg-[var(--border-strong)]/40 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          g.pct >= 100 ? 'bg-emerald-400' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${g.pct}%` }}
+                      />
                     </div>
                   </div>
 
-                  <div className="mt-3.5 h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        g.pct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'
-                      }`}
-                      style={{ width: `${g.pct}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-[var(--muted)]">
-                      {g.remaining > 0 ? (
-                        <>Sisa <span className="text-[var(--fg)] font-black">{formatCurrency(g.remaining, g.currency || defaultCurrency)}</span> lagi</>
-                      ) : (
-                        <span className="text-emerald-500 font-extrabold">Tercapai!</span>
-                      )}
-                    </span>
-                    <span className="font-extrabold text-[var(--accent)] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                      Detail <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </div>
-
-                  <div className="mt-3.5 pt-3 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+                  <div className="mt-3 pt-2.5 border-t border-[var(--border)]/60 flex items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => openFundModal(g, 'add', e)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                       >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+                        <Plus className="h-3 w-3" strokeWidth={3} />
                         Setor
                       </button>
                       <button
                         type="button"
                         onClick={(e) => openFundModal(g, 'withdraw', e)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/25 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[var(--panel)] text-[var(--fg)] border border-[var(--border)] hover:bg-[var(--field-bg)] transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                       >
-                        <Minus className="h-3.5 w-3.5" strokeWidth={3} />
+                        <Minus className="h-3 w-3" strokeWidth={3} />
                         Tarik
                       </button>
                     </div>
@@ -282,7 +270,7 @@ function Savings() {
                       <button
                         type="button"
                         onClick={(e) => openEdit(g, e)}
-                        className="p-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
                         title="Edit Target"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
@@ -293,7 +281,7 @@ function Savings() {
                           e.stopPropagation()
                           setDeletingGoal(g)
                         }}
-                        className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
                         title="Hapus Target"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

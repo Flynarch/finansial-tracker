@@ -6,7 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp, ChevronRight, Plus, HandCoins, Receipt, AlertCircle, Clock } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp, ChevronRight, Plus, HandCoins, Receipt, AlertCircle, Clock, Target } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { db } from '../lib/db'
@@ -14,6 +14,7 @@ import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransaction
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
+import { calculateBudgetSpent } from '../lib/budgetUtils'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -108,6 +109,30 @@ function Dashboard() {
   const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+  const [activeBudgetSlide, setActiveBudgetSlide] = useState(0)
+  const budgetTouchStartXRef = useRef(null)
+  const budgetTouchEndXRef = useRef(null)
+
+  const handleBudgetTouchStart = (e) => {
+    budgetTouchStartXRef.current = e.touches[0].clientX
+    budgetTouchEndXRef.current = e.touches[0].clientX
+  }
+
+  const handleBudgetTouchMove = (e) => {
+    budgetTouchEndXRef.current = e.touches[0].clientX
+  }
+
+  const handleBudgetTouchEnd = () => {
+    if (budgetTouchStartXRef.current === null || budgetTouchEndXRef.current === null) return
+    const diff = budgetTouchStartXRef.current - budgetTouchEndXRef.current
+    if (diff > 45) {
+      setActiveBudgetSlide(1)
+    } else if (diff < -45) {
+      setActiveBudgetSlide(0)
+    }
+    budgetTouchStartXRef.current = null
+    budgetTouchEndXRef.current = null
+  }
 
   const setZoomRevenueRange = useCallback((range) => {
     setZoomTooltipDismissed(true)
@@ -403,7 +428,7 @@ function Dashboard() {
     const monthBudgetCount = monthBudgets.length
     const goalCount = (goals ?? []).length
     const monthExpenseTxs = (transactions ?? []).filter(
-      (tx) => tx?.type === 'expense' && tx?.date?.startsWith(currentMonthKey),
+      (tx) => tx?.type === 'expense' && tx?.date?.startsWith(currentMonthKey) && !isExcludeAnalyticsTx(tx),
     )
     const monthExpenseTotal = monthExpenseTxs.reduce(
       (sum, tx) =>
@@ -417,43 +442,9 @@ function Dashboard() {
       0,
     )
 
-    const normalize = (value) => String(value ?? '').trim().toLowerCase()
-    const txMatchesBudget = (budgetCategory, txCategory) => {
-      const b = normalize(budgetCategory)
-      if (!b) return false
-      const raw = String(txCategory ?? '')
-      const rawNorm = normalize(raw)
-      if (rawNorm && rawNorm === b) return true
-
-      const parsed = parseExpenseCategoryPath(raw)
-      if (parsed) {
-        const candidates = [
-          parsed.parent?.names?.id,
-          parsed.parent?.names?.en,
-          parsed.child?.names?.id,
-          parsed.child?.names?.en,
-        ]
-          .filter(Boolean)
-          .map(normalize)
-        if (candidates.includes(b)) return true
-        const combined = normalize(`${parsed.parent?.names?.id ?? ''} ${parsed.child?.names?.id ?? ''}`)
-        if (combined.includes(b)) return true
-      }
-
-      return rawNorm.includes(b)
-    }
-
     const budgetRows = monthBudgets.map((b) => {
       const limit = toSafeNumber(b.limit)
-      const spent = monthExpenseTxs.reduce((sum, tx) => {
-        if (!txMatchesBudget(b.category, tx.category)) return sum
-        return sum + convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
-      }, 0)
+      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
       const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0
       return { id: b.id, category: b.category, limit, spent, pct }
     })
@@ -1239,6 +1230,201 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Swipeable Budget & Savings Widget (Positioned right above Net Worth) */}
+      <section data-tour="budget-chart-section" className="mb-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
+          {/* Header Row with Active Expandable Pill Dots */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)]/60 pb-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold tracking-tight text-[var(--fg)] truncate">
+                {activeBudgetSlide === 0 ? 'Anggaran Bulan Ini' : 'Target & Progres Tabungan'}
+              </h3>
+              <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)] truncate">
+                {activeBudgetSlide === 0
+                  ? 'Pantau pengeluaran agar tetap dalam batas aman'
+                  : 'Progres akumulasi dana menuju tujuan finansialmu'}
+              </p>
+            </div>
+
+            {/* Active Expandable Pill Dots + Actions */}
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Expandable Pill Dots */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveBudgetSlide(0)}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    activeBudgetSlide === 0 ? 'w-6 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
+                  }`}
+                  title="Anggaran Bulan Ini"
+                  aria-label="Anggaran Bulan Ini"
+                />
+                <button
+                  type="button"
+                  onClick={() => setActiveBudgetSlide(1)}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    activeBudgetSlide === 1 ? 'w-6 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
+                  }`}
+                  title="Target & Progres Tabungan"
+                  aria-label="Target & Progres Tabungan"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(activeBudgetSlide === 0 ? '/budget' : '/savings')}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer hidden sm:inline-block"
+                >
+                  Lihat Halaman
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeBudgetSlide === 0) setIsOpenQuickBudget(true)
+                    else setIsOpenQuickGoal(true)
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--fg)] px-2.5 py-1.5 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 cursor-pointer"
+                  aria-label={activeBudgetSlide === 0 ? t('dashboard.budget.add') : t('dashboard.savings.add')}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{activeBudgetSlide === 0 ? 'Anggaran' : 'Target'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Touch Swipeable Container */}
+          <div
+            className="relative overflow-hidden touch-pan-y"
+            onTouchStart={handleBudgetTouchStart}
+            onTouchMove={handleBudgetTouchMove}
+            onTouchEnd={handleBudgetTouchEnd}
+          >
+            <div
+              className="flex transition-transform duration-300 ease-out"
+              style={{ transform: `translateX(-${activeBudgetSlide * 100}%)` }}
+            >
+              {/* Slide 0: Budget */}
+              <div className="w-full shrink-0 pr-0.5">
+                {budgetGoalSummary.budgetRows?.length ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+                    {budgetGoalSummary.budgetRows.slice(0, 6).map((row) => (
+                      <div
+                        key={row.id}
+                        onClick={() => navigate('/budget')}
+                        className="group rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 hover:border-[var(--border-strong)] transition-all active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${getCategoryColorClass(resolveTransactionIconKey(row.category, 'expense'), 'expense', row.category)}`}>
+                              <CategoryIcon iconKey={resolveTransactionIconKey(row.category, 'expense')} className="h-3.5 w-3.5" />
+                            </div>
+                            <p className="line-clamp-1 text-xs sm:text-sm font-extrabold leading-tight text-[var(--fg)] truncate">
+                              {formatExpenseCategory(row.category, locale)}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                              row.pct >= 100
+                                ? 'bg-rose-500/15 text-rose-500 border border-rose-500/25'
+                                : row.pct >= 80
+                                ? 'bg-amber-500/15 text-amber-500 border border-amber-500/25'
+                                : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
+                            }`}
+                          >
+                            {Math.round(row.pct)}%
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
+                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.spent, defaultCurrency)}</span>
+                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.limit, defaultCurrency)}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                row.pct >= 100 ? 'bg-rose-500' : row.pct >= 80 ? 'bg-amber-500' : 'bg-[var(--accent)]'
+                              }`}
+                              style={{ width: `${Math.min(100, row.pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center transition hover:bg-[var(--panel)] cursor-pointer"
+                    onClick={() => navigate('/budget')}
+                  >
+                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.budget.emptyCta')}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.budget.emptyDesc')}</p>
+                  </button>
+                )}
+              </div>
+
+              {/* Slide 1: Savings */}
+              <div className="w-full shrink-0 pl-0.5">
+                {budgetGoalSummary.goalRows?.length ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+                    {budgetGoalSummary.goalRows.slice(0, 6).map((row) => (
+                      <div
+                        key={row.id}
+                        onClick={() => navigate('/savings')}
+                        className="group rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 hover:border-[var(--border-strong)] transition-all active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                              <Target className="h-3.5 w-3.5" />
+                            </div>
+                            <p className="line-clamp-1 text-xs sm:text-sm font-extrabold leading-tight text-[var(--fg)] truncate">
+                              {String(row.name || '').replace(/_/g, ' ')}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                              row.pct >= 100
+                                ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
+                                : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
+                            }`}
+                          >
+                            {Math.round(row.pct)}%
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
+                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.current, defaultCurrency)}</span>
+                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.target, defaultCurrency)}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                              style={{ width: `${Math.min(100, row.pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
+                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.savings.emptyDesc')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="grid grid-cols-1 gap-3">
         <MiniChartCard
           t={t}
@@ -1439,141 +1625,7 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* Combined Budget & Savings Tabbed Card (Fintech Pro Segmented Design) */}
-      <section data-tour="budget-chart-section">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5">
-          {/* Segmented Control Switcher */}
-          <div className="grid grid-cols-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
-            <button
-              type="button"
-              onClick={() => setBudgetTab('budget')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 sm:px-3 text-xs font-bold transition ${
-                budgetTab === 'budget'
-                  ? 'bg-[var(--fg)] text-[var(--bg)] shadow-2xs'
-                  : 'text-[var(--muted)] hover:text-[var(--fg)]'
-              }`}
-            >
-              <span>{t('dashboard.budget')}</span>
-              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider hidden sm:inline-block ${
-                budgetTab === 'budget' ? 'bg-[var(--bg)]/20 text-[var(--bg)]' : 'bg-[var(--border)]/60 text-[var(--muted)]'
-              }`}>
-                {currentMonthLabel}
-              </span>
-            </button>
 
-            <button
-              type="button"
-              onClick={() => setBudgetTab('savings')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 sm:px-3 text-xs font-bold transition ${
-                budgetTab === 'savings'
-                  ? 'bg-[var(--fg)] text-[var(--bg)] shadow-2xs'
-                  : 'text-[var(--muted)] hover:text-[var(--fg)]'
-              }`}
-            >
-              <span>{t('dashboard.savings')}</span>
-              {budgetGoalSummary.goalCount ? (
-                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                  budgetTab === 'savings' ? 'bg-[var(--bg)]/20 text-[var(--bg)]' : 'bg-[var(--border)]/60 text-[var(--muted)]'
-                }`}>
-                  {budgetGoalSummary.goalCount}
-                </span>
-              ) : null}
-            </button>
-          </div>
-
-          {/* Section Header & Actions Row */}
-          <div className="mt-4 flex flex-col justify-between gap-3 border-b border-[var(--border)]/60 pb-3.5 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold tracking-tight text-[var(--fg)]">
-                {budgetTab === 'budget' ? 'Anggaran Bulan Ini' : 'Target & Progres Tabungan'}
-              </h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
-                {budgetTab === 'budget' ? 'Pantau pengeluaran agar tetap dalam batas aman' : 'Progres akumulasi dana menuju tujuan finansialmu'}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={() => navigate(budgetTab === 'budget' ? '/budget' : '/savings')}
-                className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer"
-              >
-                Lihat Halaman
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (budgetTab === 'budget') setIsOpenQuickBudget(true)
-                  else setIsOpenQuickGoal(true)
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--fg)] px-3 py-1.5 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 cursor-pointer"
-                aria-label={budgetTab === 'budget' ? t('dashboard.budget.add') : t('dashboard.savings.add')}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{budgetTab === 'budget' ? 'Anggaran' : 'Target'}</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            {budgetTab === 'budget' ? (
-              <div className="space-y-3">
-                {budgetGoalSummary.budgetRows?.length ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                    {budgetGoalSummary.budgetRows.slice(0, 6).map((row) => (
-                      <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-sm font-bold leading-tight text-[var(--fg)]">{row.category}</p>
-                          <span className={`shrink-0 text-[11px] font-bold ${
-                            row.pct >= 100 ? 'text-rose-500 dark:text-rose-400' : row.pct >= 80 ? 'text-amber-500 dark:text-amber-400' : 'text-[var(--muted)]'
-                          }`}>{Math.round(row.pct)}%</span>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
-                          {formatCurrency(row.spent, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.limit, defaultCurrency)}</span>
-                        </p>
-                        <ProgressBar value={row.pct} tone="budget" className="mt-2" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center transition hover:bg-[var(--panel)]"
-                    onClick={() => navigate('/budget')}
-                  >
-                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.budget.emptyCta')}</p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.budget.emptyDesc')}</p>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {budgetGoalSummary.goalRows?.length ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                    {budgetGoalSummary.goalRows.slice(0, 6).map((row) => (
-                      <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-sm font-bold leading-tight text-[var(--fg)]">{row.name}</p>
-                          <span className="shrink-0 text-[11px] font-bold text-[var(--muted)]">{Math.round(row.pct)}%</span>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
-                          {formatCurrency(row.current, defaultCurrency)} / <span className="text-[var(--fg)]">{formatCurrency(row.target, defaultCurrency)}</span>
-                        </p>
-                        <ProgressBar value={row.pct} tone="savings" className="mt-2" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                    <p className="text-sm font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.savings.emptyDesc')}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
 
       
 
@@ -1724,7 +1776,7 @@ function Dashboard() {
                         {budgetGoalSummary.budgetRows.map((row) => (
                           <div key={row.id} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="truncate text-sm font-bold text-[var(--fg)]">{row.category}</p>
+                              <p className="truncate text-sm font-bold text-[var(--fg)]">{formatExpenseCategory(row.category, locale)}</p>
                               <span className={`text-[11px] font-bold ${
                                 row.pct >= 100 ? 'text-rose-500 dark:text-rose-400' : row.pct >= 80 ? 'text-amber-500 dark:text-amber-400' : 'text-[var(--muted)]'
                               }`}>{Math.round(row.pct)}%</span>

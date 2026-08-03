@@ -3,11 +3,16 @@ import { getIncomeCategoryColor, normalizeIncomeCategoryId, parseIncomeCategoryP
 
 const EXPENSE_ICON_BY_PARENT = {
   makanan: 'food',
+  makanan_minuman: 'food',
+  tagihan: 'home',
+  tagihan_utilitas: 'home',
   kehidupan_sosial: 'people',
   transportasi: 'transport',
   kultur: 'culture',
+  hiburan: 'culture',
   kebutuhan_harian: 'home',
   pakaian: 'clothing',
+  belanja: 'clothing',
   kecantikan: 'beauty',
   pendidikan: 'education',
   kesehatan: 'health',
@@ -28,7 +33,8 @@ const INCOME_ICON_BY_ID = {
 }
 
 export function resolveExpenseParentIconKey(parentId) {
-  return EXPENSE_ICON_BY_PARENT[String(parentId || '')] || 'expense'
+  const pid = String(parentId || '').toLowerCase()
+  return EXPENSE_ICON_BY_PARENT[pid] || 'food'
 }
 
 export function resolveIncomeParentIconKey(parentId) {
@@ -43,19 +49,40 @@ export function resolveIncomeCategoryIconKey(categoryId) {
 }
 
 export function resolveTransactionIconKey(category, type) {
-  if (type === 'income') {
-    return resolveIncomeCategoryIconKey(category)
+  let catStr = category
+  let typeStr = type
+  if (category && typeof category === 'object') {
+    catStr = category.category
+    typeStr = category.type || type
   }
 
-  const parsed = parseExpenseCategoryPath(category)
-  if (parsed?.parentId) return resolveExpenseParentIconKey(parsed.parentId)
+  if (typeStr === 'income') {
+    return resolveIncomeCategoryIconKey(catStr)
+  }
 
-  const raw = String(category || '').toLowerCase()
-  if (raw.includes('food') || raw.includes('makan')) return 'food'
-  if (raw.includes('transport') || raw.includes('ojek')) return 'transport'
+  const parsed = parseExpenseCategoryPath(catStr)
+  if (parsed?.parentId) {
+    const parentIcon = EXPENSE_ICON_BY_PARENT[parsed.parentId.toLowerCase()]
+    if (parentIcon) return parentIcon
+  }
+
+  const raw = String(catStr || '').toLowerCase()
+  if (EXPENSE_ICON_BY_PARENT[raw]) return EXPENSE_ICON_BY_PARENT[raw]
+
+  const firstPart = raw.split('/')[0]
+  if (EXPENSE_ICON_BY_PARENT[firstPart]) return EXPENSE_ICON_BY_PARENT[firstPart]
+
+  if (raw.includes('food') || raw.includes('makan') || raw.includes('kopi') || raw.includes('minum') || raw.includes('resto')) return 'food'
+  if (raw.includes('transport') || raw.includes('ojek') || raw.includes('bensin') || raw.includes('parkir') || raw.includes('travel')) return 'transport'
+  if (raw.includes('tagihan') || raw.includes('bill') || raw.includes('listrik') || raw.includes('pulsa') || raw.includes('wifi')) return 'home'
+  if (raw.includes('belanja') || raw.includes('pakaian') || raw.includes('baju') || raw.includes('sepatu')) return 'clothing'
   if (raw.includes('invest')) return 'investment'
-  if (raw.includes('health') || raw.includes('obat')) return 'health'
-  return 'expense'
+  if (raw.includes('health') || raw.includes('obat') || raw.includes('sehat') || raw.includes('dokter')) return 'health'
+  if (raw.includes('pendidikan') || raw.includes('sekolah') || raw.includes('kursus') || raw.includes('buku')) return 'education'
+  if (raw.includes('hiburan') || raw.includes('nonton') || raw.includes('game') || raw.includes('sosial')) return 'culture'
+  if (raw.includes('hadiah') || raw.includes('kado') || raw.includes('donasi')) return 'gift'
+
+  return 'food'
 }
 
 export function getCategoryToneClass(tone) {
@@ -147,16 +174,25 @@ export function getEffectiveIncomeCategoryTone(categoryId) {
   }
 }
 
-export function getCategoryColorClass(iconKey, type, categoryId) {
-  if (categoryId) {
-    const customColor = type === 'expense' ? getExpenseCategoryColor(categoryId) : getIncomeCategoryColor(categoryId)
+export function getCategoryColorClass(iconKey, type = 'expense', categoryId) {
+  let realCategory = categoryId
+  let realIconKey = iconKey
+  let realType = type
+
+  if (!categoryId && iconKey && typeof iconKey === 'string') {
+    realCategory = iconKey
+    realIconKey = resolveTransactionIconKey(iconKey, type)
+  }
+
+  if (realCategory) {
+    const customColor = realType === 'expense' ? getExpenseCategoryColor(realCategory) : getIncomeCategoryColor(realCategory)
     if (customColor) {
       const toneClass = getCategoryToneClass(customColor)
       if (toneClass) return toneClass
     }
   }
 
-  switch (iconKey) {
+  switch (realIconKey) {
     case 'food':
       return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
     case 'transport':
@@ -186,9 +222,9 @@ export function getCategoryColorClass(iconKey, type, categoryId) {
     case 'repayment':
       return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
     default:
-      if (type === 'income') return 'ft-income-soft border border-[var(--status-income)]/25'
-      if (type === 'transfer') return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
-      return 'ft-expense-soft border border-[var(--status-expense)]/25'
+      if (realType === 'income') return 'ft-income-soft border border-[var(--status-income)]/25'
+      if (realType === 'transfer') return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
+      return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
   }
 }
 

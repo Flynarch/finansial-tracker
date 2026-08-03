@@ -124,3 +124,27 @@ Before marking any task as complete, execute and pass all verification gates in 
 - **No Emojis in UI or Copy**: Do not use default system emojis (like ✨, 📝, 🚀, 😊, etc.) in the application's user interface, components, buttons, or placeholder texts. Use clean, high-quality SVG/Lucide icons or plain text instead to maintain a premium look.
 - **No Emojis in AI Responses**: When responding to the user or generating text, do not include emojis.
 - **No Unrequested Glow Effects**: Do not add visual glow effects (such as glowing halos, neon effects, ambient background radial glows, or shadow glows) to UI cards or components unless explicitly requested by the user. Keep styling clean, crisp, flat/subtle, and modern.
+
+---
+
+## 12. Deep Debugging & Feature Improvement Protocol (`/debug` or "Deep Audit")
+
+When requested to **Debug**, **Audit**, or **Improve** a feature (or when triggered by `/debug`), the AI agent MUST follow this 4-step protocol:
+
+### A. Root-Cause Data Flow Tracing (No Guesswork)
+- **End-to-End Tracing**: Trace data flow strictly: Database Query -> Hook/State -> Calculations/Filters -> UI Component -> Event Handlers.
+- **Data Contract & Schema Audit**: Inspect raw data structures, Dexie schema versioning, date string formats (`yyyy-MM`), currency conversions, and analytics exclusion flags (`isExcludeAnalyticsTx`).
+- **Edge Case Coverage**: Actively test for null/undefined values, zero-value states, month/year boundary transitions, currency mismatches, and subcategory string overlaps.
+
+### B. No Superficial Patches
+- Never fix symptoms by adding silent fallbacks or suppressing error messages.
+- Always fix the underlying data contract and calculation logic at the primary source.
+
+### C. Systematic Feature Improvement & UI Polish
+- **Visual Aesthetics**: Ensure strict adherence to explicit color tokens, proper spacing, typography hierarchy, contrast ratios, and responsive layouts.
+- **UX Friction Elimination**: Add smooth transitions, micro-interactions, empty state CTAs, and clear loading/error feedback.
+
+### D. Verification & Regression Checks
+- Execute all verification gates: `npm run lint` and `npm run build`.
+- Confirm that the fix does not break related components, analytics cards, or database transactions.
+
