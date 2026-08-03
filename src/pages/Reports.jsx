@@ -24,7 +24,7 @@ import EmptyState from '../components/ui/EmptyState'
 import useTranslation from '../hooks/useTranslation'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
-import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, toSafeNumber } from '../lib/utils'
+import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useSettingsStore from '../store/useSettingsStore'
 
@@ -283,8 +283,9 @@ function Reports() {
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return []
-    if (selectedWalletFilter === 'all') return transactions
-    return transactions.filter(t => Number(t.walletId) === Number(selectedWalletFilter))
+    const validTxs = transactions.filter((t) => !isExcludeAnalyticsTx(t))
+    if (selectedWalletFilter === 'all') return validTxs
+    return validTxs.filter(t => Number(t.walletId) === Number(selectedWalletFilter))
   }, [transactions, selectedWalletFilter])
 
   const monthlyIncomeExpense = useMemo(() => {

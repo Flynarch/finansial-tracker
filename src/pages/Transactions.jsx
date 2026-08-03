@@ -26,6 +26,7 @@ import {
   formatMoneyInput,
   formatMoneyValueForInput,
   getMoneyInputCaret,
+  isExcludeAnalyticsTx,
   parseMoneyInput,
   toTransactionsCsv,
 } from '../lib/utils'
@@ -555,6 +556,7 @@ function Transactions() {
 
   const totals = filteredTransactions.reduce(
     (accumulator, transaction) => {
+      if (isExcludeAnalyticsTx(transaction)) return accumulator
       const convertedAmount = convertCurrency(
         transaction.amount,
         transaction.currency || defaultCurrency,

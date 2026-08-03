@@ -1,18 +1,18 @@
 /* eslint-disable */
-import { format, startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths, differenceInDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitCompare, Activity, PieChart, ChevronDown, ChevronUp, ChevronRight, Plus, HandCoins, Receipt, AlertCircle, Clock } from 'lucide-react'
 import Card from '../components/ui/Card'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { db } from '../lib/db'
 import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, toSafeNumber } from '../lib/utils'
+import { convertCurrency, FALLBACK_EXCHANGE_RATES, formatCurrency, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import useTranslation from '../hooks/useTranslation'
@@ -22,6 +22,8 @@ import MiniHabitHeatmap from '../components/habits/MiniHabitHeatmap'
 import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
+import LoanSheetModal from '../components/loans/LoanSheetModal'
+import LoanPaymentModal from '../components/loans/LoanPaymentModal'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
 import {
   clampPercent,
@@ -93,6 +95,7 @@ function Dashboard() {
   const investments = useLiveQuery(() => db.investments.toArray(), [], null)
   const budgets = useLiveQuery(() => db.budgets.toArray(), [], null)
   const goals = useLiveQuery(() => db.goals.toArray(), [], null)
+  const loans = useLiveQuery(() => db.loans.toArray(), [], null)
   // Wallets balance needs ALL transactions (including older ones for correct balance history)
   const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], null)
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], null)
@@ -102,6 +105,9 @@ function Dashboard() {
 
   const [zoomRevenueRange, setZoomRevenueRangeState] = useState(() => getSavedNetWorthRange())
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
+  const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
+  const [payLoan, setPayLoan] = useState(null)
+  const [isPayOpen, setIsPayOpen] = useState(false)
 
   const setZoomRevenueRange = useCallback((range) => {
     setZoomTooltipDismissed(true)
@@ -198,6 +204,7 @@ function Dashboard() {
 
     const lastMonth = safeTx.reduce((acc, tx) => {
       if (!tx?.date?.startsWith(lastMonthKey)) return acc
+      if (isExcludeAnalyticsTx(tx)) return acc
       const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
       if (tx.type === 'income') acc.income += amount
       if (tx.type === 'expense') acc.expense += amount
@@ -206,6 +213,7 @@ function Dashboard() {
 
     const thisMonth = safeTx.reduce((acc, tx) => {
       if (!tx?.date?.startsWith(currentMonthKey)) return acc
+      if (isExcludeAnalyticsTx(tx)) return acc
       const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
       if (tx.type === 'income') acc.income += amount
       if (tx.type === 'expense') acc.expense += amount
@@ -492,6 +500,69 @@ function Dashboard() {
     }
   }, [budgets, goals, transactions, currentMonthKey, defaultCurrency, rates])
 
+  const loanSummary = useMemo(() => {
+    let totalDebt = 0
+    let totalReceivable = 0
+    const safeLoans = loans ?? []
+    const activeLoans = safeLoans
+      .map((l) => {
+        const remaining = toSafeNumber(l.remainingAmount)
+        const val = convertCurrency(remaining, l.currency || defaultCurrency, defaultCurrency, rates)
+        const isPaid = l.status === 'paid' || remaining <= 0
+
+        let isOverdue = false
+        let daysLeft = null
+        if (l.dueDate && !isPaid) {
+          daysLeft = differenceInDays(new Date(l.dueDate), new Date())
+          if (daysLeft < 0) isOverdue = true
+        }
+
+        if (!isPaid) {
+          if (l.type === 'debt') totalDebt += val
+          else if (l.type === 'receivable') totalReceivable += val
+        }
+
+        return {
+          ...l,
+          remaining,
+          convertedRemaining: val,
+          isPaid,
+          isOverdue,
+          daysLeft,
+        }
+      })
+      .filter((l) => !l.isPaid)
+
+    const sortedUrgent = [...activeLoans].sort((a, b) => {
+      if (a.isOverdue && !b.isOverdue) return -1
+      if (!a.isOverdue && b.isOverdue) return 1
+      if (a.isOverdue && b.isOverdue) return (a.daysLeft ?? 0) - (b.daysLeft ?? 0)
+
+      if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft
+      if (a.daysLeft !== null && b.daysLeft === null) return -1
+      if (a.daysLeft === null && b.daysLeft !== null) return 1
+
+      if (b.convertedRemaining !== a.convertedRemaining) return b.convertedRemaining - a.convertedRemaining
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    })
+
+    const mostUrgentItem = sortedUrgent[0] || null
+    const netPosition = totalReceivable - totalDebt
+    const totalCombined = totalReceivable + totalDebt
+    const receivablePct = totalCombined > 0 ? Math.round((totalReceivable / totalCombined) * 100) : 50
+    const debtPct = totalCombined > 0 ? 100 - receivablePct : 50
+
+    return {
+      totalDebt,
+      totalReceivable,
+      netPosition,
+      receivablePct,
+      debtPct,
+      activeCount: activeLoans.length,
+      mostUrgentItem,
+    }
+  }, [loans, defaultCurrency, rates])
+
   const [miniRevenueSnapshot, setMiniRevenueSnapshot] = useState([])
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
@@ -717,12 +788,10 @@ function Dashboard() {
   useEffect(() => {
     if (!zoomedChart || typeof document === 'undefined') return undefined
     const previousOverflow = document.body.style.overflow
-    const previousTouchAction = document.body.style.touchAction
     document.body.style.overflow = 'hidden'
-    document.body.style.touchAction = 'none'
     return () => {
-      document.body.style.overflow = previousOverflow
-      document.body.style.touchAction = previousTouchAction
+      document.body.style.overflow = previousOverflow && previousOverflow !== 'hidden' ? previousOverflow : ''
+      document.body.style.touchAction = ''
     }
   }, [zoomedChart])
 
@@ -1039,12 +1108,14 @@ function Dashboard() {
         }`}
       >
       {/* Wallet Carousel Hero */}
-      <WalletCarousel
-        monthIncome={monthIncome}
-        monthExpense={monthExpense}
-        wallets={walletsWithBalance}
-        defaultCurrency={defaultCurrency}
-      />
+      <div data-tour="networth-card">
+        <WalletCarousel
+          monthIncome={monthIncome}
+          monthExpense={monthExpense}
+          wallets={walletsWithBalance}
+          defaultCurrency={defaultCurrency}
+        />
+      </div>
 
       {/* Transaksi Terakhir Card */}
       <section>
@@ -1225,31 +1296,175 @@ function Dashboard() {
       </section>
 
       
+      {/* Standalone Bento Card for Utang & Piutang */}
+      <section className="mb-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
+          {/* Header Row */}
+          <div className="flex items-center justify-between gap-3">
+            <div
+              onClick={() => navigate('/loans')}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition active:scale-[0.99] min-w-0"
+            >
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                <HandCoins className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold tracking-tight text-[var(--fg)] truncate">Utang & Piutang</h3>
+                <p className="text-[10px] font-semibold text-[var(--muted)] truncate">
+                  {loanSummary.activeCount > 0 ? `${loanSummary.activeCount} Catatan Aktif` : 'Tidak Ada Catatan Aktif'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLoanSheetOpen(true)}
+                className="flex h-7 items-center gap-1 rounded-lg bg-[var(--fg)] px-2.5 py-1 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 active:scale-95 cursor-pointer"
+                title="Catat Utang / Piutang Baru"
+                aria-label="Catat Utang / Piutang Baru"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Catat</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/loans')}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer"
+                title="Buka Halaman Utang & Piutang"
+                aria-label="Buka Halaman Utang & Piutang"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Hero Bento Net Position & Totals */}
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Posisi Bersih (Net Position)</span>
+                <p className={`text-base sm:text-lg font-black tabular-nums tracking-tight ${
+                  loanSummary.netPosition > 0 ? 'text-emerald-500' : loanSummary.netPosition < 0 ? 'text-rose-500' : 'text-[var(--fg)]'
+                }`}>
+                  {loanSummary.netPosition > 0 ? '+' : ''}{formatCurrency(loanSummary.netPosition, defaultCurrency)}
+                </p>
+              </div>
+
+              <div className="text-right flex flex-col items-end text-xs font-extrabold tabular-nums">
+                <span className="text-rose-500">Hutang: {formatCurrency(loanSummary.totalDebt, defaultCurrency)}</span>
+                <span className="text-emerald-500">Piutang: {formatCurrency(loanSummary.totalReceivable, defaultCurrency)}</span>
+              </div>
+            </div>
+
+            {/* Balance Ratio Visual Bar */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${loanSummary.receivablePct}%` }}
+                  title={`Piutang: ${loanSummary.receivablePct}%`}
+                />
+                <div
+                  className="h-full bg-rose-500 transition-all duration-500"
+                  style={{ width: `${loanSummary.debtPct}%` }}
+                  title={`Hutang: ${loanSummary.debtPct}%`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Most Urgent Item Preview Box with Direct Payment Interaction */}
+          {loanSummary.mostUrgentItem ? (
+            <div
+              onClick={() => {
+                setPayLoan(loanSummary.mostUrgentItem)
+                setIsPayOpen(true)
+              }}
+              className="group relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 cursor-pointer hover:border-[var(--border-strong)] transition-all active:scale-[0.98] shadow-2xs"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${
+                      loanSummary.mostUrgentItem.type === 'debt'
+                        ? 'bg-rose-500/15 text-rose-500 border-rose-500/25'
+                        : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                    }`}
+                  >
+                    {loanSummary.mostUrgentItem.type === 'debt' ? (
+                      <HandCoins className="h-3.5 w-3.5" />
+                    ) : (
+                      <Receipt className="h-3.5 w-3.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="truncate text-xs font-extrabold text-[var(--fg)]">
+                        {loanSummary.mostUrgentItem.title}
+                      </p>
+                      <span className="text-[10px] font-extrabold text-[var(--muted)]">·</span>
+                      <span className="text-[11px] font-bold text-[var(--muted)] truncate">
+                        {loanSummary.mostUrgentItem.personName}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs font-black tabular-nums text-[var(--fg)]">
+                      Sisa {formatCurrency(loanSummary.mostUrgentItem.remaining, loanSummary.mostUrgentItem.currency || defaultCurrency)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {loanSummary.mostUrgentItem.isOverdue ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[10px] font-black text-rose-500">
+                      <AlertCircle className="h-3 w-3" />
+                      Terlambat
+                    </span>
+                  ) : loanSummary.mostUrgentItem.daysLeft !== null ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--panel-strong)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-black text-[var(--muted)]">
+                      <Clock className="h-3 w-3" />
+                      {loanSummary.mostUrgentItem.daysLeft === 0
+                        ? 'Hari Ini'
+                        : `${loanSummary.mostUrgentItem.daysLeft} Hari Lagi`}
+                    </span>
+                  ) : null}
+
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1 text-[10px] font-extrabold text-[var(--accent)] group-hover:border-[var(--accent)] transition-colors">
+                    Bayar <ChevronRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
       {/* Combined Budget & Savings Tabbed Card (Fintech Pro Segmented Design) */}
-      <section>
+      <section data-tour="budget-chart-section">
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5">
           {/* Segmented Control Switcher */}
           <div className="grid grid-cols-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
             <button
               type="button"
               onClick={() => setBudgetTab('budget')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 sm:px-3 text-xs font-bold transition ${
                 budgetTab === 'budget'
                   ? 'bg-[var(--fg)] text-[var(--bg)] shadow-2xs'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
               }`}
             >
               <span>{t('dashboard.budget')}</span>
-              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider hidden sm:inline-block ${
                 budgetTab === 'budget' ? 'bg-[var(--bg)]/20 text-[var(--bg)]' : 'bg-[var(--border)]/60 text-[var(--muted)]'
               }`}>
                 {currentMonthLabel}
               </span>
             </button>
+
             <button
               type="button"
               onClick={() => setBudgetTab('savings')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 sm:px-3 text-xs font-bold transition ${
                 budgetTab === 'savings'
                   ? 'bg-[var(--fg)] text-[var(--bg)] shadow-2xs'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
@@ -1281,17 +1496,20 @@ function Dashboard() {
               <button
                 type="button"
                 onClick={() => navigate(budgetTab === 'budget' ? '/budget' : '/savings')}
-                className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)]"
+                className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer"
               >
                 Lihat Halaman
               </button>
               <button
                 type="button"
-                onClick={() => (budgetTab === 'budget' ? setIsOpenQuickBudget(true) : setIsOpenQuickGoal(true))}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--fg)] px-3 py-1.5 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90"
+                onClick={() => {
+                  if (budgetTab === 'budget') setIsOpenQuickBudget(true)
+                  else setIsOpenQuickGoal(true)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--fg)] px-3 py-1.5 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 cursor-pointer"
                 aria-label={budgetTab === 'budget' ? t('dashboard.budget.add') : t('dashboard.savings.add')}
               >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                <Plus className="h-3.5 w-3.5" />
                 <span>{budgetTab === 'budget' ? 'Anggaran' : 'Target'}</span>
               </button>
             </div>
@@ -1858,6 +2076,18 @@ function Dashboard() {
       <SavingsSheetModal
         isOpen={isOpenQuickGoal}
         onClose={() => setIsOpenQuickGoal(false)}
+      />
+      <LoanSheetModal
+        isOpen={isLoanSheetOpen}
+        onClose={() => setIsLoanSheetOpen(false)}
+      />
+      <LoanPaymentModal
+        isOpen={isPayOpen}
+        onClose={() => {
+          setIsPayOpen(false)
+          setPayLoan(null)
+        }}
+        loan={payLoan}
       />
       </div>
     </div>

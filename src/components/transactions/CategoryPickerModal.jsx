@@ -6,7 +6,6 @@ import CategoryIcon from '../ui/CategoryIcon'
 import useTranslation from '../../hooks/useTranslation'
 import { resolveExpenseParentIconKey, resolveIncomeParentIconKey } from '../../lib/categoryIcon'
 import {
-  addExpenseParentCategory,
   addExpenseSubcategory,
   getMergedExpenseTree,
   isBuiltinExpenseChild,
@@ -16,7 +15,6 @@ import {
   EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT,
 } from '../../lib/expenseCategories'
 import {
-  addIncomeParentCategory,
   addIncomeSubcategory,
   getMergedIncomeTree,
   isBuiltinIncomeChild,
@@ -35,14 +33,12 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
   const [incomeParentId, setIncomeParentId] = useState(null)
   const [editMode, setEditMode] = useState(false)
   const [newSubName, setNewSubName] = useState('')
-  const [newParentName, setNewParentName] = useState('')
   const [renameParentVal, setRenameParentVal] = useState('')
 
   useEffect(() => {
     if (isOpen) {
       setEditMode(false)
       setNewSubName('')
-      setNewParentName('')
       if (txType === 'expense' && selectedCategory && typeof selectedCategory === 'string' && selectedCategory.trim()) {
         const [pid] = String(selectedCategory).split('/')
         if (pid) setExpenseParentId(pid)
@@ -122,13 +118,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
     })
   }
 
-  const handleAddParent = () => {
-    const name = newParentName.trim()
-    if (!name) return
-    if (txType === 'expense') addExpenseParentCategory(name, name)
-    else addIncomeParentCategory(name, name)
-    setNewParentName('')
-  }
+
 
   const handleRemoveParent = (parentId) => {
     const msg = t('addTx.confirmRemoveCustom') || 'Hapus kategori utama ini?'

@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronLeft, Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-react'
+import { Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
@@ -13,6 +13,7 @@ import useWalletStore from '../store/useWalletStore'
 import Modal from '../components/ui/Modal'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
+import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
 import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import useTranslation from '../hooks/useTranslation'
@@ -23,6 +24,7 @@ export default function WalletDetailPage() {
   const { id } = useParams()
   const walletId = Number(id)
   const navigate = useNavigate()
+  const [pageError, setPageError] = useState('')
   
   const wallet = useLiveQuery(() => db.wallets.get(walletId), [walletId])
   const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
@@ -160,11 +162,23 @@ export default function WalletDetailPage() {
 
   const handleDeleteWallet = async () => {
     try {
+      const activeLoans = await db.loans
+        .where('walletId')
+        .equals(Number(walletId))
+        .filter((l) => l.status !== 'paid')
+        .toArray()
+
+      if (activeLoans && activeLoans.length > 0) {
+        setIsDeleteModalOpen(false)
+        setPageError('Tidak bisa menghapus wallet ini karena masih terdapat catatan utang/piutang aktif yang terhubung. Selesaikan atau hapus catatan utang/piutang terlebih dahulu.')
+        return
+      }
+
       await deleteWallet(walletId)
       navigate('/dashboard', { replace: true })
     } catch (err) {
       console.error('Failed to delete wallet', err)
-      alert('Gagal menghapus wallet')
+      setPageError('Gagal menghapus wallet')
     }
   }
 
@@ -258,6 +272,7 @@ export default function WalletDetailPage() {
   return (
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-28 relative">
+        {pageError ? <ToastBanner message={pageError} type="error" onDismiss={() => setPageError('')} /> : null}
         {/* ── 1. Curved Hero Section with Wallet Icon & Accent Glow ────────────── */}
         <div 
           className="ft-wallet-detail-hero -mx-4 -mt-4 pb-9 pt-3 px-4 text-center relative overflow-hidden"

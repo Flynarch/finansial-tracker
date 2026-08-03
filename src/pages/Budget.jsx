@@ -1,22 +1,18 @@
 import { format } from 'date-fns'
-import { useCallback, useEffect, useRef, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { createPortal } from 'react-dom'
 import Button from '../components/ui/Button'
-import CategoryIcon from '../components/ui/CategoryIcon'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import MonthPicker from '../components/ui/MonthPicker'
-import ToastBanner from '../components/ui/ToastBanner'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
-import { resolveExpenseParentIconKey } from '../lib/categoryIcon'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import { convertCurrency, formatCurrency, formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../lib/utils'
-import { getMergedExpenseTree, parseExpenseCategoryPath } from '../lib/expenseCategories'
+import { formatCurrency, toSafeNumber } from '../lib/utils'
+import { parseExpenseCategoryPath } from '../lib/expenseCategories'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
 
@@ -45,90 +41,29 @@ function Budget() {
   const currentMonth = format(new Date(), 'yyyy-MM')
 
   const [month, setMonth] = useState(currentMonth)
-  const { isOpen: sheetOpen, isVisible: sheetVisible, openSheet, closeSheet } = useBottomSheet(false)
+  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingBudget, setDeletingBudget] = useState(null)
   const { swipedId, setSwipedId, getSwipeHandlers } = useSwipeAction()
-  const [expandedParentId, setExpandedParentId] = useState(null)
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false)
-  const [sheetError, setSheetError] = useState('')
-  const limitInputRef = useRef(null)
 
-  useEffect(() => {
-    if (!sheetOpen || !isCategoryOpen) return undefined
-    const onPointerDown = (event) => {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-      if (target.closest('[data-budget-category]')) return
-      setIsCategoryOpen(false)
-    }
-    window.addEventListener('pointerdown', onPointerDown, { passive: true })
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [sheetOpen, isCategoryOpen])
-
-  const tree = useMemo(() => getMergedExpenseTree(), [])
   const lang = locale === 'en' ? 'en' : 'id'
-
-  const [form, setForm] = useState(() => ({
-    month: currentMonth,
-    categoryPath: '',
-    limit: '',
-  }))
-  const [limitInput, setLimitInput] = useState('')
-
-  const selectedParentId = useMemo(() => {
-    const raw = String(form.categoryPath || '')
-    if (!raw) return ''
-    if (raw.includes('/')) return raw.split('/')[0]
-    return raw
-  }, [form.categoryPath])
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
   const monthExpenseTxs = useMemo(
     () => (transactions ?? []).filter((tx) => tx?.type === 'expense' && tx?.date?.startsWith(month)),
-    [transactions, month],
+    [transactions, month]
   )
 
-  const txMatchesBudget = useCallback((budgetCategory, txCategory) => {
-    const normalize = (value) => String(value ?? '').trim().toLowerCase()
-    const b = normalize(budgetCategory)
-    if (!b) return false
-    const raw = String(txCategory ?? '')
-    const rawNorm = normalize(raw)
-    if (rawNorm && (rawNorm === b || b.includes(rawNorm) || rawNorm.includes(b))) return true
-
-    const parsed = parseExpenseCategoryPath(raw)
-    if (parsed) {
-      const candidates = [
-        parsed.parent?.id,
-        parsed.child?.id,
-        parsed.parent?.names?.id,
-        parsed.parent?.names?.en,
-        parsed.child?.names?.id,
-        parsed.child?.names?.en,
-      ]
-        .filter(Boolean)
-        .map(normalize)
-      if (candidates.includes(b)) return true
-      const combined = normalize(`${parsed.parent?.names?.id ?? ''} ${parsed.child?.names?.id ?? ''}`)
-      if (combined.includes(b)) return true
-    }
-
-    return rawNorm.includes(b)
-  }, [])
-
   const spentByCategoryPath = useMemo(() => {
-    const result = {}
-    monthBudgets.forEach((b) => {
-      const cat = String(b.category || '')
-      result[cat] = monthExpenseTxs.reduce((sum, tx) => {
-        if (!txMatchesBudget(cat, tx.category)) return sum
-        return sum + convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, {})
-      }, 0)
+    const map = {}
+    monthExpenseTxs.forEach((tx) => {
+      const cat = String(tx.category || '').trim()
+      if (!cat) return
+      map[cat] = (map[cat] ?? 0) + toSafeNumber(tx.amount)
     })
-    return result
-  }, [defaultCurrency, monthBudgets, monthExpenseTxs, txMatchesBudget])
+    return map
+  }, [monthExpenseTxs])
 
   const getBudgetLabel = (path) => {
     const parsed = parseExpenseCategoryPath(path)
@@ -140,66 +75,15 @@ function Budget() {
   }
 
   const openAdd = useCallback(() => {
-    setSheetError('')
     setEditingId(null)
     setSwipedId(null)
-    setForm((p) => ({
-      ...p,
-      month,
-      categoryPath: '',
-      limit: '',
-    }))
-    setLimitInput('')
-    setExpandedParentId(null)
-    setIsCategoryOpen(false)
     openSheet()
-  }, [month, openSheet, setSwipedId])
+  }, [openSheet, setSwipedId])
 
   const openEdit = (budget) => {
-    setSheetError('')
     setEditingId(budget.id)
     setSwipedId(null)
-    setForm({
-      month: budget.month,
-      categoryPath: String(budget.category || ''),
-      limit: String(budget.limit ?? ''),
-    })
-    setLimitInput(formatGroupedIntegerInput(budget.limit ?? ''))
-    const raw = String(budget.category || '')
-    setExpandedParentId(raw.includes('/') ? raw.split('/')[0] : raw || null)
-    setIsCategoryOpen(false)
     openSheet()
-  }
-
-
-
-  const save = async () => {
-    const payload = {
-      month: form.month,
-      category: String(form.categoryPath || '').trim(),
-      limit: toSafeNumber(form.limit),
-    }
-    if (!payload.category) {
-      setSheetError(t('budget.validation.category'))
-      return
-    }
-    if (!payload.month || payload.limit <= 0) {
-      setSheetError(t('budget.validation.limit'))
-      return
-    }
-    try {
-      setSheetError('')
-      if (editingId) {
-        await db.budgets.update(editingId, payload)
-      } else {
-        await db.budgets.add(payload)
-      }
-      closeSheet()
-      setEditingId(null)
-    } catch {
-      const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-      setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
-    }
   }
 
   useEffect(() => {

@@ -60,28 +60,22 @@ export default function useBottomSheet(configOrState = false) {
     }
   }, [isControlled, controlledIsOpen])
 
-  // Lock body scroll and touchAction while sheet is open
+  // Lock body scroll while sheet is open
   useEffect(() => {
     if (!isOpen || !lockBodyScroll || typeof document === 'undefined') return undefined
     const { body, documentElement } = document
     const prevBodyOverflow = body.style.overflow
-    const prevBodyTouchAction = body.style.touchAction
-    const prevBodyOverscroll = body.style.overscrollBehavior
     const prevHtmlOverflow = documentElement.style.overflow
-    const prevHtmlOverscroll = documentElement.style.overscrollBehavior
 
     body.style.overflow = 'hidden'
-    body.style.touchAction = 'none'
-    body.style.overscrollBehavior = 'none'
     documentElement.style.overflow = 'hidden'
-    documentElement.style.overscrollBehavior = 'none'
 
     return () => {
-      body.style.overflow = prevBodyOverflow
-      body.style.touchAction = prevBodyTouchAction
-      body.style.overscrollBehavior = prevBodyOverscroll
-      documentElement.style.overflow = prevHtmlOverflow
-      documentElement.style.overscrollBehavior = prevHtmlOverscroll
+      body.style.overflow = prevBodyOverflow && prevBodyOverflow !== 'hidden' ? prevBodyOverflow : ''
+      body.style.touchAction = ''
+      body.style.overscrollBehavior = ''
+      documentElement.style.overflow = prevHtmlOverflow && prevHtmlOverflow !== 'hidden' ? prevHtmlOverflow : ''
+      documentElement.style.overscrollBehavior = ''
     }
   }, [isOpen, lockBodyScroll])
 

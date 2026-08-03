@@ -116,7 +116,7 @@ function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 md:hidden">
+      <nav data-tour="bottom-nav" className="fixed inset-x-0 bottom-0 z-30 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 md:hidden">
         {/*
           Kartu nav: lebar penuh, tinggi = lebar×72/400 → skala SVG seragam.
           Notch pakai kurva bezier bertahap (lebih halus di bahu kiri/kanan, tidak tajam saat masuk-keluar lengkungan).

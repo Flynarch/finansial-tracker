@@ -14,7 +14,7 @@ function Sidebar() {
   const { t } = useTranslation()
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--panel)] px-3 py-4 md:block">
+    <aside data-tour="bottom-nav" className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--panel)] px-3 py-4 md:block">
       <nav className="flex flex-col gap-0.5">
         {navItems.map((item) => (
           <NavLink key={item.path} to={item.path} className={linkClassName}>

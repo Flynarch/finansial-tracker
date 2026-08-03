@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
+import useWalletStore from '../../store/useWalletStore'
+import useLoanStore from '../../store/useLoanStore'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
@@ -90,12 +92,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return undefined
     const previousOverflow = document.body.style.overflow
-    const previousTouchAction = document.body.style.touchAction
     document.body.style.overflow = 'hidden'
-    document.body.style.touchAction = 'none'
     return () => {
-      document.body.style.overflow = previousOverflow
-      document.body.style.touchAction = previousTouchAction
+      document.body.style.overflow = previousOverflow && previousOverflow !== 'hidden' ? previousOverflow : ''
+      document.body.style.touchAction = ''
     }
   }, [isOpen])
 
@@ -443,6 +443,108 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         }
       }
 
+      if (result.type === 'wallet') {
+        const createWalletFn = useWalletStore.getState().createWallet
+        
+        if (result.action === 'create') {
+          const walletName = result.name || 'Dompet Baru'
+          const initialBal = result.initialBalance || 0
+          const wType = result.walletType || 'bank'
+          await createWalletFn({
+            name: walletName,
+            institutionType: wType,
+            currency: defaultCurrency,
+            balance: initialBal,
+            logoUrl: null,
+            createdAt: Date.now()
+          })
+          const balFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(initialBal)
+          newMsgs.push({ 
+            id: Date.now()+3, 
+            role: 'ai', 
+            type: 'action_success', 
+            data: { type: 'wallet', action: 'create', title: walletName, subtitle: `Saldo awal: ${balFormatted}` } 
+          })
+        } else if (result.action === 'transfer') {
+          let fromWallet = wallets.find(w => w.id === Number(result.fromWalletId))
+          let toWallet = wallets.find(w => w.id === Number(result.toWalletId))
+          
+          if (!fromWallet && wallets.length > 0) fromWallet = wallets[0]
+          if (!toWallet && wallets.length > 1) toWallet = wallets[1]
+
+          const transferAmt = result.amount || 0
+          const amtFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(transferAmt)
+          
+          const txToSave = {
+            type: 'transfer',
+            category: 'transfer/out',
+            amount: transferAmt,
+            date: format(new Date(), 'yyyy-MM-dd'),
+            notes: `Transfer AI: ${fromWallet ? fromWallet.name : 'Dompet Asal'} ke ${toWallet ? toWallet.name : 'Dompet Tujuan'}`,
+            walletId: fromWallet ? fromWallet.id : null,
+            targetWalletId: toWallet ? toWallet.id : null,
+            currency: defaultCurrency,
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+            createdAt: new Date().toISOString()
+          }
+          await addTransaction(txToSave)
+          
+          newMsgs.push({ 
+            id: Date.now()+3, 
+            role: 'ai', 
+            type: 'action_success', 
+            data: { 
+              type: 'wallet', 
+              action: 'transfer', 
+              title: `Transfer ${amtFormatted}`, 
+              subtitle: `${fromWallet ? fromWallet.name : 'Dompet Asal'} → ${toWallet ? toWallet.name : 'Dompet Tujuan'}` 
+            } 
+          })
+        }
+      }
+
+      if (result.type === 'loan') {
+        const { addLoan, recordPayment } = useLoanStore.getState()
+        if (result.action === 'create') {
+          await addLoan({
+            type: result.loanType || 'debt',
+            personName: result.personName || 'Pihak Terkait',
+            title: result.title || 'Pinjaman Baru',
+            totalAmount: result.amount,
+            dueDate: result.dueDate || null,
+            currency: defaultCurrency,
+          })
+          newMsgs.push({
+            id: Date.now() + 4,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'loan',
+              action: 'create',
+              title: result.title || 'Pinjaman Baru',
+              subtitle: `${result.loanType === 'debt' ? 'Hutang' : 'Piutang'} (${result.personName || 'Pihak Terkait'})`,
+            },
+          })
+        } else if (result.action === 'pay') {
+          const allLoans = await db.loans.toArray()
+          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()) && l.status !== 'paid')
+          if (matched) {
+            await recordPayment(matched.id, result.amount, new Date().toISOString().split('T')[0], 'Dicatat via AI Assistant')
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'loan',
+                action: 'pay',
+                title: matched.title,
+                subtitle: `Cicilan ${result.amount ? result.amount : ''} dicatat`,
+              },
+            })
+          }
+        }
+      }
+
       if (newMsgs.length > 0) {
          const firstSuccessMsg = newMsgs.find(m => m.type === 'success' || m.type === 'action_success')
          if (firstSuccessMsg) {
@@ -520,17 +622,17 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         <div className="ft-chat-drag-handle" />
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)]">
-              <Sparkles size={15} />
-              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/70 bg-[var(--panel-strong)]/80 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-400 text-white shadow-xs">
+              <Sparkles size={16} className="stroke-[2.2]" />
+              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--panel-strong)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-[15px] text-[var(--fg)] tracking-tight leading-tight">
+              <span className="font-extrabold text-[15px] text-[var(--fg)] tracking-tight leading-tight">
                 {translate(locale, 'aiChat.title')}
               </span>
-              <span className="text-[10px] font-semibold text-[var(--muted)] flex items-center gap-1">
+              <span className="text-[10px] font-bold text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
                 <span className={`inline-block h-1.5 w-1.5 rounded-full ${isLoading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
                 {isLoading ? (locale === 'en' ? 'Thinking...' : 'Berpikir...') : (locale === 'en' ? 'Proactive Advisor' : 'Financial Advisor')}
               </span>
@@ -538,6 +640,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           </div>
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={handleClear}
               title={translate(locale, 'aiChat.clear')}
               className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
@@ -545,6 +648,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               <Trash2 size={15} />
             </button>
             <button
+              type="button"
               onClick={onClose}
               title="Tutup"
               className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
@@ -563,7 +667,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             <div key={msg.id} className="flex flex-col gap-2">
               {msg.role === 'user' && (
                 <div className="flex flex-col items-end gap-1">
-                  {msg.image && <img src={msg.image} alt="Upload" className="max-w-[200px] rounded-lg border border-[var(--border)]" />}
+                  {msg.image && <img src={msg.image} alt="Upload" className="max-w-[200px] rounded-2xl border border-[var(--border)] shadow-xs" />}
                   {msg.content && <UserBubble content={msg.content} />}
                 </div>
               )}
@@ -636,11 +740,6 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                   {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
                 </>
               )}
-
-              {/* Show QuickChips only after the very last AI message (except welcome which has its own) */}
-              {isLastAi && !isLoading && msg.type !== 'welcome' && msg.type !== 'text' && msg.type !== 'chart' && (
-                <QuickChips chips={msg.chips} onSelect={handleSend} />
-              )}
             </div>
           )})}
 
@@ -650,6 +749,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           {consecutiveErrors >= 2 && (
              <div className="flex justify-center mt-2">
                <button 
+                 type="button"
                  onClick={() => {
                    onClose()
                    window.dispatchEvent(new CustomEvent('ft-open-add-transaction'))
@@ -664,19 +764,19 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
-        <div className="px-3 py-3 border-t border-[var(--border)] bg-[var(--bg)] flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+        {/* Input Dock Bar */}
+        <div className="p-3 border-t border-[var(--border)]/70 bg-[var(--bg)]/80 backdrop-blur-md flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
           {selectedImage && (
              <div className="relative inline-block self-start">
-               <img src={selectedImage} alt="Preview" className="h-16 rounded-md border border-[var(--border)]" />
-               <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5">
+               <img src={selectedImage} alt="Preview" className="h-16 rounded-xl border border-[var(--border)] shadow-xs" />
+               <button type="button" onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 shadow-xs">
                   <X size={12} />
                </button>
              </div>
           )}
 
           {isRecording && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold animate-fade-in">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold animate-fade-in backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
               <span>{locale === 'en' ? 'Listening...' : 'Mendengarkan ucapan Anda...'}</span>
               <div className="ml-auto ft-waveform">
@@ -689,23 +789,23 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           )}
 
           <form
-            className="flex items-end gap-2 bg-[var(--field-bg)] rounded-2xl px-3 py-2.5 transition-all focus-within:ring-2 ring-[var(--accent)] border border-[var(--field-border)]"
+            className="flex items-center gap-2 bg-[var(--field-bg)]/90 backdrop-blur-md rounded-2xl px-3 py-2 transition-all focus-within:ring-2 ring-indigo-500/40 border border-[var(--field-border)]"
             onSubmit={(e) => {
               e.preventDefault()
               handleSend()
             }}
           >
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageSelect} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors p-1.5 shrink-0 mb-0.5" title="Upload gambar">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors p-1.5 shrink-0" title="Upload gambar">
                <ImageIcon size={18} />
             </button>
-            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-rose-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--fg)]'} transition-colors p-1.5 shrink-0 mb-0.5`} title="Voice input">
+            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-rose-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--fg)]'} transition-colors p-1.5 shrink-0`} title="Voice input">
                <Mic size={18} />
             </button>
             <textarea
               ref={inputRef}
               rows={1}
-              className="flex-1 bg-transparent border-none text-[14px] text-[var(--fg)] focus:outline-none px-1 py-1.5 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
+              className="flex-1 bg-transparent border-none text-[13.5px] font-medium text-[var(--fg)] focus:outline-none px-1 py-1 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
               placeholder={isRecording ? (locale === 'en' ? 'Listening...' : 'Bicara sekarang...') : (locale === 'en' ? 'Ask or record anything...' : 'Ketik transaksi, tugas, atau pertanyaan...')}
               value={inputValue}
               onChange={(e) => {
@@ -724,13 +824,13 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             />
             <button
               type="submit"
-              className={`p-2 rounded-full shrink-0 mb-0.5 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-[var(--accent)] text-[var(--bg)] shadow-md' : 'bg-transparent text-[var(--muted)]'}`}
+              className={`p-2 rounded-xl shrink-0 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md shadow-indigo-500/20' : 'bg-transparent text-[var(--muted)]'}`}
               disabled={isLoading || (!inputValue.trim() && !selectedImage)}
             >
               {isLoading ? (
-                <Sparkles size={16} className="animate-spin text-[var(--accent)]" />
+                <Sparkles size={16} className="animate-spin text-indigo-500" />
               ) : (
-                <Send size={16} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
+                <Send size={15} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
               )}
             </button>
           </form>

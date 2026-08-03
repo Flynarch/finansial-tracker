@@ -14,6 +14,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Budget = lazy(() => import('./pages/Budget'))
 const Savings = lazy(() => import('./pages/Savings'))
 const SavingsDetail = lazy(() => import('./pages/SavingsDetail'))
+const Loans = lazy(() => import('./pages/Loans'))
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'))
 const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'))
 const SettingsSecurity = lazy(() => import('./pages/settings/SettingsSecurity'))
@@ -42,6 +43,7 @@ function App() {
           <Route path="/budget" element={<Budget />} />
           <Route path="/savings" element={<Savings />} />
           <Route path="/savings/:id" element={<SavingsDetail />} />
+          <Route path="/loans" element={<Loans />} />
           <Route path="/add-account" element={<AddAccountPage />} />
           <Route path="/wallet/:id" element={<WalletDetailPage />} />
           <Route path="/todos/:id" element={<TodoDetailPage />} />

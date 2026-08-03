@@ -2,7 +2,7 @@
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
-import { Check, Undo2 } from 'lucide-react'
+import { Undo2 } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { format, parseISO } from 'date-fns'

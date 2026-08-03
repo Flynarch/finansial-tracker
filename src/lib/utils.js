@@ -147,3 +147,18 @@ export function downloadTextFile(filename, content, mimeType = 'text/plain;chars
   anchor.click()
   URL.revokeObjectURL(url)
 }
+
+export const LOAN_CATEGORIES = Object.freeze([
+  'Pinjaman Diterima',
+  'Pinjaman Diberikan',
+  'Bayar Hutang',
+  'Terima Piutang',
+])
+
+export function isExcludeAnalyticsTx(tx) {
+  if (!tx) return false
+  if (tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
+  if (LOAN_CATEGORIES.includes(tx.category)) return true
+  return false
+}
+

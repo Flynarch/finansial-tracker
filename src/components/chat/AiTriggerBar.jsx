@@ -10,18 +10,20 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
 
   return (
     <button
+      type="button"
       data-tour="ai-chat-btn"
-      className="ft-ai-bar md:hidden flex items-center justify-center group relative overflow-hidden p-[1.5px] shadow-md shadow-[var(--accent)]/15 active:scale-95 transition-transform whitespace-nowrap shrink-0"
       onClick={onOpen}
       aria-label="Open AI Chat"
+      className="ft-ai-bar md:hidden relative inline-flex items-center gap-2 rounded-full border border-[var(--border)]/80 bg-[var(--panel-strong)]/90 px-3.5 py-1.5 backdrop-blur-md shadow-md shadow-black/5 active:scale-95 transition-all shrink-0 hover:border-[var(--accent)]/40"
     >
-      <div className="absolute inset-[-1000%] animate-[spin_5s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,color-mix(in_srgb,var(--accent)_20%,transparent)_25%,var(--accent)_50%,color-mix(in_srgb,var(--accent)_20%,transparent)_75%,transparent_100%)] opacity-100" />
-      <div className="relative flex h-full w-full items-center justify-center gap-1.5 rounded-full bg-[var(--fg)] px-3.5 py-1.5 whitespace-nowrap">
-        <Sparkles size={13.5} className="text-[#ffffff] shrink-0" />
-        <span className="text-[12px] font-bold text-[var(--bg)] whitespace-nowrap leading-none">
-          {translate(locale, 'aiChat.trigger')}
-        </span>
-      </div>
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+      </span>
+      <Sparkles size={13} className="text-[var(--fg)] shrink-0" />
+      <span className="text-[12px] font-bold text-[var(--fg)] tracking-tight leading-none">
+        {translate(locale, 'aiChat.trigger')}
+      </span>
     </button>
   )
 }

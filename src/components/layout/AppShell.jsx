@@ -8,6 +8,7 @@ import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LockScreen from '../ui/LockScreen'
 import OnboardingFlow from '../onboarding/OnboardingFlow'
+import SpotlightTour from '../onboarding/SpotlightTour'
 import BottomNav from './BottomNav'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
@@ -144,6 +145,14 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
+    // Clear any residual overflow or touchAction locks from unmounted modals/sheets on route change
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+      document.body.style.overscrollBehavior = ''
+      document.documentElement.style.overflow = ''
+      document.documentElement.style.overscrollBehavior = ''
+    }
     // Reset scroll position to top when route changes
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [location.pathname])
@@ -163,6 +172,7 @@ function AppShell() {
       </div>
       {!isDetailPage && <BottomNav />}
       <OnboardingFlow />
+      <SpotlightTour />
       {isLoaded && securityEnabled && !isUnlocked ? (
         <LockScreen method={securityMethod} secret={lockSecret} onUnlock={unlock} />
       ) : null}

@@ -216,7 +216,7 @@ export function FrameNode({ idea, onContentChange, onDelete }) {
   )
 }
 
-export function TextNode({ idea, size, onContentChange, onDelete, onDuplicate, onToggleLock, isSelected }) {
+export function TextNode({ idea, onContentChange, onDelete, onDuplicate, onToggleLock, isSelected }) {
   return (
     <div className={`h-full w-full relative flex items-center justify-center ${idea.locked ? 'ring-1 ring-amber-500/40 rounded-lg' : ''}`}>
       <textarea

@@ -289,12 +289,13 @@ export default function SavingsDetail() {
             logs.map(log => {
               const isWithdraw = (log.amount || 0) < 0
               const absAmount = Math.abs(log.amount || 0)
-              let logDateStr = ''
-              try {
-                logDateStr = format(new Date(log.date), 'dd MMM yyyy, HH:mm')
-              } catch {
-                logDateStr = String(log.date || '')
-              }
+              const logDateStr = (() => {
+                try {
+                  return format(new Date(log.date), 'dd MMM yyyy, HH:mm')
+                } catch {
+                  return String(log.date || '')
+                }
+              })()
 
               return (
                 <div key={log.id} className="bg-[var(--panel-strong)] rounded-2xl p-3.5 border border-[var(--border)] flex items-center justify-between shadow-2xs">

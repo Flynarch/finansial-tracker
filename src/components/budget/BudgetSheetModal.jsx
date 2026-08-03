@@ -1,6 +1,5 @@
 import { format } from 'date-fns'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import BottomSheet from '../ui/BottomSheet'
@@ -132,7 +131,7 @@ const BudgetParentCategoryItem = memo(function BudgetParentCategoryItem({
 
 export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null, initialMonth, onSaved }) {
   const { locale, t } = useTranslation()
-  const { isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
   const [expandedParentId, setExpandedParentId] = useState(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)

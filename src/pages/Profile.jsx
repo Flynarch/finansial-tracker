@@ -81,6 +81,14 @@ function ShortcutIcon({ name }) {
       </svg>
     )
   }
+  if (name === 'loans') {
+    return (
+      <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="m7 21 1.6-1.4c.4-.4.9-.6 1.4-.6h4c1.7 0 3-1.3 3-3V7c0-1.7-1.3-3-3-3H9C7.3 4 6 5.3 6 7v4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
   return null
 }
 
@@ -269,6 +277,12 @@ function Profile() {
               label={t('profile.menu.reports')}
               sublabel={t('profile.menu.reportsSub')}
               onClick={() => navigate('/reports')}
+            />
+            <ShortcutRow
+              icon="loans"
+              label={t('profile.menu.loans') || 'Utang & Piutang'}
+              sublabel={t('profile.menu.loansSub') || 'Kelola utang & tagihan piutang'}
+              onClick={() => navigate('/loans')}
             />
             <ShortcutRow
               icon="todo"

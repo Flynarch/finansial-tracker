@@ -219,6 +219,43 @@ const getTools = () => ([
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           }
         }
+      },
+      {
+        name: "manage_wallet",
+        description: "Kelola dompet/rekening pengguna (buat dompet baru atau transfer saldo antar dompet).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "transfer"], description: "create untuk dompet baru, transfer untuk memindahkan saldo" },
+            name: { type: "STRING", description: "Nama dompet baru (misal: 'BCA', 'Gopay', 'Cash')" },
+            walletType: { type: "STRING", enum: ["bank", "e-wallet", "cash", "credit_card", "investment", "other"], description: "Jenis dompet baru" },
+            initialBalance: { type: "NUMBER", description: "Saldo awal dompet baru (jika action=create)" },
+            fromWalletId: { type: "NUMBER", description: "ID dompet asal (jika action=transfer)" },
+            toWalletId: { type: "NUMBER", description: "ID dompet tujuan (jika action=transfer)" },
+            amount: { type: "NUMBER", description: "Nominal transfer (jika action=transfer)" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user. WAJIB DIISI!" }
+          },
+          required: ["action"]
+        }
+      },
+      {
+        name: "manage_loans",
+        description: "Kelola catatan utang atau piutang pengguna (catat utang/piutang baru atau bayar cicilan).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "pay"], description: "create untuk pinjaman baru, pay untuk bayar cicilan" },
+            loanType: { type: "STRING", enum: ["debt", "receivable"], description: "debt = hutang saya, receivable = piutang saya" },
+            title: { type: "STRING", description: "Judul pinjaman (misal: 'Pinjaman Motor', 'Pinjam ke Andi')" },
+            personName: { type: "STRING", description: "Nama pihak terkait (pemberi pinjaman / peminjam)" },
+            amount: { type: "NUMBER", description: "Total nominal pinjaman (action=create) atau nominal bayar (action=pay)" },
+            dueDate: { type: "STRING", description: "Tanggal jatuh tempo (YYYY-MM-DD) - opsional" },
+            replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user. WAJIB DIISI!" }
+          },
+          required: ["action", "title", "amount"]
+        }
       }
     ]
   }
@@ -465,6 +502,35 @@ ${buildCategoryContext(locale)}`
 
       if (fnCall.name === 'export_report') {
         return { type: 'export', month: fnCall.args.month, text: fnCall.args.replyMessage || "Menyiapkan file laporan Anda...", chips: fnCall.args.suggestedChips }
+      }
+      
+      if (fnCall.name === 'manage_wallet') {
+        return { 
+          type: 'wallet', 
+          action: fnCall.args.action, 
+          name: fnCall.args.name, 
+          walletType: fnCall.args.walletType, 
+          initialBalance: fnCall.args.initialBalance, 
+          fromWalletId: fnCall.args.fromWalletId, 
+          toWalletId: fnCall.args.toWalletId, 
+          amount: fnCall.args.amount, 
+          text: fnCall.args.replyMessage || "Memproses dompet...", 
+          chips: fnCall.args.suggestedChips 
+        }
+      }
+
+      if (fnCall.name === 'manage_loans') {
+        return {
+          type: 'loan',
+          action: fnCall.args.action,
+          loanType: fnCall.args.loanType || 'debt',
+          title: fnCall.args.title,
+          personName: fnCall.args.personName,
+          amount: fnCall.args.amount,
+          dueDate: fnCall.args.dueDate,
+          text: fnCall.args.replyMessage || "Memproses catat pinjaman...",
+          chips: fnCall.args.suggestedChips
+        }
       }
       
       if (fnCall.name === 'query_database') {

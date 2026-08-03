@@ -12,6 +12,8 @@ const useSettingsStore = create((set, get) => ({
   profileName: '',
   initialBalance: 0,
   hasCompletedOnboarding: false,
+  hasCompletedSpotlightTour: false,
+  isSpotlightTourActive: false,
   securityEnabled: false,
   securityMethod: 'pin',
   lockSecret: '',
@@ -29,6 +31,7 @@ const useSettingsStore = create((set, get) => ({
       profileName: next.profileName,
       initialBalance: next.initialBalance,
       hasCompletedOnboarding: next.hasCompletedOnboarding,
+      hasCompletedSpotlightTour: next.hasCompletedSpotlightTour,
       securityEnabled: next.securityEnabled,
       securityMethod: next.securityMethod,
       lockSecret: next.lockSecret,
@@ -84,13 +87,24 @@ const useSettingsStore = create((set, get) => ({
     set({ hasCompletedOnboarding: true })
     await get().persist({ hasCompletedOnboarding: true })
   },
+  startSpotlightTour: () => {
+    set({ isSpotlightTourActive: true })
+  },
+  completeSpotlightTour: async () => {
+    set({ hasCompletedSpotlightTour: true, isSpotlightTourActive: false })
+    await get().persist({ hasCompletedSpotlightTour: true })
+  },
+  resetSpotlightTour: async () => {
+    set({ hasCompletedSpotlightTour: false, isSpotlightTourActive: true })
+    await get().persist({ hasCompletedSpotlightTour: false })
+  },
   loadSettings: async () => {
     const record = await db.settings.get(SETTINGS_KEY)
     // Check old onboarding localStorage flag for migration
     const oldOnboardingSeen = typeof window !== 'undefined' && window.localStorage.getItem('ft_onboarding_seen_v1') === '1'
     if (!record) {
       // No settings record: new user OR user who saw old onboarding but never changed settings
-      set({ isLoaded: true, isUnlocked: true, hasCompletedOnboarding: oldOnboardingSeen })
+      set({ isLoaded: true, isUnlocked: true, hasCompletedOnboarding: oldOnboardingSeen, hasCompletedSpotlightTour: oldOnboardingSeen })
       return
     }
     const securityEnabled = Boolean(record.securityEnabled)
@@ -99,6 +113,9 @@ const useSettingsStore = create((set, get) => ({
     const onboardingDone = record.hasCompletedOnboarding !== undefined
       ? Boolean(record.hasCompletedOnboarding)
       : true // existing user → skip onboarding
+    const tourDone = record.hasCompletedSpotlightTour !== undefined
+      ? Boolean(record.hasCompletedSpotlightTour)
+      : onboardingDone
     set({
       theme: record.theme || 'light',
       locale: record.locale === 'en' ? 'en' : 'id',
@@ -109,6 +126,7 @@ const useSettingsStore = create((set, get) => ({
       profileName: record.profileName || '',
       initialBalance: Number(record.initialBalance) || 0,
       hasCompletedOnboarding: onboardingDone,
+      hasCompletedSpotlightTour: tourDone,
       securityEnabled,
       securityMethod: record.securityMethod || 'pin',
       lockSecret: record.lockSecret || '',

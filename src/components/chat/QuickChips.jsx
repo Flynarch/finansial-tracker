@@ -60,11 +60,11 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
           <button
             key={idx}
             type="button"
-            className="ft-chip inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all active:scale-95 shrink-0 shadow-xs"
+            className="ft-chip inline-flex items-center gap-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-md px-3.5 py-1.5 text-[12px] font-bold text-[var(--fg)] hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all active:scale-95 shrink-0 shadow-xs"
             onClick={() => onSelect(chipText)}
             style={{ animationDelay: `${idx * 60}ms` }}
           >
-            <Sparkles size={12} className="text-[var(--accent)]" />
+            <Sparkles size={12} className="text-indigo-500 shrink-0" />
             <span>{chipText}</span>
           </button>
         ))}
@@ -78,18 +78,18 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
         <button
           key={idx}
           type="button"
-          className="ft-chip-card group relative overflow-hidden"
+          className="ft-chip-card group relative overflow-hidden transition-all duration-200"
           onClick={() => onSelect(item.triggerText)}
           style={{ animationDelay: `${idx * 50}ms` }}
         >
-          <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${item.bgClass}`}>
+          <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${item.bgClass} shrink-0`}>
             {item.icon}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs font-bold text-[var(--fg)] truncate group-hover:text-[var(--accent)] transition-colors">
+            <span className="text-[12px] font-bold text-[var(--fg)] truncate group-hover:text-indigo-500 transition-colors">
               {item.label}
             </span>
-            <span className="text-[10px] text-[var(--muted)] truncate">
+            <span className="text-[10px] font-medium text-[var(--muted)] truncate">
               {item.desc}
             </span>
           </div>

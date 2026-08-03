@@ -116,14 +116,28 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         <button
           type="button"
           className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)]"
-          onClick={() => openEditTransaction(transaction)}
+          onClick={() => {
+            if (transaction.loanId) {
+              if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
+              if (setApiErrorTone) setApiErrorTone('error')
+              return
+            }
+            openEditTransaction(transaction)
+          }}
         >
           {t('tx.item.edit')}
         </button>
         <button
           type="button"
           className="rounded-lg border border-rose-500/30 bg-rose-500/12 px-3 py-1.5 text-xs font-semibold text-rose-400"
-          onClick={() => setIsDeleteModalOpen(true)}
+          onClick={() => {
+            if (transaction.loanId) {
+              if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
+              if (setApiErrorTone) setApiErrorTone('error')
+              return
+            }
+            setIsDeleteModalOpen(true)
+          }}
         >
           {t('tx.item.delete')}
         </button>

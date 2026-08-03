@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
@@ -17,7 +16,7 @@ import {
 export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null, onSaved }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
-  const { isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
   const targetAmountInputRef = useRef(null)
   const currentAmountInputRef = useRef(null)
