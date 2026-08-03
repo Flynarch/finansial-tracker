@@ -14,8 +14,8 @@ function donutCalloutLabel({ cx, cy, midAngle, outerRadius, percent, payload }) 
   const sin = Math.sin(-RADIAN * midAngle)
   const cos = Math.cos(-RADIAN * midAngle)
 
-  const r0 = Number(outerRadius) + 5
-  const r1 = Number(outerRadius) + 14
+  const r0 = Number(outerRadius) + 4
+  const r1 = Number(outerRadius) + 12
 
   const x0 = Number(cx) + r0 * cos
   const y0 = Number(cy) + r0 * sin
@@ -23,7 +23,7 @@ function donutCalloutLabel({ cx, cy, midAngle, outerRadius, percent, payload }) 
   const y1 = Number(cy) + r1 * sin
 
   const isRight = cos >= 0
-  const x2 = x1 + (isRight ? 10 : -10)
+  const x2 = x1 + (isRight ? 8 : -8)
   const y2 = y1
 
   const label = String(payload?.label || payload?.name || '')
@@ -35,11 +35,11 @@ function donutCalloutLabel({ cx, cy, midAngle, outerRadius, percent, payload }) 
     <g>
       <path d={`M${x0},${y0} L${x1},${y1} L${x2},${y2}`} stroke={stroke} strokeWidth={1} fill="none" />
       <circle cx={x2} cy={y2} r={2} fill={stroke} />
-      <text x={x2 + (isRight ? 6 : -6)} y={y2 - 2} textAnchor={textAnchor} dominantBaseline="central" fill="var(--fg)" fontSize={10} fontWeight={650}>
+      <text x={x2 + (isRight ? 5 : -5)} y={y2 - 2} textAnchor={textAnchor} dominantBaseline="central" fill="var(--fg)" fontSize={10} fontWeight={650}>
         {pctText}
       </text>
-      <text x={x2 + (isRight ? 6 : -6)} y={y2 + 12} textAnchor={textAnchor} dominantBaseline="central" fill="var(--muted)" fontSize={9}>
-        {label.length > 18 ? `${label.slice(0, 18)}…` : label}
+      <text x={x2 + (isRight ? 5 : -5)} y={y2 + 12} textAnchor={textAnchor} dominantBaseline="central" fill="var(--muted)" fontSize={9}>
+        {label.length > 14 ? `${label.slice(0, 14)}…` : label}
       </text>
     </g>
   )
@@ -53,7 +53,7 @@ function donutInsidePercentLabel({ cx, cy, midAngle, innerRadius, outerRadius, p
   const x = Number(cx) + r * Math.cos(-midAngle * RADIAN)
   const y = Number(cy) + r * Math.sin(-midAngle * RADIAN)
   return (
-    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="var(--fg)" fontSize={11} fontWeight={750}>
+    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="var(--fg)" fontSize={10} fontWeight={750}>
       {Math.round(p * 100)}%
     </text>
   )
@@ -103,10 +103,11 @@ export default function ReportDonutSection({
 
   return (
     <section className="overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-      <h3 className="border-b border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_40%,transparent)] px-5 py-3.5 text-[15px] font-bold tracking-tight text-[var(--fg)]">
-        {t('reports.expenseBreakdown')}
-      </h3>
       <div className="p-4 sm:p-5">
+        <h3 className="mb-3 text-sm font-bold tracking-tight text-[var(--fg)]">
+          {t('reports.expenseBreakdown')}
+        </h3>
+
         {/* Controls: Segmented Tabs & Wallet Filter */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-1 backdrop-blur-md">
@@ -117,7 +118,7 @@ export default function ReportDonutSection({
                 setActivePieIdx(0)
                 setSelectedDrilldownParent(null)
               }}
-              className={`rounded-[0.625rem] px-4 py-2 text-xs font-bold tracking-wide transition ${
+              className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition ${
                 donutKind === 'expense'
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
@@ -132,7 +133,7 @@ export default function ReportDonutSection({
                 setActivePieIdx(0)
                 setSelectedDrilldownParent(null)
               }}
-              className={`rounded-[0.625rem] px-4 py-2 text-xs font-bold tracking-wide transition ${
+              className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition ${
                 donutKind === 'income'
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
@@ -147,7 +148,7 @@ export default function ReportDonutSection({
             <select
               value={selectedWalletFilter}
               onChange={(e) => setSelectedWalletFilter(e.target.value)}
-              className="cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] shadow-2xs outline-none transition-all focus:border-[var(--accent)]"
+              className="cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] shadow-2xs outline-none transition-all focus:border-[var(--accent)]"
             >
               <option value="all">Semua Wallet</option>
               {wallets?.map((w) => (
@@ -176,11 +177,11 @@ export default function ReportDonutSection({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Donut Chart */}
-          <div className="h-80 rounded-2xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_40%,transparent)] p-4 shadow-inner">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Donut Chart -- h-64 compact height */}
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 12, right: 22, bottom: 12, left: 22 }}>
+              <PieChart margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
                 <defs>
                   {ELEGANT_PIE_COLORS.map((color, i) => (
                     <linearGradient key={`grad-${i}`} id={`pieGrad-${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -196,10 +197,10 @@ export default function ReportDonutSection({
                   startAngle={90}
                   endAngle={-270}
                   paddingAngle={3}
-                  outerRadius={96}
-                  innerRadius={68}
+                  outerRadius={80}
+                  innerRadius={54}
                   activeIndex={safeActivePieIdx}
-                  activeOuterRadius={106}
+                  activeOuterRadius={90}
                   onMouseEnter={(_, index) => setActivePieIdx(index)}
                   onTouchMove={(_, index) => setActivePieIdx(index)}
                   onClick={(_, index) => {
@@ -230,13 +231,13 @@ export default function ReportDonutSection({
                 <Tooltip content={<ChartTooltip />} />
                 <text
                   x="50%"
-                  y={compactDonut ? '43%' : '46%'}
+                  y={compactDonut ? '43%' : '45%'}
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="var(--muted-2)"
-                  fontSize={compactDonut ? 9 : 11}
+                  fontSize={compactDonut ? 9 : 10}
                   fontWeight={700}
-                  style={{ letterSpacing: compactDonut ? '0.08em' : '0.12em', textTransform: 'uppercase' }}
+                  style={{ letterSpacing: compactDonut ? '0.08em' : '0.1em', textTransform: 'uppercase' }}
                 >
                   {compactDonut ? (
                     <>
@@ -253,7 +254,7 @@ export default function ReportDonutSection({
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="var(--fg)"
-                  fontSize={compactDonut ? 15 : 18}
+                  fontSize={compactDonut ? 14 : 16}
                   fontWeight={800}
                 >
                   {donutTotalText}
@@ -263,8 +264,8 @@ export default function ReportDonutSection({
           </div>
 
           {/* List Breakdown */}
-          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_20%,transparent)] p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <div className="mb-2.5 flex items-center justify-between gap-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--muted-2)]">
                 {donutKind === 'income'
                   ? t('reports.topIncome')
@@ -280,7 +281,7 @@ export default function ReportDonutSection({
             {categoriesList.length === 0 ? (
               <EmptyState title={donutKind === 'income' ? t('reports.noIncomeYet') : t('reports.noExpenseYet')} />
             ) : (
-              <ul className="space-y-2.5">
+              <ul className="space-y-2">
                 {categoriesList.map((row, index) => {
                   const share = donutTotal > 0 ? (toSafeNumber(row.value) / donutTotal) * 100 : 0
                   return (
@@ -292,32 +293,32 @@ export default function ReportDonutSection({
                           setActivePieIdx(0)
                         }
                       }}
-                      className={`group relative overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_60%,transparent)] px-4 py-3 transition ${
+                      className={`group relative overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] px-3.5 py-2.5 transition ${
                         row.isParent
                           ? 'cursor-pointer hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_6%,var(--field-bg))]'
                           : 'hover:bg-[var(--field-bg)]'
                       }`}
                     >
                       <div className="relative z-10 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <span
-                            className="h-3 w-3 rounded-full shadow-inner shrink-0"
+                            className="h-2.5 w-2.5 rounded-full shadow-inner shrink-0"
                             style={{ background: ELEGANT_PIE_COLORS[index % ELEGANT_PIE_COLORS.length] }}
                           />
-                          <p className="truncate text-sm font-semibold text-[var(--fg)]">{row.label || '-'}</p>
+                          <p className="truncate text-xs sm:text-sm font-semibold text-[var(--fg)]">{row.label || '-'}</p>
                           {row.isParent ? (
-                            <span className="rounded bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-bold text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition shrink-0">
-                              {locale === 'en' ? 'Subcategories ›' : 'Lihat Sub ›'}
+                            <span className="rounded bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition shrink-0">
+                              {locale === 'en' ? 'Sub ›' : 'Lihat Sub ›'}
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm font-bold tabular-nums tracking-tight text-[var(--fg)] shrink-0">
+                        <p className="text-xs sm:text-sm font-bold tabular-nums tracking-tight text-[var(--fg)] shrink-0">
                           {formatCurrency(row.value, 'IDR')}
                         </p>
                       </div>
-                      <div className="relative z-10 mt-2.5 flex items-center justify-between gap-3">
-                        <p className="text-[11px] font-bold tabular-nums text-[var(--muted)]">{share.toFixed(1)}%</p>
-                        <div className="h-1.5 flex-1 rounded-full bg-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
+                      <div className="relative z-10 mt-2 flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-bold tabular-nums text-[var(--muted)]">{share.toFixed(1)}%</p>
+                        <div className="h-1 flex-1 rounded-full bg-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-500 ease-out"
                             style={{
@@ -333,7 +334,7 @@ export default function ReportDonutSection({
               </ul>
             )}
 
-            <div className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-3 text-center">
+            <div className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-2.5 text-center">
               <p className="text-xs font-medium text-[var(--muted)]">
                 {t('reports.avgExpense')}:{' '}
                 <span className="font-bold tracking-tight text-[var(--fg)]">{formatCurrency(averageExpense, 'IDR')}</span>

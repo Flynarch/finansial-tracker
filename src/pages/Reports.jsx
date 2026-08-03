@@ -204,7 +204,6 @@ export default function Reports() {
   }, [expenseByCategory, selectedDrilldownParent])
 
   const topIncomeCategories = useMemo(() => [...incomeByCategory].sort((a, b) => b.value - a.value).slice(0, 6), [incomeByCategory])
-  const selectedMonth = monthlyIncomeExpense[selectedMonthIdx ?? (monthlyIncomeExpense.length - 1)] || { income: 0, expense: 0, month: '-' }
 
   return (
     <div className="min-h-full">
@@ -227,7 +226,6 @@ export default function Reports() {
         {/* Monthly Income vs Expense Bar Chart */}
         <ReportBarChart
           monthlyIncomeExpense={monthlyIncomeExpense}
-          selectedMonth={selectedMonth}
           onSelectMonthIdx={setSelectedMonthIdx}
         />
 
