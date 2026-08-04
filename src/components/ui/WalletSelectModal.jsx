@@ -6,6 +6,22 @@ import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { formatCurrency } from '../../lib/utils'
 import useSettingsStore from '../../store/useSettingsStore'
 
+function formatAbbreviatedBalance(val, currency = 'IDR') {
+  const num = Number(val ?? 0)
+  if (!Number.isFinite(num) || num === 0) return `${currency === 'IDR' ? 'Rp' : currency} 0`
+  const abs = Math.abs(num)
+  const sign = num < 0 ? '-' : ''
+  if (abs >= 1000000) {
+    const millions = (abs / 1000000).toFixed(1).replace(/\.0$/, '')
+    return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${millions}jt`
+  }
+  if (abs >= 1000) {
+    const thousands = Math.round(abs / 1000)
+    return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${thousands}rb`
+  }
+  return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${abs}`
+}
+
 export function WalletSelectTrigger({
   wallet,
   placeholder = 'Pilih Dompet',
@@ -13,6 +29,8 @@ export function WalletSelectTrigger({
   className = '',
   disabled = false,
   error = false,
+  compact = false,
+  abbreviateBalance = false,
 }) {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
@@ -21,22 +39,26 @@ export function WalletSelectTrigger({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group flex min-h-[50px] w-full items-center justify-between gap-3 rounded-2xl border bg-[var(--field-bg)] px-3.5 py-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
-        disabled
-          ? 'opacity-60 cursor-not-allowed border-[var(--border)]'
-          : error
-          ? 'border-rose-500/50 hover:border-rose-500'
-          : 'border-[var(--border)] hover:border-[var(--border-strong)] active:scale-[0.99] cursor-pointer'
+      className={`group flex w-full items-center justify-between gap-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+        compact
+          ? 'min-h-[42px] rounded-xl bg-[var(--field-bg)] px-3 py-1.5 border-none hover:bg-[var(--panel-strong)] active:scale-[0.99] cursor-pointer'
+          : `min-h-[50px] rounded-2xl border bg-[var(--field-bg)] px-3.5 py-2.5 ${
+              disabled
+                ? 'opacity-60 cursor-not-allowed border-[var(--border)]'
+                : error
+                ? 'border-rose-500/50 hover:border-rose-500'
+                : 'border-[var(--border)] hover:border-[var(--border-strong)] active:scale-[0.99] cursor-pointer'
+            }`
       } ${className}`}
     >
       {wallet ? (
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--border)]/60 bg-[var(--panel)] overflow-hidden shadow-2xs">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} relative grid shrink-0 place-items-center border border-[var(--border)]/60 bg-[var(--panel)] overflow-hidden shadow-2xs`}>
             {getWalletLogoUrl(wallet) ? (
               <img
                 src={getWalletLogoUrl(wallet)}
                 alt={wallet.name}
-                className="h-6 w-6 object-contain"
+                className={`${compact ? 'h-5 w-5' : 'h-6 w-6'} object-contain`}
                 onError={(e) => {
                   e.target.style.display = 'none'
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -52,18 +74,18 @@ export function WalletSelectTrigger({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-black text-[var(--fg)] leading-tight">
+            <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
               {wallet.name}
             </p>
-            <p className="text-[10px] font-bold text-[var(--muted)] truncate tabular-nums mt-0.5">
-              Saldo: {formatCurrency(wallet.balance ?? wallet.currentBalance ?? 0, wallet.currency || defaultCurrency)}
+            <p className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5">
+              Saldo: {abbreviateBalance ? formatAbbreviatedBalance(wallet.balance ?? wallet.currentBalance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.balance ?? wallet.currentBalance ?? 0, wallet.currency || defaultCurrency)}
             </p>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-            <Wallet className="h-4 w-4" />
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} grid shrink-0 place-items-center border border-dashed border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]`}>
+            <Wallet className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           </div>
           <span className="text-xs font-bold text-[var(--muted)] truncate">
             {placeholder}
@@ -71,7 +93,7 @@ export function WalletSelectTrigger({
         </div>
       )}
 
-      <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-hover:text-[var(--fg)]" />
+      <ChevronDown className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-[var(--muted)] transition-transform group-hover:text-[var(--fg)]`} />
     </button>
   )
 }

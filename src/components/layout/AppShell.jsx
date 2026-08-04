@@ -153,8 +153,7 @@ function AppShell() {
       document.documentElement.style.overflow = ''
       document.documentElement.style.overscrollBehavior = ''
     }
-    // Reset scroll position to top when route changes
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    window.scrollTo(0, 0)
   }, [location.pathname])
 
   return (

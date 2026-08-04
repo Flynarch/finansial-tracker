@@ -30,8 +30,7 @@ export default function WalletDetailPage() {
   const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const allTransactions = useLiveQuery(async () => {
     const txs = await db.transactions
-      .where('walletId').equals(walletId)
-      .or('targetWalletId').equals(walletId)
+      .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
       .toArray()
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
   }, [walletId])
@@ -299,7 +298,7 @@ export default function WalletDetailPage() {
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(true)} 
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95"
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[var(--earthy-terra)]/80 hover:text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-soft)] transition active:scale-95"
                   title="Hapus Akun"
                   aria-label="Hapus Akun"
                 >

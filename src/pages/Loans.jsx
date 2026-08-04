@@ -26,7 +26,7 @@ export default function Loans() {
   const [activeTab, setActiveTab] = useState('debt') // 'debt' or 'receivable'
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    window.scrollTo(0, 0)
     const id = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(id)
   }, [])
@@ -179,10 +179,10 @@ export default function Loans() {
             {/* Total Debt */}
             <div className="min-w-0">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
-                <HandCoins className="h-3.5 w-3.5 text-rose-500" />
-                Hutang Saya
+                <HandCoins className="h-3.5 w-3.5 text-[var(--earthy-terra)]" />
+                Utang Saya
               </span>
-              <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-rose-500">
+              <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-terra)]">
                 {formatCurrency(totals.totalDebt, defaultCurrency)}
               </p>
             </div>
@@ -190,10 +190,10 @@ export default function Loans() {
             {/* Total Receivable */}
             <div className="min-w-0 pl-4">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
-                <Receipt className="h-3.5 w-3.5 text-emerald-500" />
+                <Receipt className="h-3.5 w-3.5 text-[var(--earthy-green)]" />
                 Piutang Saya
               </span>
-              <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-emerald-500">
+              <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-green)]">
                 {formatCurrency(totals.totalReceivable, defaultCurrency)}
               </p>
             </div>
@@ -214,12 +214,12 @@ export default function Loans() {
             onClick={() => setActiveTab('debt')}
             className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'debt'
-                ? 'bg-[var(--accent)] text-white shadow-xs'
+                ? 'bg-[var(--earthy-terra)] text-white shadow-xs'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
             <HandCoins className="h-3.5 w-3.5" />
-            Hutang Saya ({rows.filter((r) => r.type === 'debt').length})
+            Utang Saya ({rows.filter((r) => r.type === 'debt').length})
           </button>
 
           <button
@@ -227,7 +227,7 @@ export default function Loans() {
             onClick={() => setActiveTab('receivable')}
             className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'receivable'
-                ? 'bg-[var(--accent)] text-white shadow-xs'
+                ? 'bg-[var(--earthy-green)] text-white shadow-xs'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
@@ -240,11 +240,11 @@ export default function Loans() {
         <div className="space-y-3 pt-1">
           {filteredRows.length === 0 ? (
             <EmptyState
-              title={activeTab === 'debt' ? 'Belum Ada Catatan Hutang' : 'Belum Ada Catatan Piutang'}
-              description={activeTab === 'debt' ? 'Tekan "Catat Baru" untuk menambah catatan hutang Anda.' : 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.'}
+              title={activeTab === 'debt' ? 'Belum Ada Catatan Utang' : 'Belum Ada Catatan Piutang'}
+              description={activeTab === 'debt' ? 'Tekan "Catat Baru" untuk menambah catatan utang Anda.' : 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.'}
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 ft-stagger-in">
               {filteredRows.map((item) => {
                 const isPaid = item.status === 'paid' || item.remaining <= 0
                 const isDebt = item.type === 'debt'
@@ -259,8 +259,8 @@ export default function Loans() {
                         <div
                           className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl border ${
                             isDebt
-                              ? 'bg-rose-500/15 text-rose-500 border-rose-500/25'
-                              : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                              ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25'
+                              : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25'
                           }`}
                         >
                           {isDebt ? <HandCoins className="h-5 w-5" /> : <Receipt className="h-5 w-5" />}
@@ -292,11 +292,11 @@ export default function Loans() {
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black ${
                             isPaid
-                              ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                              ? 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
                               : item.status === 'partially_paid'
                                 ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
                                 : item.isOverdue
-                                  ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
+                                  ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border border-[var(--earthy-terra)]/25'
                                   : 'bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]'
                           }`}
                         >
@@ -319,7 +319,7 @@ export default function Loans() {
                         {item.dueText && !isPaid && (
                           <span
                             className={`text-[10px] font-extrabold ${
-                              item.isOverdue ? 'text-rose-500' : 'text-[var(--muted)]'
+                              item.isOverdue ? 'text-[var(--earthy-terra)]' : 'text-[var(--muted)]'
                             }`}
                           >
                             {item.dueText}
@@ -332,7 +332,7 @@ export default function Loans() {
                     <div className="mt-3.5 h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)] overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          isPaid ? 'bg-emerald-500' : isDebt ? 'bg-rose-500' : 'bg-emerald-500'
+                          isPaid ? 'bg-[var(--earthy-green)]' : isDebt ? 'bg-[var(--earthy-terra)]' : 'bg-[var(--earthy-green)]'
                         }`}
                         style={{ width: `${item.pct}%` }}
                       />
@@ -342,7 +342,7 @@ export default function Loans() {
                     <div className="mt-2 flex items-center justify-between text-[11px] font-bold">
                       <span className="text-[var(--muted)]">
                         {isPaid ? (
-                          <span className="text-emerald-500 font-extrabold">Pinjaman Lunas</span>
+                          <span className="text-[var(--earthy-green)] font-extrabold">Pinjaman Lunas</span>
                         ) : (
                           <>
                             Sisa <span className="text-[var(--fg)] font-black">{formatCurrency(item.remaining, item.currency || defaultCurrency)}</span> lagi
@@ -363,8 +363,8 @@ export default function Loans() {
                             onClick={(e) => openPaymentModal(item, e)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 border ${
                               isDebt
-                                ? 'bg-rose-500/15 text-rose-500 border-rose-500/30 hover:bg-rose-500/25'
-                                : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/25'
+                                ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25 hover:bg-[var(--earthy-terra)]/20'
+                                : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25 hover:bg-[var(--earthy-green)]/20'
                             }`}
                           >
                             <Plus className="h-3.5 w-3.5" strokeWidth={3} />
@@ -388,7 +388,7 @@ export default function Loans() {
                             e.stopPropagation()
                             setDeletingLoan(item)
                           }}
-                          className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer"
                           title="Hapus Catatan"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

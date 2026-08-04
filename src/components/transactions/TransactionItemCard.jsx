@@ -76,12 +76,12 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   } else if (transaction.type === 'transfer') {
     iconKey = 'arrow-right-left'
     if (contextWalletId && contextWalletId === transaction.targetWalletId) {
-      colorClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+      colorClass = 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)]'
       labels = { main: `Transfer dari ${getWalletName(transaction.walletId)}`, sub: 'Transfer Masuk' }
       amountPrefix = '+'
       amountColorClass = 'ft-income-text'
     } else if (contextWalletId && contextWalletId === transaction.walletId) {
-      colorClass = 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
+      colorClass = 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)]'
       labels = { main: `Transfer ke ${getWalletName(transaction.targetWalletId)}`, sub: 'Transfer Keluar' }
       amountPrefix = '-'
       amountColorClass = 'ft-expense-text'
@@ -129,7 +129,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         </button>
         <button
           type="button"
-          className="rounded-lg border border-rose-500/30 bg-rose-500/12 px-3 py-1.5 text-xs font-semibold text-rose-400 cursor-pointer"
+          className="rounded-lg border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--earthy-terra)] cursor-pointer"
           onClick={() => {
             if (transaction.loanId) {
               if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')

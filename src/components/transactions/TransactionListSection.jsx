@@ -54,14 +54,14 @@ export const TransactionListSection = memo(function TransactionListSection({
               onScroll={onScroll}
             >
               <div className="min-h-full space-y-4 p-1 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
-                {groupedEntriesDetailed.map((group) => (
-                  <section key={group.dateKey} className="space-y-2">
+                {groupedEntriesDetailed.map((group, idx) => (
+                  <section key={group.dateKey} className="space-y-2 ft-stagger-in" style={{ '--stagger': idx }}>
                     <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--border)]/40">
                       <span className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
                         {group.dateLabel}
                       </span>
                       {group.dailySummaryText ? (
-                        <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-green-600 dark:text-green-400' : 'text-[var(--muted)]'}`}>
+                        <span className={`text-[11px] font-extrabold tabular-nums ${group.isPositive ? 'text-[var(--earthy-green)]' : 'text-[var(--muted)]'}`}>
                           {group.dailySummaryText}
                         </span>
                       ) : null}

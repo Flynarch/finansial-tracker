@@ -5,6 +5,16 @@ import './index.css'
 import App from './App.jsx'
 import { initFirebaseAnalytics } from './lib/firebase'
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.warn('Unhandled promise rejection:', event.reason)
+    if (typeof event.preventDefault === 'function') event.preventDefault()
+  })
+  window.addEventListener('error', (event) => {
+    console.warn('Global error caught:', event.error || event.message)
+  })
+}
+
 void initFirebaseAnalytics()
 
 createRoot(document.getElementById('root')).render(

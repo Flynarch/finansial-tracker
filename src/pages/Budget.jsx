@@ -30,7 +30,7 @@ function Budget() {
   const [isLeaving, setIsLeaving] = useState(false)
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    window.scrollTo(0, 0)
     const id = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(id)
   }, [])
@@ -175,10 +175,10 @@ function Budget() {
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${
                   summary.pct >= 100
-                    ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                    ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/30'
                     : summary.pct >= 80
-                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                    : 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
+                    ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                    : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
                 }`}
               >
                 {Math.round(summary.pct)}%
@@ -190,10 +190,10 @@ function Budget() {
             <div
               className={`h-full rounded-full transition-all duration-700 ease-out ${
                 summary.pct >= 100
-                  ? 'bg-rose-500'
+                  ? 'bg-[var(--earthy-terra)]'
                   : summary.pct >= 80
                   ? 'bg-amber-500'
-                  : 'bg-[var(--accent)]'
+                  : 'bg-[var(--earthy-green)]'
               }`}
               style={{ width: `${Math.min(100, summary.pct)}%` }}
             />
@@ -211,7 +211,7 @@ function Budget() {
           {monthBudgets.length === 0 ? (
             <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ft-stagger-in">
               {monthBudgets.map((b) => {
                 const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
                 const limit = toSafeNumber(b.limit)
@@ -226,16 +226,16 @@ function Budget() {
                 const isWarn = pct >= 80 && pct < 100
 
                 const badgeClass = isDanger
-                  ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
+                  ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border border-[var(--earthy-terra)]/30'
                   : isWarn
                   ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                  : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
 
                 const barClass = isDanger
-                  ? 'bg-gradient-to-r from-rose-500 to-pink-500'
+                  ? 'bg-[var(--earthy-terra)]'
                   : isWarn
                   ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                  : 'bg-[var(--earthy-green)]'
 
                 return (
                   <div
@@ -258,7 +258,7 @@ function Budget() {
                       </button>
                       <button
                         type="button"
-                        className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-2.5 py-1.5 text-[11px] font-bold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                        className="rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer"
                         onClick={() => setDeletingBudget(b)}
                       >
                         {t('budget.delete')}
@@ -309,7 +309,7 @@ function Budget() {
                         <span className="text-[var(--muted)]">
                           {isOver ? `Over budget` : `Sisa`}
                         </span>
-                        <span className={isOver ? 'text-rose-500' : 'text-[var(--fg)]'}>
+                        <span className={isOver ? 'text-[var(--earthy-terra)]' : 'text-[var(--fg)]'}>
                           {isOver ? formatCurrency(spent - limit, defaultCurrency) : formatCurrency(remaining, defaultCurrency)}
                         </span>
                       </div>

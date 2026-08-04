@@ -52,7 +52,7 @@ export default function PageHeader({
       ) : <div className="w-9" />}
 
       {title ? (
-        <h1 className={`absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-base sm:text-lg font-extrabold tracking-tight text-[var(--fg)] pointer-events-none ${titleUppercase ? 'uppercase' : ''}`} style={{ fontFamily: 'var(--font-display)' }}>
+        <h1 className={`absolute left-1/2 -translate-x-1/2 max-w-[60%] truncate text-center text-[17px] sm:text-lg font-extrabold tracking-tight text-[var(--fg)] pointer-events-none ${titleUppercase ? 'uppercase' : ''}`} style={{ fontFamily: 'var(--font-display)' }}>
           {title}
         </h1>
       ) : null}

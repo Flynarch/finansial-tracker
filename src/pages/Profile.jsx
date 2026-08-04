@@ -129,7 +129,14 @@ function Profile() {
 
   const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
   const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
-  const goalsCount = useLiveQuery(() => db.goals.count(), [], 0)
+  const goalsCount = useLiveQuery(async () => {
+    try {
+      const all = await db.goals.toArray()
+      return all.filter((g) => !g.isCompleted && !g.isArchived).length
+    } catch {
+      return 0
+    }
+  }, [], 0)
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
@@ -209,27 +216,21 @@ function Profile() {
         </section>
 
         {/* ── Stats row ── */}
-        <section className="flex gap-3">
+        <section className="flex gap-3 ft-stagger-in">
           <ProfileStatCard
             value={txCount}
             label={t('profile.stats.transactions')}
             icon="tx"
-            accentColor="#5eead4"
-            accentBg="rgba(94,234,212,0.14)"
           />
           <ProfileStatCard
             value={budgetCount}
             label={t('profile.stats.budgets')}
             icon="budget"
-            accentColor="#818cf8"
-            accentBg="rgba(129,140,248,0.14)"
           />
           <ProfileStatCard
             value={goalsCount}
             label={t('profile.stats.goals')}
             icon="goals"
-            accentColor="#f472b6"
-            accentBg="rgba(244,114,182,0.14)"
           />
         </section>
 

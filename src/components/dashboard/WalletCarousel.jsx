@@ -46,7 +46,7 @@ export default function WalletCarousel({
             if (slides[activeSlide]) {
               scrollRef.current.scrollTo({
                 left: slides[activeSlide].offsetLeft,
-                behavior: 'instant'
+                behavior: 'auto'
               })
             }
           }
@@ -107,7 +107,7 @@ export default function WalletCarousel({
 
 
   return (
-    <section className="mb-4 relative">
+    <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
@@ -127,7 +127,7 @@ export default function WalletCarousel({
           </div>
 
           {/* Main amount */}
-          <p className="relative z-10 ft-display mt-2 text-[2.25rem] leading-[1.05] font-black tracking-tight tabular-nums text-[var(--fg)] break-words">
+          <p className="relative z-10 ft-hero-number mt-2 break-words">
             <span className="whitespace-nowrap">{formatCurrency(sisaKeuangan, defaultCurrency)}</span>
           </p>
 
@@ -139,10 +139,10 @@ export default function WalletCarousel({
                 <ArrowDownLeft size={16} strokeWidth={2.5} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-income)' }}>
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-green)' }}>
                   Pemasukan
                 </p>
-                <p className="mt-0.5 text-[12px] font-black tabular-nums truncate" style={{ color: 'var(--status-income)' }}>
+                <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-green)' }}>
                   {formatCurrency(monthIncome, defaultCurrency)}
                 </p>
               </div>
@@ -154,10 +154,10 @@ export default function WalletCarousel({
                 <ArrowUpRight size={16} strokeWidth={2.5} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--status-expense)' }}>
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-terra)' }}>
                   Pengeluaran
                 </p>
-                <p className="mt-0.5 text-[12px] font-black tabular-nums truncate" style={{ color: 'var(--status-expense)' }}>
+                <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-terra)' }}>
                   {formatCurrency(monthExpense, defaultCurrency)}
                 </p>
               </div>
@@ -179,7 +179,7 @@ export default function WalletCarousel({
             </div>
 
             {/* Main amount */}
-            <p className="relative z-10 ft-display mt-2 break-all text-[2.25rem] leading-[1.05] font-black tracking-tight tabular-nums text-[var(--fg)]">
+            <p className="relative z-10 ft-hero-number mt-2 break-all">
               {formatCurrency(totalSaldo, defaultCurrency)}
             </p>
           </div>

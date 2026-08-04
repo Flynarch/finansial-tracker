@@ -704,7 +704,7 @@ function Transactions() {
                   <button
                     type="button"
                     onClick={() => setDraftFilters((p) => ({ ...(p || filters), startDate: '', endDate: '' }))}
-                    className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
+                    className="text-[10px] font-bold text-[var(--earthy-terra)] hover:underline cursor-pointer"
                   >
                     Hapus Tanggal
                   </button>

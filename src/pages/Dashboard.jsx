@@ -426,7 +426,8 @@ function Dashboard() {
   const budgetGoalSummary = useMemo(() => {
     const monthBudgets = (budgets ?? []).filter((b) => b.month === currentMonthKey)
     const monthBudgetCount = monthBudgets.length
-    const goalCount = (goals ?? []).length
+    const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isArchived)
+    const goalCount = activeGoals.length
     const monthExpenseTxs = (transactions ?? []).filter(
       (tx) => tx?.type === 'expense' && tx?.date?.startsWith(currentMonthKey) && !isExcludeAnalyticsTx(tx),
     )
@@ -453,17 +454,17 @@ function Dashboard() {
     const totalSpent = monthExpenseTotal
     const budgetPercent = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0
 
-    const goalTarget = (goals ?? []).reduce(
+    const goalTarget = activeGoals.reduce(
       (sum, g) => sum + convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, rates),
       0,
     )
-    const goalCurrent = (goals ?? []).reduce(
+    const goalCurrent = activeGoals.reduce(
       (sum, g) => sum + convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, rates),
       0,
     )
     const goalPercent = goalTarget > 0 ? Math.min(100, Math.round((goalCurrent / goalTarget) * 100)) : 0
 
-    const goalRows = (goals ?? []).map((g) => {
+    const goalRows = activeGoals.map((g) => {
       const target = convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, rates)
       const current = convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, rates)
       const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
@@ -1167,7 +1168,7 @@ function Dashboard() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className={`text-[13px] font-black ${isExpense ? 'text-[var(--fg)]' : 'text-emerald-500'}`}>
+                      <p className={`text-[13px] font-black ${isExpense ? 'ft-expense-text' : 'ft-income-text'}`}>
                         {isExpense ? '-' : '+'}{formatCurrency(convertCurrency(toSafeNumber(latestTx?.amount), latestTx?.currency || defaultCurrency, defaultCurrency, rates), defaultCurrency, locale)}
                       </p>
                     </div>
@@ -1205,8 +1206,8 @@ function Dashboard() {
 
 
       <div
-        className="ft-interactive-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        style={{ boxShadow: 'var(--shadow-card)' }}
+        className="ft-interactive-card ft-stagger-in rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        style={{ boxShadow: 'var(--shadow-card)', '--stagger': 1 }}
         onClick={() => setZoomedChart('habits')}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setZoomedChart('habits') }}
       >
@@ -1231,7 +1232,7 @@ function Dashboard() {
       </div>
 
       {/* Swipeable Budget & Savings Widget (Positioned right above Net Worth) */}
-      <section data-tour="budget-chart-section" className="mb-4">
+      <section data-tour="budget-chart-section" className="mb-4 ft-stagger-in" style={{ '--stagger': 2 }}>
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
           {/* Header Row with Active Expandable Pill Dots */}
           <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
@@ -1346,7 +1347,7 @@ function Dashboard() {
                                   ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
                                   : isWarn
                                   ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                                  : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
                               }`}
                             >
                               {Math.round(row.pct)}%
@@ -1365,7 +1366,7 @@ function Dashboard() {
                                     ? 'bg-gradient-to-r from-rose-500 to-pink-500'
                                     : isWarn
                                     ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                                    : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                    : 'bg-[var(--earthy-green)]'
                                 }`}
                                 style={{ width: `${Math.min(100, row.pct)}%` }}
                               />
@@ -1402,7 +1403,7 @@ function Dashboard() {
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25">
                                 <Target className="h-4 w-4" />
                               </div>
                               <div className="min-w-0">
@@ -1418,7 +1419,7 @@ function Dashboard() {
                             <span
                               className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wide ${
                                 isComplete
-                                  ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                                  ? 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
                                   : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
                               }`}
                             >
@@ -1433,7 +1434,7 @@ function Dashboard() {
                             </div>
                             <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                                className="h-full rounded-full bg-[var(--earthy-green)] transition-all duration-500"
                                 style={{ width: `${Math.min(100, row.pct)}%` }}
                               />
                             </div>
@@ -1454,7 +1455,7 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3">
+      <section className="grid grid-cols-1 gap-3 ft-stagger-in" style={{ '--stagger': 3 }}>
         <MiniChartCard
           t={t}
           title={t('dashboard.netWorth')}
@@ -1463,16 +1464,16 @@ function Dashboard() {
             <span
               className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border transition-colors ${
                 netWorthGrowth.net > 0
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                  ? 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/20'
                   : netWorthGrowth.net < 0
-                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                  ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/20'
                   : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
               }`}
             >
               {netWorthGrowth.net > 0 ? (
-                <TrendingUp className="h-3 w-3 shrink-0 text-emerald-500" strokeWidth={2.5} />
+                <TrendingUp className="h-3 w-3 shrink-0 text-[var(--earthy-green)]" strokeWidth={2.5} />
               ) : netWorthGrowth.net < 0 ? (
-                <TrendingDown className="h-3 w-3 shrink-0 text-rose-500" strokeWidth={2.5} />
+                <TrendingDown className="h-3 w-3 shrink-0 text-[var(--earthy-terra)]" strokeWidth={2.5} />
               ) : null}
               <span>{netWorthGrowth.miniLabel}</span>
             </span>
@@ -1512,7 +1513,7 @@ function Dashboard() {
 
       
       {/* Standalone Bento Card for Utang & Piutang */}
-      <section className="mb-4">
+      <section className="mb-4 ft-stagger-in" style={{ '--stagger': 4 }}>
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
           {/* Header Row */}
           <div className="flex items-center justify-between gap-3">
@@ -1560,15 +1561,15 @@ function Dashboard() {
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Posisi Bersih (Net Position)</span>
                 <p className={`text-base sm:text-lg font-black tabular-nums tracking-tight ${
-                  loanSummary.netPosition > 0 ? 'text-emerald-500' : loanSummary.netPosition < 0 ? 'text-rose-500' : 'text-[var(--fg)]'
+                  loanSummary.netPosition > 0 ? 'text-[var(--earthy-green)]' : loanSummary.netPosition < 0 ? 'text-[var(--earthy-terra)]' : 'text-[var(--fg)]'
                 }`}>
                   {loanSummary.netPosition > 0 ? '+' : ''}{formatCurrency(loanSummary.netPosition, defaultCurrency)}
                 </p>
               </div>
 
               <div className="text-right flex flex-col items-end text-xs font-extrabold tabular-nums">
-                <span className="text-rose-500">Hutang: {formatCurrency(loanSummary.totalDebt, defaultCurrency)}</span>
-                <span className="text-emerald-500">Piutang: {formatCurrency(loanSummary.totalReceivable, defaultCurrency)}</span>
+                <span className="text-[var(--earthy-terra)]">Utang: {formatCurrency(loanSummary.totalDebt, defaultCurrency)}</span>
+                <span className="text-[var(--earthy-green)]">Piutang: {formatCurrency(loanSummary.totalReceivable, defaultCurrency)}</span>
               </div>
             </div>
 
@@ -1576,14 +1577,14 @@ function Dashboard() {
             <div className="space-y-1 pt-0.5">
               <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
                 <div
-                  className="h-full bg-emerald-500 transition-all duration-500"
+                  className="h-full bg-[var(--earthy-green)] transition-all duration-500"
                   style={{ width: `${loanSummary.receivablePct}%` }}
                   title={`Piutang: ${loanSummary.receivablePct}%`}
                 />
                 <div
-                  className="h-full bg-rose-500 transition-all duration-500"
+                  className="h-full bg-[var(--earthy-terra)] transition-all duration-500"
                   style={{ width: `${loanSummary.debtPct}%` }}
-                  title={`Hutang: ${loanSummary.debtPct}%`}
+                  title={`Utang: ${loanSummary.debtPct}%`}
                 />
               </div>
             </div>
@@ -1603,8 +1604,8 @@ function Dashboard() {
                   <div
                     className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${
                       loanSummary.mostUrgentItem.type === 'debt'
-                        ? 'bg-rose-500/15 text-rose-500 border-rose-500/25'
-                        : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                        ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25'
+                        : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25'
                     }`}
                   >
                     {loanSummary.mostUrgentItem.type === 'debt' ? (

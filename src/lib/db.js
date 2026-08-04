@@ -364,8 +364,7 @@ export async function getWalletCurrentBalance(walletId) {
   if (!wallet) return 0
 
   const allTxs = await db.transactions
-    .where('walletId').equals(walletId)
-    .or('targetWalletId').equals(walletId)
+    .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
     .toArray()
 
   return computeWalletBalance(wallet, allTxs)

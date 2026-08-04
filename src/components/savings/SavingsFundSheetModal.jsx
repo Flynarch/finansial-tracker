@@ -13,7 +13,8 @@ export default function SavingsFundSheetModal({
   isOpen,
   onClose,
   goal,
-  initialAction = 'add' // 'add' | 'withdraw'
+  initialAction = 'add', // 'add' | 'withdraw'
+  onGoalCompleted,
 }) {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [fundActionType, setFundActionType] = useState(initialAction)
@@ -101,7 +102,16 @@ export default function SavingsFundSheetModal({
         })
       }
 
+      const targetAmt = Number(goal.targetAmount || 0)
+      const isTargetAchieved = !isWithdraw && targetAmt > 0 && newGoalAmount >= targetAmt
+
       onClose()
+
+      if (isTargetAchieved) {
+        window.setTimeout(() => {
+          onGoalCompleted?.({ ...goal, currentAmount: newGoalAmount })
+        }, 150)
+      }
     } catch (err) {
       console.error('Failed to save savings transaction:', err)
     } finally {
@@ -126,7 +136,7 @@ export default function SavingsFundSheetModal({
             onClick={() => setFundActionType('add')}
             className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
               fundActionType === 'add'
-                ? 'bg-emerald-500 text-white shadow-sm scale-[1.02]'
+                ? 'bg-[var(--earthy-green)] text-white shadow-sm scale-[1.02]'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
@@ -138,7 +148,7 @@ export default function SavingsFundSheetModal({
             onClick={() => setFundActionType('withdraw')}
             className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
               fundActionType === 'withdraw'
-                ? 'bg-rose-500 text-white shadow-sm scale-[1.02]'
+                ? 'bg-[var(--earthy-terra)] text-white shadow-sm scale-[1.02]'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
@@ -225,15 +235,27 @@ export default function SavingsFundSheetModal({
           />
         </div>
 
+        {/* Warning if withdrawal exceeds balance */}
+        {fundActionType === 'withdraw' && parseMoneyInput(amountInput) > Number(goal.currentAmount || 0) && (
+          <div className="rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] p-2.5 text-center text-xs font-bold text-[var(--earthy-terra)]">
+            Nominal penarikan melebihi saldo tabungan terkumpul.
+          </div>
+        )}
+
         {/* Submit Button */}
         <button
           type="button"
-          disabled={!amountInput || parseMoneyInput(amountInput) <= 0 || isSubmitting}
+          disabled={
+            !amountInput ||
+            parseMoneyInput(amountInput) <= 0 ||
+            isSubmitting ||
+            (fundActionType === 'withdraw' && parseMoneyInput(amountInput) > Number(goal.currentAmount || 0))
+          }
           onClick={handleSave}
           className={`w-full py-3.5 rounded-2xl font-black text-xs text-white shadow-md transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
             fundActionType === 'withdraw'
-              ? 'bg-rose-500 hover:bg-rose-600'
-              : 'bg-emerald-500 hover:bg-emerald-600'
+              ? 'bg-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-dark)]'
+              : 'bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)]'
           }`}
         >
           <Check className="h-4 w-4" />

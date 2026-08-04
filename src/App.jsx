@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoadingScreen from './components/ui/LoadingScreen'
 import ProductTourOverlay from './components/onboarding/ProductTourOverlay'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
@@ -28,36 +29,38 @@ const TodoDetailPage = lazy(() => import('./pages/TodoDetailPage'))
 
 function App() {
   return (
-    <Suspense fallback={<LoadingScreen />}>
-      <ProductTourOverlay />
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/todos" element={<TodoList />} />
-          <Route path="/investments" element={<Investments />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/budget" element={<Budget />} />
-          <Route path="/savings" element={<Savings />} />
-          <Route path="/savings/:id" element={<SavingsDetail />} />
-          <Route path="/loans" element={<Loans />} />
-          <Route path="/add-account" element={<AddAccountPage />} />
-          <Route path="/wallet/:id" element={<WalletDetailPage />} />
-          <Route path="/todos/:id" element={<TodoDetailPage />} />
-          <Route path="/settings" element={<SettingsLayout />}>
-            <Route index element={<SettingsHome />} />
-            <Route path="security" element={<SettingsSecurity />} />
-            <Route path="categories" element={<SettingsCategories />} />
-            <Route path="recurring" element={<SettingsRecurring />} />
-            <Route path="data" element={<SettingsData />} />
-            <Route path="help" element={<SettingsHelp />} />
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingScreen />}>
+        <ProductTourOverlay />
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/todos" element={<TodoList />} />
+            <Route path="/investments" element={<Investments />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/budget" element={<Budget />} />
+            <Route path="/savings" element={<Savings />} />
+            <Route path="/savings/:id" element={<SavingsDetail />} />
+            <Route path="/loans" element={<Loans />} />
+            <Route path="/add-account" element={<AddAccountPage />} />
+            <Route path="/wallet/:id" element={<WalletDetailPage />} />
+            <Route path="/todos/:id" element={<TodoDetailPage />} />
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route index element={<SettingsHome />} />
+              <Route path="security" element={<SettingsSecurity />} />
+              <Route path="categories" element={<SettingsCategories />} />
+              <Route path="recurring" element={<SettingsRecurring />} />
+              <Route path="data" element={<SettingsData />} />
+              <Route path="help" element={<SettingsHelp />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 

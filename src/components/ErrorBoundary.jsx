@@ -32,7 +32,11 @@ export class ErrorBoundary extends React.Component {
             Mungkin fitur ini (Database/Penyimpanan Lokal) sedang diblokir oleh browser ponselmu, atau ada bug lain.
           </p>
           <div className="w-full max-w-md overflow-auto rounded-lg bg-[var(--panel-strong)] p-4 text-left text-xs text-red-400 font-mono shadow-inner border border-red-500/20">
-            <p className="font-bold mb-2 break-all">{this.state.error?.toString()}</p>
+            <p className="font-bold mb-2 break-all">
+              {typeof this.state.error === 'object' && this.state.error !== null
+                ? this.state.error.message || JSON.stringify(this.state.error)
+                : String(this.state.error || 'Unknown error')}
+            </p>
             <p className="whitespace-pre-wrap">{this.state.errorInfo?.componentStack}</p>
           </div>
           <button 

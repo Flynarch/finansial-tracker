@@ -8,9 +8,9 @@ export function ProgressBar({ value, className = '', tone }) {
   const pct = clampPercent(value)
   let fillTone = ''
   if (tone === 'budget') {
-    fillTone = value >= 100 ? 'bg-rose-500 dark:bg-rose-400' : value >= 80 ? 'bg-amber-500 dark:bg-amber-400' : ''
+    fillTone = value >= 100 ? 'ft-progress-fill--overrun' : value >= 80 ? 'bg-amber-500/80' : ''
   } else if (tone === 'savings') {
-    fillTone = 'bg-sky-500 dark:bg-sky-400'
+    fillTone = ''
   }
   return (
     <div className={`ft-progress-bar ${className}`}>
@@ -28,11 +28,11 @@ export function MetricCard({ title, value, rightLabel, progress = 0, showProgres
   return (
     <section
       className={`rounded-2xl border p-3 shadow-sm transition sm:p-4 ${toneCfg.border} ${toneCfg.bg} ${toneCfg.fg}`}
-      style={{ background: active ? 'var(--fg)' : 'var(--panel-strong)', boxShadow: 'var(--shadow-card)' }}
+      style={{ background: active ? 'var(--fg)' : 'var(--panel-strong)' }}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className={`ft-display break-all text-[17px] font-semibold leading-tight tracking-tight tabular-nums sm:text-xl ${active ? 'text-[var(--bg)]' : 'text-[var(--fg)]'}`}>
+          <p className={`ft-display break-all text-xl font-bold leading-tight tracking-tight tabular-nums sm:text-[22px] ${active ? 'text-[var(--bg)]' : 'text-[var(--fg)]'}`}>
             {value}
           </p>
           <p className={`mt-1 text-[11px] ${active ? 'text-[var(--bg)]/70' : 'text-[var(--muted)]'}`}>{title}</p>
@@ -76,7 +76,6 @@ export const MiniChartCard = memo(function MiniChartCard({
       type="button"
       onClick={onOpen}
       className="ft-interactive-card w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-left shadow-sm sm:p-4"
-      style={{ boxShadow: 'var(--shadow-card)' }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -177,7 +176,7 @@ export const ChartToggle = memo(function ChartToggle({ value, onChange, items, c
             onClick={() => onChange?.(item.id)}
             className={`relative flex h-8 items-center justify-center rounded-xl text-[11px] font-bold tracking-tight transition-colors duration-150 active:scale-95 ${
               isActive
-                ? 'bg-[var(--accent)] text-white shadow-xs'
+                ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs'
                 : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--border)]/40'
             }`}
           >
