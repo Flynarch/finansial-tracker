@@ -24,7 +24,6 @@ function getTimeBasedGreeting(locale = 'id') {
 function Navbar() {
   const { t, locale } = useTranslation()
   const profileName = useSettingsStore((state) => state.profileName)
-  const resetSpotlightTour = useSettingsStore((state) => state.resetSpotlightTour)
   const greetingText = getTimeBasedGreeting(locale)
   const [showNotifications, setShowNotifications] = useState(false)
   const dropdownRef = useRef(null)
@@ -88,20 +87,6 @@ function Navbar() {
           <span className="hidden rounded-lg bg-[var(--field-bg)] px-3 py-1.5 text-[11px] font-bold tracking-wide text-[var(--muted)] sm:inline-block">
             {todayLabel}
           </span>
-
-          <button
-            type="button"
-            onClick={resetSpotlightTour}
-            aria-label="Petunjuk Aplikasi"
-            title="Mulai Tur Fitur"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 transition-colors duration-200"
-          >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </button>
 
           <div className="relative">
             <button

@@ -201,7 +201,7 @@ export default function SettingsHome() {
         <SettingsLinkRow to="/settings/security" label={t('settings.appLock')} />
         <SettingsLinkRow to="/settings/recurring" label={t('settings.recurringTitle')} />
         <SettingsLinkRow to="/settings/data" label={t('settings.nav.data')} />
-        <SettingsLinkRow to="/settings/help" label={t('profile.help')} />
+        <SettingsLinkRow to="/settings/help" label="Tur & Panduan Aplikasi" />
       </SettingsSection>
     </>
   )
