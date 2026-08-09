@@ -94,6 +94,7 @@ export default function OnboardingFlow() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [usernameError, setUsernameError] = useState('')
   const [cameFromStep3, setCameFromStep3] = useState(false)
+  const [editingUsernameFromStep3, setEditingUsernameFromStep3] = useState(false)
   const [showAllWallets, setShowAllWallets] = useState(false)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
@@ -157,18 +158,33 @@ export default function OnboardingFlow() {
         return
       }
       setUsernameError('')
+      if (editingUsernameFromStep3) {
+        setEditingUsernameFromStep3(false)
+        goTo(3)
+        return
+      }
     }
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
-  }, [step, username, goTo])
+  }, [step, username, editingUsernameFromStep3, goTo])
 
   const handleBack = useCallback(() => {
+    if (step === 1 && editingUsernameFromStep3) {
+      setEditingUsernameFromStep3(false)
+      goTo(3)
+      return
+    }
     if (step === 2 && cameFromStep3) {
       setCameFromStep3(false)
       goTo(3)
       return
     }
     goTo(Math.max(step - 1, 0))
-  }, [step, cameFromStep3, goTo])
+  }, [step, editingUsernameFromStep3, cameFromStep3, goTo])
+
+  const handleEditUsernameFromStep3 = useCallback(() => {
+    setEditingUsernameFromStep3(true)
+    goTo(1)
+  }, [goTo])
 
   const handleAddExtraWallet = useCallback(() => {
     setCameFromStep3(true)
@@ -361,7 +377,7 @@ export default function OnboardingFlow() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => goTo(1)}
+                    onClick={handleEditUsernameFromStep3}
                     className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] transition hover:bg-[var(--border)]/40 cursor-pointer"
                   >
                     Ubah
