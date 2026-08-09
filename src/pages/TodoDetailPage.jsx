@@ -237,6 +237,9 @@ export default function TodoDetailPage() {
   const handleToggleComplete = useCallback(async () => {
     if (!todo || !todoId) return
     const next = !todo.completed
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(15) } catch { /* ignore */ }
+    }
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.todos.update(todoId, { completed: next })
       await db.sub_tasks.where('todoId').equals(todoId).modify({ checked: next })
@@ -252,22 +255,50 @@ export default function TodoDetailPage() {
   }, [todo, todoId, navigate])
 
   const handleToggleSubTask = useCallback(async (sub) => {
-    if (!sub?.id) return
-    await db.sub_tasks.update(sub.id, { checked: !sub.checked })
-  }, [])
+    if (!sub?.id || !todoId) return
+    const nextChecked = !sub.checked
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(nextChecked ? 15 : 10) } catch { /* ignore */ }
+    }
+    await db.transaction('rw', db.todos, db.sub_tasks, async () => {
+      await db.sub_tasks.update(sub.id, { checked: nextChecked })
+      const allSubs = await db.sub_tasks.where('todoId').equals(todoId).toArray()
+      if (allSubs.length > 0) {
+        const allDone = allSubs.every((s) => (s.id === sub.id ? nextChecked : s.checked))
+        if (allDone) {
+          if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            try { navigator.vibrate(25) } catch { /* ignore */ }
+          }
+          await db.todos.update(todoId, { completed: true })
+        } else {
+          await db.todos.update(todoId, { completed: false })
+        }
+      }
+    })
+  }, [todoId])
 
   const handleDeleteSubTask = useCallback(async (subId) => {
-    if (!subId) return
-    await db.sub_tasks.delete(subId)
-  }, [])
+    if (!subId || !todoId) return
+    await db.transaction('rw', db.todos, db.sub_tasks, async () => {
+      await db.sub_tasks.delete(subId)
+      const remainingSubs = await db.sub_tasks.where('todoId').equals(todoId).toArray()
+      if (remainingSubs.length > 0) {
+        const allDone = remainingSubs.every((s) => s.checked)
+        await db.todos.update(todoId, { completed: allDone })
+      }
+    })
+  }, [todoId])
 
   const handleAddSubTask = useCallback(async () => {
     const label = newSubLabel.trim()
     if (!label || !todoId) return
-    await db.sub_tasks.add({
-      todoId,
-      label,
-      checked: false,
+    await db.transaction('rw', db.todos, db.sub_tasks, async () => {
+      await db.sub_tasks.add({
+        todoId,
+        label,
+        checked: false,
+      })
+      await db.todos.update(todoId, { completed: false })
     })
     setNewSubLabel('')
   }, [newSubLabel, todoId])

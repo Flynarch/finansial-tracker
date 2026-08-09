@@ -632,6 +632,9 @@ function TodoList() {
     const id = Number(todo?.id)
     if (!id) return
     const next = !todo.completed
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(next ? 20 : 10) } catch { /* ignore */ }
+    }
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.todos.update(id, { completed: next })
       // If todo is completed, also mark all its sub-tasks as checked.
