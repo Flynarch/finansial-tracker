@@ -446,7 +446,10 @@ export function useDashboardData() {
     const safeLoans = loans ?? []
     const activeLoans = safeLoans
       .map((l) => {
-        const remaining = toSafeNumber(l.remainingAmount)
+        const remaining = toSafeNumber(l.remainingAmount ?? l.totalAmount)
+        const total = toSafeNumber(l.totalAmount || remaining)
+        const paid = Math.max(0, total - remaining)
+        const paidPct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
         const val = convertCurrency(remaining, l.currency || defaultCurrency, defaultCurrency, rates)
         const isPaid = l.status === 'paid' || remaining <= 0
 
@@ -460,6 +463,9 @@ export function useDashboardData() {
         return {
           ...l,
           remaining,
+          total,
+          paid,
+          paidPct,
           convertedRemaining: val,
           isPaid,
           isOverdue,
@@ -468,13 +474,11 @@ export function useDashboardData() {
       })
       .filter((l) => !l.isPaid)
 
-    const totalDebt = activeLoans
-      .filter((l) => l.type === 'debt')
-      .reduce((sum, l) => sum + l.convertedRemaining, 0)
+    const debtLoans = activeLoans.filter((l) => l.type === 'debt')
+    const receivableLoans = activeLoans.filter((l) => l.type === 'receivable')
 
-    const totalReceivable = activeLoans
-      .filter((l) => l.type === 'receivable')
-      .reduce((sum, l) => sum + l.convertedRemaining, 0)
+    const totalDebt = debtLoans.reduce((sum, l) => sum + l.convertedRemaining, 0)
+    const totalReceivable = receivableLoans.reduce((sum, l) => sum + l.convertedRemaining, 0)
 
     const sortedUrgent = [...activeLoans].sort((a, b) => {
       if (a.isOverdue && !b.isOverdue) return -1
@@ -499,12 +503,15 @@ export function useDashboardData() {
     return {
       totalDebt,
       totalReceivable,
+      debtCount: debtLoans.length,
+      receivableCount: receivableLoans.length,
       netPosition,
       receivablePct,
       debtPct,
       hasActiveLoans,
       activeCount: activeLoans.length,
       mostUrgentItem,
+      urgentList: sortedUrgent.slice(0, 2),
     }
   }, [loans, defaultCurrency, rates])
 

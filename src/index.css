@@ -1711,3 +1711,96 @@ body.hide-bottom-nav .ft-ai-trigger-bar,
 body.hide-bottom-nav [aria-label="Open AI Chat"] {
   display: none !important;
 }
+
+/* ── Loan Ledger & Stamp Styles ─────────────────────────────── */
+.loan-stamp {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.875rem;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-12deg);
+  pointer-events: none;
+  z-index: 10;
+  user-select: none;
+  animation: stampPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.loan-stamp-debt {
+  border: 2.5px double var(--earthy-terra);
+  color: var(--earthy-terra);
+  background: color-mix(in srgb, var(--earthy-terra) 8%, transparent);
+}
+
+.loan-stamp-receivable {
+  border: 2.5px double var(--earthy-green);
+  color: var(--earthy-green);
+  background: color-mix(in srgb, var(--earthy-green) 8%, transparent);
+}
+
+.loan-stamp-text {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+.loan-stamp-sub {
+  font-size: 0.55rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+@media (max-width: 640px) {
+  .loan-stamp {
+    width: 3.5rem;
+    height: 3.5rem;
+    top: 0.625rem;
+    right: 0.625rem;
+  }
+  .loan-stamp-text {
+    font-size: 0.65rem !important;
+  }
+  .loan-stamp-sub {
+    font-size: 0.5rem !important;
+  }
+}
+
+
+@keyframes stampPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.4) rotate(-25deg);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1) rotate(-12deg);
+  }
+}
+
+.loan-entry {
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+/* ── Subtle Bottom Glow Per Type (User requested) ───────────── */
+.loan-card-glow-debt {
+  box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--earthy-terra) 18%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.loan-card-glow-receivable {
+  box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--earthy-green) 18%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.loan-card-glow-paid {
+  box-shadow: 0 6px 20px -4px color-mix(in srgb, #10b981 15%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+

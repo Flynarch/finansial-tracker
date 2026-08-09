@@ -11,9 +11,11 @@ import { clearAppLocalStorage } from './settingsConstants'
 import { SettingsSection } from './settingsComponents'
 import { resetExpenseCategoryCustomizations } from '../../lib/expenseCategories'
 import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
+import { seedMassiveStressTestData } from '../../lib/seedDebugData'
 
 export default function SettingsData() {
   const { t } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resetConfirmText, setResetConfirmText] = useState('')
@@ -21,6 +23,19 @@ export default function SettingsData() {
   const fileInputRef = useRef(null)
   const canConfirmReset = resetConfirmText === 'RESET'
   const isBusy = busyAction !== null
+
+  const handleSeedStressTestData = async () => {
+    if (isBusy) return
+    try {
+      setBusyAction('seed')
+      const res = await seedMassiveStressTestData({ defaultCurrency })
+      setStatusMessage(`Berhasil generate ${res.transactions} transaksi, ${res.budgets} anggaran, ${res.goals} tabungan, ${res.loans} hutang/piutang, ${res.habitLogs} log habit!`)
+    } catch (err) {
+      setStatusMessage(err.message || 'Gagal generate stress test data')
+    } finally {
+      setBusyAction(null)
+    }
+  }
 
   const handleExportJson = async () => {
     if (isBusy) return
@@ -120,6 +135,19 @@ export default function SettingsData() {
             onChange={handleImportJson}
             className="hidden"
           />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection label="Stress Test Data Generator" footnote="Generate 600+ transaksi, 8 dompet, 10 anggaran, 8 tabungan, 8 pinjaman, 500+ log habit, dan 5 investasi untuk uji beban performa & stres UI.">
+        <div className="ft-settings-cell">
+          <Button
+            type="button"
+            className="w-full bg-[var(--accent)] text-white hover:opacity-90 font-bold"
+            disabled={isBusy}
+            onClick={handleSeedStressTestData}
+          >
+            {isBusy && busyAction === 'seed' ? 'Men-generate 600+ Data...' : '⚡ Generate 600+ Data Stress Test'}
+          </Button>
         </div>
       </SettingsSection>
 

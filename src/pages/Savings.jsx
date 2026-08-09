@@ -281,6 +281,18 @@ function Savings() {
                   ? 'Target tabungan yang telah 100% dan dicairkan ke dompet akan disimpan dengan aman di sini.'
                   : t('savings.emptyDesc')
               }
+              action={
+                !showArchive ? (
+                  <button
+                    type="button"
+                    onClick={openAdd}
+                    className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 mx-auto cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    Target Baru
+                  </button>
+                ) : null
+              }
             />
           ) : (
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 ft-stagger-in">

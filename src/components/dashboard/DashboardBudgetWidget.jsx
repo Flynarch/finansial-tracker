@@ -1,6 +1,6 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useRef, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Target } from 'lucide-react'
+import { Plus, Target, CheckCircle2, AlertTriangle, ArrowRight, PieChart } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { getCategoryColorClass, resolveTransactionIconKey } from '../../lib/categoryIcon'
@@ -40,23 +40,73 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
     budgetTouchEndXRef.current = null
   }
 
+  // Budget calculations
+  const budgetCalc = useMemo(() => {
+    const rows = budgetGoalSummary?.budgetRows || []
+    if (!rows.length) return null
+    const totalSpent = rows.reduce((sum, r) => sum + (r.spent || 0), 0)
+    const totalLimit = rows.reduce((sum, r) => sum + (r.limit || 0), 0)
+    const totalRemaining = Math.max(0, totalLimit - totalSpent)
+    const overallPct = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0
+    const warningItems = rows.filter((r) => r.pct >= 80).sort((a, b) => b.pct - a.pct)
+    const isOverBudget = totalSpent > totalLimit
+
+    return {
+      count: rows.length,
+      totalSpent,
+      totalLimit,
+      totalRemaining,
+      overallPct,
+      warningItems,
+      isOverBudget,
+    }
+  }, [budgetGoalSummary])
+
+  // Savings calculations
+  const goalCalc = useMemo(() => {
+    const rows = budgetGoalSummary?.goalRows || []
+    if (!rows.length) return null
+    const totalCurrent = rows.reduce((sum, r) => sum + (r.current || 0), 0)
+    const totalTarget = rows.reduce((sum, r) => sum + (r.target || 0), 0)
+    const overallPct = totalTarget > 0 ? Math.min(100, Math.round((totalCurrent / totalTarget) * 100)) : 0
+    const topGoals = [...rows].sort((a, b) => b.pct - a.pct).slice(0, 3)
+
+    return {
+      count: rows.length,
+      totalCurrent,
+      totalTarget,
+      overallPct,
+      topGoals,
+    }
+  }, [budgetGoalSummary])
+
   return (
     <section data-tour="budget-chart-section" className="ft-stagger-in" style={{ '--stagger': 3 }}>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
-        {/* Header Row with Active Expandable Pill Dots */}
+        {/* Header Row */}
         <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-black tracking-tight text-[var(--fg)] truncate">
-              {activeBudgetSlide === 0 ? 'Anggaran Bulan Ini' : 'Target Tabungan'}
-            </h3>
-            <p className="mt-0.5 text-xs font-semibold leading-tight text-[var(--muted)] truncate">
-              {activeBudgetSlide === 0 ? 'Pantau batas pengeluaran' : 'Progres tujuan finansial'}
-            </p>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-500 border border-indigo-500/25">
+              {activeBudgetSlide === 0 ? <PieChart className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black tracking-tight text-[var(--fg)] truncate">
+                {activeBudgetSlide === 0 ? 'Anggaran Bulan Ini' : 'Target Tabungan'}
+              </h3>
+              <p className="mt-0.5 text-xs font-semibold leading-tight text-[var(--muted)] truncate">
+                {activeBudgetSlide === 0
+                  ? budgetCalc
+                    ? `${budgetCalc.count} Kategori Anggaran`
+                    : 'Pantau batas pengeluaran'
+                  : goalCalc
+                    ? `${goalCalc.count} Target Aktif`
+                    : 'Progres tujuan finansial'}
+              </p>
+            </div>
           </div>
 
-          {/* Active Expandable Pill Dots + Actions */}
+          {/* Expandable Pill Dots + Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* Expandable Pill Dots */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -78,27 +128,17 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
               />
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => navigate(activeBudgetSlide === 0 ? '/budget' : '/savings')}
-                className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--muted)] transition hover:border-[var(--fg)]/40 hover:text-[var(--fg)] cursor-pointer hidden sm:inline-block"
-              >
-                Lihat Halaman
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeBudgetSlide === 0) onOpenQuickBudget()
-                  else onOpenQuickGoal()
-                }}
-                className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer"
-                aria-label={activeBudgetSlide === 0 ? t('dashboard.budget.add') : t('dashboard.savings.add')}
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                <span>{activeBudgetSlide === 0 ? 'Anggaran' : 'Target'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (activeBudgetSlide === 0) onOpenQuickBudget()
+                else onOpenQuickGoal()
+              }}
+              className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <span>{activeBudgetSlide === 0 ? 'Anggaran' : 'Target'}</span>
+            </button>
           </div>
         </div>
 
@@ -113,73 +153,130 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
             className="flex transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${activeBudgetSlide * 100}%)` }}
           >
-            {/* Slide 0: Budget */}
-            <div className="w-full shrink-0 pr-0.5">
-              {budgetGoalSummary?.budgetRows?.length ? (
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  {budgetGoalSummary.budgetRows.slice(0, 6).map((row) => {
-                    const isDanger = row.pct >= 100
-                    const isWarn = row.pct >= 80 && row.pct < 100
-                    const iconKey = resolveTransactionIconKey(row.category, 'expense')
-                    const colorClass = getCategoryColorClass(iconKey, 'expense', row.category)
-
-                    return (
-                      <div
-                        key={row.id}
-                        onClick={() => navigate('/budget')}
-                        className={`group rounded-2xl border bg-[var(--field-bg)] p-3 transition-all duration-200 active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs hover:shadow-xs ${
-                          isDanger
-                            ? 'border-rose-500/30 hover:border-rose-500/50'
-                            : isWarn
-                            ? 'border-amber-500/30 hover:border-amber-500/50'
-                            : 'border-[var(--border)] hover:border-[var(--border-strong)]'
+            {/* Slide 0: Smart Monarch-Style Budget Summary */}
+            <div className="w-full shrink-0 pr-0.5 space-y-3">
+              {budgetCalc ? (
+                <>
+                  {/* Overall Total Spent & Bar */}
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                        Total Pengeluaran Anggaran
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide border ${
+                          budgetCalc.isOverBudget
+                            ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                            : budgetCalc.overallPct >= 80
+                            ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                            : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${colorClass}`}>
-                              <CategoryIcon iconKey={iconKey} className="h-3.5 w-3.5" />
-                            </div>
-                            <p className="text-xs font-bold text-[var(--fg)] truncate">
-                              {formatExpenseCategory(row.category, locale)}
-                            </p>
-                          </div>
+                        {budgetCalc.overallPct}% Terpakai
+                      </span>
+                    </div>
 
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide ${
-                              isDanger
-                                ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
-                                : isWarn
-                                ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                                : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25'
-                            }`}
-                          >
-                            {Math.round(row.pct)}%
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap tabular-nums">
+                        <p className="text-base sm:text-lg font-black text-[var(--fg)]">
+                          {formatCurrency(budgetCalc.totalSpent, defaultCurrency, locale)}
+                          <span className="text-xs font-normal text-[var(--muted)] ml-1">
+                            / {formatCurrency(budgetCalc.totalLimit, defaultCurrency, locale)}
                           </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
-                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.spent, defaultCurrency, locale)}</span>
-                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.limit, defaultCurrency, locale)}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                isDanger
-                                  ? 'bg-rose-500'
-                                  : isWarn
-                                  ? 'bg-amber-500'
-                                  : 'bg-[var(--status-income)]'
-                              }`}
-                              style={{ width: `${Math.min(100, row.pct)}%` }}
-                            />
-                          </div>
-                        </div>
+                        </p>
+                        <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
+                          Sisa:{' '}
+                          <span
+                            className={
+                              budgetCalc.isOverBudget ? 'text-rose-500 font-black' : 'text-[var(--fg)] font-black'
+                            }
+                          >
+                            {formatCurrency(budgetCalc.totalRemaining, defaultCurrency, locale)}
+                          </span>
+                        </p>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          budgetCalc.isOverBudget
+                            ? 'bg-rose-500'
+                            : budgetCalc.overallPct >= 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${budgetCalc.overallPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Smart Warning List OR All Safe Badge */}
+                  {budgetCalc.warningItems.length > 0 ? (
+                    <div className="space-y-1.5 pt-0.5">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Perlu Diperhatikan ({budgetCalc.warningItems.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {budgetCalc.warningItems.slice(0, 3).map((row) => {
+                          const isDanger = row.pct >= 100
+                          const iconKey = resolveTransactionIconKey(row.category, 'expense')
+                          const colorClass = getCategoryColorClass(iconKey, 'expense', row.category)
+
+                          return (
+                            <div
+                              key={row.id}
+                              onClick={() => navigate('/budget')}
+                              className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${colorClass}`}>
+                                  <CategoryIcon iconKey={iconKey} className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-[var(--fg)] truncate text-xs leading-tight">
+                                    {formatExpenseCategory(row.category, locale)}
+                                  </p>
+                                  <p className="text-[10px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
+                                    {formatCurrency(row.spent, defaultCurrency, locale)}{' '}
+                                    <span className="opacity-75">/ {formatCurrency(row.limit, defaultCurrency, locale)}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span
+                                className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black tabular-nums border ${
+                                  isDanger
+                                    ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                                    : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                }`}
+                              >
+                                {Math.round(row.pct)}%
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-500 font-bold">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>Semua {budgetCalc.count} anggaran dalam batas aman ✓</span>
+                    </div>
+                  )}
+
+                  {/* Footer Link to /budget */}
+                  <div className="pt-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/budget')}
+                      className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--accent)] hover:underline cursor-pointer"
+                    >
+                      Lihat Semua {budgetCalc.count} Anggaran
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </>
               ) : (
                 <button
                   type="button"
@@ -192,55 +289,90 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
               )}
             </div>
 
-            {/* Slide 1: Savings */}
-            <div className="w-full shrink-0 pl-0.5">
-              {budgetGoalSummary?.goalRows?.length ? (
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  {budgetGoalSummary.goalRows.slice(0, 6).map((row) => {
-                    const isComplete = row.pct >= 100
-                    return (
+            {/* Slide 1: Savings Goals Summary */}
+            <div className="w-full shrink-0 pl-0.5 space-y-3">
+              {goalCalc ? (
+                <>
+                  {/* Overall Total Saved & Bar */}
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                        Total Tabungan Terkumpul
+                      </span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                        {goalCalc.overallPct}% Terkumpul
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap tabular-nums">
+                        <p className="text-base sm:text-lg font-black text-[var(--fg)]">
+                          {formatCurrency(goalCalc.totalCurrent, defaultCurrency, locale)}
+                          <span className="text-xs font-normal text-[var(--muted)] ml-1">
+                            / {formatCurrency(goalCalc.totalTarget, defaultCurrency, locale)}
+                          </span>
+                        </p>
+                        <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
+                          {goalCalc.count} Target Aktif
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
                       <div
-                        key={row.id}
-                        onClick={() => navigate('/savings')}
-                        className="group rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 hover:border-[var(--border-strong)] transition-all duration-200 active:scale-[0.99] cursor-pointer space-y-2.5 shadow-2xs hover:shadow-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${goalCalc.overallPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Top Goals List */}
+                  <div className="space-y-1.5 pt-0.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
+                      <Target className="h-3 w-3" /> Progres Target Teratas
+                    </p>
+                    <div className="space-y-1.5">
+                      {goalCalc.topGoals.map((row) => (
+                        <div
+                          key={row.id}
+                          onClick={() => navigate('/savings')}
+                          className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25">
                               <Target className="h-3.5 w-3.5" />
                             </div>
-                            <p className="text-xs font-bold text-[var(--fg)] truncate">
-                              {String(row.name || '').replace(/_/g, ' ')}
-                            </p>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-[var(--fg)] truncate text-xs leading-tight">
+                                {String(row.name || '').replace(/_/g, ' ')}
+                              </p>
+                              <p className="text-[10px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
+                                {formatCurrency(row.current, defaultCurrency, locale)}{' '}
+                                <span className="opacity-75">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
+                              </p>
+                            </div>
                           </div>
 
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide ${
-                              isComplete
-                                ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25'
-                                : 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
-                            }`}
-                          >
+                          <span className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-black tabular-nums bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border)]">
                             {Math.round(row.pct)}%
                           </span>
                         </div>
+                      ))}
+                    </div>
+                  </div>
 
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
-                            <span className="text-[var(--fg)] font-black">{formatCurrency(row.current, defaultCurrency, locale)}</span>
-                            <span className="text-[var(--muted)] font-semibold">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
-                            <div
-                              className="h-full rounded-full bg-[var(--status-income)] transition-all duration-500"
-                              style={{ width: `${Math.min(100, row.pct)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                  {/* Footer Link to /savings */}
+                  <div className="pt-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/savings')}
+                      className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--accent)] hover:underline cursor-pointer"
+                    >
+                      Lihat Semua {goalCalc.count} Target Tabungan
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-5 text-center">
                   <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.savings.empty') || 'Belum Ada Target Tabungan'}</p>

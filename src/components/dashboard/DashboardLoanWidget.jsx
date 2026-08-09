@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HandCoins, Plus, ChevronRight, Receipt, AlertCircle, Clock } from 'lucide-react'
+import { HandCoins, Plus, ChevronRight, Scale, Clock } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 
 export const DashboardLoanWidget = memo(function DashboardLoanWidget({
@@ -8,148 +8,147 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   defaultCurrency,
   locale,
   onOpenLoanSheet,
-  onPayLoan,
 }) {
   const navigate = useNavigate()
-  const { totalDebt, totalReceivable, netPosition, receivablePct, debtPct, hasActiveLoans, activeCount, mostUrgentItem } = loanSummary
+  const {
+    totalDebt = 0,
+    totalReceivable = 0,
+    netPosition = 0,
+    receivablePct = 0,
+    debtPct = 0,
+    hasActiveLoans = false,
+    activeCount = 0,
+    mostUrgentItem = null,
+  } = loanSummary || {}
+
+  const isNetPositive = netPosition > 0
+  const isNetNegative = netPosition < 0
 
   return (
     <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
-        {/* Header Row */}
-        <div className="flex items-center justify-between gap-3">
-          <div
-            onClick={() => navigate('/loans')}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition active:scale-[0.99] min-w-0"
-          >
+      <div
+        onClick={() => navigate('/loans')}
+        className="group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-[0.995] space-y-3"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/25">
               <HandCoins className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold tracking-tight text-[var(--fg)] truncate">Utang & Piutang</h3>
-              <p className="text-[10px] font-semibold text-[var(--muted)] truncate">
-                {activeCount > 0 ? `${activeCount} Catatan Aktif` : 'Tidak Ada Catatan Aktif'}
+              <h3 className="text-sm font-black tracking-tight text-[var(--fg)] flex items-center gap-1">
+                Utang & Piutang
+                <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
+              </h3>
+              <p className="text-[11px] font-bold text-[var(--muted)] truncate">
+                {activeCount > 0 ? `${activeCount} Catatan Aktif` : 'Kelola pinjaman & hak tagih'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={onOpenLoanSheet}
-              className="flex h-7 items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs font-bold text-[var(--bg)] shadow-2xs transition hover:opacity-90 active:scale-95 cursor-pointer"
-              aria-label="Catat"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Catat</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/loans')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer"
-              aria-label="Loans"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenLoanSheet()
+            }}
+            className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+            aria-label="Catat Hutang atau Piutang"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+            <span>Catat</span>
+          </button>
         </div>
 
-        {/* Hero Bento Net Position & Totals */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Posisi Bersih (Net Position)</span>
-              <p className={`text-base sm:text-lg font-black tabular-nums tracking-tight ${
-                netPosition > 0 ? 'text-[var(--status-income)]' : netPosition < 0 ? 'text-[var(--status-expense)]' : 'text-[var(--fg)]'
-              }`}>
-                {netPosition > 0 ? '+' : ''}{formatCurrency(netPosition, defaultCurrency, locale)}
-              </p>
-            </div>
+        {hasActiveLoans ? (
+          <>
+            {/* Side-by-side Totals (Clean, single surface) */}
+            <div className="grid grid-cols-2 gap-3 pt-0.5">
+              <div className="min-w-0">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--status-expense)]">
+                  Utang Saya
+                </span>
+                <p className="mt-0.5 text-base sm:text-lg font-black tabular-nums text-[var(--status-expense)] truncate">
+                  {formatCurrency(totalDebt, defaultCurrency, locale)}
+                </p>
+              </div>
 
-            <div className="text-right flex flex-col items-end text-xs font-extrabold tabular-nums">
-              <span className="text-[var(--status-expense)]">Utang: {formatCurrency(totalDebt, defaultCurrency, locale)}</span>
-              <span className="text-[var(--status-income)]">Piutang: {formatCurrency(totalReceivable, defaultCurrency, locale)}</span>
-            </div>
-          </div>
-
-          {/* Balance Ratio Visual Bar: Only show ratio split if there is active loan/debt */}
-          {hasActiveLoans ? (
-            <div className="space-y-1 pt-0.5">
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
-                <div
-                  className="h-full bg-[var(--status-income)] transition-all duration-500"
-                  style={{ width: `${receivablePct}%` }}
-                  title={`Piutang: ${receivablePct}%`}
-                />
-                <div
-                  className="h-full bg-[var(--status-expense)] transition-all duration-500"
-                  style={{ width: `${debtPct}%` }}
-                  title={`Utang: ${debtPct}%`}
-                />
+              <div className="min-w-0 border-l border-[var(--border)]/60 pl-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--status-income)]">
+                  Piutang Saya
+                </span>
+                <p className="mt-0.5 text-base sm:text-lg font-black tabular-nums text-[var(--status-income)] truncate">
+                  {formatCurrency(totalReceivable, defaultCurrency, locale)}
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="h-1.5 w-full rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/40" />
-          )}
-        </div>
 
-        {/* Most Urgent Item Preview Box with Direct Payment Interaction */}
-        {mostUrgentItem ? (
-          <div
-            onClick={() => onPayLoan(mostUrgentItem)}
-            className="group relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 cursor-pointer hover:border-[var(--border-strong)] transition-all active:scale-[0.98] shadow-2xs"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${
-                    mostUrgentItem.type === 'debt'
+            {/* Proportional bar */}
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)] border border-[var(--border)]/50">
+              <div
+                className="h-full bg-[var(--status-income)] transition-all duration-500"
+                style={{ width: `${receivablePct}%` }}
+              />
+              <div
+                className="h-full bg-[var(--status-expense)] transition-all duration-500"
+                style={{ width: `${debtPct}%` }}
+              />
+            </div>
+
+            {/* Posisi Bersih Footer */}
+            <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-dashed border-[var(--border)]">
+              <span className="text-[var(--muted)] flex items-center gap-1">
+                <Scale className="h-3.5 w-3.5" /> Posisi Bersih
+              </span>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[9px] font-black border ${
+                    isNetPositive
+                      ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
+                      : isNetNegative
                       ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/25'
-                      : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
+                      : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
                   }`}
                 >
-                  {mostUrgentItem.type === 'debt' ? (
-                    <HandCoins className="h-3.5 w-3.5" />
-                  ) : (
-                    <Receipt className="h-3.5 w-3.5" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="truncate text-xs font-extrabold text-[var(--fg)]">
-                      {mostUrgentItem.title}
-                    </p>
-                    <span className="text-[10px] font-extrabold text-[var(--muted)]">·</span>
-                    <span className="text-[11px] font-bold text-[var(--muted)] truncate">
-                      {mostUrgentItem.personName}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs font-black tabular-nums text-[var(--fg)]">
-                    Sisa {formatCurrency(mostUrgentItem.remaining, mostUrgentItem.currency || defaultCurrency, locale)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {mostUrgentItem.isOverdue ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[10px] font-black text-rose-500">
-                    <AlertCircle className="h-3 w-3" />
-                    Terlambat
-                  </span>
-                ) : mostUrgentItem.daysLeft !== null ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--panel-strong)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-black text-[var(--muted)]">
-                    <Clock className="h-3 w-3" />
-                    {mostUrgentItem.daysLeft === 0 ? 'Hari Ini' : `${mostUrgentItem.daysLeft} Hari Lagi`}
-                  </span>
-                ) : null}
-
-                <span className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1 text-[10px] font-extrabold text-[var(--accent)] group-hover:border-[var(--accent)] transition-colors">
-                  Bayar <ChevronRight className="h-3 w-3" />
+                  {isNetPositive ? 'Surplus' : isNetNegative ? 'Beban' : 'Seimbang'}
+                </span>
+                <span
+                  className={`font-black tabular-nums ${
+                    isNetPositive
+                      ? 'text-[var(--status-income)]'
+                      : isNetNegative
+                      ? 'text-[var(--status-expense)]'
+                      : 'text-[var(--fg)]'
+                  }`}
+                >
+                  {isNetPositive ? '+' : isNetNegative ? '-' : ''}
+                  {formatCurrency(Math.abs(netPosition), defaultCurrency, locale)}
                 </span>
               </div>
             </div>
+
+            {/* Urgent hint (if present) */}
+            {mostUrgentItem && mostUrgentItem.daysLeft !== null && (
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-500 font-semibold pt-0.5">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  <strong className="font-bold">{mostUrgentItem.title}</strong>{' '}
+                  {mostUrgentItem.isOverdue
+                    ? 'terlambat'
+                    : mostUrgentItem.daysLeft === 0
+                    ? 'jatuh tempo hari ini'
+                    : `${mostUrgentItem.daysLeft} hari lagi`}
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-3 text-center">
+            <p className="text-xs font-bold text-[var(--muted)]">Belum Ada Catatan Utang & Piutang</p>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   )
