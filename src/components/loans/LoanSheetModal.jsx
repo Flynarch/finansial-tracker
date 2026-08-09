@@ -15,7 +15,6 @@ import {
   getMoneyInputCaret,
   parseMoneyInput,
 } from '../../lib/utils'
-import { HandCoins, Receipt, Tag, User, Calendar, FileText, Clock, Wallet } from 'lucide-react'
 
 export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, defaultType = 'debt', onSaved }) {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
@@ -85,28 +84,6 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     window.requestAnimationFrame(() => el.setSelectionRange(caretPos, caretPos))
   }
 
-  const addAmountPreset = (addVal) => {
-    if (hasPaymentsRecorded) return
-    const currentVal = parseMoneyInput(form.totalAmount, form.currency) || 0
-    const newVal = currentVal + addVal
-    setForm((prev) => ({
-      ...prev,
-      totalAmount: formatMoneyValueForInput(newVal, form.currency),
-    }))
-  }
-
-  const setDueDatePreset = (days) => {
-    const baseDate = form.startDate ? new Date(form.startDate) : new Date()
-    if (days === 'endOfMonth') {
-      const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0)
-      setForm((prev) => ({ ...prev, dueDate: end.toISOString().split('T')[0] }))
-    } else {
-      const nextDate = new Date(baseDate)
-      nextDate.setDate(nextDate.getDate() + days)
-      setForm((prev) => ({ ...prev, dueDate: nextDate.toISOString().split('T')[0] }))
-    }
-  }
-
   const save = async () => {
     const total = parseMoneyInput(form.totalAmount, form.currency)
     if (!form.title.trim()) {
@@ -158,109 +135,102 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       maxHeight="max-h-[88dvh]"
       title={editingLoan ? 'Edit Pinjaman' : isDebt ? 'Catat Hutang Saya' : 'Catat Piutang Saya'}
     >
-      <div className="space-y-3.5">
+      <div className="space-y-4">
         {sheetError ? <ToastBanner message={sheetError} type="error" onDismiss={() => setSheetError('')} /> : null}
 
-        {/* Hutang / Piutang Toggle Cards */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* 1. Segmented Pill Toggle */}
+        <div
+          className={`relative grid grid-cols-2 rounded-xl p-0.5 ${
+            hasPaymentsRecorded ? 'opacity-60 pointer-events-none' : ''
+          } bg-[var(--field-bg)] border border-[var(--border)]`}
+        >
           <button
             type="button"
-            disabled={hasPaymentsRecorded}
             onClick={() => setForm((prev) => ({ ...prev, type: 'debt' }))}
-            className={`flex items-center gap-2.5 p-2.5 rounded-2xl border text-left transition-all duration-150 cursor-pointer active:scale-98 ${
+            className={`relative z-10 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
               isDebt
-                ? 'bg-rose-500/10 border-rose-500/40 text-rose-500 shadow-xs'
-                : 'bg-[var(--field-bg)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)]'
-            } ${hasPaymentsRecorded ? 'opacity-60 cursor-not-allowed' : ''}`}
+                ? 'bg-rose-500 text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
           >
-            <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors ${
-              isDebt ? 'bg-rose-500/20 text-rose-500' : 'bg-[var(--panel-strong)] text-[var(--muted)]'
-            }`}>
-              <HandCoins className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-black tracking-tight">Hutang Saya</p>
-              <p className="text-[10px] font-medium opacity-75 truncate">Saya meminjam</p>
-            </div>
+            Hutang Saya
           </button>
-
           <button
             type="button"
-            disabled={hasPaymentsRecorded}
             onClick={() => setForm((prev) => ({ ...prev, type: 'receivable' }))}
-            className={`flex items-center gap-2.5 p-2.5 rounded-2xl border text-left transition-all duration-150 cursor-pointer active:scale-98 ${
+            className={`relative z-10 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
               !isDebt
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500 shadow-xs'
-                : 'bg-[var(--field-bg)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)]'
-            } ${hasPaymentsRecorded ? 'opacity-60 cursor-not-allowed' : ''}`}
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
           >
-            <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors ${
-              !isDebt ? 'bg-emerald-500/20 text-emerald-500' : 'bg-[var(--panel-strong)] text-[var(--muted)]'
-            }`}>
-              <Receipt className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-black tracking-tight">Piutang Saya</p>
-              <p className="text-[10px] font-medium opacity-75 truncate">Dipinjam orang</p>
-            </div>
+            Piutang Saya
           </button>
         </div>
 
-        {/* Total Nominal Pinjaman */}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 space-y-1.5 transition-all">
+        {/* 2. Nominal Input */}
+        <div className={`rounded-2xl border p-3.5 space-y-1 transition-all duration-200 ${
+          hasFilledAmount
+            ? isDebt
+              ? 'border-rose-500/30 bg-rose-500/5'
+              : 'border-emerald-500/30 bg-emerald-500/5'
+            : 'border-[var(--border)] bg-[var(--field-bg)]'
+        }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Total Nominal Pinjaman</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Nominal Pinjaman</span>
             <span className="text-[11px] font-bold text-[var(--muted)]">{form.currency}</span>
           </div>
+          <input
+            ref={totalAmountInputRef}
+            type="text"
+            inputMode="decimal"
+            disabled={hasPaymentsRecorded}
+            className={`w-full bg-transparent text-2xl font-black tabular-nums tracking-tight focus:outline-none transition-colors ${
+              hasFilledAmount
+                ? isDebt ? 'text-rose-500' : 'text-emerald-500'
+                : 'text-[var(--fg)] placeholder:text-[var(--muted)]/40'
+            } ${hasPaymentsRecorded ? 'opacity-60 cursor-not-allowed' : ''}`}
+            placeholder="0"
+            value={form.totalAmount}
+            onChange={handleTotalAmountChange}
+          />
+          {hasPaymentsRecorded && (
+            <p className="text-[10px] font-semibold text-amber-500">
+              Nominal dan tipe tidak dapat diubah setelah ada pembayaran.
+            </p>
+          )}
+        </div>
 
-          <div className="relative flex items-center">
+        {/* 3. Detail Pinjaman */}
+        <div className="space-y-2.5">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-[var(--muted)]">Judul Pinjaman</label>
             <input
-              ref={totalAmountInputRef}
               type="text"
-              inputMode="decimal"
-              disabled={hasPaymentsRecorded}
-              className={`w-full bg-transparent text-2xl sm:text-3xl font-black tabular-nums tracking-tight focus:outline-none transition-colors ${
-                hasFilledAmount
-                  ? isDebt
-                    ? 'text-rose-500'
-                    : 'text-emerald-500'
-                  : 'text-[var(--fg)] placeholder:text-[var(--muted)]/40'
-              } ${hasPaymentsRecorded ? 'opacity-60 cursor-not-allowed' : ''}`}
-              placeholder="0"
-              value={form.totalAmount}
-              onChange={handleTotalAmountChange}
+              className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
+              placeholder={isDebt ? 'Motor, Laptop, dll' : 'Pinjamkan ke Andi'}
+              value={form.title}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
           </div>
 
-          {hasPaymentsRecorded && (
-            <p className="text-[10px] font-semibold text-amber-500 pt-0.5">
-              Nominal total dan tipe tidak dapat diubah setelah ada riwayat pembayaran.
-            </p>
-          )}
-
-          {/* Quick Nominal Chips */}
-          {!hasPaymentsRecorded && (
-            <div className="pt-1 grid grid-cols-4 gap-1.5">
-              {[100000, 500000, 1000000, 5000000].map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => addAmountPreset(amt)}
-                  className="w-full py-1 text-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-95"
-                >
-                  +{amt >= 1000000 ? `${amt / 1000000}Jt` : `${amt / 1000}Rb`}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-[var(--muted)]">
+              {isDebt ? 'Pemberi Pinjaman' : 'Nama Peminjam'}
+            </label>
+            <input
+              type="text"
+              className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
+              placeholder={isDebt ? 'BCA, Budi, dll' : 'Andi, Rina, dll'}
+              value={form.personName}
+              onChange={(e) => setForm((prev) => ({ ...prev, personName: e.target.value }))}
+            />
+          </div>
         </div>
 
-        {/* Tier 1: Wallet Picker (Opsional) */}
+        {/* 4. Wallet (Opsional) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1 mb-1">
-            <Wallet className="h-3.5 w-3.5 text-[var(--accent)]" />
-            Pilih Wallet (Opsional)
-          </label>
+          <label className="text-[11px] font-bold text-[var(--muted)]">Wallet (Opsional)</label>
           <WalletSelectTrigger
             wallet={selectedWallet}
             disabled={!!editingLoan}
@@ -275,117 +245,47 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             onSelectWallet={(id) => setForm((prev) => ({ ...prev, walletId: id }))}
             allowNone
             noneLabel="Tanpa Wallet (Hanya Catatan Memo)"
-            title="Pilih Dompet Utang / Piutang"
+            title="Pilih Dompet"
           />
         </div>
 
-        {/* Main Fields Grid: 2x2 */}
-        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-[var(--border)]/40">
+        {/* 5. Jadwal -- 2 column dates */}
+        <div className="grid grid-cols-2 gap-2.5">
           <div className="space-y-1">
-            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-              <Tag className="h-3 w-3 text-[var(--muted)]" />
-              Judul Pinjaman
-            </label>
-            <input
-              type="text"
-              className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
-              placeholder={isDebt ? 'Motor, Laptop' : 'Pinjamkan ke Andi'}
-              value={form.title}
-              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-              <User className="h-3 w-3 text-[var(--muted)]" />
-              {isDebt ? 'Pemberi Pinjaman' : 'Nama Peminjam'}
-            </label>
-            <input
-              type="text"
-              className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
-              placeholder={isDebt ? 'BCA, Budi' : 'Andi, Rina'}
-              value={form.personName}
-              onChange={(e) => setForm((prev) => ({ ...prev, personName: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-[var(--muted)]" />
-              Tanggal Pinjam
-            </label>
+            <label className="text-[11px] font-bold text-[var(--muted)]">Tanggal Pinjam</label>
             <CustomDatePicker
               value={form.startDate}
               onChange={(val) => setForm((prev) => ({ ...prev, startDate: val }))}
               title="Pilih Tanggal Pinjam"
             />
           </div>
-
           <div className="space-y-1">
-            <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-              <Clock className="h-3 w-3 text-[var(--muted)]" />
-              Jatuh Tempo
-            </label>
+            <label className="text-[11px] font-bold text-[var(--muted)]">Jatuh Tempo</label>
             <CustomDatePicker
               value={form.dueDate}
               onChange={(val) => setForm((prev) => ({ ...prev, dueDate: val }))}
               allowClear
               clearLabel="Tanpa Jatuh Tempo"
-              placeholder="Pilih Tanggal (Opsional)"
+              placeholder="Opsional"
               title="Pilih Jatuh Tempo"
             />
           </div>
         </div>
 
-        {/* Quick Due Date Presets */}
-        <div className="grid grid-cols-4 gap-1.5">
-          <button
-            type="button"
-            onClick={() => setDueDatePreset(7)}
-            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-          >
-            +7 Hari
-          </button>
-          <button
-            type="button"
-            onClick={() => setDueDatePreset(14)}
-            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-          >
-            +14 Hari
-          </button>
-          <button
-            type="button"
-            onClick={() => setDueDatePreset(30)}
-            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-          >
-            +30 Hari
-          </button>
-          <button
-            type="button"
-            onClick={() => setDueDatePreset('endOfMonth')}
-            className="w-full py-1 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer text-center active:scale-95"
-          >
-            Akhir Bulan
-          </button>
-        </div>
-
-        {/* Notes */}
+        {/* 6. Catatan (Opsional) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-extrabold text-[var(--fg)] flex items-center gap-1">
-            <FileText className="h-3 w-3 text-[var(--muted)]" />
-            Catatan (Opsional)
-          </label>
+          <label className="text-[11px] font-bold text-[var(--muted)]">Catatan (Opsional)</label>
           <input
             type="text"
-            className="ft-input w-full text-xs font-semibold py-2 px-3 placeholder:text-[var(--muted)]/60 text-[var(--fg)] rounded-xl"
-            placeholder="Catatan, nomor rekening, dsb..."
+            className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
+            placeholder="Nomor rekening, keterangan, dll"
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           />
         </div>
 
-        {/* Submit Buttons */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40">
+        {/* 6. Submit Buttons */}
+        <div className="flex items-center justify-end gap-2 pt-1 border-t border-[var(--border)]/40">
           <Button type="button" variant="secondary" onClick={closeSheet} className="!py-2.5 !px-4 text-xs active:scale-95 transition-all">
             Batal
           </Button>
@@ -396,10 +296,11 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
               isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'
             }`}
           >
-            {editingLoan ? 'Simpan Perubahan' : isDebt ? 'Simpan Catatan Hutang' : 'Simpan Catatan Piutang'}
+            {editingLoan ? 'Simpan Perubahan' : 'Simpan'}
           </Button>
         </div>
       </div>
     </BottomSheet>
   )
 }
+

@@ -127,12 +127,12 @@
     --radius-xl: 1.125rem;
     --status-income: #10b981;
     --status-income-soft: color-mix(in srgb, var(--status-income) 15%, transparent);
-    --status-expense: #ef4444;
+    --status-expense: #f43f5e;
     --status-expense-soft: color-mix(in srgb, var(--status-expense) 15%, transparent);
-    --income: #4C6B54;
-    --income-tint: #E6EDE7;
-    --expense: #A15A42;
-    --expense-tint: #F3E3DC;
+    --income: #10b981;
+    --income-tint: rgba(16, 185, 129, 0.14);
+    --expense: #f43f5e;
+    --expense-tint: rgba(244, 63, 94, 0.14);
     --shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.1);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -177,13 +177,13 @@
     --skeleton-base: rgba(255, 255, 255, 0.04);
     --skeleton-shine: rgba(255, 255, 255, 0.08);
 
-    /* ── Earthy tones ────────────────────────────────────────────────── */
-    --earthy-green: #4C6B54;
-    --earthy-green-soft: color-mix(in srgb, #4C6B54 14%, transparent);
-    --earthy-terra: #A15A42;
-    --earthy-terra-soft: color-mix(in srgb, #A15A42 14%, transparent);
-    --earthy-green-dark: #3D5645;
-    --earthy-terra-dark: #8B4D38;
+    /* ── Earthy & Vibrant tones ───────────────────────────────────────── */
+    --earthy-green: #10b981;
+    --earthy-green-soft: color-mix(in srgb, #10b981 14%, transparent);
+    --earthy-terra: #f43f5e;
+    --earthy-terra-soft: color-mix(in srgb, #f43f5e 14%, transparent);
+    --earthy-green-dark: #059669;
+    --earthy-terra-dark: #e11d48;
     /* Earthy accent alternative (reserved for future switch) */
     --accent-alt: #6B7C5E;
     --accent-alt-strong: #576848;
@@ -208,14 +208,14 @@
     --radius-md: 0.875rem;
     --radius-lg: 1rem;
     --radius-xl: 1.125rem;
-    --status-income: #16a34a;
+    --status-income: #059669;
     --status-income-soft: color-mix(in srgb, var(--status-income) 12%, transparent);
-    --status-expense: #dc2626;
+    --status-expense: #e11d48;
     --status-expense-soft: color-mix(in srgb, var(--status-expense) 12%, transparent);
-    --income: #4C6B54;
-    --income-tint: #E6EDE7;
-    --expense: #A15A42;
-    --expense-tint: #F3E3DC;
+    --income: #059669;
+    --income-tint: rgba(5, 150, 105, 0.12);
+    --expense: #e11d48;
+    --expense-tint: rgba(225, 29, 72, 0.12);
     --shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
     --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.04);
     --shadow-card: 0 1px 4px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
@@ -255,13 +255,13 @@
     --skeleton-base: rgba(15, 23, 42, 0.05);
     --skeleton-shine: rgba(15, 23, 42, 0.09);
 
-    /* ── Earthy tones (light) ─────────────────────────────────────── */
-    --earthy-green: #4C6B54;
-    --earthy-green-soft: color-mix(in srgb, #4C6B54 10%, transparent);
-    --earthy-terra: #A15A42;
-    --earthy-terra-soft: color-mix(in srgb, #A15A42 10%, transparent);
-    --earthy-green-dark: #3D5645;
-    --earthy-terra-dark: #8B4D38;
+    /* ── Earthy & Vibrant tones (light) ────────────────────────────── */
+    --earthy-green: #059669;
+    --earthy-green-soft: color-mix(in srgb, #059669 12%, transparent);
+    --earthy-terra: #e11d48;
+    --earthy-terra-soft: color-mix(in srgb, #e11d48 12%, transparent);
+    --earthy-green-dark: #047857;
+    --earthy-terra-dark: #be123c;
     --accent-alt: #6B7C5E;
     --accent-alt-strong: #576848;
   }
