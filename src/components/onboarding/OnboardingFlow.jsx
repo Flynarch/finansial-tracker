@@ -12,6 +12,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   Trash2,
   Wallet,
@@ -93,15 +94,34 @@ export default function OnboardingFlow() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [usernameError, setUsernameError] = useState('')
   const [cameFromStep3, setCameFromStep3] = useState(false)
+  const [showAllWallets, setShowAllWallets] = useState(false)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const hasWallets = wallets && wallets.length > 0
 
+  const visibleWallets = useMemo(() => {
+    if (!wallets) return []
+    if (showAllWallets || wallets.length <= 3) return wallets
+    return wallets.slice(0, 3)
+  }, [wallets, showAllWallets])
+
   const [mounted, setMounted] = useState(false)
+
+  // Prevent outer background scrolling (Dashboard bounce leak) during onboarding
   useEffect(() => {
     if (!hasCompleted && isLoaded) {
       requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
+      const origOverflow = document.body.style.overflow
+      const origOverscroll = document.body.style.overscrollBehavior
+      document.body.style.overflow = 'hidden'
+      document.body.style.overscrollBehavior = 'none'
+
+      return () => {
+        document.body.style.overflow = origOverflow
+        document.body.style.overscrollBehavior = origOverscroll
+      }
     }
+    return undefined
   }, [hasCompleted, isLoaded])
 
   useEffect(() => {
@@ -184,7 +204,9 @@ export default function OnboardingFlow() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--bg)]"
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[var(--bg)] overscroll-none select-none ${
+        step === 2 ? 'overflow-y-auto touch-auto' : 'overflow-hidden touch-none'
+      }`}
       style={{
         opacity: mounted ? 1 : 0,
         transition: 'opacity 0.4s ease-out',
@@ -354,10 +376,10 @@ export default function OnboardingFlow() {
                     </p>
                   </div>
 
-                  {/* List of Wallets */}
+                  {/* List of Wallets (3 Top + Chip Kapsul Ekspansi "+ X Dompet Lainnya") */}
                   {hasWallets ? (
-                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1 ft-hide-scrollbar">
-                      {wallets.map((w) => {
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1 ft-hide-scrollbar">
+                      {visibleWallets.map((w) => {
                         const logoUrl = getWalletLogoUrl(w)
                         return (
                           <div
@@ -411,6 +433,27 @@ export default function OnboardingFlow() {
                           </div>
                         )
                       })}
+
+                      {/* Expansion Chip Button if wallets > 3 */}
+                      {wallets.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllWallets((prev) => !prev)}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[var(--field-bg)]/80 border border-[var(--border)] text-[11px] font-extrabold text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
+                        >
+                          <span>
+                            {showAllWallets
+                              ? 'Sembunyikan'
+                              : `+ ${wallets.length - 3} dompet lainnya`}
+                          </span>
+                          <ChevronDown
+                            size={14}
+                            className={`transition-transform duration-200 ${
+                              showAllWallets ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="py-4 text-center border border-dashed border-amber-500/40 rounded-xl bg-amber-500/5">
