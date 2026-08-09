@@ -4,6 +4,18 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
+import {
+  Wallet,
+  Building2,
+  Smartphone,
+  Coins,
+  Plus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
 
@@ -24,36 +36,46 @@ function loadProgress() {
 function saveProgress(data) {
   try {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(data))
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function clearProgress() {
   try {
     localStorage.removeItem(PROGRESS_KEY)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
-/* ── Progress Dots ───────────────────────────────────────────────── */
-function ProgressDots({ total, active }) {
+/* ── Progress Indicator (Minimalist Flat) ────────────────────────── */
+function ProgressHeader({ step }) {
   return (
-    <div className="flex items-center justify-center gap-2">
-      {Array.from({ length: total }).map((_, i) => (
-        <span
-          key={i}
-          className="rounded-full transition-all duration-300 ease-out"
-          style={{
-            width: i === active ? 24 : 8,
-            height: 8,
-            backgroundColor: i === active ? 'var(--accent)' : 'color-mix(in srgb, var(--muted) 35%, transparent)',
-          }}
-        />
-      ))}
+    <div className="flex items-center justify-between border-b border-[var(--border)] pb-4 mb-6">
+      <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+        Langkah {step} dari 3
+      </span>
+      <div className="flex items-center gap-1.5">
+        {[1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === step
+                ? 'w-6 bg-[var(--fg)]'
+                : i < step
+                ? 'w-3 bg-[var(--accent)]'
+                : 'w-3 bg-[var(--border)]'
+            }`}
+          />
+        ))}
+      </div>
     </div>
   )
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
+   MAIN ONBOARDING COMPONENT (Minimalist Flat Aesthetic)
    ════════════════════════════════════════════════════════════════════ */
 export default function OnboardingFlow() {
   const navigate = useNavigate()
@@ -63,21 +85,16 @@ export default function OnboardingFlow() {
   const completeOnboarding = useSettingsStore((s) => s.completeOnboarding)
   const startSpotlightTour = useSettingsStore((s) => s.startSpotlightTour)
 
-  // Load saved progress
   const saved = useMemo(() => loadProgress(), [])
 
   const [step, setStep] = useState(saved?.step ?? 0)
   const [username, setUsername] = useState(saved?.username ?? '')
-  const [direction, setDirection] = useState(1) // 1=forward, -1=back
+  const [direction, setDirection] = useState(1)
   const [isAnimating, setIsAnimating] = useState(false)
-
-  // Validation
   const [usernameError, setUsernameError] = useState('')
 
-  // Live wallet count for confirmation step
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
-  // Entrance animation
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     if (!hasCompleted && isLoaded) {
@@ -85,31 +102,38 @@ export default function OnboardingFlow() {
     }
   }, [hasCompleted, isLoaded])
 
-  // Persist progress on change
   useEffect(() => {
     if (step > 0) {
       saveProgress({ step, username })
     }
   }, [step, username])
 
-  const goTo = useCallback((nextStep) => {
-    const dir = nextStep > step ? 1 : -1
-    setDirection(dir)
-    setIsAnimating(true)
-    setTimeout(() => {
-      setStep(nextStep)
-      requestAnimationFrame(() => {
-        setIsAnimating(false)
-      })
-    }, 200)
-  }, [step])
+  const goTo = useCallback(
+    (nextStep) => {
+      const dir = nextStep > step ? 1 : -1
+      setDirection(dir)
+      setIsAnimating(true)
+      setTimeout(() => {
+        setStep(nextStep)
+        requestAnimationFrame(() => {
+          setIsAnimating(false)
+        })
+      }, 180)
+    },
+    [step]
+  )
 
   const handleNext = useCallback(() => {
     if (step === 1) {
-      // Validate username
       const trimmed = username.trim()
-      if (!trimmed) { setUsernameError('Nama tidak boleh kosong'); return }
-      if (trimmed.length < 2) { setUsernameError('Minimal 2 karakter'); return }
+      if (!trimmed) {
+        setUsernameError('Nama tidak boleh kosong')
+        return
+      }
+      if (trimmed.length < 2) {
+        setUsernameError('Minimal 2 karakter')
+        return
+      }
       setUsernameError('')
     }
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
@@ -121,96 +145,131 @@ export default function OnboardingFlow() {
 
   const handleFinish = useCallback(async () => {
     const trimmedName = username.trim()
-    // Save profile name
     await setProfileName(trimmedName)
-    // Mark onboarding complete
     await completeOnboarding()
     startSpotlightTour()
     clearProgress()
-    // Also mark old onboarding as seen
-    try { localStorage.setItem('ft_onboarding_seen_v1', '1') } catch { /* ignore */ }
+    try {
+      localStorage.setItem('ft_onboarding_seen_v1', '1')
+    } catch {
+      /* ignore */
+    }
     navigate('/dashboard', { replace: true })
   }, [username, setProfileName, completeOnboarding, startSpotlightTour, navigate])
 
-  // Don't render if already completed or settings not loaded yet
   if (!isLoaded || hasCompleted) return null
 
   const slideTransform = isAnimating
-    ? `translateX(${direction > 0 ? '-30px' : '30px'})`
+    ? `translateX(${direction > 0 ? '-20px' : '20px'})`
     : 'translateX(0)'
   const slideOpacity = isAnimating ? 0 : 1
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--bg)]"
       style={{
-        background: 'var(--bg)',
         opacity: mounted ? 1 : 0,
-        transition: 'opacity 0.5s ease',
+        transition: 'opacity 0.4s ease-out',
       }}
     >
-      {/* Subtle background decoration */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute -top-1/4 -left-1/4 h-[600px] w-[600px] rounded-full opacity-[0.06]"
-          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute -bottom-1/4 -right-1/4 h-[500px] w-[500px] rounded-full opacity-[0.04]"
-          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)' }}
-        />
-      </div>
-
       <div className="relative z-10 flex h-full w-full max-w-lg flex-col px-6 py-8 sm:justify-center sm:py-12">
-        {/* Step content area */}
         <div
           className="flex flex-1 flex-col justify-center sm:flex-initial"
           style={{
             transform: slideTransform,
             opacity: slideOpacity,
-            transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), opacity 0.2s ease',
+            transition: 'transform 0.2s ease-out, opacity 0.15s ease-out',
           }}
         >
-          {/* ── Step 0: Welcome ────────────────────────────────── */}
+          {/* ── Step 0: Welcome Screen (Minimalist Flat) ──────────── */}
           {step === 0 && (
             <div className="flex flex-col items-center text-center">
-              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--fg)] shadow-lg">
-                <span className="text-2xl font-black tracking-wider text-[var(--bg)]">FT</span>
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--fg)] text-[var(--bg)] shadow-md">
+                <span className="text-3xl font-black tracking-widest">FT</span>
               </div>
-              <h1 className="ft-display text-3xl font-black tracking-tight text-[var(--fg)]">FinTrack</h1>
-              <p className="mt-2 text-sm font-medium leading-relaxed text-[var(--muted)]">
-                Asisten keuangan pribadimu — catat, pantau,<br />dan kendalikan finansialmu.
+
+              <h1 className="ft-display text-4xl font-black tracking-tight text-[var(--fg)]">
+                FinTrack
+              </h1>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[var(--muted)] max-w-xs">
+                Asisten keuangan pribadimu. Catat, pantau, dan kendalikan finansialmu dengan mudah.
               </p>
+
+              {/* Multi-Wallet Capability Highlight Card */}
+              <div className="mt-6 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-left space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)]">
+                    <Wallet size={16} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-[var(--fg)] uppercase tracking-wider">
+                      Dukungan Multi-Wallet Tanpa Batas
+                    </h4>
+                    <p className="text-[11px] font-medium text-[var(--muted)]">
+                      Kelola banyak dompet sekaligus dalam 1 aplikasi.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[var(--border)]/60">
+                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
+                    <Building2 size={13} className="text-sky-500 shrink-0" />
+                    <span className="truncate">Bank</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
+                    <Smartphone size={13} className="text-emerald-500 shrink-0" />
+                    <span className="truncate">e-Wallet</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
+                    <Coins size={13} className="text-amber-500 shrink-0" />
+                    <span className="truncate">Kas Utama</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Badge */}
+              <div className="mt-4 flex items-center gap-2 text-[11px] font-bold text-[var(--muted-2)]">
+                <ShieldCheck size={14} className="text-emerald-500" />
+                <span>100% Data Tersimpan Aman di Perangkat Anda</span>
+              </div>
+
               <button
                 type="button"
                 onClick={() => goTo(1)}
-                className="mt-10 w-full max-w-[280px] rounded-2xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-[0.97]"
+                className="mt-8 w-full rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
               >
-                Mulai
+                Mulai Setup
               </button>
-              <p className="mt-4 text-[11px] text-[var(--muted-2)]">Data tersimpan lokal di perangkatmu</p>
             </div>
           )}
 
-          {/* ── Step 1: Username ───────────────────────────────── */}
+          {/* ── Step 1: Username Input ────────────────────────────── */}
           {step === 1 && (
             <div className="flex flex-col">
-              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">Langkah 1 dari 2</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--fg)]">Siapa namamu?</h2>
-              <p className="mt-1.5 text-sm text-[var(--muted)]">Kami akan menyapamu di Dashboard setiap hari.</p>
+              <ProgressHeader step={1} />
+
+              <h2 className="text-3xl font-black tracking-tight text-[var(--fg)]">
+                Siapa namamu?
+              </h2>
+              <p className="mt-2 text-sm font-medium text-[var(--muted)] leading-relaxed">
+                Kami akan menyapamu di Dasbor setiap hari.
+              </p>
 
               <div className="mt-8">
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => { setUsername(e.target.value); setUsernameError('') }}
-                  placeholder="Masukkan nama kamu"
+                  onChange={(e) => {
+                    setUsername(e.target.value)
+                    setUsernameError('')
+                  }}
+                  placeholder="Masukkan nama kamu..."
                   autoFocus
                   maxLength={30}
-                  className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3.5 text-base font-semibold text-[var(--fg)] outline-none transition placeholder:text-[var(--muted-2)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                  className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-4 text-base font-bold text-[var(--fg)] outline-none transition placeholder:text-[var(--muted-2)] focus:border-[var(--fg)] focus:ring-1 focus:ring-[var(--fg)]"
                 />
                 {usernameError && (
-                  <p className="mt-2 text-xs font-semibold text-rose-400">{usernameError}</p>
+                  <p className="mt-2 text-xs font-bold text-rose-500">{usernameError}</p>
                 )}
               </div>
 
@@ -218,22 +277,23 @@ export default function OnboardingFlow() {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel)] active:scale-[0.97]"
+                  className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel-strong)] active:scale-[0.97] cursor-pointer"
                 >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <ChevronLeft size={20} strokeWidth={2.2} />
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="flex-1 rounded-2xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-[0.97]"
+                  className="flex-1 rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.97] cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  Lanjut
+                  <span>Lanjut</span>
+                  <ChevronRight size={18} strokeWidth={2.2} />
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Step 2: Tambah Akun / Wallet ────────────────── */}
+          {/* ── Step 2: Add Account / Wallet ──────────────────────── */}
           {step === 2 && (
             <div className="flex flex-col -mx-6 -my-8 h-screen">
               <Suspense fallback={<div className="flex-1 animate-pulse bg-[var(--bg)]" />}>
@@ -246,68 +306,100 @@ export default function OnboardingFlow() {
             </div>
           )}
 
-          {/* ── Step 3: Summary / Confirm ─────────────────────── */}
+          {/* ── Step 3: Multi-Wallet Summary & Finish ────────────── */}
           {step === 3 && (
             <div className="flex flex-col">
-              <div className="mb-6 flex items-center justify-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]">
-                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
+              <ProgressHeader step={3} />
+
+              <div className="mb-4 flex items-center justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500">
+                  <Check size={32} strokeWidth={3} />
                 </div>
               </div>
 
-              <h2 className="text-center text-2xl font-bold tracking-tight text-[var(--fg)]">Semua siap!</h2>
-              <p className="mt-1.5 text-center text-sm text-[var(--muted)]">Pastikan data berikut sudah benar sebelum mulai.</p>
+              <h2 className="text-center text-3xl font-black tracking-tight text-[var(--fg)]">
+                Semua Siap!
+              </h2>
+              <p className="mt-1.5 text-center text-sm font-medium text-[var(--muted)]">
+                Pastikan data profil dan dompet keuanganmu sudah sesuai.
+              </p>
 
-              {/* Summary cards */}
-              <div className="mt-8 space-y-3">
-                {/* Username */}
-                <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3.5">
+              {/* Summary Cards */}
+              <div className="mt-6 space-y-3">
+                {/* Profile Name */}
+                <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Nama</p>
-                    <p className="mt-0.5 truncate text-sm font-bold text-[var(--fg)]">{username.trim()}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => goTo(1)}
-                    className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] transition hover:bg-[var(--field-bg)] active:scale-[0.97]"
-                  >
-                    Ubah
-                  </button>
-                </div>
-
-                {/* Wallet */}
-                <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Dompet</p>
-                    <p className="mt-0.5 text-sm font-bold text-[var(--fg)]">
-                      {wallets?.length > 0 ? `${wallets.length} wallet tersimpan` : 'Belum ada wallet'}
+                    <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Nama Pengguna
+                    </p>
+                    <p className="mt-0.5 truncate text-base font-extrabold text-[var(--fg)]">
+                      {username.trim()}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => goTo(2)}
-                    className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] transition hover:bg-[var(--field-bg)] active:scale-[0.97]"
+                    onClick={() => goTo(1)}
+                    className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] transition hover:bg-[var(--border)]/40 cursor-pointer"
                   >
                     Ubah
                   </button>
                 </div>
+
+                {/* Multi-Wallet Status Card */}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
+                        Dompet Keuangan Tersimpan
+                      </p>
+                      <p className="mt-0.5 text-base font-extrabold text-[var(--fg)]">
+                        {wallets?.length > 0
+                          ? `${wallets.length} Dompet Aktif`
+                          : 'Belum Ada Dompet'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => goTo(2)}
+                      className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] transition hover:bg-[var(--border)]/40 cursor-pointer"
+                    >
+                      Ubah
+                    </button>
+                  </div>
+
+                  {/* Multi-Wallet Notice & Add Extra Button */}
+                  <div className="rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)] p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Zap size={15} className="text-amber-500 shrink-0" />
+                      <p className="text-xs font-bold text-[var(--muted)] truncate">
+                        Ingin tambah dompet e-Wallet / Bank lain?
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => goTo(2)}
+                      className="inline-flex items-center gap-1 rounded-xl bg-[var(--fg)] px-3 py-1.5 text-xs font-black text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <Plus size={13} strokeWidth={3} />
+                      <span>Tambah</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* CTA */}
+              {/* Action CTA */}
               <div className="mt-8 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel)] active:scale-[0.97]"
+                  className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel-strong)] active:scale-[0.97] cursor-pointer"
                 >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <ChevronLeft size={20} strokeWidth={2.2} />
                 </button>
                 <button
                   type="button"
                   onClick={handleFinish}
-                  className="flex-1 rounded-2xl bg-[var(--accent)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-lg transition active:scale-[0.97]"
+                  className="flex-1 rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.97] cursor-pointer"
                 >
                   Mulai Pakai FinTrack
                 </button>
@@ -315,15 +407,8 @@ export default function OnboardingFlow() {
             </div>
           )}
         </div>
-
-        {/* Progress dots — shown on steps 1-3 */}
-        {step > 0 && (
-          <div className="mt-8 sm:mt-10">
-            <ProgressDots total={TOTAL_STEPS} active={step} />
-          </div>
-        )}
       </div>
     </div>,
-    document.body,
+    document.body
   )
 }
