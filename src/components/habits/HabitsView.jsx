@@ -13,24 +13,6 @@ import useSwipeAction from '../../hooks/useSwipeAction'
 
 const HABIT_COLORS = ['#34d399', '#38bdf8', '#a855f7', '#fb7185', '#fcd34d', '#fb923c']
 const HABIT_CATEGORIES = ['Kesehatan', 'Belajar', 'Produktivitas', 'Keuangan', 'Lainnya']
-const SWIPE_EDIT_THRESHOLD = -40
-const SWIPE_DELETE_THRESHOLD = -120
-
-const updateHabitBgVisual = (bgEl, mode) => {
-  if (!bgEl || bgEl.dataset.swipeMode === mode) return
-  bgEl.dataset.swipeMode = mode
-  bgEl.classList.remove('opacity-0', 'opacity-100', 'bg-rose-500/15', 'text-rose-500', 'bg-sky-500/15', 'text-sky-500')
-  if (mode === 'delete') {
-    bgEl.classList.add('opacity-100', 'bg-rose-500/15', 'text-rose-500')
-    bgEl.innerHTML = '<svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
-  } else if (mode === 'edit') {
-    bgEl.classList.add('opacity-100', 'bg-sky-500/15', 'text-sky-500')
-    bgEl.innerHTML = '<svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>'
-  } else {
-    bgEl.classList.add('opacity-0')
-    bgEl.innerHTML = ''
-  }
-}
 
 const CustomSelect = ({ value, options, onChange }) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -81,132 +63,38 @@ const HabitItemCard = memo(function HabitItemCard({
   habit,
   isDone,
   isTodayList,
-  isSwiping,
-  setSwipeHabitId,
-  swipeHabitIdRef,
-  swipeStartXRef,
-  swipeStartYRef,
-  swipeDxRef,
+  swipedId,
+  setSwipedId,
+  getSwipeHandlers,
   ignoreNextClickRef,
-  rafIdRef,
   toggleHabitToday,
   openEdit,
   setSelectedHabitForStats,
   setConfirmDeleteId,
 }) {
+  const isSwiped = swipedId === habit.id
+
   return (
     <li key={habit.id} className="group relative overflow-hidden rounded-[1.25rem]">
       {/* Progressive Swipe Background */}
-      <div 
-        className="absolute inset-0 z-0 flex items-center justify-end rounded-[1.25rem] px-5 opacity-0 transition-colors duration-200"
-      >
-        {/* Icon is dynamically inserted via DOM manipulation */}
-      </div>
+      <div className="absolute inset-0 z-0 flex items-center justify-end rounded-[1.25rem] px-5 opacity-0 transition-colors duration-200" />
 
       {/* Foreground Card */}
       <div
-        className={`relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer`}
-        style={{ 
-          // eslint-disable-next-line react-hooks/refs
-          transform: `translateX(${isSwiping ? swipeDxRef.current : 0}px)`, 
-          transition: isSwiping ? 'none' : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-          willChange: isSwiping ? 'transform' : 'auto',
-        }}
+        className="relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer"
         onClick={() => {
           if (ignoreNextClickRef.current) {
             ignoreNextClickRef.current = false
             return
           }
-          setSelectedHabitForStats(habit)
-        }}
-        onTouchStart={(e) => {
-          if (e.touches.length !== 1) return
-          if (rafIdRef.current) {
-            cancelAnimationFrame(rafIdRef.current)
-            rafIdRef.current = null
-          }
-          const touch = e.touches[0]
-          swipeHabitIdRef.current = habit.id
-          swipeStartXRef.current = touch.clientX
-          swipeStartYRef.current = touch.clientY
-          swipeDxRef.current = 0
-          ignoreNextClickRef.current = false
-          setSwipeHabitId(habit.id)
-          e.currentTarget.style.transition = 'none'
-          e.currentTarget.style.willChange = 'transform'
-        }}
-        onTouchMove={(e) => {
-          if (swipeHabitIdRef.current !== habit.id) return
-          const touch = e.touches[0]
-          const dx = touch.clientX - swipeStartXRef.current
-          const dy = touch.clientY - swipeStartYRef.current
-          
-          if (Math.abs(dy) > Math.abs(dx) * 1.2 && Math.abs(dy) > 10 && Math.abs(dx) < 15) {
-            // Scrolling vertically initially, cancel swipe
-            if (rafIdRef.current) {
-              cancelAnimationFrame(rafIdRef.current)
-              rafIdRef.current = null
-            }
-            swipeHabitIdRef.current = null
-            setSwipeHabitId(null)
-            const currentTarget = e.currentTarget
-            currentTarget.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)'
-            currentTarget.style.transform = 'translateX(0px)'
-            currentTarget.style.willChange = 'auto'
-            updateHabitBgVisual(currentTarget.previousElementSibling, 'none')
+          if (isSwiped) {
+            setSwipedId(null)
+            openEdit(habit)
             return
           }
-
-          let totalDx = dx
-          if (totalDx > 0) totalDx = 0
-          
-          swipeDxRef.current = Math.max(-200, totalDx)
-
-          if (rafIdRef.current !== null) return
-          const currentTarget = e.currentTarget
-          const bgEl = currentTarget.previousElementSibling
-
-          rafIdRef.current = requestAnimationFrame(() => {
-            rafIdRef.current = null
-            if (swipeHabitIdRef.current !== habit.id) return
-            const currentDx = swipeDxRef.current
-            currentTarget.style.transform = `translateX(${currentDx}px)`
-            if (currentDx <= SWIPE_DELETE_THRESHOLD) {
-              updateHabitBgVisual(bgEl, 'delete')
-            } else if (currentDx <= SWIPE_EDIT_THRESHOLD) {
-              updateHabitBgVisual(bgEl, 'edit')
-            } else {
-              updateHabitBgVisual(bgEl, 'none')
-            }
-          })
+          setSelectedHabitForStats(habit)
         }}
-        onTouchEnd={(e) => {
-          if (swipeHabitIdRef.current !== habit.id) return
-          if (rafIdRef.current) {
-            cancelAnimationFrame(rafIdRef.current)
-            rafIdRef.current = null
-          }
-          const finalDx = swipeDxRef.current
-          swipeHabitIdRef.current = null
-          setSwipeHabitId(null)
-
-          const currentTarget = e.currentTarget
-          currentTarget.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)'
-          currentTarget.style.transform = 'translateX(0px)'
-          currentTarget.style.willChange = 'auto'
-          
-          updateHabitBgVisual(currentTarget.previousElementSibling, 'none')
-
-          if (finalDx <= SWIPE_DELETE_THRESHOLD) {
-             setConfirmDeleteId(habit.id)
-             ignoreNextClickRef.current = true
-             setTimeout(() => { ignoreNextClickRef.current = false }, 100)
-          } else if (finalDx <= SWIPE_EDIT_THRESHOLD) {
-             openEdit(habit)
-             ignoreNextClickRef.current = true
-             setTimeout(() => { ignoreNextClickRef.current = false }, 100)
-          }
-        }}
+        {...getSwipeHandlers(habit.id, { onEdit: () => openEdit(habit), onDelete: () => setConfirmDeleteId(habit.id) })}
       >
         <div className="flex items-center gap-4 min-w-0">
           <button
@@ -269,8 +157,7 @@ const HabitItemCard = memo(function HabitItemCard({
     prevProps.habit === nextProps.habit &&
     prevProps.isDone === nextProps.isDone &&
     prevProps.isTodayList === nextProps.isTodayList &&
-    prevProps.isSwiping === nextProps.isSwiping &&
-    prevProps.isConfirmingDelete === nextProps.isConfirmingDelete &&
+    prevProps.swipedId === nextProps.swipedId &&
     prevProps.toggleHabitToday === nextProps.toggleHabitToday &&
     prevProps.openEdit === nextProps.openEdit &&
     prevProps.setSelectedHabitForStats === nextProps.setSelectedHabitForStats &&
@@ -290,14 +177,10 @@ export default function HabitsView() {
   const {
     swipedId: swipeHabitId,
     setSwipedId: setSwipeHabitId,
-    swipeIdRef: swipeHabitIdRef,
-    swipeStartXRef,
-    swipeStartYRef,
-    swipeDxRef,
+    getSwipeHandlers,
     ignoreNextClickRef,
   } = useSwipeAction()
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
-  const rafIdRef = useRef(null)
 
   const habits = useLiveQuery(() => db.habits.orderBy('createdAt').reverse().toArray(), [])
   const todayKey = format(new Date(), 'yyyy-MM-dd')
@@ -474,15 +357,10 @@ export default function HabitsView() {
           habit={habit}
           isDone={completedHabitIds.has(habit.id)}
           isTodayList={isTodayList}
-          isSwiping={swipeHabitId === habit.id}
-          isConfirmingDelete={confirmDeleteId === habit.id}
-          setSwipeHabitId={setSwipeHabitId}
-          swipeHabitIdRef={swipeHabitIdRef}
-          swipeStartXRef={swipeStartXRef}
-          swipeStartYRef={swipeStartYRef}
-          swipeDxRef={swipeDxRef}
+          swipedId={swipeHabitId}
+          setSwipedId={setSwipeHabitId}
+          getSwipeHandlers={getSwipeHandlers}
           ignoreNextClickRef={ignoreNextClickRef}
-          rafIdRef={rafIdRef}
           toggleHabitToday={toggleHabitToday}
           openEdit={openEdit}
           setSelectedHabitForStats={setSelectedHabitForStats}

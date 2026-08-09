@@ -15,8 +15,6 @@ import { convertCurrency, formatCurrency, toSafeNumber } from '../lib/utils'
 import {
   Plus,
   ChevronLeft,
-  Edit2,
-  Trash2,
   HandCoins,
   Receipt,
   CheckCircle2,
@@ -445,35 +443,18 @@ export default function Loans() {
                     key={item.id}
                     className={`relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] ${glowClass} hover:border-[var(--border-strong)] transition-all`}
                   >
-                    {/* Hidden Action Layer Behind (Revealed on swipe left) */}
-                    <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-3 z-0">
-                      <button
-                        type="button"
-                        onClick={(e) => openEdit(item, e)}
-                        className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setDeletingLoan(item)
-                        }}
-                        className="rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] px-3 py-2 text-xs font-extrabold text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Hapus
-                      </button>
-                    </div>
+                    {/* Progressive Swipe Background (Habits Style) */}
+                    <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
                     {/* Swipable Compact Card Content (Front Layer) */}
                     <article
-                      className={`loan-entry relative z-10 bg-[var(--panel-strong)] p-3.5 space-y-2.5 transition-transform duration-200 ${
-                        isSwiped ? '-translate-x-[140px]' : 'translate-x-0'
-                      } touch-pan-y`}
-                      {...getSwipeHandlers(item.id)}
+                      className="loan-entry relative z-10 bg-[var(--panel-strong)] p-3.5 space-y-2.5 touch-pan-y cursor-pointer"
+                      onClick={(e) => {
+                        if (isSwiped) {
+                          openEdit(item, e)
+                        }
+                      }}
+                      {...getSwipeHandlers(item.id, { onEdit: () => openEdit(item), onDelete: () => setDeletingLoan(item) })}
                     >
                       {/* Circular LUNAS Stamp for Paid Items */}
                       {isPaid && (

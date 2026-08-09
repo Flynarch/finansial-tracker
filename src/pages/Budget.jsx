@@ -248,28 +248,17 @@ function Budget() {
                         : 'border-[var(--border)] bg-[var(--field-bg)] shadow-2xs hover:border-[var(--border-strong)]'
                     }`}
                   >
-                    <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-2.5 z-0">
-                      <button
-                        type="button"
-                        className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
-                        onClick={(e) => openEdit(b, e)}
-                      >
-                        {t('budget.edit')}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer"
-                        onClick={() => setDeletingBudget(b)}
-                      >
-                        {t('budget.delete')}
-                      </button>
-                    </div>
+                    {/* Progressive Swipe Background (Habits Style) */}
+                    <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
                     <article
-                      className={`relative z-10 bg-[var(--field-bg)] p-3.5 transition-all duration-200 ${
-                        swipedId === b.id ? '-translate-x-[130px]' : 'translate-x-0'
-                      } touch-pan-y`}
-                      {...getSwipeHandlers(b.id)}
+                      className="relative z-10 bg-[var(--field-bg)] p-3.5 touch-pan-y cursor-pointer"
+                      onClick={(e) => {
+                        if (swipedId === b.id) {
+                          openEdit(b, e)
+                        }
+                      }}
+                      {...getSwipeHandlers(b.id, { onEdit: () => openEdit(b), onDelete: () => setDeletingBudget(b) })}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">

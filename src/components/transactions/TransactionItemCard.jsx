@@ -44,7 +44,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       if (setApiErrorTone) setApiErrorTone('error')
     }
   }
-  const walletsInternal = useLiveQuery(() => (walletsProp ? undefined : db.wallets.toArray()), [walletsProp])
+  const walletsInternal = useLiveQuery(() => db.wallets.toArray(), [])
   const wallets = walletsProp || walletsInternal
 
   const getWalletName = (id) => wallets?.find(w => w.id === id)?.name || 'Wallet'
@@ -106,52 +106,32 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   const isContextWalletMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))
   const displayWalletName = isContextWalletMatch ? null : walletName
 
+  const isSwiped = swipedTransactionId === transaction.id
+
   return (
     <div
       key={transaction.id}
       data-transaction-id={transaction.id}
       className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] transition-transform active:scale-[0.995]"
     >
-      <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
-        <button
-          type="button"
-          className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] cursor-pointer"
-          onClick={() => {
-            if (transaction.loanId) {
-              if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
-              if (setApiErrorTone) setApiErrorTone('error')
-              return
-            }
-            openEditTransaction(transaction)
-          }}
-        >
-          {t('tx.item.edit')}
-        </button>
-        <button
-          type="button"
-          className="rounded-lg border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--earthy-terra)] cursor-pointer"
-          onClick={() => {
-            if (transaction.loanId) {
-              if (setApiError) setApiError('Transaksi ini terhubung ke catatan Utang & Piutang. Silakan kelola melalui halaman Utang & Piutang.')
-              if (setApiErrorTone) setApiErrorTone('error')
-              return
-            }
-            setIsDeleteModalOpen(true)
-          }}
-        >
-          {t('tx.item.delete')}
-        </button>
-      </div>
+      {/* Progressive Swipe Background (Habits Style) */}
+      <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
       <article
-        className={`relative flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3.5 transition-all duration-200 ${
-          swipedTransactionId === transaction.id ? '-translate-x-[118px]' : 'translate-x-0'
-        } ${isSwipingId === transaction.id ? 'shadow-[0_6px_18px_rgba(15,23,42,0.08)]' : ''} ${
+        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3.5 ${
+          isSwipingId === transaction.id ? 'shadow-[0_6px_18px_rgba(15,23,42,0.08)]' : ''
+        } ${
           highlightedTransactionId === String(transaction.id)
             ? 'ring-2 ring-[var(--accent)]/50'
             : ''
         }`}
-        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id) : {})}
+        onClick={() => {
+          if (isSwiped) {
+            setSwipedTransactionId(null)
+            openEditTransaction(transaction)
+          }
+        }}
+        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, { onEdit: () => openEditTransaction(transaction), onDelete: () => setIsDeleteModalOpen(true) }) : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="relative shrink-0">
