@@ -5,10 +5,6 @@ import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
 import {
-  Wallet,
-  Building2,
-  Smartphone,
-  Coins,
   Plus,
   Check,
   ChevronLeft,
@@ -195,40 +191,8 @@ export default function OnboardingFlow() {
                 Asisten keuangan pribadimu. Catat, pantau, dan kendalikan finansialmu dengan mudah.
               </p>
 
-              {/* Multi-Wallet Capability Highlight Card */}
-              <div className="mt-6 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-left space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)]">
-                    <Wallet size={16} strokeWidth={2.2} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-[var(--fg)] uppercase tracking-wider">
-                      Dukungan Multi-Wallet Tanpa Batas
-                    </h4>
-                    <p className="text-[11px] font-medium text-[var(--muted)]">
-                      Kelola banyak dompet sekaligus dalam 1 aplikasi.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[var(--border)]/60">
-                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
-                    <Building2 size={13} className="text-sky-500 shrink-0" />
-                    <span className="truncate">Bank</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
-                    <Smartphone size={13} className="text-emerald-500 shrink-0" />
-                    <span className="truncate">e-Wallet</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] border border-[var(--border)]">
-                    <Coins size={13} className="text-amber-500 shrink-0" />
-                    <span className="truncate">Kas Utama</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Security Badge */}
-              <div className="mt-4 flex items-center gap-2 text-[11px] font-bold text-[var(--muted-2)]">
+              <div className="mt-6 flex items-center gap-2 text-[11px] font-bold text-[var(--muted-2)]">
                 <ShieldCheck size={14} className="text-emerald-500" />
                 <span>100% Data Tersimpan Aman di Perangkat Anda</span>
               </div>
