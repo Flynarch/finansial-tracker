@@ -92,6 +92,7 @@ export default function OnboardingFlow() {
   const [direction, setDirection] = useState(1)
   const [isAnimating, setIsAnimating] = useState(false)
   const [usernameError, setUsernameError] = useState('')
+  const [lastAddedWalletId, setLastAddedWalletId] = useState(null)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
@@ -139,14 +140,25 @@ export default function OnboardingFlow() {
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
   }, [step, username, goTo])
 
-  const handleBack = useCallback(() => {
+  const handleBack = useCallback(async () => {
+    if (step === 3 && lastAddedWalletId) {
+      try {
+        await db.wallets.delete(lastAddedWalletId)
+      } catch {
+        /* ignore */
+      }
+      setLastAddedWalletId(null)
+    }
     goTo(Math.max(step - 1, 0))
-  }, [step, goTo])
+  }, [step, lastAddedWalletId, goTo])
 
   const handleDeleteWallet = useCallback(async (e, walletId) => {
     e.stopPropagation()
     await db.wallets.delete(walletId)
-  }, [])
+    if (walletId === lastAddedWalletId) {
+      setLastAddedWalletId(null)
+    }
+  }, [lastAddedWalletId])
 
   const handleFinish = useCallback(async () => {
     const trimmedName = username.trim()
@@ -154,6 +166,7 @@ export default function OnboardingFlow() {
     await completeOnboarding()
     startSpotlightTour()
     clearProgress()
+    setLastAddedWalletId(null)
     try {
       localStorage.setItem('ft_onboarding_seen_v1', '1')
     } catch {
@@ -273,7 +286,10 @@ export default function OnboardingFlow() {
                 <AddAccountPage
                   isOnboarding
                   onBack={handleBack}
-                  onSuccess={() => goTo(3)}
+                  onSuccess={(newId) => {
+                    setLastAddedWalletId(newId)
+                    goTo(3)
+                  }}
                 />
               </Suspense>
             </div>
@@ -394,7 +410,7 @@ export default function OnboardingFlow() {
                   {/* Add Extra Wallet Button */}
                   <button
                     type="button"
-                    onClick={() => goTo(2)}
+                    onClick={handleBack}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-black text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-[0.98] cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={3} />
