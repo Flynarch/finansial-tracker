@@ -1,15 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Edit2, Check, ChevronDown, XCircle, Plus } from 'lucide-react'
+import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
-
-const PRESET_AMOUNTS = [
-  { label: '+ 100rb', value: 100000 },
-  { label: '+ 500rb', value: 500000 },
-  { label: '+ 1jt', value: 1000000 },
-  { label: '+ 5jt', value: 5000000 },
-]
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const navigate = useNavigate()
@@ -22,6 +15,8 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const [displayBalance, setDisplayBalance] = useState('')
   const [rawBalance, setRawBalance] = useState(0)
 
+  const isCustomAccount = !institution
+
   const handleBalanceChange = (e) => {
     const val = e.target.value.replace(/\D/g, '')
     if (!val) {
@@ -32,12 +27,6 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
     const num = parseInt(val, 10)
     setRawBalance(num)
     setDisplayBalance(num.toLocaleString('id-ID'))
-  }
-
-  const addPresetAmount = (amount) => {
-    const newBal = rawBalance + amount
-    setRawBalance(newBal)
-    setDisplayBalance(newBal.toLocaleString('id-ID'))
   }
 
   const clearBalance = () => {
@@ -120,42 +109,46 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
               </div>
             </div>
 
-            {/* Name Editor */}
-            {isEditingName ? (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-transparent border-b-2 border-[var(--fg)] text-[var(--fg)] font-black text-2xl w-48 text-center outline-none transition pb-0.5"
-                  autoFocus
-                  onBlur={() => setIsEditingName(false)}
-                  onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setIsEditingName(false)}
-                  className="p-1.5 bg-[var(--fg)] text-[var(--bg)] rounded-full shadow-xs cursor-pointer active:scale-95"
-                >
-                  <Check size={16} strokeWidth={3} />
-                </button>
-              </div>
-            ) : (
-              <div
-                className="flex items-center gap-2 mt-1 cursor-pointer group"
-                onClick={() => setIsEditingName(true)}
-              >
-                <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight">{name}</h2>
-                <div className="p-1 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] group-hover:bg-[var(--border)]/40 transition">
-                  <Edit2 size={13} className="text-[var(--fg)]" strokeWidth={2.2} />
+            {/* Name Editor: Only editable if custom account */}
+            {isCustomAccount ? (
+              isEditingName ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-transparent border-b-2 border-[var(--fg)] text-[var(--fg)] font-black text-2xl w-48 text-center outline-none transition pb-0.5"
+                    autoFocus
+                    onBlur={() => setIsEditingName(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(false)}
+                    className="p-1.5 bg-[var(--fg)] text-[var(--bg)] rounded-full shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <Check size={16} strokeWidth={3} />
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="flex items-center gap-2 mt-1 cursor-pointer group"
+                  onClick={() => setIsEditingName(true)}
+                >
+                  <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight">{name}</h2>
+                  <div className="p-1 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] group-hover:bg-[var(--border)]/40 transition">
+                    <Edit2 size={13} className="text-[var(--fg)]" strokeWidth={2.2} />
+                  </div>
+                </div>
+              )
+            ) : (
+              <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight mt-1">{name}</h2>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Balance Input Section (Tampilan Input Saldo Premium) ────────── */}
+      {/* ── Balance Input Section ────────────────────────────────────────── */}
       <div className="flex-1 px-5 pt-6 pb-28">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Currency Select */}
@@ -203,35 +196,6 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                   title="Hapus"
                 >
                   <XCircle size={20} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Balance Shortcut Preset Chips */}
-          <div className="space-y-2">
-            <span className="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider pl-0.5">
-              Preset Saldo Cepat
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {PRESET_AMOUNTS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => addPresetAmount(preset.value)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--field-bg)] border border-[var(--border)] text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg)] transition active:scale-95 cursor-pointer"
-                >
-                  <Plus size={12} strokeWidth={3} />
-                  <span>{preset.label}</span>
-                </button>
-              ))}
-              {rawBalance > 0 && (
-                <button
-                  type="button"
-                  onClick={clearBalance}
-                  className="px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-xs font-extrabold text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer"
-                >
-                  Reset 0
                 </button>
               )}
             </div>
