@@ -71,14 +71,17 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           content: translate(locale, 'aiChat.welcome')
         }])
       }
+      // Focus input quickly after the sheet bounces in
       setTimeout(() => {
-        if (inputRef.current) inputRef.current.focus()
-      }, 300)
+        if (inputRef.current) {
+          inputRef.current.focus({ preventScroll: true })
+        }
+      }, 180)
     } else {
       setIsAnimatingIn(false)
       timeoutId = setTimeout(() => {
         setShouldRender(false)
-      }, 450)
+      }, 420)
     }
     return () => clearTimeout(timeoutId)
   }, [isOpen])

@@ -165,10 +165,6 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
           return
         }
 
-        if (absDx > 10 && absDx > absDy) {
-          setIsSwipingId(id)
-        }
-
         const initialDx = String(swipedIdRef.current) === String(id) ? -72 : 0
         let totalDx = initialDx + dx
 
@@ -186,7 +182,7 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
           rafIdRef.current = null
           if (swipeIdRef.current !== String(id)) return
           const currentDx = swipeDxRef.current
-          currentTarget.style.transform = `translateX(${currentDx}px)`
+          currentTarget.style.transform = `translate3d(${currentDx}px, 0px, 0px)`
           updateSwipeBgVisual(bgEl, magneticMode, {
             editLabel: callbacks.editLabel || 'Edit',
             deleteLabel: callbacks.deleteLabel || 'Hapus',
@@ -206,7 +202,7 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
         const currentTarget = event.currentTarget
         currentTarget.style.willChange = 'auto'
         currentTarget.style.transition = 'transform 280ms cubic-bezier(0.16, 1, 0.3, 1)'
-        currentTarget.style.transform = 'translateX(0px)'
+        currentTarget.style.transform = 'translate3d(0px, 0px, 0px)'
 
         const bgEl = currentTarget.previousElementSibling
         updateSwipeBgVisual(bgEl, 'none')
@@ -241,7 +237,7 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
         }
         const currentTarget = event.currentTarget
         currentTarget.style.transition = 'transform 320ms cubic-bezier(0.25, 1, 0.5, 1)'
-        currentTarget.style.transform = 'translateX(0px)'
+        currentTarget.style.transform = 'translate3d(0px, 0px, 0px)'
         updateSwipeBgVisual(currentTarget.previousElementSibling, 'none')
         setSwipedId(null)
       },

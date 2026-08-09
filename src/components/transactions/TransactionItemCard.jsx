@@ -8,7 +8,6 @@ import { getWalletLogoUrl } from '../../data/walletInstitutions'
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
   swipedTransactionId,
-  isSwipingId,
   highlightedTransactionId,
   openEditTransaction,
   deleteTransaction,
@@ -119,8 +118,6 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
       <article
         className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3.5 ${
-          isSwipingId === transaction.id ? 'shadow-[0_6px_18px_rgba(15,23,42,0.08)]' : ''
-        } ${
           highlightedTransactionId === String(transaction.id)
             ? 'ring-2 ring-[var(--accent)]/50'
             : ''
