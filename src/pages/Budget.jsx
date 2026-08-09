@@ -16,7 +16,7 @@ import { formatExpenseCategory } from '../lib/expenseCategories'
 import { calculateBudgetSpent } from '../lib/budgetUtils'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { ChevronLeft, Plus, Edit2 } from 'lucide-react'
+import { ChevronLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react'
 
 function Budget() {
   const { locale, t } = useTranslation()
@@ -63,7 +63,9 @@ function Budget() {
     })
     const pct = totalLimit > 0 ? clampPercent((totalSpent / totalLimit) * 100) : 0
     const remaining = Math.max(0, totalLimit - totalSpent)
-    return { totalSpent, totalLimit, pct, remaining }
+    const isOver = totalSpent > totalLimit && totalLimit > 0
+    const overAmount = isOver ? totalSpent - totalLimit : 0
+    return { totalSpent, totalLimit, pct, remaining, isOver, overAmount }
   }, [monthBudgets, monthExpenseTxs, defaultCurrency])
 
   const openAdd = useCallback(() => {
@@ -112,7 +114,7 @@ function Budget() {
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer active:scale-95"
               aria-label={t('budget.back')}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
@@ -126,18 +128,22 @@ function Budget() {
           <button
             type="button"
             onClick={openAdd}
-            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-4 py-2 rounded-full bg-[var(--fg)] text-[var(--bg)] font-black text-xs shadow-md transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             {t('budget.add')}
           </button>
         </div>
 
-        {/* Summary Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between gap-3">
+        {/* Summary Hero Card (Modern Premium Design) */}
+        <div className="relative overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border)_75%,transparent)] bg-gradient-to-br from-[color-mix(in_srgb,var(--panel-strong)_95%,var(--accent)_5%)] via-[var(--panel-strong)] to-[color-mix(in_srgb,var(--panel-strong)_90%,var(--accent)_10%)] p-5 sm:p-6 shadow-sm shadow-black/5 space-y-4">
+          {/* Subtle Ambient Background Light */}
+          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+
+          {/* Top Row: Month Picker & Category Counter */}
+          <div className="flex items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
                 {t('budget.month')}
               </span>
               <MonthPicker
@@ -149,59 +155,68 @@ function Budget() {
             </div>
             <div className="text-right">
               <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">{t('budget.totalCategories')}</span>
-              <p className="text-sm font-black tabular-nums text-[var(--fg)]">{monthBudgets.length} Kategori</p>
+              <p className="text-xs font-black tabular-nums text-[var(--fg)]">{monthBudgets.length} Kategori</p>
             </div>
           </div>
 
-          <div className="flex items-start justify-between gap-3 relative z-10 pt-1">
+          {/* Middle Row: Main Metric & Status Badge */}
+          <div className="flex items-end justify-between gap-3 relative z-10 pt-1">
             <div className="min-w-0">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
                 Total Terpakai
               </span>
-              <p className="mt-0.5 text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+              <p className="mt-0.5 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
                 {formatCurrency(summary.totalSpent, defaultCurrency)}
               </p>
-              <p className="mt-1 text-xs font-extrabold text-[var(--muted)] tabular-nums">
-                {t('budget.of')} <span className="text-[var(--fg)]">{formatCurrency(summary.totalLimit, defaultCurrency)}</span>
+              <p className="mt-1 text-xs font-bold text-[var(--muted)] tabular-nums">
+                {t('budget.of')} <span className="font-extrabold text-[var(--fg)]">{formatCurrency(summary.totalLimit, defaultCurrency)}</span>
                 {summary.totalLimit > 0 && (
-                  <span className="ml-2 text-[11px] font-bold text-[var(--muted)]">
-                    (Sisa: {formatCurrency(summary.remaining, defaultCurrency)})
+                  <span className={`ml-2 font-bold ${summary.isOver ? 'text-rose-500' : 'text-[var(--muted)]'}`}>
+                    ({summary.isOver ? `Kelebihan: ${formatCurrency(summary.overAmount, defaultCurrency)}` : `Sisa: ${formatCurrency(summary.remaining, defaultCurrency)}`})
                   </span>
                 )}
               </p>
             </div>
 
-            <div className="text-right shrink-0">
-              <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${
+            <div className="text-right shrink-0 pb-0.5">
+              <div
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black border shadow-2xs backdrop-blur-md ${
                   summary.pct >= 100
-                    ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/30'
+                    ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                     : summary.pct >= 80
-                    ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                    : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
+                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
                 }`}
               >
-                {Math.round(summary.pct)}%
-              </span>
+                {summary.pct >= 100 ? (
+                  <AlertCircle size={13} className="shrink-0" />
+                ) : summary.pct >= 80 ? (
+                  <AlertTriangle size={13} className="shrink-0" />
+                ) : (
+                  <CheckCircle2 size={13} className="shrink-0" />
+                )}
+                <span>{Math.round(summary.pct)}%</span>
+              </div>
             </div>
           </div>
 
-          <div className="h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative z-10">
+          {/* Bottom Row: Smooth Progress Bar */}
+          <div className="h-3 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden relative z-10 p-0.5">
             <div
-              className={`h-full rounded-full transition-all duration-700 ease-out ${
+              className={`h-full rounded-full transition-all duration-700 ease-out shadow-xs ${
                 summary.pct >= 100
-                  ? 'bg-[var(--earthy-terra)]'
+                  ? 'bg-gradient-to-r from-rose-500 to-red-600'
                   : summary.pct >= 80
-                  ? 'bg-amber-500'
-                  : 'bg-[var(--earthy-green)]'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                  : 'bg-gradient-to-r from-emerald-400 to-teal-500'
               }`}
               style={{ width: `${Math.min(100, summary.pct)}%` }}
             />
           </div>
         </div>
 
-        {/* Budget List */}
-        <div className="space-y-3 pt-1">
+        {/* Budget List Section */}
+        <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
               Daftar Anggaran ({monthBudgets.length})
@@ -226,16 +241,16 @@ function Budget() {
                 const isWarn = pct >= 80 && pct < 100
 
                 const badgeClass = isDanger
-                  ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border border-[var(--earthy-terra)]/30'
+                  ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
                   : isWarn
                   ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                  : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25'
+                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
 
                 const barClass = isDanger
-                  ? 'bg-[var(--earthy-terra)]'
+                  ? 'bg-gradient-to-r from-rose-500 to-red-600'
                   : isWarn
                   ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                  : 'bg-[var(--earthy-green)]'
+                  : 'bg-gradient-to-r from-emerald-400 to-teal-500'
 
                 return (
                   <div
@@ -245,14 +260,14 @@ function Budget() {
                         ? 'border-rose-500/30 bg-rose-500/5'
                         : isWarn
                         ? 'border-amber-500/30 bg-amber-500/5'
-                        : 'border-[var(--border)] bg-[var(--field-bg)] shadow-2xs hover:border-[var(--border-strong)]'
+                        : 'border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)]'
                     }`}
                   >
                     {/* Progressive Swipe Background (Habits Style) */}
                     <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
                     <article
-                      className="relative z-10 bg-[var(--field-bg)] p-3.5 touch-pan-y cursor-pointer"
+                      className="relative z-10 bg-[var(--panel-strong)] p-4 touch-pan-y cursor-pointer"
                       onClick={(e) => {
                         if (swipedId === b.id) {
                           openEdit(b, e)
@@ -261,25 +276,25 @@ function Budget() {
                       {...getSwipeHandlers(b.id, { onEdit: () => openEdit(b), onDelete: () => setDeletingBudget(b) })}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
-                            <CategoryIcon iconKey={iconKey} className="h-4.5 w-4.5" />
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${colorClass} shadow-xs`}>
+                            <CategoryIcon iconKey={iconKey} className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-bold text-[var(--fg)]">{displayLabel}</p>
-                            <p className="text-[10px] font-semibold text-[var(--muted)] truncate tabular-nums">
+                            <p className="truncate text-sm font-extrabold text-[var(--fg)]">{displayLabel}</p>
+                            <p className="text-[11px] font-bold text-[var(--muted)] truncate tabular-nums">
                               {formatCurrency(spent, defaultCurrency)} / {formatCurrency(limit, defaultCurrency)}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black tabular-nums ${badgeClass}`}>
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-black tabular-nums ${badgeClass}`}>
                             {Math.round(pct)}%
                           </span>
                           <button
                             type="button"
                             onClick={(e) => openEdit(b, e)}
-                            className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
+                            className="p-1.5 rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
                             title={t('budget.edit')}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
@@ -287,18 +302,18 @@ function Budget() {
                         </div>
                       </div>
 
-                      <div className="mt-3 h-2 w-full rounded-full bg-[var(--border-strong)]/30 overflow-hidden">
+                      <div className="mt-3.5 h-2 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${barClass}`}
                           style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                         />
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between text-[10px] font-bold">
+                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
                         <span className="text-[var(--muted)]">
-                          {isOver ? `Over budget` : `Sisa`}
+                          {isOver ? 'Kelebihan anggaran' : 'Sisa anggaran'}
                         </span>
-                        <span className={isOver ? 'text-[var(--earthy-terra)]' : 'text-[var(--fg)]'}>
+                        <span className={isOver ? 'text-rose-500 font-extrabold' : 'text-[var(--fg)]'}>
                           {isOver ? formatCurrency(spent - limit, defaultCurrency) : formatCurrency(remaining, defaultCurrency)}
                         </span>
                       </div>
