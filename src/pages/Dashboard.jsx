@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useDashboardData } from '../hooks/useDashboardData'
 import { formatCurrency } from '../lib/utils'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(0)
 
   const closeZoomTimeoutRef = useRef(null)
 
@@ -69,6 +70,42 @@ export default function Dashboard() {
   } = dashboardData
 
   const motionDelay = reduceMotion ? 0 : 220
+
+  // High-performance scroll-linked hero motion (scale 1.0 -> 0.965, opacity 1.0 -> 0.88)
+  useEffect(() => {
+    if (typeof window === 'undefined' || reduceMotion) return undefined
+
+    let ticking = false
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const progress = Math.min(1, Math.max(0, window.scrollY / 220))
+          setScrollProgress(progress)
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [reduceMotion])
+
+  const heroScale = reduceMotion ? 1 : 1 - scrollProgress * 0.035
+  const heroOpacity = reduceMotion ? 1 : 1 - scrollProgress * 0.12
+
+  // Dynamic Ambient Background Canvas Tinting (Sage when net positive, Terracotta when high spend)
+  const isNetPositive = (monthIncome || 0) >= (monthExpense || 0)
+  const ambientCanvasStyle = useMemo(() => {
+    if (isNetPositive) {
+      return {
+        background: `radial-gradient(120% 70% at 50% -5%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, var(--bg) 65%)`,
+      }
+    }
+    return {
+      background: `radial-gradient(120% 70% at 50% -5%, color-mix(in srgb, var(--status-expense) 7%, var(--bg)) 0%, var(--bg) 65%)`,
+    }
+  }, [isNetPositive])
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
@@ -141,14 +178,23 @@ export default function Dashboard() {
   }, [])
 
   return (
-    <div className="bg-[var(--bg)]">
+    <div className="min-h-full transition-colors duration-500" style={ambientCanvasStyle}>
       <div
-        className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
+        className={`ft-page-enter min-h-full flex flex-col gap-6 transform-gpu transition-opacity duration-300 ${
           isEntering ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* 1. Wallet Carousel (Hero) */}
-        <div data-tour="networth-card">
+        {/* 1. Wallet Carousel (Hero with Scroll-Linked Scale & Fade) */}
+        <div
+          data-tour="networth-card"
+          style={{
+            transform: `scale(${heroScale})`,
+            opacity: heroOpacity,
+            transformOrigin: 'top center',
+            transition: reduceMotion ? 'none' : 'transform 100ms ease-out, opacity 100ms ease-out',
+          }}
+          className="will-change-transform"
+        >
           <WalletCarousel
             monthIncome={monthIncome}
             monthExpense={monthExpense}
@@ -157,7 +203,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* 2. Transaksi Terakhir Card */}
+        {/* 2. Transaksi Terakhir Card (Flat Tier) */}
         <DashboardRecentTx
           groupedRecentEntries={groupedRecentEntries}
           isDbLoading={isDbLoading}
@@ -167,7 +213,7 @@ export default function Dashboard() {
           t={t}
         />
 
-        {/* 3. Net Worth Mini Chart */}
+        {/* 3. Net Worth Mini Chart (Elevated Tier) */}
         <DashboardNetWorthChart
           t={t}
           defaultCurrency={defaultCurrency}
@@ -184,13 +230,13 @@ export default function Dashboard() {
           isMobileScreen={isMobileScreen}
         />
 
-        {/* 4. Habit Consistency Heatmap */}
+        {/* 4. Habit Consistency Heatmap (Flat Tier) */}
         <DashboardHabitWidget
           globalConsistencyStreak={globalConsistencyStreak}
           onOpenHabitsZoom={() => openZoom('habits')}
         />
 
-        {/* 5. Swipeable Budget & Savings Widget */}
+        {/* 5. Swipeable Budget & Savings Widget (Merged Elevated Tier) */}
         <DashboardBudgetWidget
           budgetGoalSummary={budgetGoalSummary}
           defaultCurrency={defaultCurrency}
@@ -200,7 +246,7 @@ export default function Dashboard() {
           onOpenQuickGoal={() => setIsOpenQuickGoal(true)}
         />
 
-        {/* 6. Utang & Piutang Widget */}
+        {/* 6. Utang & Piutang Widget (Elevated Tier) */}
         <DashboardLoanWidget
           loanSummary={loanSummary}
           defaultCurrency={defaultCurrency}

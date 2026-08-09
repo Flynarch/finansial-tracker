@@ -7,7 +7,7 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
   onOpenHabitsZoom,
 }) {
   return (
-    <section className="ft-stagger-in" style={{ '--stagger': 6 }}>
+    <section className="ft-stagger-in py-1" style={{ '--stagger': 4 }}>
       <div
         role="button"
         tabIndex={0}
@@ -15,27 +15,28 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') onOpenHabitsZoom()
         }}
-        className="ft-interactive-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] cursor-pointer"
+        className="text-left focus-visible:outline-none cursor-pointer"
       >
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="min-w-0">
-              <p className="text-sm font-bold tracking-tight text-[var(--fg)]">Konsistensi Kebiasaan</p>
-              <p className="text-[11px] font-semibold text-[var(--muted)] mt-0.5">14 Hari Terakhir</p>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">Konsistensi Kebiasaan</p>
+              <p className="text-[11px] font-semibold text-[var(--muted)]">14 Hari Terakhir</p>
             </div>
-            <div className="flex flex-col items-end">
-              <div className="flex items-center gap-1">
-                <Flame className="h-4 w-4 text-amber-500" strokeWidth={2.5} />
-                <span className="text-lg font-black text-[var(--fg)] tabular-nums leading-none">
-                  {globalConsistencyStreak}
-                </span>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-0.5">
-                Hari Beruntun
+            <div className="flex items-center gap-1.5 bg-[var(--field-bg)]/80 border border-[var(--border)]/60 px-2.5 py-1 rounded-full">
+              <Flame className="h-4 w-4 text-amber-500" strokeWidth={2.5} />
+              <span className="text-sm font-black text-[var(--fg)] tabular-nums leading-none">
+                {globalConsistencyStreak}
+              </span>
+              <span className="text-[10px] font-bold text-[var(--muted)]">
+                hari
               </span>
             </div>
           </div>
-          <MiniHabitHeatmap />
+
+          <div className="rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-3.5 shadow-xs">
+            <MiniHabitHeatmap />
+          </div>
         </div>
       </div>
     </section>

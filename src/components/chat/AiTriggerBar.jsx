@@ -1,10 +1,38 @@
-
+import { useEffect, useState, useRef } from 'react'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
 import { Sparkles } from 'lucide-react'
 
 export default function AiTriggerBar({ isVisible, onOpen }) {
   const locale = useSettingsStore((s) => s.locale)
+  const [isScrolledDown, setIsScrolledDown] = useState(false)
+  const lastScrollY = useRef(0)
+  const ticking = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleScroll = () => {
+      if (!ticking.current) {
+        window.requestAnimationFrame(() => {
+          const currentY = window.scrollY
+          if (currentY > lastScrollY.current && currentY > 60) {
+            setIsScrolledDown(true)
+          } else {
+            setIsScrolledDown(false)
+          }
+          lastScrollY.current = currentY
+          ticking.current = false
+        })
+        ticking.current = true
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const shouldShow = isVisible && !isScrolledDown
 
   return (
     <button
@@ -12,10 +40,10 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
       data-tour="ai-chat-btn"
       onClick={onOpen}
       aria-label="Open AI Chat"
-      className={`ft-ai-bar md:hidden relative inline-flex items-center gap-2 rounded-full border border-[var(--border)]/80 bg-[var(--panel-strong)]/90 px-3.5 py-1.5 backdrop-blur-md shadow-md shadow-black/5 active:scale-95 shrink-0 hover:border-[var(--accent)]/40 ${
-        isVisible
+      className={`ft-ai-bar md:hidden fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-strong)]/90 px-4 py-2 backdrop-blur-md shadow-lg shadow-black/10 active:scale-95 shrink-0 hover:border-[var(--accent)]/40 ${
+        shouldShow
           ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto'
-          : 'translate-y-4 opacity-0 scale-90 pointer-events-none'
+          : 'translate-y-6 opacity-0 scale-90 pointer-events-none'
       }`}
       style={{
         transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease-out, scale 320ms cubic-bezier(0.32, 0.72, 0, 1)',

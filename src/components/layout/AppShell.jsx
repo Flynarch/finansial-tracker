@@ -164,7 +164,7 @@ function AppShell() {
         <Sidebar />
         <main
           className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 px-4 pt-4 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
-            isDetailPage ? 'pb-8' : 'pb-[calc(10.5rem+env(safe-area-inset-bottom))]'
+            isDetailPage ? 'pb-8' : 'pb-[calc(11.5rem+env(safe-area-inset-bottom))]'
           }`}
         >
           <Outlet />
