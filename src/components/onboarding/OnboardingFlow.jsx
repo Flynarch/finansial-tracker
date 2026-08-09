@@ -478,7 +478,7 @@ export default function OnboardingFlow() {
               </div>
 
               {/* Action CTA */}
-              <div className="mt-6 flex flex-col items-center gap-2">
+              <div className="mt-6 flex items-center">
                 <button
                   type="button"
                   onClick={handleFinish}
@@ -491,11 +491,6 @@ export default function OnboardingFlow() {
                 >
                   Mulai Pakai FinTrack
                 </button>
-                {!hasWallets && (
-                  <p className="text-[11px] font-bold text-amber-500 text-center">
-                    Tambahkan minimal 1 dompet keuangan untuk menyelesaikan onboarding.
-                  </p>
-                )}
               </div>
             </div>
           )}
