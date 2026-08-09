@@ -4,13 +4,17 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
+import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import { formatCurrency } from '../../lib/utils'
+import MoneyBagIcon from '../ui/MoneyBagIcon'
 import {
   Plus,
   Check,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Zap,
+  Trash2,
+  Wallet,
 } from 'lucide-react'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
@@ -138,6 +142,11 @@ export default function OnboardingFlow() {
   const handleBack = useCallback(() => {
     goTo(Math.max(step - 1, 0))
   }, [step, goTo])
+
+  const handleDeleteWallet = useCallback(async (e, walletId) => {
+    e.stopPropagation()
+    await db.wallets.delete(walletId)
+  }, [])
 
   const handleFinish = useCallback(async () => {
     const trimmedName = username.trim()
@@ -272,31 +281,31 @@ export default function OnboardingFlow() {
 
           {/* ── Step 3: Multi-Wallet Summary & Finish ────────────── */}
           {step === 3 && (
-            <div className="flex flex-col">
+            <div className="flex flex-col max-h-[85vh] overflow-y-auto pr-0.5">
               <ProgressHeader step={3} />
 
-              <div className="mb-4 flex items-center justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500">
-                  <Check size={32} strokeWidth={3} />
+              <div className="mb-3 flex items-center justify-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500">
+                  <Check size={30} strokeWidth={3} />
                 </div>
               </div>
 
               <h2 className="text-center text-3xl font-black tracking-tight text-[var(--fg)]">
                 Semua Siap!
               </h2>
-              <p className="mt-1.5 text-center text-sm font-medium text-[var(--muted)]">
+              <p className="mt-1 text-center text-xs font-medium text-[var(--muted)]">
                 Pastikan data profil dan dompet keuanganmu sudah sesuai.
               </p>
 
-              {/* Summary Cards */}
-              <div className="mt-6 space-y-3">
-                {/* Profile Name */}
-                <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3.5">
+              {/* Summary Sections */}
+              <div className="mt-5 space-y-4">
+                {/* Profile Name Card */}
+                <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
                       Nama Pengguna
                     </p>
-                    <p className="mt-0.5 truncate text-base font-extrabold text-[var(--fg)]">
+                    <p className="mt-0.5 truncate text-sm font-extrabold text-[var(--fg)]">
                       {username.trim()}
                     </p>
                   </div>
@@ -309,50 +318,93 @@ export default function OnboardingFlow() {
                   </button>
                 </div>
 
-                {/* Multi-Wallet Status Card */}
+                {/* Added Wallets List Section */}
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                        Dompet Keuangan Tersimpan
-                      </p>
-                      <p className="mt-0.5 text-base font-extrabold text-[var(--fg)]">
-                        {wallets?.length > 0
-                          ? `${wallets.length} Dompet Aktif`
-                          : 'Belum Ada Dompet'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => goTo(2)}
-                      className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] transition hover:bg-[var(--border)]/40 cursor-pointer"
-                    >
-                      Ubah
-                    </button>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Dompet Keuangan Tersimpan ({wallets?.length || 0})
+                    </p>
                   </div>
 
-                  {/* Multi-Wallet Notice & Add Extra Button */}
-                  <div className="rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)] p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Zap size={15} className="text-amber-500 shrink-0" />
-                      <p className="text-xs font-bold text-[var(--muted)] truncate">
-                        Ingin tambah dompet e-Wallet / Bank lain?
-                      </p>
+                  {/* List of Wallets */}
+                  {wallets && wallets.length > 0 ? (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1 ft-hide-scrollbar">
+                      {wallets.map((w) => {
+                        const logoUrl = getWalletLogoUrl(w)
+                        return (
+                          <div
+                            key={w.id}
+                            className="group flex items-center justify-between gap-3 p-3 rounded-xl border border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--field-bg)]"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-[var(--panel-strong)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
+                                {w.customIcon === 'dollar' ? (
+                                  <MoneyBagIcon size={18} strokeWidth={2.5} className="text-amber-500" />
+                                ) : logoUrl ? (
+                                  <img
+                                    src={logoUrl}
+                                    alt={w.name}
+                                    className="w-full h-full object-contain p-0.5 rounded-full"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none'
+                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                                    }}
+                                  />
+                                ) : null}
+                                <span
+                                  className="font-black text-xs text-[var(--fg)]"
+                                  style={{ display: w.customIcon === 'dollar' || logoUrl ? 'none' : 'block' }}
+                                >
+                                  {w.name?.substring(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-[var(--fg)] truncate">{w.name}</p>
+                                <p className="text-[10px] font-bold text-[var(--muted)]">
+                                  {w.currency || 'IDR'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs font-black text-[var(--fg)] tabular-nums">
+                                {formatCurrency(w.balance || 0, w.currency || 'IDR')}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteWallet(e, w.id)}
+                                className="p-1 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                                title="Hapus Dompet"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => goTo(2)}
-                      className="inline-flex items-center gap-1 rounded-xl bg-[var(--fg)] px-3 py-1.5 text-xs font-black text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
-                    >
-                      <Plus size={13} strokeWidth={3} />
-                      <span>Tambah</span>
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="py-4 text-center border border-dashed border-[var(--border)] rounded-xl bg-[var(--field-bg)]/50">
+                      <Wallet size={20} className="mx-auto text-[var(--muted)] mb-1 opacity-50" />
+                      <p className="text-xs font-bold text-[var(--muted)]">Belum ada dompet tersimpan</p>
+                    </div>
+                  )}
+
+                  {/* Add Extra Wallet Button */}
+                  <button
+                    type="button"
+                    onClick={() => goTo(2)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-black text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-[0.98] cursor-pointer"
+                  >
+                    <Plus size={14} strokeWidth={3} />
+                    <span>Tambah Dompet Lain</span>
+                  </button>
                 </div>
               </div>
 
               {/* Action CTA */}
-              <div className="mt-8 flex items-center gap-3">
+              <div className="mt-6 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleBack}
