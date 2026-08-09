@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
-import { Clock } from 'lucide-react'
+import { Clock, Plus } from 'lucide-react'
 import Modal from '../ui/Modal'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import HabitStatsModal from './HabitStatsModal'
@@ -377,9 +377,9 @@ export default function HabitsView() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--fg)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--fg)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95 shrink-0 cursor-pointer"
         >
-          <span>+</span>
+          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
           <span>Baru</span>
         </button>
       </div>

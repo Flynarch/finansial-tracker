@@ -24,6 +24,7 @@ import {
   Car,
   Folder,
   Check,
+  Plus,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -821,9 +822,10 @@ function TodoList() {
               <button
                 type="button"
                 onClick={() => { resetAddForm(); setAddOpen(true) }}
-                className="mt-6 rounded-full bg-[var(--fg)] px-6 py-2.5 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95"
+                className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[var(--fg)] px-6 py-2.5 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95"
               >
-                + Tambah Tugas
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Tambah Tugas</span>
               </button>
             )}
           </div>
