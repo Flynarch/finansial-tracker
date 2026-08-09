@@ -92,6 +92,7 @@ export default function OnboardingFlow() {
   const [direction, setDirection] = useState(1)
   const [isAnimating, setIsAnimating] = useState(false)
   const [usernameError, setUsernameError] = useState('')
+  const [cameFromStep3, setCameFromStep3] = useState(false)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
@@ -140,8 +141,18 @@ export default function OnboardingFlow() {
   }, [step, username, goTo])
 
   const handleBack = useCallback(() => {
+    if (step === 2 && cameFromStep3) {
+      setCameFromStep3(false)
+      goTo(3)
+      return
+    }
     goTo(Math.max(step - 1, 0))
-  }, [step, goTo])
+  }, [step, cameFromStep3, goTo])
+
+  const handleAddExtraWallet = useCallback(() => {
+    setCameFromStep3(true)
+    goTo(2)
+  }, [goTo])
 
   const handleDeleteWallet = useCallback(async (e, walletId) => {
     e.stopPropagation()
@@ -273,7 +284,10 @@ export default function OnboardingFlow() {
                 <AddAccountPage
                   isOnboarding
                   onBack={handleBack}
-                  onSuccess={() => goTo(3)}
+                  onSuccess={() => {
+                    setCameFromStep3(false)
+                    goTo(3)
+                  }}
                 />
               </Suspense>
             </div>
@@ -394,7 +408,7 @@ export default function OnboardingFlow() {
                   {/* Add Extra Wallet Button */}
                   <button
                     type="button"
-                    onClick={() => goTo(2)}
+                    onClick={handleAddExtraWallet}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-black text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-[0.98] cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={3} />
