@@ -30,17 +30,17 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
   )
 
   return (
-    <section className="ft-stagger-in py-1" style={{ '--stagger': 2 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 5 }}>
       <button
         type="button"
         onClick={() => navigate('/transactions')}
-        className="w-full text-left transition-colors focus-visible:outline-none cursor-pointer"
+        className="w-full text-left rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm hover:border-[var(--border-strong)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] cursor-pointer"
       >
-        <div className="flex items-center justify-between mb-2 px-1">
-          <h3 className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">Transaksi Terakhir</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold tracking-tight text-[var(--fg)]">Transaksi Terakhir</h3>
           <div className="flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)]">
             <span>Lihat Semua</span>
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight className="h-4 w-4" />
           </div>
         </div>
 
@@ -65,23 +65,23 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
 
           return (
             <div className="flex flex-col gap-2 ft-smooth-in">
-              <div className="rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-3 shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{dateLabel}</p>
-                  <span className="rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-2 py-0.5 text-[9px] font-black tracking-wider text-[var(--accent-strong)]">
-                    BARU
-                  </span>
-                </div>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{dateLabel}</p>
+                <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[var(--bg)]">
+                  BARU
+                </span>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5">
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <div className={`grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl ${colorClass}`}>
+                    <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${colorClass}`}>
                       <CategoryIcon iconKey={iconKey} className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       {createdTime ? (
                         <p className="text-[9px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
                       ) : null}
-                      <p className="truncate text-xs font-black text-[var(--fg)]">{labels.main}</p>
+                      <p className="truncate text-xs font-bold text-[var(--fg)]">{labels.main}</p>
                       {sub ? (
                         <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
                       ) : null}
@@ -107,7 +107,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
             </div>
           )
         })() : isDbLoading ? (
-          <div className="flex items-center gap-3 py-3 px-3 rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 animate-pulse">
+          <div className="flex items-center gap-3 py-3 px-2 animate-pulse">
             <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--border)]" />
             <div className="flex-1 space-y-1.5">
               <div className="h-3 w-2/3 rounded bg-[var(--border)]" />
@@ -115,7 +115,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 py-3 px-3 rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80">
+          <div className="flex items-center gap-3 py-3 px-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
               <ChevronRight className="h-4 w-4" />
             </div>

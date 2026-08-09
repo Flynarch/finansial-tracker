@@ -146,13 +146,6 @@
     /* Smoother ease-out for page/tab/sheet transitions. */
     --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-    /* ── Dashboard Flow Redesign Tokens ───────────────────────────────── */
-    --elevation-hero: var(--shadow);
-    --elevation-medium: 0 1px 3px rgba(0, 0, 0, 0.08);
-    --elevation-flat: none;
-    --spacing-tight: 8px;
-    --spacing-section: 28px;
-
     /* ── Clean solid tokens ────────────────────────────────────────────── */
     --glass-bg: var(--panel);
     --glass-bg-strong: var(--panel-strong);

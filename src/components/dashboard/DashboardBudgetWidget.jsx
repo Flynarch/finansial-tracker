@@ -81,10 +81,10 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
   }, [budgetGoalSummary])
 
   return (
-    <section data-tour="budget-chart-section" className="ft-stagger-in py-1" style={{ '--stagger': 3 }}>
-      <div className="rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)] p-4 shadow-xs sm:p-5 space-y-3.5">
+    <section data-tour="budget-chart-section" className="ft-stagger-in" style={{ '--stagger': 3 }}>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm sm:p-5 space-y-3.5">
         {/* Header Row */}
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/50 pb-3">
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-500 border border-indigo-500/25">
               {activeBudgetSlide === 0 ? <PieChart className="h-4 w-4" /> : <Target className="h-4 w-4" />}
@@ -134,7 +134,7 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                 if (activeBudgetSlide === 0) onOpenQuickBudget()
                 else onOpenQuickGoal()
               }}
-              className="inline-flex items-center gap-1 rounded-xl bg-[var(--fg)] px-3 py-1.5 text-xs font-black text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               <span>{activeBudgetSlide === 0 ? 'Anggaran' : 'Target'}</span>
@@ -153,12 +153,12 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
             className="flex transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${activeBudgetSlide * 100}%)` }}
           >
-            {/* Slide 0: Smart Budget Summary (Merged Container) */}
+            {/* Slide 0: Smart Monarch-Style Budget Summary */}
             <div className="w-full shrink-0 pr-0.5 space-y-3">
               {budgetCalc ? (
                 <>
                   {/* Overall Total Spent & Bar */}
-                  <div className="rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-3.5 space-y-2">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
                         Total Pengeluaran Anggaran
@@ -211,16 +211,15 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                     </div>
                   </div>
 
-                  {/* Smart Warning List OR All Safe Badge (Single Red Alarm Signal Rule) */}
+                  {/* Smart Warning List OR All Safe Badge */}
                   {budgetCalc.warningItems.length > 0 ? (
                     <div className="space-y-1.5 pt-0.5">
                       <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> Perlu Diperhatikan ({budgetCalc.warningItems.length})
                       </p>
                       <div className="space-y-1.5">
-                        {budgetCalc.warningItems.slice(0, 3).map((row, idx) => {
-                          // Single Red Alarm Rule: ONLY index === 0 gets the primary red alert badge if over budget
-                          const isPrimaryDanger = idx === 0 && row.pct >= 100
+                        {budgetCalc.warningItems.slice(0, 3).map((row) => {
+                          const isDanger = row.pct >= 100
                           const iconKey = resolveTransactionIconKey(row.category, 'expense')
                           const colorClass = getCategoryColorClass(iconKey, 'expense', row.category)
 
@@ -228,7 +227,7 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                             <div
                               key={row.id}
                               onClick={() => navigate('/budget')}
-                              className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
+                              className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
                             >
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                 <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${colorClass}`}>
@@ -247,11 +246,9 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
 
                               <span
                                 className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black tabular-nums border ${
-                                  isPrimaryDanger
+                                  isDanger
                                     ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                                    : row.pct >= 80
-                                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                    : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+                                    : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
                                 }`}
                               >
                                 {Math.round(row.pct)}%
@@ -297,12 +294,12 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
               {goalCalc ? (
                 <>
                   {/* Overall Total Saved & Bar */}
-                  <div className="rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-3.5 space-y-2">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
                         Total Tabungan Terkumpul
                       </span>
-                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black text-emerald-500">
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
                         {goalCalc.overallPct}% Terkumpul
                       </span>
                     </div>
@@ -315,6 +312,9 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                             / {formatCurrency(goalCalc.totalTarget, defaultCurrency, locale)}
                           </span>
                         </p>
+                        <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
+                          {goalCalc.count} Target Aktif
+                        </p>
                       </div>
                     </div>
 
@@ -326,26 +326,34 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                     </div>
                   </div>
 
-                  {/* Top 3 Goals Progress */}
+                  {/* Top Goals List */}
                   <div className="space-y-1.5 pt-0.5">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
-                      Target Pilihan ({goalCalc.topGoals.length})
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
+                      <Target className="h-3 w-3" /> Progres Target Teratas
                     </p>
                     <div className="space-y-1.5">
                       {goalCalc.topGoals.map((row) => (
                         <div
                           key={row.id}
                           onClick={() => navigate('/savings')}
-                          className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)]/80 p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
+                          className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
                         >
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-[var(--fg)] truncate text-xs leading-tight">{row.name}</p>
-                            <p className="text-[10px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
-                              {formatCurrency(row.current, defaultCurrency, locale)}{' '}
-                              <span className="opacity-75">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
-                            </p>
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25">
+                              <Target className="h-3.5 w-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-[var(--fg)] truncate text-xs leading-tight">
+                                {String(row.name || '').replace(/_/g, ' ')}
+                              </p>
+                              <p className="text-[10px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
+                                {formatCurrency(row.current, defaultCurrency, locale)}{' '}
+                                <span className="opacity-75">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
+                              </p>
+                            </div>
                           </div>
-                          <span className="shrink-0 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] font-black text-emerald-500 tabular-nums">
+
+                          <span className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-black tabular-nums bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border)]">
                             {Math.round(row.pct)}%
                           </span>
                         </div>
@@ -360,20 +368,16 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                       onClick={() => navigate('/savings')}
                       className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--accent)] hover:underline cursor-pointer"
                     >
-                      Lihat Semua {goalCalc.count} Target
+                      Lihat Semua {goalCalc.count} Target Tabungan
                       <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </>
               ) : (
-                <button
-                  type="button"
-                  className="w-full rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-5 text-center transition hover:bg-[var(--panel)] cursor-pointer"
-                  onClick={() => navigate('/savings')}
-                >
-                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.savings.emptyCta') || 'Buat Target Tabungan'}</p>
-                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.savings.emptyDesc') || 'Capai impian finansialmu secara bertahap'}</p>
-                </button>
+                <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-5 text-center">
+                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.savings.empty') || 'Belum Ada Target Tabungan'}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.savings.emptyDesc') || 'Buat impian finansialmu sekarang'}</p>
+                </div>
               )}
             </div>
           </div>

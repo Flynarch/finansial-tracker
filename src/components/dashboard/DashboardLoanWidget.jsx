@@ -25,10 +25,10 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   const isNetNegative = netPosition < 0
 
   return (
-    <section className="ft-stagger-in py-1" style={{ '--stagger': 5 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
       <div
         onClick={() => navigate('/loans')}
-        className="group rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)] p-4 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-[0.995] space-y-3"
+        className="group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-[0.995] space-y-3"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
@@ -53,7 +53,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
               e.stopPropagation()
               onOpenLoanSheet()
             }}
-            className="inline-flex items-center gap-1 rounded-xl bg-[var(--fg)] px-3 py-1.5 text-xs font-black text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
             aria-label="Catat Hutang atau Piutang"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
