@@ -92,7 +92,6 @@ export default function OnboardingFlow() {
   const [direction, setDirection] = useState(1)
   const [isAnimating, setIsAnimating] = useState(false)
   const [usernameError, setUsernameError] = useState('')
-  const [lastAddedWalletId, setLastAddedWalletId] = useState(null)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
@@ -140,25 +139,14 @@ export default function OnboardingFlow() {
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
   }, [step, username, goTo])
 
-  const handleBack = useCallback(async () => {
-    if (step === 3 && lastAddedWalletId) {
-      try {
-        await db.wallets.delete(lastAddedWalletId)
-      } catch {
-        /* ignore */
-      }
-      setLastAddedWalletId(null)
-    }
+  const handleBack = useCallback(() => {
     goTo(Math.max(step - 1, 0))
-  }, [step, lastAddedWalletId, goTo])
+  }, [step, goTo])
 
   const handleDeleteWallet = useCallback(async (e, walletId) => {
     e.stopPropagation()
     await db.wallets.delete(walletId)
-    if (walletId === lastAddedWalletId) {
-      setLastAddedWalletId(null)
-    }
-  }, [lastAddedWalletId])
+  }, [])
 
   const handleFinish = useCallback(async () => {
     const trimmedName = username.trim()
@@ -166,7 +154,6 @@ export default function OnboardingFlow() {
     await completeOnboarding()
     startSpotlightTour()
     clearProgress()
-    setLastAddedWalletId(null)
     try {
       localStorage.setItem('ft_onboarding_seen_v1', '1')
     } catch {
@@ -286,10 +273,7 @@ export default function OnboardingFlow() {
                 <AddAccountPage
                   isOnboarding
                   onBack={handleBack}
-                  onSuccess={(newId) => {
-                    setLastAddedWalletId(newId)
-                    goTo(3)
-                  }}
+                  onSuccess={() => goTo(3)}
                 />
               </Suspense>
             </div>
@@ -410,7 +394,7 @@ export default function OnboardingFlow() {
                   {/* Add Extra Wallet Button */}
                   <button
                     type="button"
-                    onClick={handleBack}
+                    onClick={() => goTo(2)}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-black text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-[0.98] cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={3} />
@@ -420,18 +404,11 @@ export default function OnboardingFlow() {
               </div>
 
               {/* Action CTA */}
-              <div className="mt-6 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] transition hover:bg-[var(--panel-strong)] active:scale-[0.97] cursor-pointer"
-                >
-                  <ChevronLeft size={20} strokeWidth={2.2} />
-                </button>
+              <div className="mt-6 flex items-center">
                 <button
                   type="button"
                   onClick={handleFinish}
-                  className="flex-1 rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.97] cursor-pointer"
+                  className="w-full rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.97] cursor-pointer"
                 >
                   Mulai Pakai FinTrack
                 </button>
