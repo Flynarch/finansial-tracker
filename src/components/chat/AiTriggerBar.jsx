@@ -18,7 +18,7 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
           : 'translate-y-4 opacity-0 scale-90 pointer-events-none'
       }`}
       style={{
-        transition: 'transform 380ms cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 280ms ease-out, scale 380ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease-out, scale 320ms cubic-bezier(0.32, 0.72, 0, 1)',
       }}
     >
       <span className="relative flex h-2 w-2">
