@@ -95,6 +95,7 @@ export default function OnboardingFlow() {
   const [cameFromStep3, setCameFromStep3] = useState(false)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const hasWallets = wallets && wallets.length > 0
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
@@ -160,6 +161,7 @@ export default function OnboardingFlow() {
   }, [])
 
   const handleFinish = useCallback(async () => {
+    if (!hasWallets) return
     const trimmedName = username.trim()
     await setProfileName(trimmedName)
     await completeOnboarding()
@@ -171,7 +173,7 @@ export default function OnboardingFlow() {
       /* ignore */
     }
     navigate('/dashboard', { replace: true })
-  }, [username, setProfileName, completeOnboarding, startSpotlightTour, navigate])
+  }, [hasWallets, username, setProfileName, completeOnboarding, startSpotlightTour, navigate])
 
   if (!isLoaded || hasCompleted) return null
 
@@ -299,16 +301,28 @@ export default function OnboardingFlow() {
               <ProgressHeader step={3} />
 
               <div className="mb-3 flex items-center justify-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500">
-                  <Check size={30} strokeWidth={3} />
+                <div
+                  className={`flex h-14 w-14 items-center justify-center rounded-2xl border transition-all ${
+                    hasWallets
+                      ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500'
+                      : 'bg-amber-500/15 border-amber-500/25 text-amber-500'
+                  }`}
+                >
+                  {hasWallets ? (
+                    <Check size={30} strokeWidth={3} />
+                  ) : (
+                    <Wallet size={28} strokeWidth={2.2} />
+                  )}
                 </div>
               </div>
 
               <h2 className="text-center text-3xl font-black tracking-tight text-[var(--fg)]">
-                Semua Siap!
+                {hasWallets ? 'Semua Siap!' : 'Tambah Dompet'}
               </h2>
               <p className="mt-1 text-center text-xs font-medium text-[var(--muted)]">
-                Pastikan data profil dan dompet keuanganmu sudah sesuai.
+                {hasWallets
+                  ? 'Pastikan data profil dan dompet keuanganmu sudah sesuai.'
+                  : 'Tambahkan minimal 1 dompet keuangan untuk melanjutkan.'}
               </p>
 
               {/* Summary Sections */}
@@ -341,7 +355,7 @@ export default function OnboardingFlow() {
                   </div>
 
                   {/* List of Wallets */}
-                  {wallets && wallets.length > 0 ? (
+                  {hasWallets ? (
                     <div className="space-y-2 max-h-52 overflow-y-auto pr-1 ft-hide-scrollbar">
                       {wallets.map((w) => {
                         const logoUrl = getWalletLogoUrl(w)
@@ -399,9 +413,12 @@ export default function OnboardingFlow() {
                       })}
                     </div>
                   ) : (
-                    <div className="py-4 text-center border border-dashed border-[var(--border)] rounded-xl bg-[var(--field-bg)]/50">
-                      <Wallet size={20} className="mx-auto text-[var(--muted)] mb-1 opacity-50" />
-                      <p className="text-xs font-bold text-[var(--muted)]">Belum ada dompet tersimpan</p>
+                    <div className="py-4 text-center border border-dashed border-amber-500/40 rounded-xl bg-amber-500/5">
+                      <Wallet size={22} className="mx-auto text-amber-500 mb-1 opacity-80" />
+                      <p className="text-xs font-extrabold text-[var(--fg)]">Belum ada dompet tersimpan</p>
+                      <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5">
+                        Tambahkan minimal 1 dompet keuangan di bawah.
+                      </p>
                     </div>
                   )}
 
@@ -412,20 +429,30 @@ export default function OnboardingFlow() {
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-black text-[var(--fg)] hover:bg-[var(--border)]/40 transition active:scale-[0.98] cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={3} />
-                    <span>Tambah Dompet Lain</span>
+                    <span>{hasWallets ? 'Tambah Dompet Lain' : 'Tambah Dompet Sekarang'}</span>
                   </button>
                 </div>
               </div>
 
               {/* Action CTA */}
-              <div className="mt-6 flex items-center">
+              <div className="mt-6 flex flex-col items-center gap-2">
                 <button
                   type="button"
                   onClick={handleFinish}
-                  className="w-full rounded-2xl bg-[var(--fg)] py-4 text-sm font-black text-[var(--bg)] shadow-md transition hover:opacity-90 active:scale-[0.97] cursor-pointer"
+                  disabled={!hasWallets}
+                  className={`w-full rounded-2xl py-4 text-sm font-black transition ${
+                    hasWallets
+                      ? 'bg-[var(--fg)] text-[var(--bg)] shadow-md hover:opacity-90 active:scale-[0.97] cursor-pointer'
+                      : 'bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] opacity-60 cursor-not-allowed'
+                  }`}
                 >
                   Mulai Pakai FinTrack
                 </button>
+                {!hasWallets && (
+                  <p className="text-[11px] font-bold text-amber-500 text-center">
+                    Tambahkan minimal 1 dompet keuangan untuk menyelesaikan onboarding.
+                  </p>
+                )}
               </div>
             </div>
           )}
