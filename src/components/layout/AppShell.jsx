@@ -15,6 +15,7 @@ import Sidebar from './Sidebar'
 import AiTriggerBar from '../chat/AiTriggerBar'
 import AiChatSheet from '../chat/AiChatSheet'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
+import InAppNotificationToast from '../notifications/InAppNotificationToast'
 
 function AppShell() {
   useNotificationEngine()
@@ -184,6 +185,8 @@ function AppShell() {
         messages={chatMessages}
         setMessages={setChatMessages}
       />
+
+      <InAppNotificationToast />
     </div>
   )
 }
