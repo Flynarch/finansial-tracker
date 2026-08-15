@@ -118,20 +118,17 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       <div className="absolute inset-0 z-0 flex items-center justify-end px-5 opacity-0 transition-colors duration-200" />
 
       <article
-        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 cursor-pointer transition-colors active:bg-[var(--field-bg)] ${
+        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 transition-colors ${
           highlightedTransactionId === String(transaction.id)
             ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/50'
             : ''
         }`}
         onClick={() => {
-          if (isSwiped) {
+          if (isSwiped && setSwipedTransactionId) {
             setSwipedTransactionId(null)
-            openEditTransaction(transaction)
-          } else {
-            openEditTransaction(transaction)
           }
         }}
-        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, { onEdit: () => openEditTransaction(transaction), onDelete: () => setIsDeleteModalOpen(true) }) : {})}
+        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, { onEdit: () => openEditTransaction?.(transaction), onDelete: () => setIsDeleteModalOpen(true) }) : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* Avatar Icon */}
