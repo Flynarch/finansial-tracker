@@ -199,7 +199,7 @@ function Savings() {
                   type="button"
                   onClick={() => setSearchParams({ view: 'archive' })}
                   className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-                  title="Buka Arsip Tabungan"
+                  title={'Buka Arsip Tabungan'}
                 >
                   <Archive className="h-4.5 w-4.5" />
                   {archivedGoals.length > 0 && (
@@ -393,7 +393,7 @@ function Savings() {
                             type="button"
                             onClick={(e) => toggleArchiveStatus(g.id, true, e)}
                             className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] hover:text-[var(--fg)] transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                            title="Kembalikan ke Target Aktif"
+                            title={'Kembalikan ke Target Aktif'}
                           >
                             <RotateCcw className="h-3 w-3" />
                             Aktifkan Kembali
@@ -419,7 +419,7 @@ function Savings() {
                             type="button"
                             onClick={(e) => openEdit(g, e)}
                             className="p-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-                            title="Edit Target"
+                            title={'Edit Target'}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
@@ -431,7 +431,7 @@ function Savings() {
                             setDeletingGoal(g)
                           }}
                           className="p-1.5 rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer"
-                          title="Hapus Target"
+                          title={'Hapus Target'}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

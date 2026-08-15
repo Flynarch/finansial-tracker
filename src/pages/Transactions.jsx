@@ -406,6 +406,18 @@ function Transactions() {
     { income: 0, expense: 0 },
   )
 
+  const newestTransactionId = useMemo(() => {
+    if (!transactions || transactions.length === 0) return null
+    const sorted = [...transactions].sort((a, b) => {
+      const byDate = String(b.date || '').localeCompare(String(a.date || ''))
+      if (byDate !== 0) return byDate
+      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
+      if (byCreatedAt !== 0) return byCreatedAt
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
+    return sorted[0]?.id || null
+  }, [transactions])
+
   const groupedEntries = useMemo(() => {
     const grouped = filteredTransactions.reduce((acc, tx) => {
       const key = tx.date || 'unknown'
@@ -642,6 +654,7 @@ function Transactions() {
           setApiError={setApiError}
           setApiErrorTone={setApiErrorTone}
           allWallets={allWallets}
+          newestTransactionId={newestTransactionId}
         />
       </div>
 
@@ -671,7 +684,7 @@ function Transactions() {
           aria-label={t('tx.filter.close')}
         />
         <div
-          className={`absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform transform-gpu ${
+          className={`absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-380 ease-[cubic-bezier(0.34,1.56,0.64,1)] will-change-transform transform-gpu ${
             isFilterOpen ? 'translate-y-0' : 'translate-y-full'
           }`}
         >

@@ -145,9 +145,9 @@ export default function SettingsHome() {
                 type={showKey ? 'text' : 'password'}
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="Masukkan API Key Gemini Anda..."
+                placeholder={'Masukkan API Key Gemini Anda...'}
                 className="ft-settings-field-compact w-full pr-10 text-xs font-mono"
-                aria-label="Gemini API Key"
+                aria-label={'Gemini API Key'}
               />
               <button
                 type="button"

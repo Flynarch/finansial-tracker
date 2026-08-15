@@ -60,7 +60,7 @@ export default function SettingsCategories() {
         isOpen={!!confirmResetType}
         onClose={() => setConfirmResetType(null)}
         onConfirm={handleConfirmReset}
-        title="Reset Kategori"
+        title={'Reset Kategori'}
         message={
           confirmResetType === 'expense'
             ? t('settings.confirmResetExpenseCategories')

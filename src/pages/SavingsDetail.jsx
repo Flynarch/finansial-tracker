@@ -339,7 +339,7 @@ export default function SavingsDetail() {
             type="button"
             onClick={() => navigate(-1)}
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
-            aria-label="Kembali"
+            aria-label={'Kembali'}
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
           </button>
@@ -665,7 +665,7 @@ export default function SavingsDetail() {
             </label>
             <WalletSelectTrigger
               wallet={selectedWallet}
-              placeholder="Tanpa Potong Dompet (Manual Log)"
+              placeholder={'Tanpa Potong Dompet (Manual Log)'}
               onClick={() => setWalletModalOpen(true)}
             />
             <WalletSelectModal
@@ -689,7 +689,7 @@ export default function SavingsDetail() {
             <CustomDatePicker
               value={dateInput}
               onChange={(val) => setDateInput(val)}
-              title="Pilih Tanggal Tabungan"
+              title={'Pilih Tanggal Tabungan'}
             />
           </div>
 
@@ -743,7 +743,7 @@ export default function SavingsDetail() {
             </label>
             <WalletSelectTrigger
               wallet={selectedCashoutWallet}
-              placeholder="Pilih Dompet Tujuan"
+              placeholder={'Pilih Dompet Tujuan'}
               onClick={() => setCashoutWalletModalOpen(true)}
             />
             <WalletSelectModal
@@ -753,7 +753,7 @@ export default function SavingsDetail() {
               selectedWalletId={cashoutWalletId}
               onSelectWallet={(id) => setCashoutWalletId(id)}
               allowNone={false}
-              title="Pilih Dompet Tujuan Pencairan"
+              title={'Pilih Dompet Tujuan Pencairan'}
             />
           </div>
 

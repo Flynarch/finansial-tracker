@@ -97,7 +97,7 @@ export default function SettingsRecurring() {
               <CustomDatePicker
                 value={recurringForm.nextDate}
                 onChange={(val) => setRecurringForm((prev) => ({ ...prev, nextDate: val }))}
-                title="Pilih Tanggal Berikutnya"
+                title={'Pilih Tanggal Berikutnya'}
               />
             </div>
           </div>

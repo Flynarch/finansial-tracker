@@ -393,12 +393,14 @@ export function useDashboardData() {
       0,
     )
 
-    const budgetRows = monthBudgets.map((b) => {
-      const limit = toSafeNumber(b.limit)
-      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
-      const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0
-      return { id: b.id, category: b.category, limit, spent, pct }
-    })
+    const budgetRows = monthBudgets
+      .map((b) => {
+        const limit = toSafeNumber(b.limit)
+        const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
+        const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
+        return { id: b.id, category: b.category, limit, spent, pct }
+      })
+      .sort((a, b) => b.pct - a.pct)
 
     const totalLimit = monthBudgets.reduce((sum, b) => sum + toSafeNumber(b.limit), 0)
     const totalSpent = monthExpenseTotal

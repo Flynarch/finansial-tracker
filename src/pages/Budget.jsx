@@ -52,21 +52,38 @@ function Budget() {
     [transactions, month]
   )
 
+  const sortedMonthBudgets = useMemo(() => {
+    const list = (monthBudgets ?? []).map((b) => {
+      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
+      const limit = toSafeNumber(b.limit)
+      const pct = limit > 0 ? (spent / limit) * 100 : 0
+      const remaining = Math.max(0, limit - spent)
+      const isOver = spent > limit
+      return {
+        ...b,
+        spent,
+        limit,
+        pct,
+        remaining,
+        isOver,
+      }
+    })
+    return list.sort((a, b) => b.pct - a.pct)
+  }, [monthBudgets, monthExpenseTxs, defaultCurrency])
+
   const summary = useMemo(() => {
     let totalSpent = 0
     let totalLimit = 0
-    monthBudgets.forEach((b) => {
-      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
-      const limit = toSafeNumber(b.limit)
-      totalSpent += spent
-      totalLimit += limit
+    sortedMonthBudgets.forEach((b) => {
+      totalSpent += b.spent
+      totalLimit += b.limit
     })
     const pct = totalLimit > 0 ? clampPercent((totalSpent / totalLimit) * 100) : 0
     const remaining = Math.max(0, totalLimit - totalSpent)
     const isOver = totalSpent > totalLimit && totalLimit > 0
     const overAmount = isOver ? totalSpent - totalLimit : 0
     return { totalSpent, totalLimit, pct, remaining, isOver, overAmount }
-  }, [monthBudgets, monthExpenseTxs, defaultCurrency])
+  }, [sortedMonthBudgets])
 
   const openAdd = useCallback(() => {
     setEditingId(null)
@@ -227,12 +244,8 @@ function Budget() {
             <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ft-stagger-in">
-              {monthBudgets.map((b) => {
-                const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
-                const limit = toSafeNumber(b.limit)
-                const pct = limit > 0 ? (spent / limit) * 100 : 0
-                const remaining = Math.max(0, limit - spent)
-                const isOver = spent > limit
+              {sortedMonthBudgets.map((b) => {
+                const { spent, limit, pct, remaining, isOver } = b
                 const iconKey = resolveTransactionIconKey(b.category, 'expense')
                 const displayLabel = formatExpenseCategory(b.category, locale)
                 const colorClass = getCategoryColorClass(iconKey, 'expense', b.category)

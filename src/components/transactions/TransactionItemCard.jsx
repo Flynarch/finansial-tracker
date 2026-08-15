@@ -27,6 +27,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   setApiErrorTone,
   contextWalletId,
   wallets: walletsProp,
+  newestTransactionId,
 }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
@@ -179,7 +180,14 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             {createdTime ? (
               <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
             ) : null}
-            <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
+              {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
+                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
+                  BARU
+                </span>
+              ) : null}
+            </div>
             {(sub || displayWalletName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
                 {sub ? <span>{sub}</span> : null}
@@ -233,6 +241,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     (prevProps.swipedTransactionId === prevProps.transaction?.id) === (nextProps.swipedTransactionId === nextProps.transaction?.id) &&
     (prevProps.isSwipingId === prevProps.transaction?.id) === (nextProps.isSwipingId === nextProps.transaction?.id) &&
     (prevProps.highlightedTransactionId === String(prevProps.transaction?.id)) === (nextProps.highlightedTransactionId === String(nextProps.transaction?.id)) &&
+    (prevProps.newestTransactionId === prevProps.transaction?.id) === (nextProps.newestTransactionId === nextProps.transaction?.id) &&
     prevProps.locale === nextProps.locale &&
     prevProps.defaultCurrency === nextProps.defaultCurrency &&
     prevProps.rates === nextProps.rates &&

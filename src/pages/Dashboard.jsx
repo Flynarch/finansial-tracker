@@ -3,11 +3,12 @@ import { useDashboardData } from '../hooks/useDashboardData'
 import { formatCurrency } from '../lib/utils'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
 import DashboardRecentTx from '../components/dashboard/DashboardRecentTx'
-import DashboardHabitWidget from '../components/dashboard/DashboardHabitWidget'
-import DashboardBudgetWidget from '../components/dashboard/DashboardBudgetWidget'
 import DashboardNetWorthChart from '../components/dashboard/DashboardNetWorthChart'
+import DashboardHabitWidget from '../components/dashboard/DashboardHabitWidget'
+import DashboardPulseBento from '../components/dashboard/DashboardPulseBento'
 import DashboardLoanWidget from '../components/dashboard/DashboardLoanWidget'
 import DashboardZoomOverlay from '../components/dashboard/DashboardZoomOverlay'
+import BudgetSavingsDetailSheet from '../components/dashboard/BudgetSavingsDetailSheet'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
@@ -23,6 +24,9 @@ export default function Dashboard() {
   const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+
+  // Budget & Savings Detail Sheet state
+  const [detailSheetMode, setDetailSheetMode] = useState(null) // 'budget' | 'savings' | null
 
   const closeZoomTimeoutRef = useRef(null)
 
@@ -133,10 +137,10 @@ export default function Dashboard() {
         minimumFractionDigits: 0,
         maximumFractionDigits: digits,
       })
-    if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000, 1)} T`
-    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000, 1)} M`
-    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)} jt`
-    if (abs >= 1_000) return `${sign}${fmt(abs / 1_000, 0)} rb`
+    if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000, 1)}\u00A0T`
+    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000, 1)}\u00A0M`
+    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)}\u00A0jt`
+    if (abs >= 1_000) return `${sign}${fmt(abs / 1_000, 0)}\u00A0rb`
     return `${sign}${fmt(abs, 0)}`
   }, [])
 
@@ -190,14 +194,13 @@ export default function Dashboard() {
           onOpenHabitsZoom={() => openZoom('habits')}
         />
 
-        {/* 5. Swipeable Budget & Savings Widget */}
-        <DashboardBudgetWidget
+        {/* 5. Compact Anggaran & Target Tabungan Bento Cards (Opens Detail Sheet on Tap) */}
+        <DashboardPulseBento
           budgetGoalSummary={budgetGoalSummary}
           defaultCurrency={defaultCurrency}
           locale={locale}
-          t={t}
-          onOpenQuickBudget={() => setIsOpenQuickBudget(true)}
-          onOpenQuickGoal={() => setIsOpenQuickGoal(true)}
+          onOpenBudgetDetail={() => setDetailSheetMode('budget')}
+          onOpenSavingsDetail={() => setDetailSheetMode('savings')}
         />
 
         {/* 6. Utang & Piutang Widget */}
@@ -210,6 +213,19 @@ export default function Dashboard() {
             setPayLoan(loan)
             setIsPayOpen(true)
           }}
+        />
+
+        {/* Detail Bottom Sheet for Budget & Savings */}
+        <BudgetSavingsDetailSheet
+          isOpen={Boolean(detailSheetMode)}
+          onClose={() => setDetailSheetMode(null)}
+          initialMode={detailSheetMode || 'budget'}
+          budgetGoalSummary={budgetGoalSummary}
+          defaultCurrency={defaultCurrency}
+          locale={locale}
+          t={t}
+          onOpenQuickBudget={() => setIsOpenQuickBudget(true)}
+          onOpenQuickGoal={() => setIsOpenQuickGoal(true)}
         />
 
         {/* Zoom Details Modal Overlay */}

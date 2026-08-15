@@ -21,7 +21,7 @@ export default function BottomSheet({
     <div className="fixed inset-0 z-50 ft-motion-overlay">
       <button
         type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
+        className={`ft-motion-overlay absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
           sheetVisible ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={closeSheet}
@@ -29,9 +29,12 @@ export default function BottomSheet({
       />
       <div className={`absolute inset-x-0 bottom-0 mx-auto w-full px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] ${maxWidth}`}>
         <div
-          className={`ft-motion-panel ${maxHeight} overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl transition-all duration-200 ${
-            sheetVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+          className={`${maxHeight} overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl transition-all duration-380 ft-hide-scrollbar ${
+            sheetVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'
           } ${className}`}
+          style={{
+            transitionTimingFunction: sheetVisible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
         >
           {showHandle ? <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" /> : null}
 

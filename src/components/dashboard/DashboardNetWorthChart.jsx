@@ -73,7 +73,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
         yDomain={miniRevenueChartDomain}
         showRightAxis={true}
         rightAxisTickFormatter={(v) => formatAxisCurrency(v, defaultCurrency)}
-        rightAxisWidth={defaultCurrency === 'IDR' ? (isMobileScreen ? 36 : 44) : 38}
+        rightAxisWidth={defaultCurrency === 'IDR' ? (isMobileScreen ? 48 : 54) : 42}
         rightAxisTicks={miniRevenueAxisTicks}
         rangeLabel={rangeLabelMap[miniRevenueRange] || '1 Bulan'}
       />

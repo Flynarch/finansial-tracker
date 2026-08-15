@@ -33,6 +33,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   setApiError,
   setApiErrorTone,
   allWallets,
+  newestTransactionId,
 }) {
   return (
     <Card
@@ -100,6 +101,7 @@ export const TransactionListSection = memo(function TransactionListSection({
                               setApiError={setApiError}
                               setApiErrorTone={setApiErrorTone}
                               wallets={allWallets}
+                              newestTransactionId={newestTransactionId}
                             />
                           </div>
                         </div>

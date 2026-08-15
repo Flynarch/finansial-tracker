@@ -481,7 +481,7 @@ export default function Loans() {
                             {isPaid && (
                               <span
                                 className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-[var(--panel-strong)]"
-                                title="Lunas"
+                                title={'Lunas'}
                               >
                                 <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={3} />
                               </span>
@@ -556,7 +556,7 @@ export default function Loans() {
                             className="ft-input text-xs font-semibold py-1 px-2.5 rounded-xl flex-1"
                             value={noteInputText}
                             onChange={(e) => setNoteInputText(e.target.value)}
-                            placeholder="Tulis catatan singkat..."
+                            placeholder={'Tulis catatan singkat...'}
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveInlineNote(item.id)
@@ -586,7 +586,7 @@ export default function Loans() {
                               <div
                                 onClick={(e) => startEditNote(item, e)}
                                 className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted)] hover:text-[var(--fg)] cursor-pointer truncate max-w-full group/note"
-                                title="Klik untuk mengedit catatan"
+                                title={'Klik untuk mengedit catatan'}
                               >
                                 <StickyNote className="h-3 w-3 text-amber-500 shrink-0" />
                                 <span className="truncate font-medium">{item.notes}</span>
@@ -648,7 +648,7 @@ export default function Loans() {
             setDeletingLoan(null)
           }
         }}
-        title="Hapus Catatan Pinjaman"
+        title={'Hapus Catatan Pinjaman'}
         message="Apakah Anda yakin ingin menghapus catatan pinjaman ini beserta seluruh riwayat pembayarannya?"
       />
     </div>

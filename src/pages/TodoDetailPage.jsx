@@ -500,7 +500,7 @@ export default function TodoDetailPage() {
                             type="button"
                             onClick={() => void saveSubTaskEdit(row.id)}
                             className="h-9 w-9 grid place-items-center rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition active:scale-95 shrink-0"
-                            aria-label="Simpan subtask"
+                            aria-label={'Simpan subtask'}
                           >
                             <CheckCircle2 size={18} />
                           </button>
@@ -508,7 +508,7 @@ export default function TodoDetailPage() {
                             type="button"
                             onClick={() => setEditingSubId(null)}
                             className="h-9 w-9 grid place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--border)]/40 transition active:scale-95 shrink-0"
-                            aria-label="Batal"
+                            aria-label={'Batal'}
                           >
                             <X size={18} />
                           </button>
@@ -524,7 +524,7 @@ export default function TodoDetailPage() {
                             />
                             <span
                               onClick={() => startEditingSubTask(row)}
-                              title="Klik untuk mengedit"
+                              title={'Klik untuk mengedit'}
                               className={`text-sm font-medium transition min-w-0 break-words [overflow-wrap:anywhere] cursor-pointer hover:opacity-80 ${
                                 row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
                               }`}

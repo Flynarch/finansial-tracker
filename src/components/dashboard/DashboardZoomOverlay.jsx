@@ -83,7 +83,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
       <button
         type="button"
         onClick={onCloseZoom}
-        className={`ft-motion-overlay absolute inset-0 bg-black/40 ${
+        className={`ft-motion-overlay absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
           zoomVisible ? 'opacity-100' : 'opacity-0'
         }`}
         aria-label={t('dashboard.zoom.close') || 'Tutup'}
@@ -91,10 +91,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
-          className={`ft-motion-panel origin-bottom rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-xl max-h-[88vh] overflow-y-auto ${
-            zoomVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+          className={`origin-bottom rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xl max-h-[88vh] overflow-y-auto transition-all duration-380 ft-hide-scrollbar ${
+            zoomVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'
           }`}
-          style={{ boxShadow: 'var(--shadow)' }}
+          style={{
+            boxShadow: 'var(--shadow)',
+            transitionTimingFunction: zoomVisible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
 

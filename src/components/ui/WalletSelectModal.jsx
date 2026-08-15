@@ -143,7 +143,7 @@ export default function WalletSelectModal({
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all max-h-[85vh] flex flex-col z-10">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all max-h-[85vh] flex flex-col z-10 animate-[ft-spring-up_0.36s_cubic-bezier(0.34,1.56,0.64,1)_both]">
         {/* Drag handle for mobile */}
         <div className="flex justify-center pt-2.5 pb-1 sm:hidden">
           <div className="h-1.5 w-12 rounded-full bg-[var(--border)]/60" />

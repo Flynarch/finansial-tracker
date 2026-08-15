@@ -314,9 +314,12 @@ export default function MonthPicker({ value, onChange, className = '', compact =
 
           {/* Panel */}
           <div
-            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-200 ${
-              visible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-8 sm:translate-y-3 opacity-0 sm:scale-95'
+            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-380 ${
+              visible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-12 sm:translate-y-4 opacity-0 scale-95'
             }`}
+            style={{
+              transitionTimingFunction: visible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
           >
             {/* Drag handle (mobile) */}
             <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-[var(--border-strong)]/40 sm:hidden" />

@@ -111,7 +111,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
       <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-2.5 border-b border-[var(--border)] shadow-xs">
         <div className="px-4 pt-4 pb-2">
           <PageHeader
-            title="Pilih Institusi / Dompet"
+            title={'Pilih Institusi / Dompet'}
             onBack={() => (isOnboarding && onBack ? onBack() : navigate(-1))}
           />
         </div>
@@ -122,7 +122,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
             <Search size={17} className="absolute left-3.5 text-[var(--muted)]" />
             <input
               type="text"
-              placeholder="Cari Bank, e-Wallet, atau Kas..."
+              placeholder={'Cari Bank, e-Wallet, atau Kas...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-2xl bg-[var(--field-bg)] py-3 pl-10 pr-4 text-sm font-semibold text-[var(--fg)] placeholder:text-[var(--muted-2)] border border-[var(--border)] focus:border-[var(--fg)] transition outline-none"
