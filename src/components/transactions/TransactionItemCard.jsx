@@ -112,38 +112,41 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     <div
       key={transaction.id}
       data-transaction-id={transaction.id}
-      className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] transition-transform active:scale-[0.995]"
+      className="relative overflow-hidden bg-[var(--panel-strong)] hover:bg-[var(--field-bg)]/60 transition-colors"
     >
-      {/* Progressive Swipe Background (Habits Style) */}
-      <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
+      {/* Progressive Swipe Background */}
+      <div className="absolute inset-0 z-0 flex items-center justify-end px-5 opacity-0 transition-colors duration-200" />
 
       <article
-        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 bg-[var(--field-bg)] p-3.5 ${
+        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 cursor-pointer transition-colors active:bg-[var(--field-bg)] ${
           highlightedTransactionId === String(transaction.id)
-            ? 'ring-2 ring-[var(--accent)]/50'
+            ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/50'
             : ''
         }`}
         onClick={() => {
           if (isSwiped) {
             setSwipedTransactionId(null)
             openEditTransaction(transaction)
+          } else {
+            openEditTransaction(transaction)
           }
         }}
         {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, { onEdit: () => openEditTransaction(transaction), onDelete: () => setIsDeleteModalOpen(true) }) : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/* Avatar Icon */}
           <div className="relative shrink-0">
             <div
-              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-xs font-semibold ${colorClass}`}
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-xs font-semibold ${colorClass} shadow-2xs`}
             >
               {transaction.type === 'transfer' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
               ) : (
-                <CategoryIcon icon={iconKey} className="h-5 w-5" />
+                <CategoryIcon icon={iconKey} className="h-4.5 w-4.5" />
               )}
             </div>
 
-            {/* Micro-Avatar Wallet Badge (Hidden when viewing dedicated context wallet) */}
+            {/* Micro-Avatar Wallet Badge */}
             {(() => {
               if (isContextWalletMatch) return null
               const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
@@ -151,7 +154,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               const logo = getWalletLogoUrl(walletObj)
               return (
                 <div
-                  className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-1.5 border-[var(--field-bg)] bg-[var(--panel-strong)] shadow-2xs"
+                  className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--panel-strong)] bg-[var(--field-bg)] shadow-2xs"
                   title={walletObj.name}
                 >
                   {logo ? (
@@ -176,42 +179,45 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             })()}
           </div>
 
-          <div className="min-w-0 flex-1">
-            {createdTime ? (
-              <p className="text-[10px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
-            ) : null}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
-              {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
-                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
-                  BARU
-                </span>
+            {/* 2 or 3 Clean Text Lines */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p className="truncate text-sm font-extrabold text-[var(--fg)] leading-tight">{labels.main}</p>
+                {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
+                  <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
+                    BARU
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Line 2: Wallet & Subcategory & Time */}
+              <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-[var(--muted)]">
+                {displayWalletName ? <span className="text-[var(--fg)]/80 font-bold">{displayWalletName}</span> : null}
+                {displayWalletName && (sub || createdTime) ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                {sub ? <span>{sub}</span> : null}
+                {sub && createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
+              </p>
+
+              {/* Line 3: Notes (Dedicated Line with line-clamp-2) */}
+              {noteStr ? (
+                <p className="mt-0.5 text-[11px] font-normal italic text-[var(--muted-2)] line-clamp-2 leading-snug break-words">
+                  "{noteStr}"
+                </p>
               ) : null}
             </div>
-            {(sub || displayWalletName) && (
-              <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
-                {sub ? <span>{sub}</span> : null}
-                {sub && displayWalletName ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                {displayWalletName ? <span className="font-semibold text-[var(--fg)]/80">{displayWalletName}</span> : null}
-              </p>
-            )}
-            {noteStr ? (
-              <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
-                {noteStr}
-              </p>
-            ) : null}
-          </div>
         </div>
 
-        <div className="shrink-0 max-w-[50%] pl-2 text-right">
+        {/* Amount */}
+        <div className="shrink-0 max-w-[45%] pl-2 text-right">
           <p
-            className={`break-all text-[15px] font-extrabold tabular-nums ${amountColorClass}`}
+            className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
           >
             {isContextWalletMatch ? '' : amountPrefix}
             {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
           </p>
           {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (
-            <p className="ft-muted break-all text-[11px]">
+            <p className="ft-muted break-all text-[10px] tabular-nums mt-0.5">
               ≈{' '}
               {formatCurrency(
                 convertCurrency(
@@ -226,6 +232,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           ) : null}
         </div>
       </article>
+
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}

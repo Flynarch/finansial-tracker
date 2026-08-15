@@ -14,6 +14,7 @@ import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import AiTriggerBar from '../chat/AiTriggerBar'
 import AiChatSheet from '../chat/AiChatSheet'
+import AiQuickLogModal from '../chat/AiQuickLogModal'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 
@@ -43,9 +44,11 @@ function AppShell() {
     location.pathname.startsWith('/savings/') ||
     location.pathname === '/add-account'
 
-  // AI Chat states
+  // AI Chat & Quick Log states
   const isChatOpen = useChatStore((state) => state.isOpen)
   const setIsChatOpen = useChatStore((state) => state.setIsOpen)
+  const isQuickLogOpen = useChatStore((state) => state.isQuickLogOpen)
+  const openQuickLog = useChatStore((state) => state.openQuickLog)
   const chatMessages = useChatStore((state) => state.messages)
   const setChatMessages = useChatStore((state) => state.setMessages)
 
@@ -177,7 +180,12 @@ function AppShell() {
         <LockScreen method={securityMethod} secret={lockSecret} onUnlock={unlock} />
       ) : null}
 
-      <AiTriggerBar isVisible={!isDetailPage && !isChatOpen} onOpen={() => setIsChatOpen(true)} />
+      <AiTriggerBar
+        isVisible={!isDetailPage && !isChatOpen && !isQuickLogOpen}
+        onOpen={openQuickLog}
+      />
+
+      <AiQuickLogModal />
 
       <AiChatSheet
         isOpen={isChatOpen}

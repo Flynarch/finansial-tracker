@@ -118,6 +118,14 @@ Before marking any task as complete, execute and pass all verification gates in 
 - **Visual Evidence Required**: Inspect generated screenshots/recordings to verify alignment, padding, and dark/light mode balance before marking the UI task as complete.
 - **User-Flow Storyboarding**: When planning complex UI interactions, describe the screen transitions from the user's POV (what they see, click, and experience) before coding.
 
+### D. List Views & Filter Sheet Patterns
+- **Zero-Chrome Content-First**: Utamakan ruang vertikal untuk daftar konten utama. Hindari menumpuk baris chip filter horizontal statis di bawah header jika filter sudah tersedia di Filter Drawer / Bottom Sheet.
+- **Intentional Trigger for Secondary Pickers**: Saat memilih opsi kustom (misal "Kustom Tanggal"), opsi radio hanya membuka kartu trigger tanpa langsung memunculkan modal *date picker*. Modal pemilih tanggal hanya terbuka saat kartu trigger diklik secara eksplisit oleh pengguna.
+- **List Item Visual Hierarchy & Multi-Line Notes**: Jangan menumpuk nama wallet, subkategori, dan catatan (*notes*) dalam 1 baris yang ter-truncate. Gunakan hirarki terstruktur:
+  - Baris 1: Kategori Utama & Nominal
+  - Baris 2: Nama Akun/Wallet (*font-bold* kontras) • Subkategori (*muted*) • Jam Transaksi
+  - Baris 3: Catatan pengguna di baris baru (*italic*, dengan tanda kutip, dan `line-clamp-2` agar terbaca utuh).
+
 ---
 
 ## 11. Specific Project Rules

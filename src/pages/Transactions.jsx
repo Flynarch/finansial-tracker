@@ -2,14 +2,11 @@ import { format, parseISO, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar as CalendarIcon, CalendarDays, Clock, Sparkles, TrendingUp, Layers, ChevronDown, ChevronRight, Check } from 'lucide-react'
-import Modal from '../components/ui/Modal'
+import { Calendar as CalendarIcon, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
-import { TransactionSummaryCard } from '../components/transactions/TransactionSummaryCard'
-import { TransactionFilterBar } from '../components/transactions/TransactionFilterBar'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import { TransactionListSection } from '../components/transactions/TransactionListSection'
 import useBackButton from '../hooks/useBackButton'
@@ -21,7 +18,6 @@ import {
   FALLBACK_EXCHANGE_RATES,
   formatCurrency,
   formatMoneyValueForInput,
-  isExcludeAnalyticsTx,
   parseMoneyInput,
   toTransactionsCsv,
 } from '../lib/utils'
@@ -60,13 +56,14 @@ function Transactions() {
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const [apiError, setApiError] = useState('')
   const [apiErrorTone, setApiErrorTone] = useState('error')
-  const [quickRange, setQuickRange] = useState('today')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   useBackButton(() => {
     setIsFilterOpen(false)
   }, isFilterOpen)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState(null)
+  const [draftPeriodPreset, setDraftPeriodPreset] = useState(null)
   const {
     swipedId: swipedTransactionId,
     setSwipedId: setSwipedTransactionId,
@@ -83,7 +80,6 @@ function Transactions() {
   const [selectedTxIds, setSelectedTxIds] = useState(new Set())
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false)
   const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false)
-  const [isRangeModalOpen, setIsRangeModalOpen] = useState(false)
   const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false)
 
   const toggleSelectTx = (id) => {
@@ -155,9 +151,10 @@ function Transactions() {
         const now = new Date()
         const yyyy = now.getFullYear()
         const mm = String(now.getMonth() + 1).padStart(2, '0')
-        const dd = String(now.getDate()).padStart(2, '0')
-        const today = `${yyyy}-${mm}-${dd}`
-        setFilters({ startDate: today, endDate: today })
+        const lastDay = new Date(yyyy, now.getMonth() + 1, 0).getDate()
+        const startKey = `${yyyy}-${mm}-01`
+        const endKey = `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`
+        setFilters({ startDate: startKey, endDate: endKey })
       }
     }
   }, [location.state?.focusTransactionId, filters.startDate, filters.endDate, setFilters])
@@ -198,7 +195,6 @@ function Transactions() {
 
     window.setTimeout(() => {
       setPendingFocusTransactionId(String(focusTransactionId))
-      setQuickRange(null)
       setFilters({
         search: '',
         type: 'all',
@@ -319,37 +315,26 @@ function Transactions() {
     })
   }, [filters, transactions, userWallets, usedCategories, ALL_TYPES])
 
-  const applyQuickRange = (nextRange) => {
+  const getDatesForQuickRange = (rangeKey) => {
     const now = new Date()
     const yyyy = now.getFullYear()
     const mm = String(now.getMonth() + 1).padStart(2, '0')
     const dd = String(now.getDate()).padStart(2, '0')
     const today = `${yyyy}-${mm}-${dd}`
 
-    setQuickRange(nextRange)
-    if (nextRange === 'all') {
-      setFilters({ startDate: '', endDate: '' })
-      return
+    if (rangeKey === 'all') {
+      return { startDate: '', endDate: '' }
     }
-    if (nextRange === 'yearly') {
-      const startKey = `${yyyy}-01-01`
-      setFilters({ startDate: startKey, endDate: today })
-      return
+    if (rangeKey === 'today') {
+      return { startDate: today, endDate: today }
     }
-    if (nextRange === 'today') {
-      setFilters({ startDate: today, endDate: today })
-      return
+    if (rangeKey === 'monthly') {
+      const startKey = `${yyyy}-${mm}-01`
+      const lastDay = new Date(yyyy, now.getMonth() + 1, 0).getDate()
+      const endKey = `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`
+      return { startDate: startKey, endDate: endKey }
     }
-    if (nextRange === 'weekly') {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 6)
-      const startKey = format(start, 'yyyy-MM-dd')
-      setFilters({ startDate: startKey, endDate: today })
-      return
-    }
-    // monthly
-    const startKey = `${yyyy}-${mm}-01`
-    setFilters({ startDate: startKey, endDate: today })
+    return { startDate: '', endDate: '' }
   }
 
   const handleEditSubmit = async () => {
@@ -386,25 +371,6 @@ function Transactions() {
     const filename = `transactions-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`
     downloadTextFile(filename, csvContent, 'text/csv;charset=utf-8;')
   }
-
-  const totals = filteredTransactions.reduce(
-    (accumulator, transaction) => {
-      if (isExcludeAnalyticsTx(transaction)) return accumulator
-      const convertedAmount = convertCurrency(
-        transaction.amount,
-        transaction.currency || defaultCurrency,
-        defaultCurrency,
-        rates,
-      )
-      if (transaction.type === 'income') {
-        accumulator.income += convertedAmount
-      } else {
-        accumulator.expense += convertedAmount
-      }
-      return accumulator
-    },
-    { income: 0, expense: 0 },
-  )
 
   const newestTransactionId = useMemo(() => {
     if (!transactions || transactions.length === 0) return null
@@ -520,40 +486,77 @@ function Transactions() {
     setShowBottomFade(maxScrollTop - el.scrollTop > 2)
   }
 
+  const datesMonthly = getDatesForQuickRange('monthly')
+  const hasActiveFilters = Boolean(
+    (filters.types && filters.types.length > 0 && filters.types.length < 3) ||
+    (filters.categories && filters.categories.length > 0) ||
+    (filters.walletIds && filters.walletIds.length > 0) ||
+    (filters.startDate && filters.startDate !== datesMonthly.startDate) ||
+    (filters.endDate && filters.endDate !== datesMonthly.endDate)
+  )
+
   return (
     <div className="bg-[var(--bg)]">
       <div
-        className={`ft-motion-page flex min-h-[calc(100svh_-_64px)] max-h-[calc(100svh_-_64px)] flex-col gap-4 overflow-hidden transform-gpu md:min-h-[calc(100vh_-_65px)] md:max-h-[calc(100vh_-_65px)] ${
+        className={`ft-motion-page flex min-h-[calc(100svh_-_64px)] max-h-[calc(100svh_-_64px)] flex-col gap-2 overflow-hidden transform-gpu md:min-h-[calc(100vh_-_65px)] md:max-h-[calc(100vh_-_65px)] ${
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
 
         {/* Top Bar Header */}
-        <section className="relative z-30 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1">{t('tx.pageTitle')}</h1>
-          <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-end">
+        <section className="relative z-30 flex items-center justify-between gap-3 pt-1">
+          <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1 truncate">
+            {t('tx.pageTitle')}
+          </h1>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Search Toggle Button */}
             <button
               type="button"
-              onClick={() => setIsRangeModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 shadow-2xs min-w-0 truncate cursor-pointer"
+              onClick={() => setIsSearchOpen((v) => !v)}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
+                isSearchOpen || filters.search
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
+                  : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
+              }`}
+              aria-label={t('tx.search.placeholder') || 'Cari'}
+              title="Cari Transaksi"
             >
-              <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
-              <span className="truncate">
-                {quickRange === 'all'
-                  ? 'Semua Transaksi'
-                  : quickRange === 'yearly'
-                  ? 'Tahun Ini'
-                  : quickRange === 'monthly'
-                  ? 'Bulan Ini'
-                  : quickRange === 'weekly'
-                  ? '7 Hari Terakhir'
-                  : quickRange === 'today'
-                  ? 'Hari Ini'
-                  : 'Periode Kustom'}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" strokeWidth={2.2} />
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
+                <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+              </svg>
             </button>
+
+            {/* Filter Modal Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false)
+                setDraftFilters({ ...filters })
+                setDraftPeriodPreset(null)
+                setIsFilterOpen(true)
+              }}
+              className={`relative inline-flex h-9 w-9 items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
+                hasActiveFilters
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
+                  : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
+              }`}
+              aria-label={t('tx.filter.open')}
+              title="Filter Lengkap"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6h16" strokeLinecap="round" />
+                <path d="M7 12h10" strokeLinecap="round" />
+                <path d="M10 18h4" strokeLinecap="round" />
+              </svg>
+              {hasActiveFilters && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]" />
+              )}
+            </button>
+
+            {/* 3-dots Menu */}
             <div className="relative z-50 shrink-0">
               {isMenuOpen ? (
                 <button
@@ -603,25 +606,36 @@ function Transactions() {
           </div>
         </section>
 
-        {/* 1. Transaction Summary Card Component */}
-        <TransactionSummaryCard
-          totals={totals}
-          defaultCurrency={defaultCurrency}
-          formatCurrency={formatCurrency}
-          t={t}
-        />
-
-        {/* 2. Transaction Filter Bar Component */}
-        <TransactionFilterBar
-          filters={filters}
-          setFilters={setFilters}
-          onOpenFilterModal={() => {
-            setIsMenuOpen(false)
-            setDraftFilters({ ...filters })
-            setIsFilterOpen(true)
-          }}
-          t={t}
-        />
+        {/* Collapsible Search Input */}
+        {(isSearchOpen || filters.search) && (
+          <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+            <input
+              type="text"
+              autoFocus
+              placeholder={t('tx.search.placeholder') || 'Cari catatan atau kategori...'}
+              value={filters.search || ''}
+              onChange={(event) => setFilters({ search: event.target.value })}
+              className="ft-field mt-0 h-10 pl-9 pr-9 text-xs sm:text-sm bg-[var(--field-bg)] border-[var(--border)] rounded-2xl focus:border-[var(--accent)]"
+            />
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
+                <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+              </svg>
+            </span>
+            {filters.search ? (
+              <button
+                type="button"
+                onClick={() => setFilters({ search: '' })}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-1 cursor-pointer"
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+        )}
 
         {/* 3. Transaction List Section Component */}
         <TransactionListSection
@@ -707,45 +721,138 @@ function Transactions() {
 
           {/* Middle Body (Single Scroll Container) */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3.5 ft-hide-scrollbar">
-            {/* 1. Date Range Setting */}
-            <div className="space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-extrabold tracking-wider text-[var(--muted)] uppercase">
-                  Setting Tanggal
-                </label>
-                {(draftFilters?.startDate || draftFilters?.endDate || filters.startDate || filters.endDate) ? (
-                  <button
-                    type="button"
-                    onClick={() => setDraftFilters((p) => ({ ...(p || filters), startDate: '', endDate: '' }))}
-                    className="text-[10px] font-bold text-[var(--earthy-terra)] hover:underline cursor-pointer"
-                  >
-                    Hapus Tanggal
-                  </button>
-                ) : null}
-              </div>
+            {/* 1. Rentang Waktu Accordion */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
               <button
                 type="button"
-                onClick={() => setIsDatePickerModalOpen(true)}
-                className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-[0.99] cursor-pointer"
+                onClick={() => setActiveFilterSection((prev) => (prev === 'date' ? null : 'date'))}
+                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <CalendarIcon className="h-4 w-4 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
-                  <div className="flex items-center gap-1.5 min-w-0 text-left">
-                    <span className="truncate">
-                      {(draftFilters?.startDate || filters.startDate)
-                        ? format(parseISO(draftFilters?.startDate || filters.startDate), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
-                        : 'Dari Tanggal'}
-                    </span>
-                    <span className="text-[var(--muted)]">-</span>
-                    <span className="truncate">
-                      {(draftFilters?.endDate || filters.endDate)
-                        ? format(parseISO(draftFilters?.endDate || filters.endDate), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
-                        : 'Sampai Tanggal'}
-                    </span>
-                  </div>
+                  <span className="shrink-0">Rentang Waktu</span>
+                  <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate">
+                    {(() => {
+                      const curStart = draftFilters?.startDate ?? filters.startDate
+                      const curEnd = draftFilters?.endDate ?? filters.endDate
+                      const datesToday = getDatesForQuickRange('today')
+                      const datesMonthly = getDatesForQuickRange('monthly')
+
+                      let activePreset = draftPeriodPreset
+                      if (!activePreset) {
+                        if (!curStart && !curEnd) activePreset = 'all'
+                        else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
+                        else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
+                        else activePreset = 'custom'
+                      }
+
+                      if (activePreset === 'all') return 'Semua'
+                      if (activePreset === 'today') return 'Hari ini'
+                      if (activePreset === 'monthly') return 'Bulan ini'
+                      if (curStart || curEnd) {
+                        const startLabel = curStart ? format(parseISO(curStart), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
+                        const endLabel = curEnd ? format(parseISO(curEnd), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
+                        return `${startLabel} - ${endLabel}`
+                      }
+                      return 'Kustom'
+                    })()}
+                  </span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-[var(--muted)] shrink-0" />
+                <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 shrink-0 ${activeFilterSection === 'date' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
               </button>
+
+              {activeFilterSection === 'date' && (
+                <div className="border-t border-[var(--border)] p-2 space-y-1.5 bg-[var(--panel-strong)] ft-slide-in">
+                  {(() => {
+                    const curStart = draftFilters?.startDate ?? filters.startDate
+                    const curEnd = draftFilters?.endDate ?? filters.endDate
+                    const datesToday = getDatesForQuickRange('today')
+                    const datesMonthly = getDatesForQuickRange('monthly')
+
+                    let activePreset = draftPeriodPreset
+                    if (!activePreset) {
+                      if (!curStart && !curEnd) activePreset = 'all'
+                      else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
+                      else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
+                      else activePreset = 'custom'
+                    }
+
+                    const periodOptions = [
+                      { id: 'today', label: 'Hari ini' },
+                      { id: 'monthly', label: 'Bulan ini' },
+                      { id: 'all', label: 'Semua' },
+                      { id: 'custom', label: 'Kustom (Pilih Tanggal)' },
+                    ]
+
+                    return (
+                      <>
+                        <div className="space-y-1">
+                          {periodOptions.map((item) => {
+                            const isSelected = activePreset === item.id
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setDraftPeriodPreset(item.id)
+                                  if (item.id !== 'custom') {
+                                    const dates = getDatesForQuickRange(item.id)
+                                    setDraftFilters((p) => ({
+                                      ...(p || filters),
+                                      startDate: dates.startDate,
+                                      endDate: dates.endDate,
+                                    }))
+                                  }
+                                }}
+                                className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                    : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                }`}
+                              >
+                                <span>{item.label}</span>
+                                <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition shrink-0 ${
+                                  isSelected ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                }`}>
+                                  {isSelected && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* Custom Date Range Display Card when Custom is active */}
+                        {activePreset === 'custom' && (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsDatePickerModalOpen(true)}
+                              className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-[0.99] cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
+                                <div className="flex items-center gap-1.5 min-w-0 text-left">
+                                  <span className="truncate">
+                                    {curStart
+                                      ? format(parseISO(curStart), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
+                                      : 'Dari Tanggal'}
+                                  </span>
+                                  <span className="text-[var(--muted)]">-</span>
+                                  <span className="truncate">
+                                    {curEnd
+                                      ? format(parseISO(curEnd), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
+                                      : 'Sampai Tanggal'}
+                                  </span>
+                                </div>
+                              </div>
+                              <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* 2. Jenis Transaksi */}
@@ -994,11 +1101,12 @@ function Transactions() {
                   types: [...ALL_TYPES],
                   walletIds: userWallets.map((w) => String(w.id)),
                   categories: [...usedCategories],
-                  startDate: '',
-                  endDate: '',
+                  startDate: datesMonthly.startDate,
+                  endDate: datesMonthly.endDate,
                 }
                 setDraftFilters(resetValues)
                 setFilters(resetValues)
+                setDraftPeriodPreset(null)
                 setIsFilterOpen(false)
               }}
             >
@@ -1081,100 +1189,6 @@ function Transactions() {
         }}
       />
 
-      {/* ── Period Selector Modal ───────────────────────────────── */}
-      <Modal
-        isOpen={isRangeModalOpen}
-        title={t('tx.period.title', 'Pilih Periode Transaksi')}
-        onClose={() => setIsRangeModalOpen(false)}
-      >
-        <div className="space-y-2.5 py-1">
-          {[
-            {
-              id: 'monthly',
-              title: 'Bulan Ini',
-              badge: 'Bulanan',
-              desc: 'Menampilkan transaksi dari tanggal 1 bulan berjalan',
-              Icon: CalendarDays,
-              color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
-            },
-            {
-              id: 'weekly',
-              title: '7 Hari Terakhir',
-              badge: 'Mingguan',
-              desc: 'Menampilkan transaksi dalam seminggu terakhir',
-              Icon: Clock,
-              color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-            },
-            {
-              id: 'today',
-              title: 'Hari Ini',
-              badge: 'Harian',
-              desc: 'Menampilkan transaksi khusus hari ini saja',
-              Icon: Sparkles,
-              color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
-            },
-            {
-              id: 'yearly',
-              title: 'Tahun Ini',
-              badge: 'Tahunan',
-              desc: 'Menampilkan transaksi dari 1 Januari tahun berjalan',
-              Icon: TrendingUp,
-              color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
-            },
-            {
-              id: 'all',
-              title: 'Semua Transaksi',
-              badge: 'Semua',
-              desc: 'Menampilkan seluruh riwayat transaksi tanpa batasan',
-              Icon: Layers,
-              color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
-            },
-          ].map((option) => {
-            const isSelected = quickRange === option.id
-            const Icon = option.Icon
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  applyQuickRange(option.id)
-                  setIsRangeModalOpen(false)
-                }}
-                className={`group relative flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 active:scale-[0.98] cursor-pointer ${
-                  isSelected
-                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] shadow-xs'
-                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel)] hover:border-[var(--border-strong)]'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${option.color} transition-transform group-hover:scale-105`}>
-                    <Icon className="h-5 w-5" strokeWidth={2.2} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-xs font-black truncate ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--fg)]'}`}>
-                        {option.title}
-                      </p>
-                      <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${
-                        isSelected ? 'bg-[var(--accent)] text-white' : 'bg-[var(--panel)] text-[var(--muted)] border border-[var(--border)]'
-                      }`}>
-                        {option.badge}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-[var(--muted)] leading-normal whitespace-normal">{option.desc}</p>
-                  </div>
-                </div>
-                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
-                  isSelected ? 'bg-[var(--accent)] text-white shadow-xs' : 'border border-[var(--border)] bg-[var(--panel-strong)] text-transparent'
-                }`}>
-                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </Modal>
-
       {/* ── Custom Date Picker Modal ───────────────────────────── */}
       <CustomDatePickerModal
         isOpen={isDatePickerModalOpen}
@@ -1183,6 +1197,7 @@ function Transactions() {
         endDate={draftFilters?.endDate ?? filters.endDate ?? ''}
         locale={locale}
         onSelectRange={({ startDate, endDate }) => {
+          setDraftPeriodPreset('custom')
           setDraftFilters((p) => ({ ...(p || filters), startDate, endDate }))
         }}
       />

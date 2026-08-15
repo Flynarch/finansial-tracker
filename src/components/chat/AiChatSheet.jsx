@@ -48,10 +48,19 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const initialInput = useChatStore((s) => s.initialInput)
   const setInitialInput = useChatStore((s) => s.setInitialInput)
 
+  const handleSendRef = useRef(null)
+
   useEffect(() => {
     if (isOpen && initialInput) {
-      setInputValue(initialInput)
+      const promptToSend = initialInput
       setInitialInput('')
+      setInputValue(promptToSend)
+      const timer = setTimeout(() => {
+        if (handleSendRef.current) {
+          handleSendRef.current(promptToSend)
+        }
+      }, 350)
+      return () => clearTimeout(timer)
     }
   }, [isOpen, initialInput, setInitialInput])
 
@@ -98,8 +107,11 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(null)
+
   useEffect(() => {
-    if (!isOpen || typeof document === 'undefined') return undefined
+    if (!isOpen) return undefined
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -108,24 +120,34 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     }
   }, [isOpen])
 
+  // Keyboard-aware: adjust sheet position smoothly using pure GPU transform
   useEffect(() => {
-    if (!isOpen) return
-    const vp = window.visualViewport
-    if (!vp) return
-    const handler = () => {
-      const sheet = document.getElementById('ai-chat-sheet')
-      if (sheet) {
-        const offset = window.innerHeight - vp.height
-        sheet.style.bottom = `${offset}px`
-        if (offset > 10) {
-          sheet.style.maxHeight = `${vp.height - 20}px`
-        } else {
-          sheet.style.maxHeight = ''
-        }
-      }
+    if (!isOpen) {
+      setKeyboardOffset(0)
+      return undefined
     }
-    vp.addEventListener('resize', handler)
-    return () => vp.removeEventListener('resize', handler)
+    const vp = window.visualViewport
+    if (!vp) return undefined
+
+    let rafId = null
+
+    const handleViewportChange = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const offset = Math.max(0, Math.round(window.innerHeight - vp.height))
+        setKeyboardOffset(offset > 15 ? offset : 0)
+        setViewportHeight(vp.height)
+      })
+    }
+
+    vp.addEventListener('resize', handleViewportChange)
+    vp.addEventListener('scroll', handleViewportChange)
+    return () => {
+      vp.removeEventListener('resize', handleViewportChange)
+      vp.removeEventListener('scroll', handleViewportChange)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
   }, [isOpen])
 
   const handleImageSelect = (e) => {
@@ -676,6 +698,8 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     setConsecutiveErrors(0)
   }
 
+  handleSendRef.current = handleSend
+
   if (!shouldRender) return null
 
   return createPortal(
@@ -687,6 +711,16 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       
       <div 
         id="ai-chat-sheet"
+        style={{
+          transform: !isAnimatingIn
+            ? 'translate3d(0, 100%, 0)'
+            : keyboardOffset > 0
+            ? `translate3d(0, -${keyboardOffset}px, 0)`
+            : 'translate3d(0, 0, 0)',
+          maxHeight: viewportHeight && keyboardOffset > 0
+            ? `${Math.max(300, viewportHeight - 16)}px`
+            : undefined,
+        }}
         className={`ft-chat-sheet ${isAnimatingIn ? 'ft-chat-sheet--open' : ''}`}
       >
         <div className="ft-chat-drag-handle" />
