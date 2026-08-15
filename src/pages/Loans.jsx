@@ -511,10 +511,8 @@ export default function Loans() {
                             {/* Combined Person · Wallet (Single line) */}
                             <p className="mt-0.5 text-[11px] font-bold text-[var(--muted)] truncate">
                               <span>{item.personName}</span>
-                              {item.walletId && walletMap.has(Number(item.walletId)) ? (
+                              {item.walletId && walletMap.has(Number(item.walletId)) && (
                                 <span> · {walletMap.get(Number(item.walletId))}</span>
-                              ) : (
-                                <span> · Memo</span>
                               )}
                             </p>
                           </div>

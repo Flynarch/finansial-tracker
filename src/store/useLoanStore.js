@@ -10,7 +10,10 @@ const useLoanStore = create((set) => ({
 
   addLoan: async (loanData) => {
     const total = Number(loanData.totalAmount) || 0
-    const walletId = loanData.walletId ? Number(loanData.walletId) : null
+    if (!loanData.walletId) {
+      throw new Error('Dompet / akun wajib dipilih untuk pencatatan pinjaman.')
+    }
+    const walletId = Number(loanData.walletId)
     const type = loanData.type || 'debt'
 
     const newLoan = {
@@ -32,29 +35,27 @@ const useLoanStore = create((set) => ({
 
     const loanId = await db.loans.add(newLoan)
 
-    // Generate initial transaction in ledger if walletId is selected
-    if (walletId) {
-      const isDebt = type === 'debt'
-      const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
-      const txType = isDebt ? 'income' : 'expense'
-      const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
+    // Generate initial transaction in ledger for mandatory walletId
+    const isDebt = type === 'debt'
+    const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
+    const txType = isDebt ? 'income' : 'expense'
+    const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
 
-      const initialTxId = await db.transactions.add({
-        date: loanData.startDate || new Date().toISOString().split('T')[0],
-        type: txType,
-        category: txCategory,
-        amount: total,
-        currency: loanData.currency || 'IDR',
-        notes: txNotes,
-        walletId,
-        loanId,
-        isExcludeFromAnalytics: true,
-        excludeFromAnalytics: true,
-        createdAt: Date.now(),
-      })
+    const initialTxId = await db.transactions.add({
+      date: loanData.startDate || new Date().toISOString().split('T')[0],
+      type: txType,
+      category: txCategory,
+      amount: total,
+      currency: loanData.currency || 'IDR',
+      notes: txNotes,
+      walletId,
+      loanId,
+      isExcludeFromAnalytics: true,
+      excludeFromAnalytics: true,
+      createdAt: Date.now(),
+    })
 
-      await db.loans.update(loanId, { initialTransactionId: initialTxId })
-    }
+    await db.loans.update(loanId, { initialTransactionId: initialTxId })
 
     return loanId
   },

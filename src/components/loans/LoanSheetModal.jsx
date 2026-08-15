@@ -68,12 +68,12 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           dueDate: '',
           startDate: new Date().toISOString().split('T')[0],
           notes: '',
-          walletId: '',
+          walletId: wallets && wallets.length > 0 ? String(wallets[0].id) : '',
           currency: defaultCurrency,
         })
       }
     }
-  }, [isOpen, editingLoan, defaultType, defaultCurrency])
+  }, [isOpen, editingLoan, defaultType, defaultCurrency, wallets])
 
   const handleTotalAmountChange = (e) => {
     if (hasPaymentsRecorded) return
@@ -98,6 +98,10 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       setSheetError('Nominal pinjaman harus lebih dari 0.')
       return
     }
+    if (!form.walletId) {
+      setSheetError('Dompet / akun wajib dipilih.')
+      return
+    }
 
     const payload = {
       type: form.type,
@@ -107,7 +111,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       dueDate: form.dueDate || null,
       startDate: form.startDate || new Date().toISOString().split('T')[0],
       notes: form.notes.trim(),
-      walletId: form.walletId ? Number(form.walletId) : null,
+      walletId: Number(form.walletId),
       currency: form.currency || defaultCurrency,
     }
 
@@ -228,13 +232,13 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           </div>
         </div>
 
-        {/* 4. Wallet (Opsional) */}
+        {/* 4. Wallet (Wajib) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-bold text-[var(--muted)]">Wallet (Opsional)</label>
+          <label className="text-[11px] font-bold text-[var(--muted)]">Dompet / Akun (Wajib)</label>
           <WalletSelectTrigger
             wallet={selectedWallet}
             disabled={!!editingLoan}
-            placeholder="Tanpa Wallet (Hanya Catatan Memo)"
+            placeholder="Pilih Dompet / Akun"
             onClick={() => setWalletModalOpen(true)}
           />
           <WalletSelectModal
@@ -243,8 +247,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             wallets={wallets}
             selectedWalletId={form.walletId}
             onSelectWallet={(id) => setForm((prev) => ({ ...prev, walletId: id }))}
-            allowNone
-            noneLabel="Tanpa Wallet (Hanya Catatan Memo)"
+            allowNone={false}
             title="Pilih Dompet"
           />
         </div>
