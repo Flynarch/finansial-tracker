@@ -183,7 +183,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
                 const selected = activeParentId === parent.id
                 const hasChildren = (parent.children || []).length > 0
                 return (
-                  <li key={parent.id}>
+                  <li key={parent.id} className="border-b border-[var(--border)]/30 last:border-b-0">
                     <button
                       type="button"
                       onClick={() => {
@@ -310,7 +310,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
             </div>
           ) : (
             <div className="flex flex-1 flex-col overflow-y-auto">
-              <ul key={activeParent?.id} className="ft-hide-scrollbar flex-1 overflow-y-auto py-1 px-1.5 space-y-1 ft-swush-in">
+              <ul key={activeParent?.id} className="ft-hide-scrollbar flex-1 overflow-y-auto py-1 px-1.5 ft-swush-in">
                 {(activeParent?.children || []).length === 0 ? (
                   <li className="px-4 py-6 text-center text-[13px] text-[var(--muted)]">{t('addTx.emptySubs') || 'Belum ada subkategori'}</li>
                 ) : (
@@ -318,20 +318,23 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
                     const path = `${activeParent.id}/${child.id}`
                     const picked = selectedCategory === path
                     return (
-                      <li key={child.id} className="p-0.5">
+                      <li key={child.id} className="py-1 border-b border-[var(--border)]/35 last:border-b-0">
                         <button
                           type="button"
                           onClick={() => {
                             onSelectCategory(path)
                             onClose()
                           }}
-                          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-3 text-left transition ${
+                          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left transition ${
                             picked
                               ? 'border border-[var(--fg)]/60 bg-[color-mix(in_srgb,var(--fg)_6%,var(--field-bg))] font-semibold text-[var(--fg)] shadow-2xs'
                               : 'border border-transparent hover:bg-[var(--field-bg)] font-medium text-[var(--fg)]'
                           }`}
                         >
-                          <span className="min-w-0 flex-1">{child.names[lang]}</span>
+                          <span className="min-w-0 flex-1 text-[13px]">{child.names[lang]}</span>
+                          {picked && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+                          )}
                         </button>
                       </li>
                     )

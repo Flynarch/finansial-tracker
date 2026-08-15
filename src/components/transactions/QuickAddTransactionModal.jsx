@@ -1053,7 +1053,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                     const selected = activeParentId === parent.id
                     const hasChildren = (parent.children || []).length > 0
                     return (
-                      <li key={parent.id}>
+                      <li key={parent.id} className="border-b border-[var(--border)]/30 last:border-b-0">
                         <button
                           type="button"
                           onClick={() => {
@@ -1228,7 +1228,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 </div>
               ) : (
                 <div className="flex min-h-[220px] min-w-0 flex-1 flex-col">
-                  <ul key={activeParent?.id} className="ft-hide-scrollbar flex-1 overflow-y-auto py-1 px-1.5 space-y-1 ft-swush-in">
+                  <ul key={activeParent?.id} className="ft-hide-scrollbar flex-1 overflow-y-auto py-1 px-1.5 ft-swush-in">
                     {(activeParent?.children || []).length === 0 ? (
                       <li className="px-4 py-6 text-center text-[13px] text-[var(--muted)]">{t('addTx.emptySubs')}</li>
                     ) : (
@@ -1236,7 +1236,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                         const path = `${activeParent.id}/${child.id}`
                         const picked = form.category === path
                         return (
-                          <li key={child.id} className="p-0.5">
+                          <li key={child.id} className="py-1 border-b border-[var(--border)]/35 last:border-b-0">
                             <button
                               type="button"
                               onClick={() => {
@@ -1244,13 +1244,16 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                                 syncParentFromCategory(path)
                                 closeCategorySheet()
                               }}
-                              className={`flex w-full items-center rounded-xl px-3.5 py-3 text-left text-[13px] transition ${
+                              className={`flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left text-[13px] transition ${
                                 picked
                                   ? 'border border-[var(--fg)]/60 bg-[color-mix(in_srgb,var(--fg)_6%,var(--field-bg))] font-semibold text-[var(--fg)] shadow-2xs'
                                   : 'border border-transparent hover:bg-[var(--field-bg)] font-medium text-[var(--fg)]'
                               }`}
                             >
                               <span className="min-w-0 flex-1">{child.names[lang]}</span>
+                              {picked && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+                              )}
                             </button>
                           </li>
                         )
