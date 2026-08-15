@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles, X, Mic, MicOff, Image as ImageIcon, Send, ArrowUpRight, Loader2, Wallet, AlertCircle } from 'lucide-react'
+import { Sparkles, X, Mic, MicOff, Image as ImageIcon, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { parseTransactionFromText } from '../../lib/gemini'
@@ -11,12 +11,36 @@ import useChatStore from '../../store/useChatStore'
 import AiDigitalReceipt from './AiDigitalReceipt'
 import AiIntentSwitchDialog from './AiIntentSwitchDialog'
 
-const SAMPLE_CHIPS = [
-  'Makan siang 35rb GoPay',
-  'Beli kopi 25rb Cash',
-  'Bensin 50rb Mandiri',
-  'Belanja bulanan 250rb BCA',
-]
+function generateSampleChips(userWallets = []) {
+  const walletNames = (userWallets || []).map((w) => w.name).filter(Boolean)
+
+  const baseTitles = [
+    'Makan siang 35rb',
+    'Gaji 5jt',
+    'Beli kopi 25rb',
+    'Uang saku 50rb',
+    'Bensin 30rb',
+    'Belanja bulanan 250rb',
+    'Token listrik 100rb',
+    'Nongkrong 45rb',
+    'Dapat cashback 15rb',
+    'Beli pulsa 50rb',
+    'Bayar WiFi 300rb',
+    'Makan malam 60rb',
+    'Beli snack 20rb',
+    'Bayar langganan 186rb',
+  ]
+
+  if (walletNames.length === 0) {
+    return baseTitles
+  }
+
+  // Cyclically & variedly distribute every wallet across all available chips
+  return baseTitles.map((title, idx) => {
+    const assignedWallet = walletNames[idx % walletNames.length]
+    return `${title} ${assignedWallet}`
+  })
+}
 
 export default function AiQuickLogModal() {
   const isOpen = useChatStore((s) => s.isQuickLogOpen)
@@ -28,6 +52,8 @@ export default function AiQuickLogModal() {
   const addTransaction = useTransactionStore((s) => s.addTransaction)
   const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
 
+  const sampleChips = useMemo(() => generateSampleChips(wallets), [wallets])
+
   // UI state machine: 'input' | 'analyzing' | 'receipt' | 'intent_switch'
   const [modalMode, setModalMode] = useState('input')
   const [inputValue, setInputValue] = useState('')
@@ -36,22 +62,19 @@ export default function AiQuickLogModal() {
   const [recordedTransactions, setRecordedTransactions] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
-
   const [shouldRender, setShouldRender] = useState(false)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
-  const [keyboardOffset, setKeyboardOffset] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(null)
-  const isKeyboardActive = keyboardOffset > 15
 
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
   const recognitionRef = useRef(null)
   const sheetRef = useRef(null)
+  const baseInputBeforeRecordingRef = useRef('')
 
-  // Open / Close animations & focus management
+  // Open / Close animations (No disruptive auto-focus on open)
   useEffect(() => {
     let timeoutId
-    let focusTimer
     let frameId
 
     if (isOpen) {
@@ -59,14 +82,8 @@ export default function AiQuickLogModal() {
       frameId = requestAnimationFrame(() => {
         setIsAnimatingIn(true)
       })
-      focusTimer = setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus({ preventScroll: true })
-        }
-      }, 250)
     } else {
       setIsAnimatingIn(false)
-      setKeyboardOffset(0)
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
@@ -87,7 +104,6 @@ export default function AiQuickLogModal() {
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
-      if (focusTimer) clearTimeout(focusTimer)
       if (frameId) cancelAnimationFrame(frameId)
     }
   }, [isOpen])
@@ -108,36 +124,6 @@ export default function AiQuickLogModal() {
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prevOverflow && prevOverflow !== 'hidden' ? prevOverflow : ''
-    }
-  }, [isOpen])
-
-  // Keyboard-aware: adjust sheet position smoothly using pure GPU transform without DOM destruction
-  useEffect(() => {
-    if (!isOpen) {
-      setKeyboardOffset(0)
-      return undefined
-    }
-    const vp = window.visualViewport
-    if (!vp) return undefined
-
-    let rafId = null
-
-    const handleViewportChange = () => {
-      if (rafId) return
-      rafId = requestAnimationFrame(() => {
-        rafId = null
-        const offset = Math.max(0, Math.round(window.innerHeight - vp.height))
-        setKeyboardOffset(offset > 15 ? offset : 0)
-        setViewportHeight(vp.height)
-      })
-    }
-
-    vp.addEventListener('resize', handleViewportChange)
-    vp.addEventListener('scroll', handleViewportChange)
-    return () => {
-      vp.removeEventListener('resize', handleViewportChange)
-      vp.removeEventListener('scroll', handleViewportChange)
-      if (rafId) cancelAnimationFrame(rafId)
     }
   }, [isOpen])
 
@@ -164,18 +150,30 @@ export default function AiQuickLogModal() {
     try {
       const recognition = new SpeechRecognition()
       recognition.lang = locale === 'id' ? 'id-ID' : 'en-US'
-      recognition.continuous = false
-      recognition.interimResults = false
+      recognition.continuous = true
+      recognition.interimResults = true
       recognitionRef.current = recognition
+      baseInputBeforeRecordingRef.current = inputValue ? `${inputValue.trim()} ` : ''
 
       recognition.onstart = () => {
         setIsRecording(true)
         setErrorMessage('')
       }
       recognition.onresult = (e) => {
-        const transcript = e.results[0][0].transcript
-        setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
-        setIsRecording(false)
+        let finalTranscript = ''
+        let interimTranscript = ''
+
+        for (let i = 0; i < e.results.length; i++) {
+          const transcript = e.results[i][0].transcript
+          if (e.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        const fullText = (baseInputBeforeRecordingRef.current + finalTranscript + interimTranscript).trim()
+        setInputValue(fullText)
       }
       recognition.onerror = () => {
         setIsRecording(false)
@@ -280,6 +278,14 @@ function isObviousNonTransaction(text) {
         setModalMode('receipt')
         setInputValue('')
         setSelectedImage(null)
+
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate([25, 40, 25])
+          } catch {
+            // ignore
+          }
+        }
       } else {
         // Non-Transaction Intent Detected (question, database query, advice, etc.)
         setModalMode('intent_switch')
@@ -298,9 +304,14 @@ function isObviousNonTransaction(text) {
     setErrorMessage('')
     setTimeout(() => {
       if (inputRef.current) {
-        inputRef.current.focus({ preventScroll: true })
+        inputRef.current.focus()
+        try {
+          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        } catch {
+          // ignore
+        }
       }
-    }, 150)
+    }, 120)
   }
 
   const handleSwitchToChat = (prompt) => {
@@ -328,19 +339,11 @@ function isObviousNonTransaction(text) {
       {/* Slide-Up Bottom Sheet */}
       <div
         ref={sheetRef}
-        style={{
-          transform: !isAnimatingIn
-            ? 'translate3d(0, 100%, 0)'
-            : keyboardOffset > 0
-            ? `translate3d(0, -${keyboardOffset}px, 0)`
-            : 'translate3d(0, 0, 0)',
-          maxHeight: viewportHeight && keyboardOffset > 0
-            ? `${Math.max(240, viewportHeight - 12)}px`
-            : undefined,
-        }}
-        className="absolute inset-x-0 bottom-0 max-h-[88dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl ft-quicklog-sheet max-w-lg mx-auto"
+        className={`absolute inset-x-0 bottom-0 max-h-[92dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl ft-quicklog-sheet max-w-lg mx-auto ${
+          isAnimatingIn ? 'ft-quicklog-sheet--open' : ''
+        }`}
       >
-        {/* Top Drag Handle & Header */}
+        {/* Top Drag Handle & Header (Fixed stable dimensions to prevent mobile jumping) */}
         <div className="shrink-0 p-4 pb-3 border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl">
           <div className="mx-auto mb-2.5 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
           <div className="flex items-center justify-between">
@@ -357,14 +360,25 @@ function isObviousNonTransaction(text) {
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={closeQuickLog}
-              className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => switchToFullChat(inputValue)}
+                title="Buka AI Finance Chat"
+                className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer flex items-center gap-1"
+                aria-label="Buka AI Finance Chat"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={closeQuickLog}
+                className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -381,20 +395,32 @@ function isObviousNonTransaction(text) {
           {/* MODE 1: Input Mode */}
           {modalMode === 'input' && (
             <div className="space-y-3 ft-mode-enter">
-              {/* Sapaan Kontekstual (Collapsible on Keyboard) */}
-              <div className={`ft-collapsible-section ${!isKeyboardActive ? 'ft-collapsible-open' : 'ft-collapsible-closed'}`}>
-                <div className="ft-collapsible-inner space-y-1 pb-1 ft-stagger-child" style={{ animationDelay: '50ms' }}>
-                  <h2 className="ft-display text-lg font-black tracking-tight text-[var(--fg)]">
-                    Mau catat apa hari ini?
-                  </h2>
-                  <p className="text-xs text-[var(--muted)]">
-                    Tulis atau ucapkan transaksi Anda dalam bahasa sehari-hari.
-                  </p>
-                </div>
+              {/* Sapaan Kontekstual */}
+              <div className="space-y-0.5 pb-0.5">
+                <h2 className="ft-display text-base sm:text-lg font-black tracking-tight text-[var(--fg)]">
+                  Mau catat apa hari ini?
+                </h2>
+                <p className="text-xs text-[var(--muted)]">
+                  Tulis atau ucapkan transaksi Anda dalam bahasa sehari-hari.
+                </p>
               </div>
 
               {/* Main Input Box */}
-              <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 focus-within:border-[var(--accent)] transition-colors shadow-inner ft-stagger-child" style={{ animationDelay: '120ms' }}>
+              <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 focus-within:border-[var(--accent)] transition-colors shadow-inner">
+                {/* Active Voice Recording Live Equalizer Visualizer */}
+                {isRecording && (
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-500 mb-2 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1 h-4 px-0.5">
+                      <div className="ft-eq-bar" />
+                      <div className="ft-eq-bar" />
+                      <div className="ft-eq-bar" />
+                      <div className="ft-eq-bar" />
+                      <div className="ft-eq-bar" />
+                    </div>
+                    <span className="text-xs font-bold tracking-tight">Mendengarkan suara Anda...</span>
+                  </div>
+                )}
+
                 <textarea
                   ref={inputRef}
                   value={inputValue}
@@ -407,7 +433,7 @@ function isObviousNonTransaction(text) {
                   }}
                   placeholder="Contoh: Makan siang 35rb & bensin 25rb pakai GoPay..."
                   rows={2}
-                  className="w-full resize-none bg-transparent text-xs sm:text-sm font-medium text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none min-h-[58px]"
+                  className="w-full resize-none bg-transparent text-[15px] sm:text-sm font-medium text-[var(--fg)] placeholder:text-[var(--muted)]/80 focus:outline-none min-h-[64px] leading-relaxed"
                 />
 
                 {/* Attached Image Thumbnail */}
@@ -426,13 +452,13 @@ function isObviousNonTransaction(text) {
                 )}
 
                 {/* Input Actions Footer Bar */}
-                <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-[var(--border)]/40">
+                <div className="mt-2 flex items-center justify-between pt-2 border-t border-[var(--border)]/40">
                   <div className="flex items-center gap-1.5">
                     {/* Voice Mic Button */}
                     <button
                       type="button"
                       onClick={toggleRecording}
-                      className={`flex h-8 w-8 items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
                         isRecording
                           ? 'border-rose-500 bg-rose-500/20 text-rose-500 animate-pulse'
                           : 'border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)]'
@@ -442,7 +468,25 @@ function isObviousNonTransaction(text) {
                       {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </button>
 
-                    {/* Image / Struk Upload Button */}
+                    {/* Camera Instant Snapshot Button */}
+                    <input
+                      type="file"
+                      ref={cameraInputRef}
+                      onChange={handleImageSelect}
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
+                      title="Foto Struk Fisik (Kamera)"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
+
+                    {/* Image / Struk Upload Gallery Button */}
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -453,8 +497,8 @@ function isObviousNonTransaction(text) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                      title="Upload Foto Struk"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
+                      title="Pilih Struk dari Galeri"
                     >
                       <ImageIcon className="h-4 w-4" />
                     </button>
@@ -465,7 +509,7 @@ function isObviousNonTransaction(text) {
                     type="button"
                     onClick={() => handleSubmit()}
                     disabled={!inputValue.trim() && !selectedImage}
-                    className="ft-btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                    className="ft-btn-primary py-2.5 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none cursor-pointer active:scale-95 transition shadow-sm"
                   >
                     <span>Catat</span>
                     <Send className="h-3.5 w-3.5" />
@@ -473,63 +517,77 @@ function isObviousNonTransaction(text) {
                 </div>
               </div>
 
-              {/* Quick Sample Chips & Connected Accounts (Collapsible on Keyboard) */}
-              <div className={`ft-collapsible-section ${!isKeyboardActive ? 'ft-collapsible-open' : 'ft-collapsible-closed'}`}>
-                <div className="ft-collapsible-inner space-y-3 pt-1">
-                  <div className="space-y-2 ft-stagger-child" style={{ animationDelay: '200ms' }}>
-                    <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">
-                      Coba Catat Cepat
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SAMPLE_CHIPS.map((chip, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setInputValue(chip)
-                            handleSubmit(chip)
-                          }}
-                          className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
-                        >
-                          <span>{chip}</span>
-                          <ArrowUpRight className="h-3 w-3 text-[var(--muted)]" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {/* Quick Sample Chips (Infinite Marquee) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                    Coba Catat Cepat
+                  </span>
+                  <span className="text-[9.5px] text-[var(--muted)]/60 font-medium">
+                    Geser atau ketuk
+                  </span>
+                </div>
 
-                  {wallets.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)] ft-stagger-child" style={{ animationDelay: '270ms' }}>
-                      <Wallet className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
-                      <span className="truncate">
-                        Akun terhubung: {wallets.map((w) => w.name).join(', ')}
-                      </span>
-                    </div>
-                  )}
+                <div className="ft-marquee-container ft-marquee-mask overflow-hidden py-1">
+                  <div className="ft-marquee-track">
+                    {[...sampleChips, ...sampleChips].map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setInputValue(chip)
+                          handleSubmit(chip)
+                        }}
+                        className="flex items-center gap-1.5 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                      >
+                        <span>{chip}</span>
+                        <ArrowUpRight className="h-3 w-3 text-[var(--muted)] shrink-0" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {/* Connected Accounts */}
+              {wallets.length > 0 && (
+                <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)] pt-0.5">
+                  <Wallet className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="truncate">
+                    Akun terhubung: {wallets.map((w) => w.name).join(', ')}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
           {/* MODE 2: Analyzing Shimmer State */}
           {modalMode === 'analyzing' && (
-            <div className="ft-mode-enter">
-              <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-3xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-lg shadow-[var(--accent)]/10">
+            <div className="ft-mode-enter py-3 px-1">
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-xl ft-shimmer-scan flex flex-col items-center text-center space-y-4">
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-lg shadow-[var(--accent)]/10">
                   <Loader2 className="h-7 w-7 animate-spin" />
                   <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-[var(--accent)] animate-bounce" />
                 </div>
+
                 <div className="space-y-1">
-                  <h3 className="text-base font-black text-[var(--fg)]">Menganalisis Transaksi...</h3>
+                  <h3 className="text-base font-black text-[var(--fg)] tracking-tight">
+                    Menganalisis Transaksi...
+                  </h3>
                   <p className="text-xs text-[var(--muted)] max-w-xs">
-                    AI sedang mengidentifikasi kategori, nominal, dan dompet yang Anda gunakan.
+                    AI sedang mengidentifikasi nominal, kategori, dan menghubungkan akun dompet Anda.
                   </p>
                 </div>
+
                 {lastSubmittedPrompt && (
-                  <div className="rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-1.5 text-xs italic text-[var(--muted)] max-w-xs truncate">
+                  <div className="rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-1.5 text-xs italic text-[var(--muted)] max-w-xs truncate shadow-2xs">
                     "{lastSubmittedPrompt}"
                   </div>
                 )}
+
+                <div className="flex items-center gap-2 pt-1 text-[11px] font-bold text-[var(--accent)]">
+                  <CheckCircle2 className="h-3.5 w-3.5 animate-pulse" />
+                  <span>FinTrack AI Engine v2.0</span>
+                </div>
               </div>
             </div>
           )}

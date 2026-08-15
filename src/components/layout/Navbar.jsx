@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
+import useChatStore from '../../store/useChatStore'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import {
@@ -119,6 +120,16 @@ function Navbar() {
           <span className="hidden rounded-lg bg-[var(--field-bg)] px-3 py-1.5 text-[11px] font-bold tracking-wide text-[var(--muted)] sm:inline-block">
             {todayLabel}
           </span>
+
+          <button
+            type="button"
+            onClick={() => useChatStore.getState().setIsOpen(true)}
+            aria-label="Konsultasi AI Chat"
+            title="Konsultasi AI Chat"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 active:scale-95 shadow-xs transition-all duration-200 cursor-pointer"
+          >
+            <Sparkles className="h-4.5 w-4.5 text-[var(--fg)]" strokeWidth={2.2} />
+          </button>
 
           <div className="relative">
             <button

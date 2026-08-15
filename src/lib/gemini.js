@@ -300,11 +300,15 @@ export async function parseTransactionFromText(userMessage, context) {
     normUserText.includes('utang piutang') ||
     normUserText.includes('hutang piutang') ||
     normUserText.includes('siapa yang utang') ||
+    normUserText.includes('siapa saja yang punya utang') ||
     normUserText.includes('siapa yang punya hutang') ||
     normUserText.includes('daftar utang') ||
     normUserText.includes('daftar piutang') ||
     normUserText.includes('sisa piutang') ||
-    normUserText.includes('sisa utang')
+    normUserText.includes('sisa utang') ||
+    normUserText.includes('total utang') ||
+    normUserText.includes('utang saya') ||
+    normUserText.includes('piutang saya')
   ) {
     const loans = await db.loans.toArray()
     const activeLoans = loans.filter((l) => l.status !== 'paid' && (l.remainingAmount ?? l.totalAmount) > 0)
@@ -317,14 +321,76 @@ export async function parseTransactionFromText(userMessage, context) {
     if (activeLoans.length > 0) {
       textMsg += '\n\nRincian Pinjaman Aktif:\n' + activeLoans.map((l) => `- ${l.type === 'debt' ? 'Hutang' : 'Piutang'}: **${l.title}** (${l.personName || '-'}) · Sisa **Rp ${(l.remainingAmount ?? l.totalAmount).toLocaleString('id-ID')}**`).join('\n')
     } else {
-      textMsg += '\n\nSaat ini tidak ada catatan utang atau piutang yang aktif.'
+      textMsg += '\n\nSaat ini tidak ada catatan utang atau piutang yang aktif. Kondisi kewajiban Anda bersih!'
     }
 
     return {
-      type: 'loan',
-      action: 'query',
+      type: 'text',
       text: textMsg,
       chips: ['Catat Piutang Baru', 'Catat Hutang Baru', 'Bayar Cicilan', 'Analisis Keuangan'],
+    }
+  }
+
+  if (
+    normUserText.includes('target tabungan') ||
+    normUserText.includes('progres tabungan') ||
+    normUserText.includes('progres target tabungan') ||
+    normUserText.includes('tabungan saya saat ini')
+  ) {
+    const goals = await db.goals.toArray()
+    const activeGoals = goals.filter((g) => g.status !== 'archived')
+    if (activeGoals.length > 0) {
+      const totalTarget = activeGoals.reduce((s, g) => s + (g.targetAmount || 0), 0)
+      const totalCurrent = activeGoals.reduce((s, g) => s + (g.currentAmount || 0), 0)
+      const pct = totalTarget > 0 ? Math.round((totalCurrent / totalTarget) * 100) : 0
+      let textMsg = `Berikut progres **Target Tabungan** Anda:\n\n- **Total Terkumpul**: **Rp ${totalCurrent.toLocaleString('id-ID')}** / Rp ${totalTarget.toLocaleString('id-ID')} (${pct}%)\n- **Jumlah Target**: **${activeGoals.length} tujuan**\n\nRincian Target Tabungan:\n`
+      textMsg += activeGoals.map(g => {
+        const p = g.targetAmount > 0 ? Math.min(100, Math.round(((g.currentAmount || 0) / g.targetAmount) * 100)) : 0
+        return `- **${g.title}**: **Rp ${(g.currentAmount || 0).toLocaleString('id-ID')}** / Rp ${(g.targetAmount || 0).toLocaleString('id-ID')} (${p}%)`
+      }).join('\n')
+      return {
+        type: 'text',
+        text: textMsg,
+        chips: ['Setor Tabungan: Rp 50.000', 'Buat Target Baru: Dana Darurat', 'Analisis Keuangan']
+      }
+    } else {
+      return {
+        type: 'text',
+        text: 'Saat ini belum ada **Target Tabungan** yang dibuat. Menentukan target tabungan (seperti Dana Darurat, Liburan, atau Beli Gadget) sangat efektif untuk menjaga konsistensi keuangan Anda.\n\nMau saya bantu buatkan target tabungan baru sekarang?',
+        chips: ['Buat Target: Dana Darurat 5 Juta', 'Buat Target: Liburan 3 Juta', 'Analisis Keuangan']
+      }
+    }
+  }
+
+  if (
+    normUserText.includes('habit harian') ||
+    normUserText.includes('status habit') ||
+    normUserText.includes('kebiasaan hari ini') ||
+    normUserText.includes('habit saya hari ini')
+  ) {
+    const habits = await db.habits.toArray()
+    const activeHabits = habits.filter(h => !h.archived)
+    if (activeHabits.length > 0) {
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      const logs = await db.habitLogs.where('date').equals(todayStr).toArray()
+      const completedIds = new Set(logs.filter(l => l.completed).map(l => l.habitId))
+      const doneCount = activeHabits.filter(h => completedIds.has(h.id)).length
+      let textMsg = `Berikut status **Habit Harian** Anda hari ini (${doneCount}/${activeHabits.length} selesai):\n\n`
+      textMsg += activeHabits.map(h => {
+        const isDone = completedIds.has(h.id)
+        return `- [${isDone ? 'x' : ' '}] **${h.title}** ${isDone ? '(Selesai)' : '(Belum)'}`
+      }).join('\n')
+      return {
+        type: 'text',
+        text: textMsg,
+        chips: ['Selesaikan Semua Habit', 'Buat Habit Baru', 'Analisis Keuangan']
+      }
+    } else {
+      return {
+        type: 'text',
+        text: 'Saat ini belum ada **Habit Harian** yang aktif. Anda bisa membuat kebiasaan finansial atau produktif harian (seperti *Tidak beli kopi di luar*, *Catat pengeluaran harian*, atau *Menabung 10rb*).\n\nMau mulai buat habit baru?',
+        chips: ['Buat Habit: Hemat Kopi', 'Buat Habit: Menabung Harian', 'Analisis Keuangan']
+      }
     }
   }
 
@@ -349,8 +415,41 @@ ${monthSummary}
 
 DILARANG KERAS MENJALANKAN KODE PYTHON ATAU MENGGUNAKAN TOOL LAIN SELAIN YANG DISEDIAKAN.
 
-ATURAN UTAMA:
-0. INTENT TRIGGER QUICK CHIPS (SANGAT PENTING):
+PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
+1. PENGENALAN SLANG ANGKA & NOMINAL:
+   - "k", "rb", "ribu" = ribuan (misal: "25k" = 25000, "50rb" = 50000).
+   - "jt", "juta", "m" = jutaan (misal: "2jt" = 2000000, "1.5jt" / "1,5 juta" = 1500000).
+   - "perak", "rupiah" = nominal satuan (misal: "500 perak" = 500).
+   - Bahasa gaul lokal:
+     * "seceng" = 1000 | "noceng" = 2000 | "goceng" = 5000 | "ceban" = 10000
+     * "gocap" = 50000 | "cepek" = 100000 | "pekgo" = 150000 | "sejeti" = 1000000
+   - SELALU konversikan nominal ke angka bulat (integer) murni pada field 'amount' tanpa koma atau titik.
+
+2. PENALARAN WAKTU & TANGGAL RELATIF (Acuan Hari Ini: ${today}):
+   - "hari ini", "tadi pagi", "tadi siang", "barusan" = tanggal ${today}.
+   - "kemarin", "semalam", "tadi malam" = 1 hari sebelum ${today}.
+   - "kemarin lusa", "2 hari lalu" = 2 hari sebelum ${today}.
+   - "lusa" = 2 hari setelah ${today}.
+   - "3 hari lalu", "minggu lalu hari senin", dsb = hitung tanggal yang tepat relatif terhadap ${today}.
+   - SELALU isi properti 'date' dalam format standar YYYY-MM-DD.
+
+3. PENCATATAN TRANSAKSI (PEMASUKAN, PENGELUARAN, TRANSFER):
+   - PEMASUKAN / INCOME (PENTING):
+     * Kenali semua istilah: "gaji", "gajian", "salary", "uang saku", "sangu", "uang jajan", "dikasih ortu/pacar", "kiriman", "bonus", "THR", "hadiah", "kado", "cashback", "komisi", "affiliate", "hasil jualan", "penjualan", "freelance", "proyek", "adsense", "kembalian", "dividen", "bunga bank", "untung", "cuan", "pemasukan", "penghasilan", "income", "dapat uang 50k", dll.
+     * SELALU gunakan type: "income" dan ID Kategori Pemasukan yang tepat (misal: "uang_jajan/uang_saku", "gaji/gaji_pokok", "gaji/lembur", "bonus/thr", "bonus/cashback", "bisnis/freelance", "bisnis/penjualan", "bisnis/content_creator", "kas_kecil/kembalian", "investasi/dividen", dll).
+     * JIKA user TIDAK menyebutkan dompet untuk pemasukan: LANGSUNG gunakan dompet pertama (default) dari daftar dompet tanpa menolak atau bertanya ulang.
+   - PENGELUARAN / EXPENSE:
+     * Kenali semua istilah pengeluaran lokal: "beli kopi", "nongkrong/nongki", "starling", "nasgor", "seblak", "makan padang", "bensin/pertamax", "ojol/gojek/grab", "parkir", "e-toll", "listrik/token", "wifi", "pulsa/kuota", "langganan/netflix/spotify", "belanja bulanan/indomaret/alfamart", "baju/sepatu", "skincare", "obat/halodoc", "spp/kuliah", "cicilan kosan/kontrakan", dll.
+     * Gunakan type: "expense" dan ID Kategori Pengeluaran yang paling spesifik.
+     * JIKA user tidak menyebutkan dompet: Otomatis pilih dompet yang saldonya mencukupi atau dompet pertama.
+   - TRANSFER ANTAR DOMPET:
+     * Gunakan type: "transfer" dengan 'walletId' (sumber) dan 'targetWalletId' (tujuan) saat user memindahkan saldo (misal: "transfer 100rb dari BCA ke GoPay", "tarik tunai 50rb dari Mandiri").
+   - MULTI-TRANSAKSI / KALIMAT MAJEMUK:
+     * JIKA user menyebutkan BANYAK transaksi sekaligus dalam 1 pesan (misal: "Gaji 5jt BCA, bayar kosan 1.5jt Cash, sama jajan kopi 25rb GoPay"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
+   - JIKA user menyebutkan transaksi TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan" atau "Dapat gaji"), JANGAN panggil fungsi! Tanyalah nominalnya dengan ramah: "Berapa nominalnya?".
+   - Panggil 'record_transactions' LANGSUNG jika nama/kategori & nominal sudah ada!
+
+4. INTENT TRIGGER QUICK CHIPS:
    - JIKA user mengirim kalimat intent umum seperti "Saya ingin mencatat pengeluaran baru" / "I want to record a new expense", JANGAN PANGGIL FUNGSI! Berikan balasan ramah menanyakan detail: "Pengeluaran apa yang ingin Anda catat? Sebutkan nama pengeluaran, nominal (contoh: **Rp 25.000**), dan dompet yang digunakan." Lalu WAJIB sertakan format: <chips>Beli kopi 25rb BCA|Makan siang 35rb Cash|Bensin 50rb Mandiri</chips>.
    - JIKA user mengirim "Saya ingin membuat tugas baru" / "I want to create a new task", JANGAN PANGGIL FUNGSI! Jawab: "Tugas apa yang ingin Anda buat? Sebutkan nama tugas, deskripsi, kategori, atau sub-tugasnya." Lalu WAJIB sertakan format: <chips>Belanja bulanan: susu, beras, minyak|Bayar listrik tagihan|Laporan kantor pekerjaan</chips>.
    - JIKA user mengirim "Saya ingin menganalisis keuangan" / "I want to analyze my finances", PANGGIL 'query_database' (renderChart: true) atau jawab ramah dengan format: <chips>Total pengeluaran bulan ini|Pengeluaran kategori terbesar|Sisa anggaran bulanan</chips>.
@@ -358,31 +457,40 @@ ATURAN UTAMA:
    - JIKA user mengirim "Saya ingin membuat habit harian" / "I want to create a daily habit", JANGAN PANGGIL FUNGSI! Jawab: "Habit harian apa yang ingin Anda bangun? Sebutkan nama kebiasaan dan jadwal pengingatnya." Lalu WAJIB sertakan format: <chips>Lari pagi jam 06:00|Baca buku jam 21:00|Minum air 8 gelas</chips>.
    - JIKA user meminta mengisi data dummy / data sampel / data debugging / test data / seed data (misal: "Isi data dummy komprehensif untuk debugging dan testing fitur", "isi data dummy", "generate test data", "populate debug data"), LANGSUNG PANGGIL 'seed_debug_data' DENGAN SEGERA!
 
-1. TRANSAKSI (PENTING & DETAIL):
-   - JIKA user menyebutkan pengeluaran/pemasukan TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan"), JANGAN panggil fungsi! Tanyalah harganya dengan ramah: "Berapa harga makannya?".
-   - Jika user menyebutkan BANYAK transaksi sekaligus (misal: "beli kopi 25rb dan bensin 50rb"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
-   - Jika kategori tidak ditemukan, gunakan "Lainnya" atau kategori induk terdekat.
-   - Panggil 'record_transactions' HANYA jika data sudah lengkap (nama & harga).
-   - JIKA user menyebutkan dompet/akun (contoh: "pakai BCA", "dari cash", "ke Gopay"), isi 'walletId' (dan 'targetWalletId' jika transfer) menggunakan ID dari Daftar Dompet di bawah.
-   - ATURAN PEMILIHAN DOMPET JIKA JUMLAH DOMPET > 1:
-     a. Jika mencatat PENGELUARAN dan TIDAK menyebutkan dompet: Cek saldo tiap dompet. Jika HANYA 1 dompet yang saldonya cukup (>= harga), LANGSUNG gunakan dompet tersebut. Jika >1 dompet cukup (atau semua kurang), JANGAN panggil fungsi! Tanyalah: "Dompet mana yang mau dipakai? [Sebutkan opsi yang cukup]".
-     b. Jika mencatat PEMASUKAN dan TIDAK menyebutkan dompet: JANGAN panggil fungsi! Tanyalah: "Masuk ke dompet mana?".
-     c. Pengecualian: Jika total dompet hanya 1, langsung gunakan dompet tersebut tanpa bertanya.
+5. TO-DO, HABIT, & LANGGANAN BARU:
+   - Jika membuat To-Do: pecah langkah-langkah besar ke array 'subTasks', tentukan priority (high/medium/low), dueDate, dan kategori yang pas.
+   - Jika membuat Habit: tentukan frequencyType, color, dan reminderTime.
+   - Jika membuat Tagihan Berulang: tentukan frequency (monthly/yearly/weekly), amount, dan category.
+   - Jika informasi penting kurang, bertanyalah. Jika sudah lengkap, LANGSUNG panggil fungsi create!
 
-2. TO-DO, HABIT, & LANGGANAN BARU: Jika user ingin membuat hal baru dan **ADALAH INFORMASI PENTING YANG KURANG**, JANGAN LANGSUNG PANGGIL FUNGSI! Bertanyalah dulu:
-   - To-Do kurang jelas: "Kapan tenggat waktunya? Mau diingatkan jam berapa?"
-   - Habit kurang jelas: "Mau warna apa? Seberapa sering?"
-   - Langganan kurang jelas: "Berapa harganya? Bayar bulanan atau tahunan?"
-   TAPI JIKA user SUDAH memberikan informasi tersebut secara lengkap di awal (misal: "Catat langganan Spotify 50rb tiap bulan"), LANGSUNG panggil fungsi create tanpa perlu bertanya lagi!
+5.B. UTANG & PIUTANG (WAJIB TERHUBUNG KE DOMPET/WALLET):
+   - SETIAP UTANG (HUTANG) ATAU PIUTANG WAJIB TERHUBUNG KE DOMPET (WALLET). OPSI TANPA WALLET TELAH DIHAPUS.
+   - PENCATATAN UTANG / PIUTANG BARU:
+     * JIKA user ingin mencatat utang atau piutang baru (misal: "Catat utang ke Budi 500rb", "Pinjam uang ke Rina 200rb", "Pinjamkan uang 1jt ke Andi"):
+       - JIKA user BELUM menyebutkan nama dompet yang digunakan (misal: "BCA", "Cash", "Mandiri"):
+         JANGAN langsung buat tanpa dompet! Tanyakan dengan ramah:
+         "Pinjaman ini ingin dicatat masuk/keluar dari dompet mana?"
+         DAN WAJIB sertakan follow-up chips daftar dompet pengguna! Contoh: <chips>Pakai BCA|Pakai Cash|Pakai Mandiri</chips>.
+       - JIKA user SUDAH menyebutkan dompet (atau memilih chip dompet):
+         LANGSUNG panggil tool 'manage_loans' (action='create') dengan 'walletId' yang sesuai!
+   - PEMBAYARAN CICILAN / PELUNASAN:
+     * Saat user ingin bayar cicilan hutang atau terima pelunasan piutang:
+       - Panggil 'manage_loans' (action='pay' atau action='mark_paid') dan tentukan 'walletId'.
 
-3. HABIT LOG & TODO COMPLETE: Jika user bilang "Aku sudah lari pagi" atau "Tugas bayar listrik sudah beres", langsung panggil fungsi tanpa banyak tanya.
-
-4. EKSPOR LAPORAN: Jika user minta unduh/ekspor laporan atau data ke CSV/Excel/PDF, panggil 'export_report'.
-
-5. DISKUSI, TANYA JAWAB & ADVICE: 
-   - Jika user hanya menyapa ("Halo") atau membahas [KONTEKS SISTEM], JAWAB LANGSUNG DENGAN TEKS ramah & kontekstual jam (pagi/siang/malam).
-   - JIKA user meminta evaluasi keuangannya atau nasihat pengeluaran pribadinya (misal: "aku kurangi apa biar ga boros?", "cek pengeluaranku", "analisa keuanganku"), PANGGIL 'query_database' (set renderChart: false jika user tidak minta grafik) agar kamu bisa memberikan nasihat spesifik berdasarkan data riil pengguna! JANGAN hanya memberi saran umum.
-   - Jika Anda hanya merespons dengan teks biasa (tidak memanggil fungsi/tool), WAJIB tambahkan rekomendasi aksi/pertanyaan di akhir pesan menggunakan format: <chips>Rekomendasi 1|Rekomendasi 2</chips>.
+6. DISKUSI, TANYA JAWAB, FINANCIAL ADVICE & PERBANDINGAN:
+   - PERBANDINGAN BULANAN (misal: "Bandingkan dengan bulan lalu", "apakah bulan ini lebih hemat?"):
+     * JANGAN panggil fungsi dengan renderChart: true kecuali user secara eksplisit meminta gambar grafik.
+     * Gunakan data dari RINGKASAN REAL-TIME PENGGUNA di atas untuk menyajikan analisis perbandingan terstruktur:
+       1) **Ringkasan Pengeluaran**: Sebutkan total pengeluaran bulan ini vs bulan lalu serta selisih nominal dan persentasenya.
+       2) **Kategori Dominan**: Jelaskan kategori mana yang mengalami kenaikan atau penurunan terbesar.
+       3) **Kesimpulan & Saran**: Berikan kesimpulan singkat apakah performa keuangan membaik atau perlu pengetatan anggaran.
+     * WAJIB sertakan follow-up chips: <chips>Kategori pengeluaran terbesar|Tips hemat AI|Tampilkan grafik pengeluaran</chips>.
+   - PERTANYAAN PENGELUARAN TERBESAR (misal: "Apa pengeluaran terbesarku?", "Kategori paling boros"):
+     * Sebutkan rincian kategori pengeluaran terbesar bulan ini berdasarkan data riil beserta nominalnya (**Rp XX.XXX**).
+     * WAJIB sertakan follow-up chips: <chips>Bandingkan dengan bulan lalu|Tips hemat AI|Tampilkan grafik pengeluaran</chips>.
+   - PERTANYAAN ANALISIS / EVALUASI KEUANGAN UMUM:
+     * Berikan evaluasi keuangan yang tajam, empati, dan berbasis angka riil pengguna.
+     * Jika Anda hanya merespons dengan teks biasa (tanpa memanggil tool), WAJIB tambahkan rekomendasi aksi di akhir pesan menggunakan format: <chips>Rekomendasi 1|Rekomendasi 2</chips>.
 
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus jika pengeluaran tampak terburu-buru atau besar.
@@ -533,11 +641,19 @@ ${buildCategoryContext(locale)}`
       const fnCall = response.functionCall
       
       if (fnCall.name === 'record_transactions') {
-        const txs = fnCall.args.transactions?.map(t => ({
-          ...t,
-          category: sanitizeCategoryPath(t.category, t.type),
-          currency: defaultCurrency,
-        })) || []
+        const defaultWalletId = wallets[0]?.id || 1
+        const txs = fnCall.args.transactions?.map(t => {
+          let resolvedWalletId = t.walletId
+          if (!resolvedWalletId || (wallets.length > 0 && !wallets.some(w => String(w.id) === String(resolvedWalletId)))) {
+            resolvedWalletId = defaultWalletId
+          }
+          return {
+            ...t,
+            category: sanitizeCategoryPath(t.category, t.type),
+            currency: defaultCurrency,
+            walletId: resolvedWalletId,
+          }
+        }) || []
         return { type: 'transactions', action: 'create', transactions: txs, text: fnCall.args.replyMessage || "Berhasil dicatat!", chips: fnCall.args.suggestedChips }
       }
       

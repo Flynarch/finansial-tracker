@@ -11,7 +11,7 @@ import { parseTransactionFromText } from '../../lib/gemini'
 import { seedComprehensiveDebugData } from '../../lib/seedDebugData'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import { format } from 'date-fns'
-import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, X } from 'lucide-react'
+import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, Camera, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
 import TransactionSuccess from './TransactionSuccess'
 import ActionSuccessCard from './ActionSuccessCard'
@@ -41,6 +41,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const [selectedImage, setSelectedImage] = useState(null)
   const [isRecording, setIsRecording] = useState(false)
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -107,8 +108,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  const [keyboardOffset, setKeyboardOffset] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(null)
+  const chatSheetRef = useRef(null)
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -120,10 +120,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     }
   }, [isOpen])
 
-  // Keyboard-aware: adjust sheet position smoothly using pure GPU transform
+  // Keyboard-aware: smoothly slide chat sheet up when virtual keyboard opens
   useEffect(() => {
     if (!isOpen) {
-      setKeyboardOffset(0)
+      if (chatSheetRef.current) chatSheetRef.current.style.bottom = '0px'
       return undefined
     }
     const vp = window.visualViewport
@@ -136,8 +136,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       rafId = requestAnimationFrame(() => {
         rafId = null
         const offset = Math.max(0, Math.round(window.innerHeight - vp.height))
-        setKeyboardOffset(offset > 15 ? offset : 0)
-        setViewportHeight(vp.height)
+        if (chatSheetRef.current) {
+          chatSheetRef.current.style.bottom = `${offset > 15 ? offset : 0}px`
+        }
       })
     }
 
@@ -199,7 +200,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     setConsecutiveErrors(0)
 
     const aiMsgId = Date.now() + 1
-    setMessages(prev => [...prev, userMsg, { id: aiMsgId, role: 'ai', type: 'text', content: '' }])
+    setMessages(prev => [...prev, userMsg])
 
     try {
       const result = await parseTransactionFromText(text || "Lihat gambar struk ini", {
@@ -209,7 +210,13 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         imageData: image,
         wallets,
         onStream: (chunk) => {
-           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + chunk } : m))
+           setMessages(prev => {
+              const exists = prev.some(m => m.id === aiMsgId)
+              if (exists) {
+                 return prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + chunk } : m)
+              }
+              return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: chunk }]
+           })
         }
       })
 
@@ -423,8 +430,17 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           }
         }
       }
+
       if (result.type === 'chart') {
-         newMsgs.push({ id: Date.now() + 5, role: 'ai', type: 'chart', data: result.data, chips: result.chips, chartType: result.chartType })
+         newMsgs.push({ 
+           id: Date.now() + 5, 
+           role: 'ai', 
+           type: 'chart', 
+           content: result.text || (result.chartType === 'income' ? 'Berikut adalah grafik rincian pemasukan Anda:' : 'Berikut adalah grafik rincian pengeluaran Anda:'),
+           data: result.data, 
+           chips: result.chips, 
+           chartType: result.chartType 
+         })
       }
 
       if (result.type === 'recurring') {
@@ -553,9 +569,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       if (result.type === 'loan') {
         if (result.action === 'create') {
           let selectedWalletId = result.walletId ? Number(result.walletId) : null
-          if (selectedWalletId && !wallets.find((w) => w.id === selectedWalletId)) {
+          if (!selectedWalletId || !wallets.find((w) => w.id === selectedWalletId)) {
             selectedWalletId = wallets.length > 0 ? wallets[0].id : null
           }
+          const chosenWallet = wallets.find((w) => w.id === selectedWalletId)
           await addLoan({
             type: result.loanType || 'debt',
             personName: result.personName || 'Pihak Terkait',
@@ -573,7 +590,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type: 'loan',
               action: 'create',
               title: result.title || 'Pinjaman Baru',
-              subtitle: `${result.loanType === 'debt' ? 'Hutang' : 'Piutang'} (${result.personName || 'Pihak Terkait'})`,
+              subtitle: `${result.loanType === 'debt' ? 'Hutang' : 'Piutang'} (${result.personName || 'Pihak Terkait'})${chosenWallet ? ` • ${chosenWallet.name}` : ''}`,
             },
           })
         } else if (result.action === 'pay') {
@@ -638,34 +655,26 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       if (newMsgs.length > 0) {
-         const firstSuccessMsg = newMsgs.find(m => m.type === 'success' || m.type === 'action_success')
-         if (firstSuccessMsg) {
-            // Merge response text into the action success message so it renders inside a single AiBubble
-            firstSuccessMsg.content = result.text || firstSuccessMsg.customMsg || ''
-            if (result.chips && result.chips.length > 0) {
-               firstSuccessMsg.chips = result.chips
-            }
-            // Replace temporary streaming aiMsgId with the unified success message
-            setMessages(prev => {
-               const exists = prev.some(m => m.id === aiMsgId)
-               if (exists) {
-                  return prev.map(m => m.id === aiMsgId ? firstSuccessMsg : m)
-               }
-               return [...prev, firstSuccessMsg]
-            })
-         } else {
-            if (result.text) {
-               setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
-            } else {
-               setMessages(prev => prev.filter(m => m.id !== aiMsgId))
-            }
-            if (result.chips && result.chips.length > 0) {
-               newMsgs[newMsgs.length - 1].chips = result.chips
-            }
-            setMessages(prev => [...prev, ...newMsgs])
+         const unifiedMsg = newMsgs[0]
+         unifiedMsg.content = result.text || unifiedMsg.content || unifiedMsg.customMsg || ''
+         if (result.chips && result.chips.length > 0) {
+            unifiedMsg.chips = result.chips
          }
+         setMessages(prev => {
+            const exists = prev.some(m => m.id === aiMsgId)
+            if (exists) {
+               return prev.map(m => m.id === aiMsgId ? unifiedMsg : m)
+            }
+            return [...prev, unifiedMsg]
+         })
       } else if (result.text) {
-         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
+         setMessages(prev => {
+            const exists = prev.some(m => m.id === aiMsgId)
+            if (exists) {
+               return prev.map(m => m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m)
+            }
+            return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: result.text, chips: result.chips }]
+         })
       } else {
          setMessages(prev => prev.filter(m => m.id !== aiMsgId))
       }
@@ -710,35 +719,26 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       />
       
       <div 
+        ref={chatSheetRef}
         id="ai-chat-sheet"
-        style={{
-          transform: !isAnimatingIn
-            ? 'translate3d(0, 100%, 0)'
-            : keyboardOffset > 0
-            ? `translate3d(0, -${keyboardOffset}px, 0)`
-            : 'translate3d(0, 0, 0)',
-          maxHeight: viewportHeight && keyboardOffset > 0
-            ? `${Math.max(300, viewportHeight - 16)}px`
-            : undefined,
-        }}
         className={`ft-chat-sheet ${isAnimatingIn ? 'ft-chat-sheet--open' : ''}`}
       >
-        <div className="ft-chat-drag-handle" />
+        <div className="h-1.5 w-10 bg-[var(--border-strong)]/40 rounded-full mx-auto my-2 shrink-0" />
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/70 bg-[var(--panel-strong)]/80 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-400 text-white shadow-xs">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--panel-strong)] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/25 text-[var(--accent)] shadow-2xs">
               <Sparkles size={16} className="stroke-[2.2]" />
-              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--panel-strong)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
+              <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-[var(--panel-strong)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-[15px] text-[var(--fg)] tracking-tight leading-tight">
+              <span className="font-black text-sm text-[var(--fg)] tracking-tight leading-tight">
                 {translate(locale, 'aiChat.title')}
               </span>
               <span className="text-[10px] font-bold text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
                 <span className={`inline-block h-1.5 w-1.5 rounded-full ${isLoading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-                {isLoading ? (locale === 'en' ? 'Thinking...' : 'Berpikir...') : (locale === 'en' ? 'Proactive Advisor' : 'Financial Advisor')}
+                {isLoading ? (locale === 'en' ? 'Thinking...' : 'Berpikir...') : (locale === 'en' ? 'Financial Advisor' : 'Konsultasi Finansial')}
               </span>
             </div>
           </div>
@@ -747,7 +747,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type="button"
               onClick={handleClear}
               title={translate(locale, 'aiChat.clear')}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
             >
               <Trash2 size={15} />
             </button>
@@ -755,7 +755,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type="button"
               onClick={onClose}
               title="Tutup"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--border)]/50 hover:text-[var(--fg)] transition-colors active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
             >
               <X size={17} />
             </button>
@@ -776,79 +776,55 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                 </div>
               )}
               
-              {msg.role === 'ai' && msg.type === 'text' && (
-                 <>
-                   {msg.content && <AiBubble content={msg.content} isNew={isLatestMessage} isStreaming={isLoading && isLatestMessage} />}
-                   {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
-                 </>
-              )}
-              
-              {msg.role === 'ai' && msg.type === 'welcome' && (
-                <>
-                  <AiBubble content={msg.content} />
-                  <QuickChips onSelect={handleSend} />
-                </>
-              )}
-              
-              {msg.role === 'ai' && msg.type === 'chart' && (
-                  <>
-                   {ChartBubble && <ChartBubble data={msg.data} chartType={msg.chartType} />}
-                   {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
-                 </>
-              )}
-              
-              {msg.role === 'ai' && msg.type === 'success' && (
+              {msg.role === 'ai' && (
                 <>
                   <AiBubble 
-                    content={msg.content || msg.customMsg} 
+                    content={msg.content || (msg.type === 'welcome' ? translate(locale, 'aiChat.welcome') : '')} 
                     timestamp={msg.timestamp}
-                    isNew={isLatestMessage}
+                    isNew={isLatestMessage} 
                     isStreaming={isLoading && isLatestMessage}
                     embeddedWidget={
-                      <TransactionSuccess 
-                        data={msg.data}
-                        embedded={true}
-                        onUndo={() => {
-                          if (Array.isArray(msg.data)) {
-                            msg.data.forEach(tx => deleteTransaction(tx.id))
-                          } else {
-                            deleteTransaction(msg.data.id)
-                          }
-                          setMessages(prev => prev.filter(m => m.id !== msg.id))
-                        }}
-                        contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
-                      />
+                      msg.type === 'chart' && msg.data ? (
+                        <ChartBubble data={msg.data} chartType={msg.chartType} embedded={true} />
+                      ) : msg.type === 'success' ? (
+                        <TransactionSuccess 
+                          data={msg.data}
+                          embedded={true}
+                          onUndo={() => {
+                            if (Array.isArray(msg.data)) {
+                              msg.data.forEach(tx => deleteTransaction(tx.id))
+                            } else {
+                              deleteTransaction(msg.data.id)
+                            }
+                            setMessages(prev => prev.filter(m => m.id !== msg.id))
+                          }}
+                          contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
+                        />
+                      ) : msg.type === 'action_success' && msg.data ? (
+                        <ActionSuccessCard 
+                          type={msg.data.type}
+                          action={msg.data.action}
+                          title={msg.data.title}
+                          subtitle={msg.data.subtitle}
+                          embedded={true}
+                        />
+                      ) : null
                     }
                   />
-                  {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
-                </>
-              )}
-
-              {msg.role === 'ai' && msg.type === 'action_success' && (
-                <>
-                  <AiBubble 
-                    content={msg.content} 
-                    timestamp={msg.timestamp}
-                    isNew={isLatestMessage}
-                    isStreaming={isLoading && isLatestMessage}
-                    embeddedWidget={
-                      <ActionSuccessCard 
-                        type={msg.data.type}
-                        action={msg.data.action}
-                        title={msg.data.title}
-                        subtitle={msg.data.subtitle}
-                        embedded={true}
-                      />
-                    }
-                  />
-                  {isLastAi && msg.chips && msg.chips.length > 0 && <QuickChips chips={msg.chips} onSelect={handleSend} />}
+                  {isLastAi && !isLoading && (
+                    <QuickChips 
+                      chips={msg.type === 'welcome' ? null : msg.chips} 
+                      onSelect={handleSend} 
+                    />
+                  )}
                 </>
               )}
             </div>
           )})}
 
-
-          {isLoading && <TypingIndicator />}
+          {isLoading && !messages.some(m => m.id === (messages[messages.length - 1]?.id) && m.role === 'ai' && m.content) && (
+            <TypingIndicator />
+          )}
           
           {consecutiveErrors >= 2 && (
              <div className="flex justify-center mt-2">
@@ -858,7 +834,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                    onClose()
                    window.dispatchEvent(new CustomEvent('ft-open-add-transaction'))
                  }}
-                 className="ft-btn-secondary text-xs px-4 py-2 flex items-center gap-2"
+                 className="ft-btn-secondary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer"
                >
                  {translate(locale, 'aiChat.manual')}
                </button>
@@ -869,47 +845,72 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         </div>
 
         {/* Input Dock Bar */}
-        <div className="p-3 border-t border-[var(--border)]/70 bg-[var(--bg)]/80 backdrop-blur-md flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+        <div className="p-3 border-t border-[var(--border)] bg-[var(--panel-strong)] flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
           {selectedImage && (
              <div className="relative inline-block self-start">
                <img src={selectedImage} alt="Preview" className="h-16 rounded-xl border border-[var(--border)] shadow-xs" />
-               <button type="button" onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 shadow-xs">
+               <button type="button" onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 shadow-xs cursor-pointer">
                   <X size={12} />
                </button>
              </div>
           )}
 
           {isRecording && (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold animate-fade-in backdrop-blur-md">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold animate-fade-in">
               <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
               <span>{locale === 'en' ? 'Listening...' : 'Mendengarkan ucapan Anda...'}</span>
-              <div className="ml-auto ft-waveform">
-                <div className="ft-waveform-bar bg-rose-500" />
-                <div className="ft-waveform-bar bg-rose-500" />
-                <div className="ft-waveform-bar bg-rose-500" />
-                <div className="ft-waveform-bar bg-rose-500" />
+              <div className="ml-auto flex items-center gap-1 h-3.5">
+                <div className="ft-eq-bar bg-rose-500" />
+                <div className="ft-eq-bar bg-rose-500" />
+                <div className="ft-eq-bar bg-rose-500" />
+                <div className="ft-eq-bar bg-rose-500" />
               </div>
             </div>
           )}
 
           <form
-            className="flex items-center gap-2 bg-[var(--field-bg)]/90 backdrop-blur-md rounded-2xl px-3 py-2 transition-all focus-within:ring-2 ring-indigo-500/40 border border-[var(--field-border)]"
+            className="flex items-center gap-1.5 bg-[var(--field-bg)] rounded-2xl p-1.5 transition border border-[var(--border)] focus-within:border-[var(--accent)]"
             onSubmit={(e) => {
               e.preventDefault()
               handleSend()
             }}
           >
+            {/* Gallery input */}
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageSelect} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors p-1.5 shrink-0" title="Upload gambar">
-               <ImageIcon size={18} />
+            {/* Camera input with capture="environment" for instant camera snap */}
+            <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleImageSelect} />
+
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition p-2 rounded-xl shrink-0 cursor-pointer"
+              title="Ambil foto struk langsung"
+            >
+              <Camera size={17} />
             </button>
-            <button type="button" onClick={toggleRecording} className={`${isRecording ? 'text-rose-500 animate-pulse' : 'text-[var(--muted)] hover:text-[var(--fg)]'} transition-colors p-1.5 shrink-0`} title="Voice input">
-               <Mic size={18} />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition p-2 rounded-xl shrink-0 cursor-pointer"
+              title="Unggah gambar struk"
+            >
+              <ImageIcon size={17} />
             </button>
+
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`${isRecording ? 'text-rose-500 bg-rose-500/10' : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'} transition p-2 rounded-xl shrink-0 cursor-pointer`}
+              title="Rekam suara"
+            >
+              <Mic size={17} />
+            </button>
+
             <textarea
               ref={inputRef}
               rows={1}
-              className="flex-1 bg-transparent border-none text-[13.5px] font-medium text-[var(--fg)] focus:outline-none px-1 py-1 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
+              className="flex-1 bg-transparent border-none text-[13px] font-medium text-[var(--fg)] focus:outline-none px-2 py-1 placeholder-[var(--muted)] resize-none max-h-32 ft-hide-scrollbar"
               placeholder={isRecording ? (locale === 'en' ? 'Listening...' : 'Bicara sekarang...') : (locale === 'en' ? 'Ask or record anything...' : 'Ketik transaksi, tugas, atau pertanyaan...')}
               value={inputValue}
               onChange={(e) => {
@@ -926,15 +927,20 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               }}
               disabled={isLoading}
             />
+
             <button
               type="submit"
-              className={`p-2 rounded-xl shrink-0 transition-all active:scale-90 ${inputValue.trim() || selectedImage ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md shadow-indigo-500/20' : 'bg-transparent text-[var(--muted)]'}`}
+              className={`p-2 rounded-xl shrink-0 transition active:scale-90 cursor-pointer ${
+                inputValue.trim() || selectedImage
+                  ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs'
+                  : 'bg-transparent text-[var(--muted)]/40 pointer-events-none'
+              }`}
               disabled={isLoading || (!inputValue.trim() && !selectedImage)}
             >
               {isLoading ? (
-                <Sparkles size={16} className="animate-spin text-indigo-500" />
+                <Sparkles size={16} className="animate-spin text-[var(--accent)]" />
               ) : (
-                <Send size={15} className={inputValue.trim() || selectedImage ? 'ml-0.5' : ''} />
+                <Send size={15} />
               )}
             </button>
           </form>

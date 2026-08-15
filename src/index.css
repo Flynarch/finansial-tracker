@@ -988,40 +988,19 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   animation: ft-mode-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* High-Performance 120fps GPU-Accelerated Keyboard Transitions */
+/* High-Performance Smooth Mobile Bottom Sheet */
 .ft-quicklog-sheet {
-  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translate3d(0, 100%, 0);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   transform-origin: bottom center;
-  contain: paint layout;
 }
 
-/* GPU Compositor Collapse: Zero CPU Layout recalculations */
-.ft-collapsible-section {
-  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1), max-height 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform, max-height;
-  overflow: hidden;
-  transform: translateZ(0);
-}
-
-.ft-collapsible-section.ft-collapsible-open {
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 220px;
-}
-
-.ft-collapsible-section.ft-collapsible-closed {
-  opacity: 0;
-  transform: translateY(-4px);
-  max-height: 0px;
-  pointer-events: none;
-}
-
-.ft-collapsible-inner {
-  overflow: hidden;
-  min-height: 0;
+.ft-quicklog-sheet.ft-quicklog-sheet--open {
+  transform: translate3d(0, 0, 0);
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes ft-smooth-in {
@@ -1177,7 +1156,7 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 
 .ft-chat-sheet {
   position: fixed;
-  bottom: 0;
+  bottom: 0px;
   left: 0;
   right: 0;
   z-index: 46;
@@ -1192,54 +1171,69 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), max-height 320ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.18);
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.22);
 }
 .ft-chat-sheet.ft-chat-sheet--open {
   transform: translate3d(0, 0, 0);
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ft-chat-drag-handle {
   width: 36px;
   height: 4px;
   border-radius: 99px;
-  background: var(--muted-2);
+  background: var(--border-strong);
   margin: 8px auto 4px;
   flex-shrink: 0;
 }
 
 .ft-chat-user {
-  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
-  color: #ffffff;
-  border-radius: 20px 20px 4px 20px;
-  padding: 11px 16px;
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
   font-size: 13.5px;
   font-weight: 500;
   line-height: 1.5;
   word-break: break-word;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   animation: ft-fade-up var(--motion-duration) var(--motion-ease);
 }
 
 .ft-chat-ai {
-  background: color-mix(in srgb, var(--panel-strong) 85%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--field-bg);
   color: var(--fg);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--accent) 15%);
-  border-radius: 20px 20px 20px 6px;
-  padding: 13px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 18px 4px;
+  padding: 12px 14px;
   font-size: 13.5px;
   line-height: 1.55;
   animation: ft-fade-up var(--motion-duration) var(--motion-ease);
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
+
+/* Equalizer audio bar animation */
+@keyframes ft-eq-bounce {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+
+.ft-eq-bar {
+  width: 2.5px;
+  height: 4px;
+  border-radius: 99px;
+  animation: ft-eq-bounce 0.8s ease-in-out infinite;
+}
+.ft-eq-bar:nth-child(2) { animation-delay: 0.15s; }
+.ft-eq-bar:nth-child(3) { animation-delay: 0.3s; }
+.ft-eq-bar:nth-child(4) { animation-delay: 0.45s; }
 
 /* Shimmer border animation for AI message */
 @keyframes ft-shimmer {
-  0% { border-color: var(--accent); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent); }
-  100% { border-color: color-mix(in srgb, var(--border) 80%, var(--accent) 15%); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
+  0% { border-color: var(--accent); }
+  100% { border-color: var(--border); }
 }
 
 .ft-chat-ai--shimmer {
@@ -1920,17 +1914,84 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   transition: background-color 0.2s ease;
 }
 
-/* ── Subtle Bottom Glow Per Type (User requested) ───────────── */
-.loan-card-glow-debt {
-  box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--earthy-terra) 18%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+/* ── Infinite Scrolling Marquee for Quick Chips ──────────── */
+@keyframes ft-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
-.loan-card-glow-receivable {
-  box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--earthy-green) 18%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+.ft-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 0.5rem;
+  animation: ft-marquee-scroll 34s linear infinite;
+  will-change: transform;
 }
 
-.loan-card-glow-paid {
-  box-shadow: 0 6px 20px -4px color-mix(in srgb, #10b981 15%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+.ft-marquee-container:hover .ft-marquee-track,
+.ft-marquee-container:active .ft-marquee-track {
+  animation-play-state: paused;
 }
+
+.ft-marquee-mask {
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+/* ── Live Audio Visualizer Equalizer ────────────────────── */
+@keyframes ft-eq-bounce {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+.ft-eq-bar {
+  width: 3px;
+  border-radius: 9999px;
+  background-color: #f43f5e;
+  animation: ft-eq-bounce 0.8s ease-in-out infinite;
+}
+
+.ft-eq-bar:nth-child(1) { animation-delay: 0.1s; }
+.ft-eq-bar:nth-child(2) { animation-delay: 0.35s; }
+.ft-eq-bar:nth-child(3) { animation-delay: 0.18s; }
+.ft-eq-bar:nth-child(4) { animation-delay: 0.42s; }
+.ft-eq-bar:nth-child(5) { animation-delay: 0.25s; }
+
+/* ── AI Shimmer Scan Beam ────────────────────────────────── */
+@keyframes ft-shimmer-beam {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.ft-shimmer-scan {
+  position: relative;
+  overflow: hidden;
+}
+
+.ft-shimmer-scan::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 20%, transparent), transparent);
+  animation: ft-shimmer-beam 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+
 
 
