@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
@@ -8,14 +8,16 @@ import { Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
+import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
+import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
-import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../lib/categoryIcon'
@@ -43,6 +45,8 @@ export default function WalletDetailPage() {
 
   const deleteWallet = useWalletStore(state => state.deleteWallet)
   const addTransaction = useTransactionStore(state => state.addTransaction)
+  const updateTransaction = useTransactionStore(state => state.updateTransaction)
+  const deleteTransaction = useTransactionStore(state => state.deleteTransaction)
 
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore(state => state.defaultCurrency)
@@ -53,6 +57,49 @@ export default function WalletDetailPage() {
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
   const [newBalanceRaw, setNewBalanceRaw] = useState('')
+
+  const [editingTransaction, setEditingTransaction] = useState(null)
+  const [editFormData, setEditFormData] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    amount: '',
+    type: 'expense',
+    category: '',
+    notes: '',
+    currency: 'IDR',
+  })
+
+  const {
+    swipedId: swipedTransactionId,
+    setSwipedId: setSwipedTransactionId,
+    isSwipingId,
+    getSwipeHandlers,
+  } = useSwipeAction()
+
+  const openEditTransaction = useCallback((transaction) => {
+    setEditingTransaction(transaction)
+    setEditFormData({
+      date: transaction.date,
+      amount: formatMoneyValueForInput(transaction.amount, transaction.currency || 'IDR'),
+      type: transaction.type,
+      category: transaction.category,
+      notes: transaction.notes || '',
+      currency: transaction.currency || 'IDR',
+    })
+  }, [])
+
+  const handleEditSubmit = async () => {
+    if (!editingTransaction?.id) return
+    try {
+      setPageError('')
+      await updateTransaction(editingTransaction.id, {
+        ...editFormData,
+        amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+      })
+      setEditingTransaction(null)
+    } catch (err) {
+      setPageError(err.message || 'Gagal mengubah transaksi.')
+    }
+  }
 
   const filteredTransactions = useMemo(() => {
     if (!allTransactions) return []
@@ -438,22 +485,22 @@ export default function WalletDetailPage() {
             </div>
 
             {groupedTransactions && groupedTransactions.length > 0 ? (
-              groupedTransactions.map((group) => (
-                <div key={group.dateKey} className="space-y-1.5">
-                  {/* Timeline Date Header - Rectangular Neutral Box */}
-                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md border border-[var(--border)] bg-[var(--field-bg)]">
-                    <span className="text-[10px] font-extrabold tracking-wider text-[var(--fg)] uppercase">
+              groupedTransactions.map((group, idx) => (
+                <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
+                  {/* Sticky Date Header Strip */}
+                  <div className="sticky top-0 z-20 flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg)]">
+                    <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">
                       {group.dateLabel}
                     </span>
                     {group.dailySummaryText ? (
-                      <span className="text-[11px] font-extrabold tabular-nums text-[var(--muted)]">
+                      <span className={`text-[11px] font-black tabular-nums ${group.isPositive ? 'text-[var(--earthy-green)]' : 'text-[var(--muted)]'}`}>
                         {group.dailySummaryText}
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Transaction Cards in this Date Group */}
-                  <div className="space-y-2">
+                  {/* Feed Group Card */}
+                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] divide-y divide-[var(--border)]/40 shadow-xs">
                     {group.items.map((tx) => (
                       <TransactionItemCard
                         key={tx.id}
@@ -468,14 +515,18 @@ export default function WalletDetailPage() {
                         getTransactionCategoryLabels={getTransactionCategoryLabels}
                         convertCurrency={() => 0}
                         rates={FALLBACK_EXCHANGE_RATES}
-                        openEditTransaction={() => {}}
-                        deleteTransaction={() => {}}
+                        openEditTransaction={openEditTransaction}
+                        deleteTransaction={deleteTransaction}
+                        swipedTransactionId={swipedTransactionId}
+                        setSwipedTransactionId={setSwipedTransactionId}
+                        isSwipingId={isSwipingId}
+                        getSwipeHandlers={getSwipeHandlers}
                         contextWalletId={walletId}
                         wallets={allWallets}
                       />
                     ))}
                   </div>
-                </div>
+                </section>
               ))
             ) : (
               <div className="py-10 text-center">
@@ -494,6 +545,16 @@ export default function WalletDetailPage() {
       </div>
 
       {/* Modals */}
+      <TransactionEditSheet
+        isOpen={Boolean(editingTransaction)}
+        onClose={() => setEditingTransaction(null)}
+        formData={editFormData}
+        setFormData={setEditFormData}
+        onSubmit={handleEditSubmit}
+        t={t}
+        locale={locale}
+      />
+
       <QuickAddTransactionModal 
         isOpen={isQuickAddOpen}
         onClose={() => setIsQuickAddOpen(false)}
