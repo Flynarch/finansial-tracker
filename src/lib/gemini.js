@@ -244,17 +244,6 @@ const getTools = () => ([
         }
       },
       {
-        name: "seed_debug_data",
-        description: "GENERATE/POPULATE MOCK DATA UTK DEBUGGING. Panggil ini JIKA user meminta mengisi data dummy/sample/debug/testing data (misal: 'isi data dummy untuk debugging', 'generate test data', 'populate debug data', 'seed demo data'). Ini akan otomatis membuat transaksi, anggaran, tabungan, habit, todo, dan utang-piutang sekaligus secara instan.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            replyMessage: { type: "STRING", description: "Pesan balasan ramah bahwa data dummy debugging telah berhasil dibuat." },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" } }
-          }
-        }
-      },
-      {
         name: "manage_loans",
         description: "Kelola catatan utang atau piutang pengguna (catat utang/piutang baru, bayar cicilan, tandai lunas, hapus, atau query ringkasan utang/piutang).",
         parameters: {
@@ -281,22 +270,6 @@ export async function parseTransactionFromText(userMessage, context) {
   const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null, scanMode = 'all' } = context
 
   const normUserText = String(userMessage || '').toLowerCase()
-  if (
-    normUserText.includes('data dummy') ||
-    normUserText.includes('dummy data') ||
-    normUserText.includes('seed data') ||
-    normUserText.includes('data sample') ||
-    normUserText.includes('data sampel') ||
-    normUserText.includes('debug data') ||
-    normUserText.includes('test data') ||
-    normUserText.includes('isi data dummy')
-  ) {
-    return {
-      type: 'seed_debug_data',
-      text: 'Menyiapkan dan mengisi data dummy komprehensif (transaksi, anggaran, tabungan, habit, todo, dan utang-piutang) untuk debugging...',
-      chips: ['Analisis Keuangan', 'Catat Pengeluaran', 'Target Tabungan']
-    }
-  }
 
   if (
     normUserText.includes('utang piutang') ||
@@ -457,7 +430,6 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
    - JIKA user mengirim "Saya ingin menganalisis keuangan" / "I want to analyze my finances", PANGGIL 'query_database' (renderChart: true) atau jawab ramah dengan format: <chips>Total pengeluaran bulan ini|Pengeluaran kategori terbesar|Sisa anggaran bulanan</chips>.
    - JIKA user mengirim "Saya ingin membuat target tabungan" / "I want to create a savings goal", JANGAN PANGGIL FUNGSI! Jawab: "Target tabungan apa yang ingin Anda wujudkan? Sebutkan nama tujuan dan target nominalnya." Lalu WAJIB sertakan format: <chips>Beli Laptop 10 juta|Dana darurat 5 juta|Liburan 3 juta</chips>.
    - JIKA user mengirim "Saya ingin membuat habit harian" / "I want to create a daily habit", JANGAN PANGGIL FUNGSI! Jawab: "Habit harian apa yang ingin Anda bangun? Sebutkan nama kebiasaan dan jadwal pengingatnya." Lalu WAJIB sertakan format: <chips>Lari pagi jam 06:00|Baca buku jam 21:00|Minum air 8 gelas</chips>.
-   - JIKA user meminta mengisi data dummy / data sampel / data debugging / test data / seed data (misal: "Isi data dummy komprehensif untuk debugging dan testing fitur", "isi data dummy", "generate test data", "populate debug data"), LANGSUNG PANGGIL 'seed_debug_data' DENGAN SEGERA!
 
 5. TO-DO, HABIT, & LANGGANAN BARU:
    - Jika membuat To-Do: pecah langkah-langkah besar ke array 'subTasks', tentukan priority (high/medium/low), dueDate, dan kategori yang pas.
@@ -735,13 +707,7 @@ ${buildCategoryContext(locale)}`
         }
       }
 
-      if (fnCall.name === 'seed_debug_data') {
-        return {
-          type: 'seed_debug_data',
-          text: fnCall.args.replyMessage || "Menyiapkan dan mengisi data dummy komprehensif untuk debugging...",
-          chips: fnCall.args.suggestedChips || ['Analisis Keuangan', 'Catat Pengeluaran']
-        }
-      }
+
 
       if (fnCall.name === 'manage_loans') {
         return {

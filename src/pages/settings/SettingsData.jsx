@@ -3,10 +3,8 @@ import { useRef, useState } from 'react'
 import {
   Download,
   UploadCloud,
-  Zap,
   AlertTriangle,
   CheckCircle2,
-  RefreshCw,
   HardDrive,
 } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
@@ -19,11 +17,9 @@ import { clearAppLocalStorage } from './settingsConstants'
 import { SettingsSection } from './settingsComponents'
 import { resetExpenseCategoryCustomizations } from '../../lib/expenseCategories'
 import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
-import { seedMassiveStressTestData } from '../../lib/seedDebugData'
 
 export default function SettingsData() {
   const { t } = useTranslation()
-  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resetConfirmText, setResetConfirmText] = useState('')
@@ -31,21 +27,6 @@ export default function SettingsData() {
   const fileInputRef = useRef(null)
   const canConfirmReset = resetConfirmText === 'RESET'
   const isBusy = busyAction !== null
-
-  const handleSeedStressTestData = async () => {
-    if (isBusy) return
-    try {
-      setBusyAction('seed')
-      const res = await seedMassiveStressTestData({ defaultCurrency })
-      setStatusMessage(
-        `Berhasil generate ${res.transactions} transaksi, ${res.budgets} anggaran, ${res.goals} tabungan, ${res.loans} hutang/piutang, ${res.habitLogs} log habit!`,
-      )
-    } catch (err) {
-      setStatusMessage(err.message || 'Gagal generate stress test data')
-    } finally {
-      setBusyAction(null)
-    }
-  }
 
   const handleExportJson = async () => {
     if (isBusy) return
@@ -245,46 +226,7 @@ export default function SettingsData() {
         </div>
       </SettingsSection>
 
-      {/* Generator Data Uji Coba */}
-      <SettingsSection
-        label="Data Uji Coba & Performa"
-        footnote="Generate ratusan transaksi realistis untuk menguji performa dashboard dan visualisasi analitik."
-      >
-        <div className="ft-settings-cell space-y-3.5">
-          <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-2xs">
-              <Zap className="h-5.5 w-5.5" />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
-                Stress Test Data Generator
-              </h3>
-              <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                Generate 600+ transaksi acak, 8 dompet, 10 anggaran, dan target tabungan.
-              </p>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
-            disabled={isBusy}
-            onClick={handleSeedStressTestData}
-          >
-            {isBusy && busyAction === 'seed' ? (
-              <>
-                <RefreshCw className="h-4.5 w-4.5 animate-spin text-[var(--accent)]" />
-                <span>Men-generate 600+ Data...</span>
-              </>
-            ) : (
-              <>
-                <Zap className="h-4.5 w-4.5 text-amber-500" />
-                <span>Generate 600+ Data Stress Test</span>
-              </>
-            )}
-          </button>
-        </div>
-      </SettingsSection>
 
       {/* Zona Berbahaya */}
       <SettingsSection

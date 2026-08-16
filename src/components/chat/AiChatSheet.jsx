@@ -8,7 +8,6 @@ import useLoanStore from '../../store/useLoanStore'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
-import { seedComprehensiveDebugData } from '../../lib/seedDebugData'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import { format } from 'date-fns'
 import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, Camera, X } from 'lucide-react'
@@ -280,20 +279,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
 
       const newMsgs = []
 
-      if (result.type === 'seed_debug_data' || result.name === 'seed_debug_data') {
-        const counts = await seedComprehensiveDebugData({ wallets, defaultCurrency })
-        newMsgs.push({
-          id: Date.now() + 3,
-          role: 'ai',
-          type: 'action_success',
-          data: {
-            type: 'seed_debug',
-            action: 'create',
-            title: 'Data Dummy Debugging Berhasil Diisi',
-            subtitle: `${counts.transactions} Transaksi · ${counts.budgets} Anggaran · ${counts.goals} Tabungan · ${counts.habits} Habit · ${counts.todos} Todo · ${counts.loans} Utang-Piutang`,
-          },
-        })
-      }
+
 
       if (result.type === 'transactions') {
         if (result.action === 'create' && result.transactions?.length > 0) {
