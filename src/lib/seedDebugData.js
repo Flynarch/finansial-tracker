@@ -2,12 +2,16 @@ import { format, subMonths, subDays, addDays } from 'date-fns'
 import { db } from './db'
 
 /**
- * High-volume stress test data generator.
- * Seeds 500+ transactions, 8 wallets, 10 budgets, 8 savings goals,
- * 8 loans with payment history, 6 habits with 90-day logs, and 5 investment assets.
+ * High-volume stress test & demo data generator.
+ * Seeds 500+ realistic Indonesian transactions (strictly up to today, never in the future),
+ * 8 wallets, 10 budgets, 8 savings goals, 8 loans with payment history,
+ * 6 habits with 90-day logs, and 5 investment assets.
  */
 export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}) {
   const now = new Date()
+  const todayDate = now.getDate()
+  const todayHour = now.getHours()
+  const todayMinute = now.getMinutes()
   const todayStr = format(now, 'yyyy-MM-dd')
   const currentMonthKey = format(now, 'yyyy-MM')
 
@@ -22,6 +26,15 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
     loans: 0,
     loanPayments: 0,
     investments: 0,
+  }
+
+  // 0. Remove any accidental future transactions from previous mock runs
+  const futureTxs = await db.transactions.where('date').above(todayStr).toArray()
+  if (futureTxs.length > 0) {
+    const futureIds = futureTxs.map((t) => t.id).filter(Boolean)
+    if (futureIds.length > 0) {
+      await db.transactions.bulkDelete(futureIds)
+    }
   }
 
   // 1. Seed 8 Wallets / Accounts
@@ -50,30 +63,29 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
 
   const [bcaId, mandiriId, jagoId, cashId, gopayId, ovoId] = walletIds
 
-  // 2. Generate 12 Months of Rich Transactions (~45-55 tx per month = ~600 tx total)
+  // 2. Generate 12 Months of Rich Indonesian Transactions strictly up to TODAY
   const expenseTemplates = [
     { category: 'makanan/makan_siang', notes: 'Makan Siang Kantor', min: 25000, max: 65000, wallet: cashId },
     { category: 'makanan/kopi', notes: 'Kopi Kenangan / Janji Jiwa', min: 18000, max: 42000, wallet: gopayId },
     { category: 'makanan/makan_malam', notes: 'Makan Malam Kuliner', min: 45000, max: 150000, wallet: ovoId },
-    { category: 'makanan/snack', notes: 'Camilan Minimarket', min: 15000, max: 35000, wallet: cashId },
+    { category: 'makanan/jajan', notes: 'Camilan Minimarket', min: 15000, max: 35000, wallet: cashId },
     { category: 'kebutuhan_harian/belanja_bulanan', notes: 'Belanja Supermarket Bulanan', min: 450000, max: 1200000, wallet: bcaId },
     { category: 'transportasi/bensin', notes: 'Bensin Pertamax Full Tank', min: 100000, max: 250000, wallet: mandiriId },
-    { category: 'transportasi/ojek_online', notes: 'Gojek / Grab ke Stasiun', min: 14000, max: 35000, wallet: gopayId },
+    { category: 'transportasi/ojol', notes: 'Gojek / Grab ke Stasiun', min: 14000, max: 35000, wallet: gopayId },
     { category: 'transportasi/parkir', notes: 'Parkir Mall & Kantor', min: 5000, max: 20000, wallet: cashId },
     { category: 'transportasi/tol', notes: 'Topup e-Toll', min: 100000, max: 200000, wallet: mandiriId },
     { category: 'tagihan/listrik', notes: 'Token Listrik PLN', min: 350000, max: 600000, wallet: bcaId },
     { category: 'tagihan/internet', notes: 'IndiHome Fiber 50Mbps', min: 380000, max: 450000, wallet: bcaId },
     { category: 'tagihan/air', notes: 'Tagihan PDAM', min: 85000, max: 150000, wallet: mandiriId },
-    { category: 'tagihan/pulsa', notes: 'Paket Data Telkomsel 50GB', min: 120000, max: 180000, wallet: gopayId },
-    { category: 'hiburan/netflix', notes: 'Langganan Netflix Premium', min: 186000, max: 186000, wallet: bcaId },
-    { category: 'hiburan/spotify', notes: 'Spotify Family', min: 86900, max: 86900, wallet: jagoId },
-    { category: 'hiburan/bioskop', notes: 'Nonton XXI Cinema', min: 90000, max: 200000, wallet: ovoId },
+    { category: 'tagihan/paket_data', notes: 'Paket Data Telkomsel 50GB', min: 120000, max: 180000, wallet: gopayId },
+    { category: 'tagihan/langganan', notes: 'Langganan Netflix & Spotify Premium', min: 186000, max: 186000, wallet: jagoId },
+    { category: 'kultur/bioskop', notes: 'Nonton XXI Cinema', min: 90000, max: 200000, wallet: ovoId },
     { category: 'kesehatan/obat', notes: 'Apotek K-24 Vitamin & Suplemen', min: 65000, max: 180000, wallet: cashId },
     { category: 'kesehatan/gym', notes: 'Iuran Gym Bulanan', min: 350000, max: 500000, wallet: bcaId },
-    { category: 'belanja/pakaian', notes: 'Beli Kaos & Celana Uniqlo', min: 299000, max: 799000, wallet: bcaId },
-    { category: 'belanja/skincare', notes: 'Skincare & Perawatan Diri', min: 150000, max: 450000, wallet: ovoId },
-    { category: 'donasi/zakat', notes: 'Infaq & Zakat Sedekah', min: 50000, max: 250000, wallet: cashId },
-    { category: 'keluarga/ortu', notes: 'Uang Bulanan Orang Tua', min: 1500000, max: 2500000, wallet: bcaId },
+    { category: 'pakaian/baju', notes: 'Beli Kaos & Celana Uniqlo', min: 299000, max: 799000, wallet: bcaId },
+    { category: 'kecantikan/skincare', notes: 'Skincare & Perawatan Diri', min: 150000, max: 450000, wallet: ovoId },
+    { category: 'kehidupan_sosial/amal_donasi', notes: 'Infaq & Zakat Sedekah', min: 50000, max: 250000, wallet: cashId },
+    { category: 'kehidupan_sosial/kumpul_teman', notes: 'Nongkrong Bareng Teman', min: 75000, max: 220000, wallet: gopayId },
   ]
 
   const transactionsToInsert = []
@@ -82,67 +94,99 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
     const monthDate = subMonths(now, monthOffset)
     const yMonth = format(monthDate, 'yyyy-MM')
     const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate()
+    const maxDay = (monthOffset === 0) ? todayDate : daysInMonth
 
-    // 1. Income entries per month
-    transactionsToInsert.push({
-      type: 'income',
-      category: 'gaji/gaji_pokok',
-      amount: 16500000,
-      currency: defaultCurrency,
-      date: `${yMonth}-01`,
-      time: '09:00',
-      notes: 'Gaji Bulanan PT Maju Bersama',
-      walletId: bcaId,
-    })
+    // 1. Income entries per month (strictly capped to maxDay)
+    if (maxDay >= 1) {
+      const txDate = `${yMonth}-01`
+      const txTime = '09:00'
+      const txCreatedAt = new Date(`${txDate}T${txTime}:00`).getTime()
+      transactionsToInsert.push({
+        type: 'income',
+        category: 'gaji/gaji_pokok',
+        amount: 16500000,
+        currency: defaultCurrency,
+        date: txDate,
+        time: txTime,
+        notes: 'Gaji Bulanan PT Maju Bersama',
+        walletId: bcaId,
+        createdAt: txCreatedAt,
+      })
+    }
 
-    if (monthOffset % 2 === 0) {
+    if (maxDay >= 15 && monthOffset % 2 === 0) {
+      const txDate = `${yMonth}-15`
+      const txTime = '14:30'
+      const txCreatedAt = new Date(`${txDate}T${txTime}:00`).getTime()
       transactionsToInsert.push({
         type: 'income',
         category: 'bisnis/freelance',
         amount: 4250000,
         currency: defaultCurrency,
-        date: `${yMonth}-15`,
-        time: '14:30',
+        date: txDate,
+        time: txTime,
         notes: 'Honor Desain UI/UX & Konsultasi Web',
         walletId: mandiriId,
+        createdAt: txCreatedAt,
       })
     }
 
-    if (monthOffset % 3 === 0) {
+    if (maxDay >= 20 && monthOffset % 3 === 0) {
+      const txDate = `${yMonth}-20`
+      const txTime = '11:00'
+      const txCreatedAt = new Date(`${txDate}T${txTime}:00`).getTime()
       transactionsToInsert.push({
         type: 'income',
         category: 'investasi/dividen',
         amount: 1850000,
         currency: defaultCurrency,
-        date: `${yMonth}-20`,
-        time: '11:00',
+        date: txDate,
+        time: txTime,
         notes: 'Dividen Saham BBCA & Reksadana',
         walletId: bcaId,
+        createdAt: txCreatedAt,
       })
     }
 
-    // 2. Generate 40-50 realistic expense transactions scattered throughout each month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const expensesCount = (day % 3 === 0) ? 2 : (day % 5 === 0) ? 3 : 1
+    // 2. Generate realistic expense transactions scattered throughout past days up to maxDay
+    for (let day = 1; day <= maxDay; day++) {
+      const isToday = (monthOffset === 0 && day === todayDate)
+      const expensesCount = isToday ? 1 : (day % 3 === 0) ? 2 : (day % 5 === 0) ? 3 : 1
+
       for (let i = 0; i < expensesCount; i++) {
         const templateIdx = (day * 7 + i * 11 + monthOffset * 3) % expenseTemplates.length
         const tmpl = expenseTemplates[templateIdx]
         const range = tmpl.max - tmpl.min
         const amt = Math.round((tmpl.min + (Math.sin(day * 13 + i * 17) * 0.5 + 0.5) * range) / 1000) * 1000
 
-        const hour = String(8 + ((day * 3 + i * 4) % 14)).padStart(2, '0')
-        const minute = String((day * 17 + i * 23) % 60).padStart(2, '0')
+        let hourNum = 8 + ((day * 3 + i * 4) % 14)
+        let minuteNum = (day * 17 + i * 23) % 60
+
+        // If today, ensure hour/minute does not exceed current local time
+        if (isToday) {
+          hourNum = Math.max(7, Math.min(todayHour, hourNum))
+          if (hourNum === todayHour) {
+            minuteNum = Math.max(0, Math.min(todayMinute - 5, minuteNum))
+          }
+        }
+
+        const hour = String(hourNum).padStart(2, '0')
+        const minute = String(minuteNum).padStart(2, '0')
         const dayStr = String(day).padStart(2, '0')
+        const txDate = `${yMonth}-${dayStr}`
+        const txTime = `${hour}:${minute}`
+        const txCreatedAt = new Date(`${txDate}T${txTime}:00`).getTime()
 
         transactionsToInsert.push({
           type: 'expense',
           category: tmpl.category,
           amount: Math.max(tmpl.min, amt),
           currency: defaultCurrency,
-          date: `${yMonth}-${dayStr}`,
-          time: `${hour}:${minute}`,
+          date: txDate,
+          time: txTime,
           notes: tmpl.notes,
           walletId: tmpl.wallet || bcaId,
+          createdAt: txCreatedAt,
         })
       }
     }
@@ -150,7 +194,7 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
 
   // Batch insert transactions
   for (const tx of transactionsToInsert) {
-    await db.transactions.add({ ...tx, createdAt: Date.now() })
+    await db.transactions.add(tx)
     createdCount.transactions++
   }
 
@@ -160,16 +204,16 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
     { category: 'transportasi', categoryPath: 'transportasi', limit: 1800000, month: currentMonthKey },
     { category: 'kebutuhan_harian', categoryPath: 'kebutuhan_harian', limit: 2500000, month: currentMonthKey },
     { category: 'tagihan', categoryPath: 'tagihan', limit: 2000000, month: currentMonthKey },
-    { category: 'hiburan', categoryPath: 'hiburan', limit: 1000000, month: currentMonthKey },
-    { category: 'belanja', categoryPath: 'belanja', limit: 2000000, month: currentMonthKey },
+    { category: 'kultur', categoryPath: 'kultur', limit: 1000000, month: currentMonthKey },
+    { category: 'pakaian', categoryPath: 'pakaian', limit: 1500000, month: currentMonthKey },
     { category: 'kesehatan', categoryPath: 'kesehatan', limit: 1200000, month: currentMonthKey },
     { category: 'pendidikan', categoryPath: 'pendidikan', limit: 800000, month: currentMonthKey },
-    { category: 'donasi', categoryPath: 'donasi', limit: 600000, month: currentMonthKey },
-    { category: 'keluarga', categoryPath: 'keluarga', limit: 3000000, month: currentMonthKey },
+    { category: 'kehidupan_sosial', categoryPath: 'kehidupan_sosial', limit: 1000000, month: currentMonthKey },
+    { category: 'kecantikan', categoryPath: 'kecantikan', limit: 800000, month: currentMonthKey },
   ]
 
   for (const b of budgetDefs) {
-    const existing = await db.budgets.where('category').equals(b.category).first()
+    const existing = await db.budgets.where({ category: b.category, month: b.month }).first()
     if (!existing) {
       await db.budgets.add({ ...b, createdAt: Date.now() })
       createdCount.budgets++
@@ -485,4 +529,3 @@ export async function seedMassiveStressTestData({ defaultCurrency = 'IDR' } = {}
 }
 
 export const seedComprehensiveDebugData = seedMassiveStressTestData
-
