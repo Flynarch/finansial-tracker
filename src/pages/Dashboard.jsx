@@ -68,7 +68,6 @@ export default function Dashboard() {
     setShowDetailedAnalytics,
     zoomTooltipDismissed,
     setZoomTooltipDismissed,
-    isCoarsePointer,
     computeRevenueValue,
   } = dashboardData
 
@@ -181,8 +180,6 @@ export default function Dashboard() {
           miniRevenueChartDomain={miniRevenueChartDomain}
           miniRevenueAxisTicks={miniRevenueAxisTicks}
           netWorthGrowth={netWorthGrowth}
-          reduceMotion={reduceMotion}
-          isCoarsePointer={isCoarsePointer}
           computeRevenueValue={computeRevenueValue}
           onOpenZoom={() => openZoom('revenue')}
           formatAxisCurrency={formatAxisCurrency}

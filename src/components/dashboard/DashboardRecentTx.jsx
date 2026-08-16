@@ -30,7 +30,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
   )
 
   return (
-    <section className="ft-stagger-in" style={{ '--stagger': 5 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 1 }}>
       <button
         type="button"
         onClick={() => navigate('/transactions')}

@@ -63,7 +63,7 @@ export default function WalletCarousel({
   // Loading state handling
   if (wallets === undefined || wallets === null) {
     return (
-      <section className="mb-4">
+      <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
         <div className="ft-hero-card flex flex-col justify-between p-5 h-[200px] animate-pulse border border-[var(--border)] bg-[var(--panel-strong)] rounded-3xl">
           <div className="flex items-center justify-between">
             <div className="h-3.5 w-28 rounded-md bg-[var(--border)]/70" />
@@ -85,7 +85,7 @@ export default function WalletCarousel({
   // Empty state handling
   if (wallets.length === 0) {
     return (
-      <section className="mb-4">
+      <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
         <div className="ft-hero-card flex flex-col items-center justify-center text-center" style={{ minHeight: '200px' }}>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">Total Saldo</p>
           <p className="ft-display mt-2 text-[2.25rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)]">

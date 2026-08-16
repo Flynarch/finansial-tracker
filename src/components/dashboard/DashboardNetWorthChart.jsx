@@ -12,8 +12,6 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   miniRevenueChartDomain,
   miniRevenueAxisTicks,
   netWorthGrowth,
-  reduceMotion,
-  isCoarsePointer,
   computeRevenueValue,
   onOpenZoom,
   formatAxisCurrency,
@@ -79,10 +77,8 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
         data={miniRevenueSeries}
         stroke="var(--accent)"
         fill="var(--accent)"
-        animate={!reduceMotion}
+        animate={false}
         premium
-        animationDuration={isCoarsePointer ? 700 : 900}
-        animationEasing="ease"
         onOpen={onOpenZoom}
         formatValue={(v) => formatCurrency(v, defaultCurrency)}
         xKey="time"
