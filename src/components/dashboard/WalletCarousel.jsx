@@ -4,6 +4,7 @@ import { formatCurrency } from '../../lib/utils'
 import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function WalletCarousel({ 
   monthIncome, 
@@ -12,6 +13,7 @@ export default function WalletCarousel({
   defaultCurrency 
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [activeSlide, setActiveSlide] = useState(() => {
     const saved = sessionStorage.getItem('dashboard_carousel_slide')
     return saved ? parseInt(saved, 10) : 0
@@ -63,7 +65,7 @@ export default function WalletCarousel({
   // Loading state handling
   if (wallets === undefined || wallets === null) {
     return (
-      <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
+      <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
         <div className="ft-hero-card flex flex-col justify-between p-5 h-[200px] animate-pulse border border-[var(--border)] bg-[var(--panel-strong)] rounded-3xl">
           <div className="flex items-center justify-between">
             <div className="h-3.5 w-28 rounded-md bg-[var(--border)]/70" />
@@ -85,7 +87,7 @@ export default function WalletCarousel({
   // Empty state handling
   if (wallets.length === 0) {
     return (
-      <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
+      <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
         <div className="ft-hero-card flex flex-col items-center justify-center text-center" style={{ minHeight: '200px' }}>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">Total Saldo</p>
           <p className="ft-display mt-2 text-[2.25rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)]">
@@ -120,7 +122,7 @@ export default function WalletCarousel({
 
 
   return (
-    <section className="mb-4 relative ft-stagger-in" style={{ '--stagger': 0 }}>
+    <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
@@ -131,9 +133,26 @@ export default function WalletCarousel({
         <div className="w-full shrink-0 snap-center ft-hero-card">
           {/* Header row */}
           <div className="relative z-10 flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-              Sisa Keuangan
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
+                Sisa Keuangan
+              </p>
+              {/* Inline Slide Indicator */}
+              <div className="flex items-center gap-1 ml-0.5">
+                <button 
+                  type="button"
+                  onClick={() => scrollTo(0)} 
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
+                  aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')} 
+                />
+                <button 
+                  type="button"
+                  onClick={() => scrollTo(1)} 
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
+                  aria-label={t('dashboard.totalSaldo', 'Total Saldo')} 
+                />
+              </div>
+            </div>
             <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
               Bulan Ini
             </span>
@@ -183,9 +202,26 @@ export default function WalletCarousel({
           <div>
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-                Total Saldo
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
+                  Total Saldo
+                </p>
+                {/* Inline Slide Indicator */}
+                <div className="flex items-center gap-1 ml-0.5">
+                  <button 
+                    type="button"
+                    onClick={() => scrollTo(0)} 
+                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
+                    aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')} 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => scrollTo(1)} 
+                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
+                    aria-label={t('dashboard.totalSaldo', 'Total Saldo')} 
+                  />
+                </div>
+              </div>
               <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
                 {activeWallets.length} Akun
               </span>
@@ -258,20 +294,6 @@ export default function WalletCarousel({
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Dots Indicator */}
-      <div className="flex justify-center gap-2 mt-3">
-        <button 
-          onClick={() => scrollTo(0)} 
-          className={`h-2 rounded-full transition-all ${activeSlide === 0 ? 'w-5 bg-[var(--accent)]' : 'w-2 bg-[var(--border-strong)]'}`} 
-          aria-label={`Slide 1`} 
-        />
-        <button 
-          onClick={() => scrollTo(1)} 
-          className={`h-2 rounded-full transition-all ${activeSlide === 1 ? 'w-5 bg-[var(--accent)]' : 'w-2 bg-[var(--border-strong)]'}`} 
-          aria-label={`Slide 2`} 
-        />
       </div>
     </section>
   )
