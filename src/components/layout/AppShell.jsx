@@ -29,13 +29,16 @@ function AppShell() {
   const securityEnabled = useSettingsStore((state) => state.securityEnabled)
   const securityMethod = useSettingsStore((state) => state.securityMethod)
   const lockSecret = useSettingsStore((state) => state.lockSecret)
+  const autoLockTimeout = useSettingsStore((state) => state.autoLockTimeout)
   const loadSettings = useSettingsStore((state) => state.loadSettings)
   const unlock = useSettingsStore((state) => state.unlock)
+  const lock = useSettingsStore((state) => state.lock)
   const location = useLocation()
   const navigate = useNavigate()
   const navigationType = useNavigationType()
 
   const historyStack = useRef([])
+  const backgroundTimeRef = useRef(null)
 
   // Hide global navigation & AI trigger bar on dedicated sub-detail pages
   const isDetailPage =
@@ -159,6 +162,45 @@ function AppShell() {
     }
     window.scrollTo(0, 0)
   }, [location.pathname])
+
+  // Background auto-lock when security is enabled
+  useEffect(() => {
+    if (!securityEnabled) return undefined
+
+    const checkAndLock = () => {
+      if (backgroundTimeRef.current) {
+        const elapsedSec = (Date.now() - backgroundTimeRef.current) / 1000
+        if (elapsedSec >= (autoLockTimeout || 0)) {
+          lock()
+        }
+      }
+      backgroundTimeRef.current = null
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        backgroundTimeRef.current = Date.now()
+      } else if (document.visibilityState === 'visible') {
+        checkAndLock()
+      }
+    }
+
+    const handleAppStateChange = (state) => {
+      if (!state.isActive) {
+        backgroundTimeRef.current = Date.now()
+      } else {
+        checkAndLock()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    const appListenerPromise = App.addListener('appStateChange', handleAppStateChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      appListenerPromise.then((l) => l.remove?.())
+    }
+  }, [securityEnabled, autoLockTimeout, lock])
 
   return (
     <div className="ft-app-shell min-h-screen text-[var(--fg)]">

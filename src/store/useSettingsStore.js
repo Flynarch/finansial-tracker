@@ -17,6 +17,7 @@ const useSettingsStore = create((set, get) => ({
   securityEnabled: false,
   securityMethod: 'pin',
   lockSecret: '',
+  autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
   isUnlocked: true,
   isLoaded: false,
@@ -35,6 +36,7 @@ const useSettingsStore = create((set, get) => ({
       securityEnabled: next.securityEnabled,
       securityMethod: next.securityMethod,
       lockSecret: next.lockSecret,
+      autoLockTimeout: next.autoLockTimeout,
       geminiApiKey: next.geminiApiKey,
     })
   },
@@ -73,13 +75,14 @@ const useSettingsStore = create((set, get) => ({
   setReduceMotion: (reduceMotion) => {
     set({ reduceMotion: Boolean(reduceMotion) })
   },
-  setSecurity: async ({ securityEnabled, securityMethod, lockSecret }) => {
+  setSecurity: async ({ securityEnabled, securityMethod, lockSecret, autoLockTimeout }) => {
     set({
       securityEnabled: securityEnabled ?? get().securityEnabled,
       securityMethod: securityMethod ?? get().securityMethod,
       lockSecret: lockSecret ?? get().lockSecret,
+      autoLockTimeout: autoLockTimeout !== undefined ? Number(autoLockTimeout) : get().autoLockTimeout,
     })
-    await get().persist({ securityEnabled, securityMethod, lockSecret })
+    await get().persist({ securityEnabled, securityMethod, lockSecret, autoLockTimeout })
   },
   unlock: () => set({ isUnlocked: true }),
   lock: () => set({ isUnlocked: false }),
@@ -130,6 +133,7 @@ const useSettingsStore = create((set, get) => ({
       securityEnabled,
       securityMethod: record.securityMethod || 'pin',
       lockSecret: record.lockSecret || '',
+      autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
       geminiApiKey: record.geminiApiKey || '',
       isUnlocked: !securityEnabled,
       isLoaded: true,
