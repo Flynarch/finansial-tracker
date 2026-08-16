@@ -45,11 +45,21 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const chatScrollContainerRef = useRef(null)
+  const isStreamingRef = useRef(false)
+  const streamBufferRef = useRef('')
+  const streamRafRef = useRef(null)
 
   const initialInput = useChatStore((s) => s.initialInput)
   const setInitialInput = useChatStore((s) => s.setInitialInput)
 
   const handleSendRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (streamRafRef.current) cancelAnimationFrame(streamRafRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (isOpen && initialInput) {
@@ -108,7 +118,13 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   }, [isOpen])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isStreamingRef.current) {
+      if (chatScrollContainerRef.current) {
+        chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, isLoading])
 
   useEffect(() => {
@@ -220,6 +236,9 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     const aiMsgId = Date.now() + 1
     setMessages(prev => [...prev, userMsg])
 
+    isStreamingRef.current = true
+    streamBufferRef.current = ''
+
     try {
       const result = await parseTransactionFromText(text || "Lihat gambar struk ini", {
         locale,
@@ -228,13 +247,23 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         imageData: image,
         wallets,
         onStream: (chunk) => {
-           setMessages(prev => {
-              const exists = prev.some(m => m.id === aiMsgId)
-              if (exists) {
-                 return prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + chunk } : m)
+          streamBufferRef.current += chunk
+          if (!streamRafRef.current) {
+            streamRafRef.current = requestAnimationFrame(() => {
+              streamRafRef.current = null
+              const currentBuffered = streamBufferRef.current
+              setMessages(prev => {
+                const exists = prev.some(m => m.id === aiMsgId)
+                if (exists) {
+                  return prev.map(m => m.id === aiMsgId ? { ...m, content: currentBuffered } : m)
+                }
+                return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: currentBuffered }]
+              })
+              if (chatScrollContainerRef.current) {
+                chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
               }
-              return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: chunk }]
-           })
+            })
+          }
         }
       })
 
@@ -710,6 +739,11 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
          }]
       })
     } finally {
+      if (streamRafRef.current) {
+        cancelAnimationFrame(streamRafRef.current)
+        streamRafRef.current = null
+      }
+      isStreamingRef.current = false
       setIsLoading(false)
       if (inputRef.current) inputRef.current.focus()
     }
@@ -738,15 +772,14 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       
       <div 
         ref={chatSheetRef}
-        id="ai-chat-sheet"
         className={`ft-chat-sheet ${isAnimatingIn ? 'ft-chat-sheet--open' : ''}`}
       >
-        <div className="h-1.5 w-10 bg-[var(--border-strong)]/40 rounded-full mx-auto my-2 shrink-0" />
-        
+        <div className="ft-chat-drag-handle" />
+
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--panel-strong)] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/25 text-[var(--accent)] shadow-2xs">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--panel-strong)] select-none">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-2xs">
               <Sparkles size={16} className="stroke-[2.2]" />
               <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-[var(--panel-strong)] ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
             </div>
@@ -780,7 +813,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
+        <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
           {messages.filter(m => m.type !== 'hidden').map((msg, index) => {
             const visibleMessages = messages.filter(m => m.type !== 'hidden')
             const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id

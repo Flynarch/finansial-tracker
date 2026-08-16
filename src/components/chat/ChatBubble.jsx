@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -12,7 +12,7 @@ function getCurrentTimeStr(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-export function UserBubble({ content, timestamp }) {
+export const UserBubble = memo(function UserBubble({ content, timestamp }) {
   const timeStr = getCurrentTimeStr(timestamp)
   return (
     <div className="ft-swush-in flex flex-col items-end gap-1 max-w-[85%] self-end my-1">
@@ -24,9 +24,9 @@ export function UserBubble({ content, timestamp }) {
       </span>
     </div>
   )
-}
+})
 
-export function AiAvatarBadge({ isThinking = false }) {
+export const AiAvatarBadge = memo(function AiAvatarBadge({ isThinking = false }) {
   return (
     <div className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-2xs relative ${
       isThinking ? 'ring-2 ring-[var(--accent)]/40 animate-pulse' : ''
@@ -34,9 +34,9 @@ export function AiAvatarBadge({ isThinking = false }) {
       <Sparkles size={14} className="stroke-[2.2]" />
     </div>
   )
-}
+})
 
-export function AiBubble({ content, timestamp, isStreaming = false, isNew = false, embeddedWidget = null }) {
+export const AiBubble = memo(function AiBubble({ content, timestamp, isStreaming = false, isNew = false, embeddedWidget = null }) {
   if (!content && !embeddedWidget) return null
   const timeStr = getCurrentTimeStr(timestamp)
   return (
@@ -67,9 +67,9 @@ export function AiBubble({ content, timestamp, isStreaming = false, isNew = fals
       </div>
     </div>
   )
-}
+})
 
-export function TypingIndicator() {
+export const TypingIndicator = memo(function TypingIndicator() {
   const locale = useSettingsStore(s => s.locale)
   return (
     <div className="flex items-center gap-2.5 max-w-[80%] my-1.5 ft-swush-in">
@@ -87,7 +87,7 @@ export function TypingIndicator() {
       </div>
     </div>
   )
-}
+})
 
 const ELEGANT_PIE_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#818cf8']
 
@@ -117,7 +117,7 @@ function CustomTooltip({ active, payload }) {
   return null
 }
 
-export function ChartBubble({ data = {}, chartType = 'expense', timestamp, embedded = false }) {
+export const ChartBubble = memo(function ChartBubble({ data = {}, chartType = 'expense', timestamp, embedded = false }) {
   const locale = useSettingsStore(s => s.locale)
   const timeStr = getCurrentTimeStr(timestamp)
   
@@ -225,4 +225,4 @@ export function ChartBubble({ data = {}, chartType = 'expense', timestamp, embed
       </div>
     </div>
   )
-}
+})
