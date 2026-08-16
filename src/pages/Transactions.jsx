@@ -93,9 +93,24 @@ function Transactions() {
   const location = useLocation()
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
-  const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [], [])
+  const cachedTransactions = useTransactionStore((state) => state.transactions)
+  const setStoreTransactions = useTransactionStore((state) => state.setTransactions)
+  const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
   const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
-  const transactions = useMemo(() => transactionsRaw || [], [transactionsRaw])
+
+  useEffect(() => {
+    if (transactionsRaw) {
+      setStoreTransactions(transactionsRaw)
+    }
+  }, [transactionsRaw, setStoreTransactions])
+
+  const transactions = useMemo(() => {
+    if (transactionsRaw !== undefined) return transactionsRaw
+    if (cachedTransactions && cachedTransactions.length > 0) return cachedTransactions
+    return []
+  }, [transactionsRaw, cachedTransactions])
+
+  const isInitialLoading = transactionsRaw === undefined && (!cachedTransactions || cachedTransactions.length === 0)
   const {
     filters,
     setFilters,
@@ -656,6 +671,7 @@ function Transactions() {
 
         {/* 3. Transaction List Section Component */}
         <TransactionListSection
+          isLoading={isInitialLoading}
           filteredTransactions={filteredTransactions}
           groupedEntriesDetailed={groupedEntriesDetailed}
           listScrollRef={listScrollRef}

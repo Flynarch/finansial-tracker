@@ -2,7 +2,45 @@ import { memo } from 'react'
 import EmptyState from '../ui/EmptyState'
 import { TransactionItemCard } from './TransactionItemCard'
 
+export function TransactionListSkeleton() {
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-3 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+        {[1, 2].map((groupKey) => (
+          <section key={groupKey} className="space-y-1.5 animate-pulse">
+            {/* Shimmer Date Header Strip */}
+            <div className="flex items-center justify-between px-2.5 py-1.5">
+              <div className="h-3 w-28 rounded-md bg-[var(--border)]/60" />
+              <div className="h-3 w-16 rounded-md bg-[var(--border)]/40" />
+            </div>
+
+            {/* Shimmer Feed Group Card */}
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] divide-y divide-[var(--border)]/40 shadow-xs">
+              {[1, 2, 3].map((itemKey) => (
+                <div key={itemKey} className="flex items-center justify-between p-3 gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Shimmer Icon */}
+                    <div className="h-10 w-10 shrink-0 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
+                    {/* Shimmer Labels */}
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="h-3.5 w-24 rounded-md bg-[var(--border)]/70" />
+                      <div className="h-2.5 w-36 rounded-md bg-[var(--border)]/40" />
+                    </div>
+                  </div>
+                  {/* Shimmer Amount */}
+                  <div className="h-4 w-20 rounded-md bg-[var(--border)]/60 shrink-0" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export const TransactionListSection = memo(function TransactionListSection({
+  isLoading = false,
   filteredTransactions,
   groupedEntriesDetailed,
   listScrollRef,
@@ -34,6 +72,10 @@ export const TransactionListSection = memo(function TransactionListSection({
   allWallets,
   newestTransactionId,
 }) {
+  if (isLoading) {
+    return <TransactionListSkeleton />
+  }
+
   if (filteredTransactions.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6">
