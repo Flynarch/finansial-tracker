@@ -3,12 +3,42 @@ import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2 } from 'luc
 import { formatCurrency } from '../../lib/utils'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
+  isDbLoading = false,
   budgetGoalSummary,
   defaultCurrency = 'IDR',
   locale = 'id',
   onOpenBudgetDetail,
   onOpenSavingsDetail,
 }) {
+  if (isDbLoading) {
+    return (
+      <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 h-[110px] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+              <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-2.5 w-14 rounded bg-[var(--border)]/50" />
+              <div className="h-4 w-20 rounded bg-[var(--border)]/70" />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 h-[110px] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+              <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-2.5 w-14 rounded bg-[var(--border)]/50" />
+              <div className="h-4 w-20 rounded bg-[var(--border)]/70" />
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   // 1. Budget Stats
   const budgetRows = budgetGoalSummary?.budgetRows || []
   const totalBudgetSpent = budgetRows.reduce((sum, r) => sum + (r.spent || 0), 0)

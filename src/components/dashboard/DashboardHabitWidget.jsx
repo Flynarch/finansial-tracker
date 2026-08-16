@@ -3,9 +3,27 @@ import { Flame } from 'lucide-react'
 import MiniHabitHeatmap from '../habits/MiniHabitHeatmap'
 
 export const DashboardHabitWidget = memo(function DashboardHabitWidget({
+  isDbLoading = false,
   globalConsistencyStreak = 0,
   onOpenHabitsZoom,
 }) {
+  if (isDbLoading) {
+    return (
+      <section className="ft-stagger-in" style={{ '--stagger': 6 }}>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm animate-pulse space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="space-y-1">
+              <div className="h-3.5 w-32 rounded bg-[var(--border)]/70" />
+              <div className="h-2.5 w-20 rounded bg-[var(--border)]/40" />
+            </div>
+            <div className="h-6 w-12 rounded bg-[var(--border)]/60" />
+          </div>
+          <div className="h-8 w-full rounded-xl bg-[var(--field-bg)]/60" />
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="ft-stagger-in" style={{ '--stagger': 6 }}>
       <div

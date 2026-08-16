@@ -61,10 +61,23 @@ export default function WalletCarousel({
   }, [wallets, activeSlide])
 
   // Loading state handling
-  if (wallets === undefined) {
+  if (wallets === undefined || wallets === null) {
     return (
       <section className="mb-4">
-        <div className="ft-hero-card h-[200px] animate-pulse" style={{ background: 'var(--field-bg)' }} />
+        <div className="ft-hero-card flex flex-col justify-between p-5 h-[200px] animate-pulse border border-[var(--border)] bg-[var(--panel-strong)] rounded-3xl">
+          <div className="flex items-center justify-between">
+            <div className="h-3.5 w-28 rounded-md bg-[var(--border)]/70" />
+            <div className="h-4 w-4 rounded-full bg-[var(--border)]/50" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-8 w-44 rounded-xl bg-[var(--border)]/80" />
+            <div className="h-3 w-20 rounded-md bg-[var(--border)]/40" />
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <div className="h-9 flex-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
+            <div className="h-9 flex-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
+          </div>
+        </div>
       </section>
     )
   }

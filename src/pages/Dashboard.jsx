@@ -173,6 +173,7 @@ export default function Dashboard() {
 
         {/* 3. Net Worth Mini Chart */}
         <DashboardNetWorthChart
+          isDbLoading={isDbLoading}
           t={t}
           defaultCurrency={defaultCurrency}
           miniRevenueRange={miniRevenueRange}
@@ -190,12 +191,14 @@ export default function Dashboard() {
 
         {/* 4. Habit Consistency Heatmap */}
         <DashboardHabitWidget
+          isDbLoading={isDbLoading}
           globalConsistencyStreak={globalConsistencyStreak}
           onOpenHabitsZoom={() => openZoom('habits')}
         />
 
         {/* 5. Compact Anggaran & Target Tabungan Bento Cards (Opens Detail Sheet on Tap) */}
         <DashboardPulseBento
+          isDbLoading={isDbLoading}
           budgetGoalSummary={budgetGoalSummary}
           defaultCurrency={defaultCurrency}
           locale={locale}
@@ -205,6 +208,7 @@ export default function Dashboard() {
 
         {/* 6. Utang & Piutang Widget */}
         <DashboardLoanWidget
+          isDbLoading={isDbLoading}
           loanSummary={loanSummary}
           defaultCurrency={defaultCurrency}
           locale={locale}

@@ -4,6 +4,7 @@ import { formatCurrency } from '../../lib/utils'
 import { MiniChartCard } from './DashboardStatComponents'
 
 export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
+  isDbLoading = false,
   t,
   defaultCurrency,
   miniRevenueRange,
@@ -18,6 +19,21 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   formatAxisCurrency,
   isMobileScreen,
 }) {
+  if (isDbLoading) {
+    return (
+      <section className="ft-stagger-in" style={{ '--stagger': 2 }}>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm animate-pulse space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="h-3.5 w-28 rounded-md bg-[var(--border)]/70" />
+            <div className="h-5 w-24 rounded-full bg-[var(--border)]/50" />
+          </div>
+          <div className="h-7 w-36 rounded-xl bg-[var(--border)]/80" />
+          <div className="h-20 w-full rounded-xl bg-[var(--field-bg)]/60" />
+        </div>
+      </section>
+    )
+  }
+
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
 

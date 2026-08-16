@@ -5,6 +5,7 @@ import { formatCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
 
 export const DashboardLoanWidget = memo(function DashboardLoanWidget({
+  isDbLoading = false,
   loanSummary,
   defaultCurrency,
   locale,
@@ -12,6 +13,26 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+
+  if (isDbLoading) {
+    return (
+      <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm animate-pulse space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-[var(--border)]/60" />
+              <div className="space-y-1">
+                <div className="h-3.5 w-24 rounded bg-[var(--border)]/70" />
+                <div className="h-2.5 w-32 rounded bg-[var(--border)]/40" />
+              </div>
+            </div>
+            <div className="h-7 w-20 rounded-xl bg-[var(--border)]/60" />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   const {
     totalDebt = 0,
     totalReceivable = 0,
