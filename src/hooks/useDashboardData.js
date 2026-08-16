@@ -37,6 +37,19 @@ export const getSavedNetWorthRange = () => {
   }
 }
 
+// Module-level in-memory cache to eliminate skeleton flash and layout jump on tab switching
+const cachedDashboardState = {
+  transactions: null,
+  investments: null,
+  budgets: null,
+  goals: null,
+  loans: null,
+  allTransactionsForBalance: null,
+  wallets: null,
+  rawHabitLogs: null,
+  rawHabits: null,
+}
+
 export function useDashboardData() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
@@ -52,16 +65,30 @@ export function useDashboardData() {
   const transactions = useLiveQuery(
     () => db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray(),
     [txCutoffDate],
-    null,
+    cachedDashboardState.transactions,
   )
-  const investments = useLiveQuery(() => db.investments.toArray(), [], null)
-  const budgets = useLiveQuery(() => db.budgets.toArray(), [], null)
-  const goals = useLiveQuery(() => db.goals.toArray(), [], null)
-  const loans = useLiveQuery(() => db.loans.toArray(), [], null)
-  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], null)
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], null)
-  const rawHabitLogs = useLiveQuery(() => db.habitLogs.toArray(), [])
-  const rawHabits = useLiveQuery(() => db.habits.toArray(), [])
+  const investments = useLiveQuery(() => db.investments.toArray(), [], cachedDashboardState.investments)
+  const budgets = useLiveQuery(() => db.budgets.toArray(), [], cachedDashboardState.budgets)
+  const goals = useLiveQuery(() => db.goals.toArray(), [], cachedDashboardState.goals)
+  const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans)
+  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], cachedDashboardState.allTransactionsForBalance)
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets)
+  const rawHabitLogs = useLiveQuery(() => db.habitLogs.toArray(), [], cachedDashboardState.rawHabitLogs)
+  const rawHabits = useLiveQuery(() => db.habits.toArray(), [], cachedDashboardState.rawHabits)
+
+  // Keep in-memory cache updated whenever live query results resolve
+  useEffect(() => {
+    if (transactions !== null) cachedDashboardState.transactions = transactions
+    if (investments !== null) cachedDashboardState.investments = investments
+    if (budgets !== null) cachedDashboardState.budgets = budgets
+    if (goals !== null) cachedDashboardState.goals = goals
+    if (loans !== null) cachedDashboardState.loans = loans
+    if (allTransactionsForBalance !== null) cachedDashboardState.allTransactionsForBalance = allTransactionsForBalance
+    if (wallets !== null) cachedDashboardState.wallets = wallets
+    if (rawHabitLogs !== null && rawHabitLogs !== undefined) cachedDashboardState.rawHabitLogs = rawHabitLogs
+    if (rawHabits !== null && rawHabits !== undefined) cachedDashboardState.rawHabits = rawHabits
+  }, [transactions, investments, budgets, goals, loans, allTransactionsForBalance, wallets, rawHabitLogs, rawHabits])
+
   const allHabitLogs = useMemo(() => rawHabitLogs || [], [rawHabitLogs])
   const allHabits = useMemo(() => rawHabits || [], [rawHabits])
 
