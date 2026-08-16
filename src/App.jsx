@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoadingScreen from './components/ui/LoadingScreen'
-import ProductTourOverlay from './components/onboarding/ProductTourOverlay'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -31,7 +30,6 @@ function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
-        <ProductTourOverlay />
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/dashboard" replace />} />

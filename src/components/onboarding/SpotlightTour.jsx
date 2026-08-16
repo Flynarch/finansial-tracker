@@ -1,71 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  Wallet,
+  TrendingUp,
+  PieChart,
+  Sparkles,
+  PlusCircle,
+  X,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+} from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
-
-const TOUR_STEPS = [
-  {
-    id: 'networth-card',
-    target: '[data-tour="networth-card"]',
-    title: 'Total Saldo & Kekayaan',
-    desc: 'Lihat akumulasi saldo seluruh dompet dan riwayat perkembangan kekayaan bersihmu secara real-time di sini.',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="5" width="20" height="14" rx="3" />
-        <line x1="2" y1="10" x2="22" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    id: 'quick-add-btn',
-    target: '[data-tour="quick-add-btn"]',
-    title: 'Catat Transaksi Cepat',
-    desc: 'Gunakan tombol + melayang ini kapan saja untuk mencatat pemasukan atau pengeluaran hanya dalam beberapa detik.',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <line x1="12" y1="8" x2="12" y2="16" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-    ),
-  },
-  {
-    id: 'budget-chart-section',
-    target: '[data-tour="budget-chart-section"]',
-    title: 'Anggaran & Analisis Finansial',
-    desc: 'Pantau pengeluaran bulanan, batas anggaran tiap kategori, serta grafik tren transaksi untuk menjaga kestabilan finansial.',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 20V10" />
-        <path d="M12 20V4" />
-        <path d="M6 20v-6" />
-      </svg>
-    ),
-  },
-  {
-    id: 'bottom-nav',
-    target: '[data-tour="bottom-nav"]',
-    title: 'Menu Navigasi Utama',
-    desc: 'Berpindah antar fitur dengan mudah: Transaksi, Anggaran, Habit Tracker, Catatan Finansial, hingga Pengaturan.',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="2" />
-        <rect x="14" y="3" width="7" height="7" rx="2" />
-        <rect x="14" y="14" width="7" height="7" rx="2" />
-        <rect x="3" y="14" width="7" height="7" rx="2" />
-      </svg>
-    ),
-  },
-]
 
 function getVisibleElement(selector) {
   if (typeof document === 'undefined' || !selector) return null
   const elements = Array.from(document.querySelectorAll(selector))
-  return elements.find(el => {
-    const rect = el.getBoundingClientRect()
-    return rect.width > 0 && rect.height > 0
-  }) || elements[0] || null
+  return (
+    elements.find((el) => {
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    }) ||
+    elements[0] ||
+    null
+  )
 }
 
 export default function SpotlightTour() {
@@ -77,9 +37,70 @@ export default function SpotlightTour() {
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [targetRect, setTargetRect] = useState(null)
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, placement: 'bottom' })
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 340, placement: 'bottom' })
 
-  const currentStep = TOUR_STEPS[currentStepIndex]
+  const tourSteps = useMemo(
+    () => [
+      {
+        id: 'hero-carousel',
+        target: '[data-tour="hero-carousel"]',
+        title: t('tour.step.hero.title', 'Kartu Saldo & Keuangan'),
+        desc: t(
+          'tour.step.hero.desc',
+          'Pantau total saldo seluruh dompet, estimasi sisa uang bulanan, serta ringkasan pemasukan dan pengeluaran secara real-time.',
+        ),
+        Icon: Wallet,
+        color: 'text-indigo-500 bg-indigo-500/12 border-indigo-500/20',
+      },
+      {
+        id: 'networth-chart',
+        target: '[data-tour="networth-chart"]',
+        title: t('tour.step.networth.title', 'Grafik Kekayaan Bersih'),
+        desc: t(
+          'tour.step.networth.desc',
+          'Lacak perkembangan akumulasi aset dan tren pertumbuhan kekayaan finansialmu dengan visualisasi interaktif.',
+        ),
+        Icon: TrendingUp,
+        color: 'text-emerald-500 bg-emerald-500/12 border-emerald-500/20',
+      },
+      {
+        id: 'pulse-bento',
+        target: '[data-tour="pulse-bento"]',
+        title: t('tour.step.bento.title', 'Anggaran & Target Tabungan'),
+        desc: t(
+          'tour.step.bento.desc',
+          'Kendalikan batas pengeluaran kategori bulanan agar tidak overbudget dan wujudkan impian lewat target tabungan.',
+        ),
+        Icon: PieChart,
+        color: 'text-purple-500 bg-purple-500/12 border-purple-500/20',
+      },
+      {
+        id: 'ai-chat-btn',
+        target: '[data-tour="ai-chat-btn"]',
+        title: t('tour.step.ai.title', 'Pencatatan Cepat Pakai AI'),
+        desc: t(
+          'tour.step.ai.desc',
+          'Cukup ketik santai transaksi (misal: "Makan siang 35rb"), dan asisten pintar FinTrack akan otomatis mencatatnya.',
+        ),
+        Icon: Sparkles,
+        color: 'text-amber-500 bg-amber-500/12 border-amber-500/20',
+      },
+      {
+        id: 'bottom-nav',
+        target: '[data-tour="bottom-nav"]',
+        title: t('tour.step.nav.title', 'Navigasi & Tombol Catat'),
+        desc: t(
+          'tour.step.nav.desc',
+          'Gunakan tombol (+) melayang untuk mencatat manual kapan saja, serta jelajahi menu Transaksi, Aktivitas, dan Profil.',
+        ),
+        Icon: PlusCircle,
+        color: 'text-sky-500 bg-sky-500/12 border-sky-500/20',
+      },
+    ],
+    [t],
+  )
+
+  const currentStep = tourSteps[currentStepIndex] || tourSteps[0]
 
   // Update bounding box coordinates for active step
   const updateBoundingBox = useCallback(() => {
@@ -97,25 +118,24 @@ export default function SpotlightTour() {
     let width = rect.width
     let height = rect.height
 
-    // For bottom-nav step on mobile, combine bottom nav card and central FAB button bounds if present
+    // For bottom-nav step on mobile, include the central FAB button bounds if present
     if (currentStep.id === 'bottom-nav') {
-      const navCard = el.querySelector('.max-w-\\[393px\\]') || el
-      const cardRect = navCard.getBoundingClientRect()
       const fabEl = getVisibleElement('[data-tour="quick-add-btn"]')
-      const fabRect = fabEl ? fabEl.getBoundingClientRect() : cardRect
+      if (fabEl) {
+        const fabRect = fabEl.getBoundingClientRect()
+        const combinedTop = Math.min(rect.top, fabRect.top)
+        const combinedBottom = Math.max(rect.bottom, fabRect.bottom)
+        const combinedLeft = Math.min(rect.left, fabRect.left)
+        const combinedRight = Math.max(rect.right, fabRect.right)
 
-      const combinedTop = Math.min(cardRect.top, fabRect.top)
-      const combinedBottom = Math.max(cardRect.bottom, fabRect.bottom)
-      const combinedLeft = Math.min(cardRect.left, fabRect.left)
-      const combinedRight = Math.max(cardRect.right, fabRect.right)
-
-      top = combinedTop
-      left = combinedLeft
-      width = combinedRight - combinedLeft
-      height = combinedBottom - combinedTop
+        top = combinedTop
+        left = combinedLeft
+        width = combinedRight - combinedLeft
+        height = combinedBottom - combinedTop
+      }
     }
 
-    const padding = 8
+    const padding = 6
     const roundedRect = {
       top: Math.max(0, top - padding),
       left: Math.max(0, left - padding),
@@ -131,7 +151,7 @@ export default function SpotlightTour() {
     const vw = window.innerWidth
     const vh = window.innerHeight
     const cardWidth = Math.min(360, vw - 32)
-    const cardHeight = 210
+    const estimatedCardHeight = 220
 
     let popoverLeft = roundedRect.left + roundedRect.width / 2 - cardWidth / 2
     popoverLeft = Math.max(16, Math.min(popoverLeft, vw - cardWidth - 16))
@@ -140,16 +160,16 @@ export default function SpotlightTour() {
     let placement
 
     if (currentStep.id === 'bottom-nav') {
-      popoverTop = Math.max(16, roundedRect.top - cardHeight - 16)
+      popoverTop = Math.max(16, roundedRect.top - estimatedCardHeight - 14)
       placement = 'top'
-    } else if (roundedRect.bottom + cardHeight + 16 < vh) {
+    } else if (roundedRect.bottom + estimatedCardHeight + 20 < vh) {
       popoverTop = roundedRect.bottom + 12
       placement = 'bottom'
-    } else if (roundedRect.top - cardHeight - 16 > 0) {
-      popoverTop = roundedRect.top - cardHeight - 12
+    } else if (roundedRect.top - estimatedCardHeight - 16 > 0) {
+      popoverTop = roundedRect.top - estimatedCardHeight - 12
       placement = 'top'
     } else {
-      popoverTop = Math.max(16, vh / 2 - cardHeight / 2)
+      popoverTop = Math.max(16, vh / 2 - estimatedCardHeight / 2)
       placement = 'center'
     }
 
@@ -160,7 +180,7 @@ export default function SpotlightTour() {
   useEffect(() => {
     if (!isSpotlightTourActive) return
 
-    // Ensure user is on /dashboard
+    // Ensure user is on /dashboard during the feature tour
     if (location.pathname !== '/dashboard') {
       navigate('/dashboard')
     }
@@ -168,7 +188,6 @@ export default function SpotlightTour() {
     const timer = setTimeout(() => {
       const el = getVisibleElement(currentStep?.target)
       if (el) {
-        // Auto-scroll target element smoothly to center of viewport
         el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
       }
       updateBoundingBox()
@@ -184,30 +203,52 @@ export default function SpotlightTour() {
     }
   }, [isSpotlightTourActive, currentStepIndex, location.pathname, navigate, currentStep, updateBoundingBox])
 
-  if (!isSpotlightTourActive) return null
-
-  const handleNext = () => {
-    if (currentStepIndex < TOUR_STEPS.length - 1) {
+  const handleNext = useCallback(() => {
+    if (currentStepIndex < tourSteps.length - 1) {
       setCurrentStepIndex((prev) => prev + 1)
     } else {
       completeSpotlightTour()
       setCurrentStepIndex(0)
     }
-  }
+  }, [currentStepIndex, tourSteps.length, completeSpotlightTour])
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (currentStepIndex > 0) {
       setCurrentStepIndex((prev) => prev - 1)
     }
-  }
+  }, [currentStepIndex])
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     completeSpotlightTour()
     setCurrentStepIndex(0)
-  }
+  }, [completeSpotlightTour])
+
+  // Keyboard navigation support
+  useEffect(() => {
+    if (!isSpotlightTourActive) return undefined
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault()
+        handleNext()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handlePrev()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        handleSkip()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isSpotlightTourActive, handleNext, handlePrev, handleSkip])
+
+  if (!isSpotlightTourActive) return null
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
   const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+  const StepIcon = currentStep?.Icon || Sparkles
 
   return createPortal(
     <div className="fixed inset-0 z-[110] overflow-hidden select-none">
@@ -222,8 +263,8 @@ export default function SpotlightTour() {
                 y={targetRect.top}
                 width={targetRect.width}
                 height={targetRect.height}
-                rx="16"
-                ry="16"
+                rx="18"
+                ry="18"
                 fill="black"
               />
             )}
@@ -234,16 +275,16 @@ export default function SpotlightTour() {
           y="0"
           width="100%"
           height="100%"
-          fill="rgba(15, 23, 42, 0.75)"
+          fill="rgba(15, 23, 42, 0.72)"
           mask="url(#spotlight-mask)"
-          className="transition-all duration-300 ease-out"
+          className="transition-all duration-300 ease-out backdrop-blur-2xs"
         />
       </svg>
 
       {/* Target Highlight Border Ring */}
       {targetRect && (
         <div
-          className="pointer-events-none absolute rounded-2xl border-2 border-[var(--accent)] shadow-[0_0_20px_rgba(var(--accent-rgb),0.3)] transition-all duration-300 ease-out"
+          className="pointer-events-none absolute rounded-2xl border-2 border-[var(--accent)] ring-4 ring-[var(--accent)]/20 shadow-2xl transition-all duration-300 ease-out"
           style={{
             top: targetRect.top,
             left: targetRect.left,
@@ -255,7 +296,7 @@ export default function SpotlightTour() {
 
       {/* Floating Tooltip Card */}
       <div
-        className="absolute z-10 flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-2xl transition-all duration-300 ease-out pointer-events-auto"
+        className="absolute z-10 flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-300 ease-out pointer-events-auto backdrop-blur-md"
         style={{
           top: popoverPos.top,
           left: popoverPos.left,
@@ -263,16 +304,16 @@ export default function SpotlightTour() {
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
-              {currentStep?.icon}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${currentStep.color}`}>
+              <StepIcon className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                Langkah {currentStepIndex + 1} dari {TOUR_STEPS.length}
-              </p>
-              <h3 className="text-base font-bold text-[var(--fg)] leading-tight">
+            <div className="min-w-0">
+              <span className="inline-block rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[var(--accent)] uppercase border border-[var(--accent)]/20">
+                {t('tour.stepBadge', { current: currentStepIndex + 1, total: tourSteps.length })}
+              </span>
+              <h3 className="truncate text-sm sm:text-base font-black text-[var(--fg)] tracking-tight mt-0.5">
                 {currentStep?.title}
               </h3>
             </div>
@@ -281,59 +322,71 @@ export default function SpotlightTour() {
           <button
             type="button"
             onClick={handleSkip}
-            className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition"
-            title={t('common.finishTour', 'Selesaikan Tur')}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition cursor-pointer"
+            title={t('tour.skip', 'Lewati Tur')}
+            aria-label={t('tour.skip', 'Lewati Tur')}
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content Body */}
-        <p className="mt-3 text-xs leading-relaxed text-[var(--muted)] font-medium">
+        <p className="mt-2.5 text-xs leading-relaxed text-[var(--muted)] font-medium">
           {currentStep?.desc}
         </p>
 
         {/* Footer controls */}
-        <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-3.5">
+        <div className="mt-4 flex items-center justify-between border-t border-[var(--border)]/60 pt-3">
           {/* Step dots */}
-          <div className="flex items-center gap-1.5">
-            {TOUR_STEPS.map((_, idx) => (
-              <span
+          <div className="flex items-center gap-1">
+            {tourSteps.map((_, idx) => (
+              <button
                 key={idx}
-                className="rounded-full transition-all duration-300"
+                type="button"
+                onClick={() => setCurrentStepIndex(idx)}
+                aria-label={`Langkah ${idx + 1}`}
+                className="h-1.5 rounded-full transition-all duration-300 cursor-pointer"
                 style={{
-                  width: idx === currentStepIndex ? 16 : 6,
-                  height: 6,
-                  backgroundColor: idx === currentStepIndex ? 'var(--accent)' : 'color-mix(in srgb, var(--muted) 30%, transparent)',
+                  width: idx === currentStepIndex ? 18 : 6,
+                  backgroundColor:
+                    idx === currentStepIndex ? 'var(--accent)' : 'var(--border)',
                 }}
               />
             ))}
           </div>
 
           <div className="flex items-center gap-2">
-            {currentStepIndex > 0 && (
+            {currentStepIndex > 0 ? (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95"
+                className="inline-flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
               >
-                Kembali
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>{t('tour.prev', 'Kembali')}</span>
               </button>
-            )}
+            ) : null}
+
             <button
               type="button"
               onClick={handleNext}
-              className="rounded-xl bg-[var(--accent)] px-4 py-1.5 text-xs font-bold text-[var(--bg)] shadow-md transition active:scale-95 hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3.5 py-1.5 text-xs font-extrabold text-[var(--bg)] shadow-md transition active:scale-95 hover:opacity-90 cursor-pointer"
             >
-              {currentStepIndex < TOUR_STEPS.length - 1 ? 'Berikutnya' : 'Selesai'}
+              <span>
+                {currentStepIndex < tourSteps.length - 1
+                  ? t('tour.next', 'Lanjut')
+                  : t('tour.finish', 'Selesai')}
+              </span>
+              {currentStepIndex < tourSteps.length - 1 ? (
+                <ArrowRight className="h-3.5 w-3.5" />
+              ) : (
+                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+              )}
             </button>
           </div>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

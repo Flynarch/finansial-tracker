@@ -151,7 +151,7 @@ export default function Dashboard() {
         }`}
       >
         {/* 1. Wallet Carousel (Hero) */}
-        <div data-tour="networth-card">
+        <div data-tour="hero-carousel">
           <WalletCarousel
             monthIncome={monthIncome}
             monthExpense={monthExpense}
@@ -171,20 +171,22 @@ export default function Dashboard() {
         />
 
         {/* 3. Net Worth Mini Chart */}
-        <DashboardNetWorthChart
-          isDbLoading={isDbLoading}
-          t={t}
-          defaultCurrency={defaultCurrency}
-          miniRevenueRange={miniRevenueRange}
-          miniRevenueSeries={miniRevenueSeries}
-          miniRevenueChartDomain={miniRevenueChartDomain}
-          miniRevenueAxisTicks={miniRevenueAxisTicks}
-          netWorthGrowth={netWorthGrowth}
-          computeRevenueValue={computeRevenueValue}
-          onOpenZoom={() => openZoom('revenue')}
-          formatAxisCurrency={formatAxisCurrency}
-          isMobileScreen={isMobileScreen}
-        />
+        <div data-tour="networth-chart">
+          <DashboardNetWorthChart
+            isDbLoading={isDbLoading}
+            t={t}
+            defaultCurrency={defaultCurrency}
+            miniRevenueRange={miniRevenueRange}
+            miniRevenueSeries={miniRevenueSeries}
+            miniRevenueChartDomain={miniRevenueChartDomain}
+            miniRevenueAxisTicks={miniRevenueAxisTicks}
+            netWorthGrowth={netWorthGrowth}
+            computeRevenueValue={computeRevenueValue}
+            onOpenZoom={() => openZoom('revenue')}
+            formatAxisCurrency={formatAxisCurrency}
+            isMobileScreen={isMobileScreen}
+          />
+        </div>
 
         {/* 4. Habit Consistency Heatmap */}
         <DashboardHabitWidget
@@ -194,14 +196,16 @@ export default function Dashboard() {
         />
 
         {/* 5. Compact Anggaran & Target Tabungan Bento Cards (Opens Detail Sheet on Tap) */}
-        <DashboardPulseBento
-          isDbLoading={isDbLoading}
-          budgetGoalSummary={budgetGoalSummary}
-          defaultCurrency={defaultCurrency}
-          locale={locale}
-          onOpenBudgetDetail={() => setDetailSheetMode('budget')}
-          onOpenSavingsDetail={() => setDetailSheetMode('savings')}
-        />
+        <div data-tour="pulse-bento">
+          <DashboardPulseBento
+            isDbLoading={isDbLoading}
+            budgetGoalSummary={budgetGoalSummary}
+            defaultCurrency={defaultCurrency}
+            locale={locale}
+            onOpenBudgetDetail={() => setDetailSheetMode('budget')}
+            onOpenSavingsDetail={() => setDetailSheetMode('savings')}
+          />
+        </div>
 
         {/* 6. Utang & Piutang Widget */}
         <DashboardLoanWidget
