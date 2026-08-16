@@ -16,8 +16,11 @@ import {
   Clock,
   HandCoins,
   Sparkles,
+  Search,
   X,
 } from 'lucide-react'
+import GlobalSearchModal from '../search/GlobalSearchModal'
+import { triggerHaptic } from '../../lib/haptics'
 
 /* ─── time-based greeting ─── */
 function getTimeBasedGreeting(locale = 'id') {
@@ -66,7 +69,20 @@ function Navbar() {
   const greetingText = getTimeBasedGreeting(locale)
   const compactDate = getCompactDate(locale)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        triggerHaptic('light')
+        setIsSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const notifications = useLiveQuery(async () => {
     const data = await db.notifications.toArray()
@@ -161,6 +177,20 @@ function Navbar() {
           <span className="hidden sm:inline-flex items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-2 text-[11px] font-bold tracking-wide text-[var(--muted)] mr-1">
             {compactDate}
           </span>
+
+          {/* Search Button (Spotlight) */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light')
+              setIsSearchOpen(true)
+            }}
+            aria-label={t('navbar.searchLabel', 'Cari Transaksi, Dompet & Menu')}
+            title={t('navbar.searchTitle', 'Cari Cepat (Ctrl+K)')}
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-[var(--shadow-soft)] transition-all duration-150 cursor-pointer"
+          >
+            <Search className="h-[18px] w-[18px]" strokeWidth={2.2} />
+          </button>
 
           {/* AI Chat */}
           <button
@@ -302,6 +332,9 @@ function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* Global Spotlight Search Modal */}
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   )
 }

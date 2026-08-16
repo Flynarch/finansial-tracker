@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
+import { triggerHaptic } from '../../lib/haptics'
 import {
   SettingsSection,
   SettingsSegmentControl,
@@ -33,11 +34,13 @@ export default function SettingsSecurity() {
       { value: 0, label: 'Segera' },
       { value: 60, label: '1 Menit' },
       { value: 300, label: '5 Menit' },
+      { value: 900, label: '15 Menit' },
     ],
     [],
   )
 
   const handleToggleSecurity = async (enabled) => {
+    triggerHaptic('medium')
     setIsEnabledState(enabled)
     setStatusMessage('')
     await setSecurity({
@@ -54,6 +57,7 @@ export default function SettingsSecurity() {
   }
 
   const handleSaveTimeout = async (sec) => {
+    triggerHaptic('light')
     setTimeoutSec(sec)
     if (isEnabledState) {
       await setSecurity({
@@ -115,7 +119,7 @@ export default function SettingsSecurity() {
             <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3">
               <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Waktu Kunci</span>
               <span className="block text-xs font-black text-[var(--fg)] mt-0.5">
-                {timeoutSec === 0 ? 'Segera (Background)' : timeoutSec === 60 ? '1 Menit' : '5 Menit'}
+                {timeoutOptions.find((opt) => opt.value === timeoutSec)?.label || (timeoutSec === 0 ? 'Segera' : `${timeoutSec}s`)}
               </span>
             </div>
           </div>

@@ -7,6 +7,7 @@ export async function exportAllDataAsJson() {
     investmentOrders,
     budgets,
     goals,
+    goalLogs,
     calendarEvents,
     recurringTransactions,
     settings,
@@ -16,12 +17,17 @@ export async function exportAllDataAsJson() {
     habitLogs,
     ideas,
     boardLinks,
+    notifications,
+    wallets,
+    loans,
+    loanPayments,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.investments.toArray(),
     db.investmentOrders.toArray(),
     db.budgets.toArray(),
     db.goals.toArray(),
+    db.goalLogs.toArray(),
     db.calendarEvents.toArray(),
     db.recurringTransactions.toArray(),
     db.settings.toArray(),
@@ -31,18 +37,23 @@ export async function exportAllDataAsJson() {
     db.habitLogs.toArray(),
     db.ideas.toArray(),
     db.board_links.toArray(),
+    db.notifications.toArray(),
+    db.wallets.toArray(),
+    db.loans.toArray(),
+    db.loanPayments.toArray(),
   ])
 
   return {
     exportedAt: new Date().toISOString(),
     app: 'FinTrack',
-    version: 2,
+    version: 3,
     data: {
       transactions,
       investments,
       investmentOrders,
       budgets,
       goals,
+      goalLogs,
       calendarEvents,
       recurringTransactions,
       settings,
@@ -52,6 +63,10 @@ export async function exportAllDataAsJson() {
       habitLogs,
       ideas,
       board_links: boardLinks,
+      notifications,
+      wallets,
+      loans,
+      loanPayments,
     },
   }
 }
@@ -68,6 +83,7 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.investmentOrders) && data.investmentOrders.length > 0) await db.investmentOrders.bulkAdd(data.investmentOrders)
     if (Array.isArray(data.budgets) && data.budgets.length > 0) await db.budgets.bulkAdd(data.budgets)
     if (Array.isArray(data.goals) && data.goals.length > 0) await db.goals.bulkAdd(data.goals)
+    if (Array.isArray(data.goalLogs) && data.goalLogs.length > 0) await db.goalLogs.bulkAdd(data.goalLogs)
     if (Array.isArray(data.calendarEvents) && data.calendarEvents.length > 0) await db.calendarEvents.bulkAdd(data.calendarEvents)
     if (Array.isArray(data.recurringTransactions) && data.recurringTransactions.length > 0)
       await db.recurringTransactions.bulkAdd(data.recurringTransactions)
@@ -78,6 +94,10 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.habitLogs) && data.habitLogs.length > 0) await db.habitLogs.bulkAdd(data.habitLogs)
     if (Array.isArray(data.ideas) && data.ideas.length > 0) await db.ideas.bulkAdd(data.ideas)
     if (Array.isArray(data.board_links) && data.board_links.length > 0) await db.board_links.bulkAdd(data.board_links)
+    if (Array.isArray(data.notifications) && data.notifications.length > 0) await db.notifications.bulkAdd(data.notifications)
+    if (Array.isArray(data.wallets) && data.wallets.length > 0) await db.wallets.bulkAdd(data.wallets)
+    if (Array.isArray(data.loans) && data.loans.length > 0) await db.loans.bulkAdd(data.loans)
+    if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkAdd(data.loanPayments)
   })
 }
 
@@ -85,4 +105,3 @@ export async function isLocalDataEmpty() {
   const counts = await Promise.all(db.tables.map((table) => table.count()))
   return counts.reduce((acc, c) => acc + c, 0) === 0
 }
-

@@ -8,6 +8,7 @@ import { formatIncomeCategory } from '../lib/incomeCategories'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useSettingsStore from '../store/useSettingsStore'
+import { exportTransactionsToCsv, printFinancialReport } from '../lib/exportReports'
 
 import ReportHeader from '../components/reports/ReportHeader'
 import ReportKpiCards from '../components/reports/ReportKpiCards'
@@ -232,6 +233,23 @@ export default function Reports() {
           rangeMonths={rangeMonths}
           setRangeMonths={setRangeMonths}
           monthlyIncomeExpense={monthlyIncomeExpense}
+          onExportCsv={() => exportTransactionsToCsv(filteredTransactions, wallets, defaultCurrency, locale)}
+          onPrintReport={() => {
+            const categories = (donutKind === 'expense' ? expenseByCategory : incomeByCategory).map((cat) => ({
+              name: cat.label || cat.key,
+              amount: toSafeNumber(cat.value),
+              percent: donutTotal > 0 ? Math.round((toSafeNumber(cat.value) / donutTotal) * 100) : 0,
+            }))
+            printFinancialReport({
+              title: `Laporan Keuangan (${rangeMonths} Bulan)`,
+              totalIncome: thisMonth.income,
+              totalExpense: thisMonth.expense,
+              netSavings: thisMonth.income - thisMonth.expense,
+              categories,
+              defaultCurrency,
+              locale,
+            })
+          }}
         />
 
         {/* 2-Column KPI Cards */}

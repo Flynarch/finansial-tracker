@@ -1,8 +1,10 @@
-import { Printer, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Printer, Sparkles, FileSpreadsheet, Check } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import { formatCurrency } from '../../lib/utils'
+import { triggerHaptic } from '../../lib/haptics'
 
 const RANGE_OPTIONS = [
   { id: 3, label: '3M' },
@@ -10,11 +12,19 @@ const RANGE_OPTIONS = [
   { id: 12, label: '12M' },
 ]
 
-export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncomeExpense }) {
+export default function ReportHeader({
+  rangeMonths,
+  setRangeMonths,
+  monthlyIncomeExpense,
+  onExportCsv,
+  onPrintReport,
+}) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const [csvExported, setCsvExported] = useState(false)
 
   const handleOpenAiChat = () => {
+    triggerHaptic('light')
     const store = useChatStore.getState()
     const latestData = monthlyIncomeExpense?.at(-1) || { income: 0, expense: 0, month: '' }
     const prevData = monthlyIncomeExpense?.at(-2) || { income: 0, expense: 0, month: '' }
@@ -36,6 +46,26 @@ export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncom
     store.openWithPrompt(promptText)
   }
 
+  const handleCsvClick = () => {
+    triggerHaptic('medium')
+    if (onExportCsv) {
+      const ok = onExportCsv()
+      if (ok) {
+        setCsvExported(true)
+        setTimeout(() => setCsvExported(false), 2000)
+      }
+    }
+  }
+
+  const handlePrintClick = () => {
+    triggerHaptic('light')
+    if (onPrintReport) {
+      onPrintReport()
+    } else {
+      window.print()
+    }
+  }
+
   return (
     <section className="relative overflow-hidden rounded-[1.5rem] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
       <div
@@ -53,26 +83,41 @@ export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncom
             <p className="mt-0.5 text-xs sm:text-sm text-[var(--muted)] line-clamp-2">{t('reports.subtitle')}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            {/* CSV Export Button */}
+            <button
+              type="button"
+              onClick={handleCsvClick}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
+              title={t('reports.csvTitle', 'Ekspor Laporan Transaksi ke CSV/Excel')}
+            >
+              {csvExported ? (
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+              )}
+              <span>{csvExported ? 'Unduh...' : 'CSV'}</span>
+            </button>
+
             {/* AI Analysis Button */}
             <button
               type="button"
               onClick={handleOpenAiChat}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel-strong))] px-2.5 py-1.5 text-xs font-bold text-[var(--accent)] shadow-xs transition hover:bg-[color-mix(in_srgb,var(--accent)_20%,var(--panel-strong))] active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel-strong))] px-2.5 py-1.5 text-xs font-bold text-[var(--accent)] shadow-xs transition hover:bg-[color-mix(in_srgb,var(--accent)_20%,var(--panel-strong))] active:scale-95 cursor-pointer"
               title={t('reports.aiTitle', 'Analisis Laporan dengan AI')}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>{locale === 'en' ? 'AI' : 'AI'}</span>
+              <span>AI</span>
             </button>
 
-            {/* PDF Export -- Hidden on mobile */}
+            {/* PDF / Print Export */}
             <button
               type="button"
-              onClick={() => window.print()}
-              className="no-print hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95"
-              title={t('reports.pdfTitle', 'Ekspor Laporan ke PDF')}
+              onClick={handlePrintClick}
+              className="no-print inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
+              title={t('reports.pdfTitle', 'Cetak Laporan / Simpan PDF')}
             >
               <Printer className="h-3.5 w-3.5 text-[var(--accent)]" />
-              <span>PDF</span>
+              <span>Cetak</span>
             </button>
           </div>
         </div>
@@ -84,9 +129,10 @@ export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncom
               key={opt.id}
               type="button"
               onClick={() => {
+                triggerHaptic('light')
                 setRangeMonths(opt.id)
               }}
-              className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition ${
+              className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition cursor-pointer ${
                 rangeMonths === opt.id
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'

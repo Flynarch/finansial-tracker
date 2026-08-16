@@ -31,6 +31,7 @@ import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import HabitsView from '../components/habits/HabitsView'
 import useSwipeAction from '../hooks/useSwipeAction'
+import { triggerHaptic } from '../lib/haptics'
 
 const TODO_CATEGORIES = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
 
@@ -633,9 +634,7 @@ function TodoList() {
     const id = Number(todo?.id)
     if (!id) return
     const next = !todo.completed
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      try { navigator.vibrate(next ? 20 : 10) } catch { /* ignore */ }
-    }
+    triggerHaptic(next ? 'success' : 'light')
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.todos.update(id, { completed: next })
       // If todo is completed, also mark all its sub-tasks as checked.

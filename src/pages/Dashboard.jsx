@@ -13,6 +13,8 @@ import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
+import FinancialHealthWidget from '../components/dashboard/FinancialHealthWidget'
+import SplitBillModal from '../components/splitbill/SplitBillModal'
 
 export default function Dashboard() {
   const [isEntering, setIsEntering] = useState(false)
@@ -24,6 +26,7 @@ export default function Dashboard() {
   const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+  const [isOpenSplitBill, setIsOpenSplitBill] = useState(false)
 
   // Budget & Savings Detail Sheet state
   const [detailSheetMode, setDetailSheetMode] = useState(null) // 'budget' | 'savings' | null
@@ -172,6 +175,15 @@ export default function Dashboard() {
           t={t}
         />
 
+        {/* 2.5 Skor Kesehatan Finansial */}
+        <FinancialHealthWidget
+          monthlyIncome={monthIncome}
+          monthlyExpense={monthExpense}
+          totalLiquidBalance={walletsWithBalance?.reduce((sum, w) => sum + (w.computedBalance || w.balance || 0), 0) || 0}
+          activeLoans={loanSummary?.activeLoans || []}
+          budgets={budgetGoalSummary?.budgetRows || []}
+        />
+
         {/* 3. Net Worth Mini Chart */}
         <div data-tour="networth-chart">
           <DashboardNetWorthChart
@@ -206,6 +218,7 @@ export default function Dashboard() {
             locale={locale}
             onOpenBudgetDetail={() => setDetailSheetMode('budget')}
             onOpenSavingsDetail={() => setDetailSheetMode('savings')}
+            onOpenSplitBill={() => setIsOpenSplitBill(true)}
           />
         </div>
 
@@ -286,6 +299,10 @@ export default function Dashboard() {
             setPayLoan(null)
           }}
           loan={payLoan}
+        />
+        <SplitBillModal
+          isOpen={isOpenSplitBill}
+          onClose={() => setIsOpenSplitBill(false)}
         />
       </div>
     </div>

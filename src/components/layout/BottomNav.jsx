@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import QuickAddTransactionModal from '../transactions/QuickAddTransactionModal'
 import useTranslation from '../../hooks/useTranslation'
 import { navItems } from './navItems'
+import { triggerHaptic } from '../../lib/haptics'
 
 function linkClassName({ isActive }) {
   return `flex min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1.5 text-[11px] leading-tight transition-all duration-200 ${
@@ -205,6 +206,7 @@ function BottomNav() {
                 animation: 'ft-glow-pulse 3s ease-in-out infinite',
               }}
               onClick={() => {
+                triggerHaptic('medium')
                 setAddTxNonce((v) => v + 1)
                 setIsAddTransactionOpen(true)
               }}
