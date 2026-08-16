@@ -1,12 +1,14 @@
 import { Capacitor } from '@capacitor/core'
-import { BiometricAuth } from '@aparajita/capacitor-biometric-auth'
+import { BiometricAuth, AndroidBiometryStrength } from '@aparajita/capacitor-biometric-auth'
 
 export async function canUseBiometric() {
   if (Capacitor.isNativePlatform()) {
     try {
       const result = await BiometricAuth.checkBiometry()
-      return Boolean(result?.isAvailable)
-    } catch {
+      // Device can authenticate if biometric hardware is enrolled OR phone has a PIN/Pattern/Password screen lock
+      return Boolean(result?.isAvailable || result?.deviceIsSecure)
+    } catch (err) {
+      console.warn('[BiometricAuth] checkBiometry error:', err)
       return false
     }
   }
@@ -27,17 +29,25 @@ export async function canUseBiometric() {
 export async function authenticateBiometric() {
   if (Capacitor.isNativePlatform()) {
     try {
-      const result = await BiometricAuth.authenticate({
-        reason: 'Buka Kunci FinTrack dengan Sidik Jari atau Sandi HP',
+      // In @aparajita/capacitor-biometric-auth:
+      // authenticate() returns Promise<void>. If successful, it resolves (returns undefined).
+      // If failed or cancelled, it rejects/throws BiometryError.
+      await BiometricAuth.authenticate({
+        reason: 'Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka FinTrack',
         cancelTitle: 'Batal',
         allowDeviceCredential: true, // Allows falling back to phone PIN/Pattern/Password
+        androidTitle: 'FinTrack Terkunci',
+        androidSubtitle: 'Gunakan sidik jari atau kunci layar HP Anda',
+        androidBiometryStrength: AndroidBiometryStrength.weak,
       })
-      return Boolean(result?.authenticated)
-    } catch {
+      // If we reach this line without throwing, authentication succeeded!
+      return true
+    } catch (err) {
+      console.warn('[BiometricAuth] authenticate error:', err)
       return false
     }
   }
 
-  // On Web / Browser: simulate instant success for development if platform biometrics not configured
+  // On Web / Browser: simulate instant success for development
   return true
 }

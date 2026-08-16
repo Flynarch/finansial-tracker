@@ -22,12 +22,6 @@ function LockScreen({ onUnlock }) {
   const handleBiometricUnlock = useCallback(async () => {
     setIsAuthenticating(true)
     setError('')
-    const available = await canUseBiometric()
-    if (!available) {
-      setError(t('lock.biometricUnavailable', 'Biometrik / Kunci HP tidak tersedia di perangkat ini.'))
-      setIsAuthenticating(false)
-      return
-    }
     const success = await authenticateBiometric()
     setIsAuthenticating(false)
     if (success) {
