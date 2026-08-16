@@ -118,14 +118,14 @@ function Navbar() {
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          className="group flex min-w-0 items-center gap-3 text-left rounded-2xl py-1.5 pr-2 pl-1 -ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.97] transition-transform duration-150 cursor-pointer"
+          className="group flex min-w-0 items-center gap-3 text-left rounded-2xl py-1 pr-2.5 pl-1 -ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.97] transition-transform duration-150 cursor-pointer"
           title={t('profile.title', 'Lihat Profil')}
           aria-label={t('profile.title', 'Lihat Profil')}
         >
           {/* Avatar */}
           <div className="relative shrink-0">
             <div
-              className="flex h-11 w-11 items-center justify-center rounded-[0.85rem] text-[13px] font-black tracking-wide transition-shadow duration-200 group-hover:shadow-md"
+              className="flex h-12 w-12 items-center justify-center rounded-[0.95rem] text-sm font-black tracking-wide transition-shadow duration-200 group-hover:shadow-md"
               style={{
                 background: 'linear-gradient(145deg, var(--fg), color-mix(in srgb, var(--fg) 75%, var(--accent)))',
                 color: 'var(--bg)',
@@ -134,20 +134,20 @@ function Navbar() {
               {initials}
             </div>
             {/* Online status indicator */}
-            <span className="absolute -bottom-[2px] -right-[2px] h-[10px] w-[10px] rounded-full bg-emerald-500 ring-[2.5px] ring-[var(--bg)]" />
+            <span className="absolute -bottom-[1px] -right-[1px] h-[11px] w-[11px] rounded-full bg-emerald-500 ring-[2.5px] ring-[var(--bg)]" />
           </div>
 
           {/* Identity text */}
-          <div className="min-w-0 flex flex-col gap-0.5">
-            <p className="truncate text-[10px] font-extrabold tracking-[0.14em] text-[var(--muted)] uppercase leading-none select-none">
+          <div className="min-w-0 flex flex-col justify-center">
+            <p className="truncate text-[11.5px] font-extrabold tracking-[0.08em] text-[var(--muted)] uppercase leading-none select-none mb-1">
               {greetingText}
             </p>
-            <div className="flex items-center gap-0.5 min-w-0">
-              <h1 className="truncate text-[15px] font-black tracking-tight text-[var(--fg)] leading-tight">
+            <div className="flex items-center gap-1 min-w-0">
+              <h1 className="truncate text-base sm:text-lg font-black tracking-tight text-[var(--fg)] leading-tight">
                 {profileName || 'FinTrack'}
               </h1>
               <ChevronRight
-                className="h-3.5 w-3.5 shrink-0 text-[var(--muted-2)] group-hover:text-[var(--fg)] group-hover:translate-x-0.5 transition-all duration-200"
+                className="h-4 w-4 shrink-0 text-[var(--muted-2)] group-hover:text-[var(--fg)] group-hover:translate-x-0.5 transition-all duration-200"
                 strokeWidth={2.5}
               />
             </div>
@@ -155,10 +155,10 @@ function Navbar() {
         </button>
 
         {/* ── Right: Action Icons ── */}
-        <div className="flex shrink-0 items-center gap-1.5" ref={dropdownRef}>
+        <div className="flex shrink-0 items-center gap-2" ref={dropdownRef}>
 
           {/* Date chip — desktop only */}
-          <span className="hidden sm:inline-flex items-center rounded-lg bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1.5 text-[10px] font-bold tracking-wide text-[var(--muted)] mr-1">
+          <span className="hidden sm:inline-flex items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-2 text-[11px] font-bold tracking-wide text-[var(--muted)] mr-1">
             {compactDate}
           </span>
 
@@ -168,9 +168,9 @@ function Navbar() {
             onClick={() => useChatStore.getState().setIsOpen(true)}
             aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
             title={t('aiChat.title', 'Konsultasi AI Chat')}
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-[var(--shadow-soft)] transition-all duration-150 cursor-pointer"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-[var(--shadow-soft)] transition-all duration-150 cursor-pointer"
           >
-            <Sparkles className="h-[15px] w-[15px]" strokeWidth={2.2} />
+            <Sparkles className="h-[18px] w-[18px]" strokeWidth={2.2} />
           </button>
 
           {/* Notification Bell */}
@@ -181,15 +181,15 @@ function Navbar() {
               aria-label={t('navbar.notifications', 'Notifikasi')}
               aria-expanded={showNotifications}
               title={t('navbar.notifications', 'Notifikasi')}
-              className={`relative inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-150 active:scale-[0.92] cursor-pointer ${
+              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all duration-150 active:scale-[0.92] cursor-pointer ${
                 showNotifications
                   ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent shadow-md'
                   : 'bg-[var(--panel-strong)] text-[var(--fg)] border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] shadow-[var(--shadow-soft)]'
               }`}
             >
-              <Bell className="h-[15px] w-[15px]" strokeWidth={2.2} />
+              <Bell className="h-[18px] w-[18px]" strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-[3px] text-[8px] font-black text-white ring-2 ring-[var(--bg)] tabular-nums">
+                <span className="absolute -top-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-rose-500 px-[3px] text-[8.5px] font-black text-white ring-2 ring-[var(--bg)] tabular-nums">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -197,7 +197,7 @@ function Navbar() {
 
             {/* ── Notification Dropdown ── */}
             {showNotifications && (
-              <div className="absolute right-0 top-11 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.32s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+              <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.32s_cubic-bezier(0.34,1.56,0.64,1)_both]">
                 {/* Panel Header */}
                 <div className="flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5 mb-2.5 shrink-0">
                   <div className="flex items-center gap-2">
