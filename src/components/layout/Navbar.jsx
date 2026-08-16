@@ -124,8 +124,8 @@ function Navbar() {
           <button
             type="button"
             onClick={() => useChatStore.getState().setIsOpen(true)}
-            aria-label="Konsultasi AI Chat"
-            title="Konsultasi AI Chat"
+            aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
+            title={t('aiChat.title', 'Konsultasi AI Chat')}
             className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 active:scale-95 shadow-xs transition-all duration-200 cursor-pointer"
           >
             <Sparkles className="h-4.5 w-4.5 text-[var(--fg)]" strokeWidth={2.2} />
@@ -158,7 +158,7 @@ function Navbar() {
                 <div className="flex items-center justify-between border-b border-[var(--border)]/60 pb-3 mb-3 shrink-0">
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-black tracking-tight text-[var(--fg)]">
-                      Notifikasi
+                      {t('navbar.notifications', 'Notifikasi')}
                     </h4>
                     {unreadCount > 0 && (
                       <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-black text-rose-500 border border-rose-500/20">
@@ -173,10 +173,10 @@ function Navbar() {
                         type="button"
                         onClick={markAllAsRead}
                         className="text-[11px] font-extrabold flex items-center gap-1 text-[var(--accent)] hover:opacity-80 transition cursor-pointer"
-                        title="Tandai semua dibaca"
+                        title={t('notifications.markAllRead', 'Tandai semua dibaca')}
                       >
                         <CheckCheck size={13} />
-                        <span>Dibaca</span>
+                        <span>{t('notifications.read', 'Dibaca')}</span>
                       </button>
                     )}
                     {notifications && notifications.length > 0 && (
@@ -184,7 +184,7 @@ function Navbar() {
                         type="button"
                         onClick={clearAllNotifications}
                         className="p-1 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                        title="Hapus semua"
+                        title={t('common.deleteAll', 'Hapus semua')}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -242,7 +242,7 @@ function Navbar() {
                             type="button"
                             onClick={(e) => deleteNotification(e, n.id)}
                             className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer"
-                            title="Hapus"
+                            title={t('common.delete', 'Hapus')}
                           >
                             <X size={12} />
                           </button>

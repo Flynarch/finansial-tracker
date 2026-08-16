@@ -252,12 +252,12 @@ export default function WalletCarousel({
         <button 
           onClick={() => scrollTo(0)} 
           className={`h-2 rounded-full transition-all ${activeSlide === 0 ? 'w-5 bg-[var(--accent)]' : 'w-2 bg-[var(--border-strong)]'}`} 
-          aria-label="Slide 1" 
+          aria-label={`Slide 1`} 
         />
         <button 
           onClick={() => scrollTo(1)} 
           className={`h-2 rounded-full transition-all ${activeSlide === 1 ? 'w-5 bg-[var(--accent)]' : 'w-2 bg-[var(--border-strong)]'}`} 
-          aria-label="Slide 2" 
+          aria-label={`Slide 2`} 
         />
       </div>
     </section>

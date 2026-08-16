@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { formatCurrency } from '../../lib/utils'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
@@ -79,6 +80,7 @@ function ProgressHeader({ step }) {
    MAIN ONBOARDING COMPONENT (Minimalist Flat Aesthetic)
    ════════════════════════════════════════════════════════════════════ */
 export default function OnboardingFlow() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const hasCompleted = useSettingsStore((s) => s.hasCompletedOnboarding)
   const isLoaded = useSettingsStore((s) => s.isLoaded)
@@ -287,7 +289,7 @@ export default function OnboardingFlow() {
                     setUsername(e.target.value)
                     setUsernameError('')
                   }}
-                  placeholder="Masukkan nama kamu..."
+                  placeholder={t('onboarding.namePlaceholder', 'Masukkan nama kamu...')}
                   autoFocus
                   maxLength={30}
                   className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-4 text-base font-bold text-[var(--fg)] outline-none transition placeholder:text-[var(--muted-2)] focus:border-[var(--fg)] focus:ring-1 focus:ring-[var(--fg)]"
@@ -441,7 +443,7 @@ export default function OnboardingFlow() {
                                 type="button"
                                 onClick={(e) => handleDeleteWallet(e, w.id)}
                                 className="p-1 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                                title="Hapus Dompet"
+                                title={t('wallets.deleteTitle', 'Hapus Dompet')}
                               >
                                 <Trash2 size={13} />
                               </button>

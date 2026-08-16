@@ -11,7 +11,7 @@ export default function AiTriggerBar({ isVisible, onOpen }) {
       type="button"
       data-tour="ai-chat-btn"
       onClick={onOpen}
-      aria-label="Open AI Chat"
+      aria-label={translate(locale, 'aiChat.title') || 'AI Chat'}
       className={`ft-ai-bar md:hidden relative inline-flex items-center gap-2 rounded-full border border-[var(--border)]/80 bg-[var(--panel-strong)]/90 px-3.5 py-1.5 backdrop-blur-md shadow-md shadow-black/5 active:scale-95 shrink-0 hover:border-[var(--accent)]/40 ${
         isVisible
           ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto'

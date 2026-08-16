@@ -65,14 +65,11 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     }
   }, [isOpen, initialInput, setInitialInput])
 
-  // Initialization & Auto-focus
-  useEffect(() => {
-    let timeoutId
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen)
     if (isOpen) {
       setShouldRender(true)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setIsAnimatingIn(true))
-      })
       if (messages.length === 0) {
         setMessages([{
           id: Date.now(),
@@ -81,8 +78,19 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           content: translate(locale, 'aiChat.welcome')
         }])
       }
+    }
+  }
+
+  // Initialization & Auto-focus
+  useEffect(() => {
+    let timeoutId
+    let focusTimer
+    if (isOpen) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setIsAnimatingIn(true))
+      })
       // Focus input cleanly right after sheet slide-up completes (340ms)
-      setTimeout(() => {
+      focusTimer = setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus({ preventScroll: true })
         }
@@ -93,7 +101,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         setShouldRender(false)
       }, 350)
     }
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+      clearTimeout(focusTimer)
+    }
   }, [isOpen])
 
   useEffect(() => {
@@ -167,8 +178,15 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-       alert("Browser Anda tidak mendukung Voice Input.")
-       return
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content: locale === 'en' ? 'Voice input is not supported on this device.' : 'Perangkat Anda belum mendukung input suara.',
+        },
+      ])
+      return
     }
     const recognition = new SpeechRecognition()
     recognition.lang = locale === 'id' ? 'id-ID' : 'en-US'
@@ -754,7 +772,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             <button
               type="button"
               onClick={onClose}
-              title="Tutup"
+              title={locale === 'en' ? 'Close' : 'Tutup'}
               className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
             >
               <X size={17} />
@@ -884,7 +902,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type="button"
               onClick={() => cameraInputRef.current?.click()}
               className="text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition p-2 rounded-xl shrink-0 cursor-pointer"
-              title="Ambil foto struk langsung"
+              title={locale === 'en' ? 'Take receipt photo directly' : 'Ambil foto struk langsung'}
             >
               <Camera size={17} />
             </button>
@@ -893,7 +911,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition p-2 rounded-xl shrink-0 cursor-pointer"
-              title="Unggah gambar struk"
+              title={locale === 'en' ? 'Upload receipt image' : 'Unggah gambar struk'}
             >
               <ImageIcon size={17} />
             </button>
@@ -902,7 +920,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
               type="button"
               onClick={toggleRecording}
               className={`${isRecording ? 'text-rose-500 bg-rose-500/10' : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'} transition p-2 rounded-xl shrink-0 cursor-pointer`}
-              title="Rekam suara"
+              title={locale === 'en' ? 'Record voice' : 'Rekam suara'}
             >
               <Mic size={17} />
             </button>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 
 const TOUR_STEPS = [
   {
@@ -68,6 +69,7 @@ function getVisibleElement(selector) {
 }
 
 export default function SpotlightTour() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const isSpotlightTourActive = useSettingsStore((s) => s.isSpotlightTourActive)
@@ -280,7 +282,7 @@ export default function SpotlightTour() {
             type="button"
             onClick={handleSkip}
             className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition"
-            title="Selesaikan Tur"
+            title={t('common.finishTour', 'Selesaikan Tur')}
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />

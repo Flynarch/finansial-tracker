@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import useTranslation from '../../hooks/useTranslation'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const COLOR_PALETTE = ['#fbbf24', '#f87171', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#38bdf8', '#facc15', '#4ade80']
 
 function ColorPicker({ currentColor, onColorChange }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   
   return (
@@ -13,7 +15,7 @@ function ColorPicker({ currentColor, onColorChange }) {
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         onPointerDown={(e) => e.stopPropagation()}
         className="flex h-7 w-7 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition"
-        title="Warna"
+        title={t('common.color', 'Warna')}
       >
         <div 
           className="w-4 h-4 rounded-full border-2 border-white/60 shadow-sm" 
@@ -42,6 +44,7 @@ function ColorPicker({ currentColor, onColorChange }) {
 
 // Action bar shared across node types — always visible on mobile
 function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock, compact }) {
+  const { t } = useTranslation()
   return (
     <div className={`flex items-center gap-0.5 ${compact ? 'p-0.5' : 'p-1'} rounded-xl bg-black/15 backdrop-blur-sm`}>
       {onColorChange && (
@@ -53,7 +56,7 @@ function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, on
           onClick={(e) => { e.stopPropagation(); onDuplicate(idea.id) }}
           onPointerDown={(e) => e.stopPropagation()}
           className="flex h-7 w-7 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-white/20"
-          title="Duplikat"
+          title={t('common.duplicate', 'Duplikat')}
         >
           <svg className="h-3.5 w-3.5 text-black/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
         </button>
@@ -64,7 +67,7 @@ function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, on
           onClick={(e) => { e.stopPropagation(); onToggleLock(idea.id, !idea.locked) }}
           onPointerDown={(e) => e.stopPropagation()}
           className={`flex h-7 w-7 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition ${idea.locked ? 'bg-amber-500/30' : 'hover:bg-white/20'}`}
-          title={idea.locked ? 'Buka Kunci' : 'Kunci'}
+          title={idea.locked ? t('common.unlock', 'Buka Kunci') : t('common.lock', 'Kunci')}
         >
           {idea.locked ? (
             <svg className="h-3.5 w-3.5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -78,7 +81,7 @@ function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, on
           type="button"
           onPointerDown={(e) => { e.stopPropagation(); onConnect(idea.id); }}
           className="flex h-7 w-7 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-white/20"
-          title="Hubungkan"
+          title={t('common.connect', 'Hubungkan')}
         >
           <svg className="h-3.5 w-3.5 text-black/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
         </button>
@@ -87,7 +90,7 @@ function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, on
         type="button"
         onClick={() => onDelete(idea.id)}
         className="flex h-7 w-7 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-red-500/20"
-        title="Hapus"
+        title={t('common.delete', 'Hapus')}
       >
         <svg className="h-3.5 w-3.5 text-black/70 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
@@ -97,6 +100,7 @@ function NodeActions({ idea, onDelete, onConnect, onColorChange, onDuplicate, on
 
 // Dark themed action bar for non-colored nodes
 function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-[var(--panel-strong)] shadow-lg border border-[var(--border)]">
       {onDuplicate && (
@@ -105,7 +109,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
           onClick={(e) => { e.stopPropagation(); onDuplicate(idea.id) }}
           onPointerDown={(e) => e.stopPropagation()}
           className="flex h-8 w-8 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-[var(--field-bg)]"
-          title="Duplikat"
+          title={t('common.duplicate', 'Duplikat')}
         >
           <svg className="h-4 w-4 text-[var(--fg)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
         </button>
@@ -116,7 +120,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
           onClick={(e) => { e.stopPropagation(); onToggleLock(idea.id, !idea.locked) }}
           onPointerDown={(e) => e.stopPropagation()}
           className={`flex h-8 w-8 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition ${idea.locked ? 'bg-amber-500/20' : 'hover:bg-[var(--field-bg)]'}`}
-          title={idea.locked ? 'Buka Kunci' : 'Kunci'}
+          title={idea.locked ? t('common.unlock', 'Buka Kunci') : t('common.lock', 'Kunci')}
         >
           {idea.locked ? (
             <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -130,7 +134,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
           type="button"
           onPointerDown={(e) => { e.stopPropagation(); onConnect(idea.id); }}
           className="flex h-8 w-8 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-[var(--field-bg)]"
-          title="Hubungkan"
+          title={t('common.connect', 'Hubungkan')}
         >
           <svg className="h-4 w-4 text-[var(--fg)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
         </button>
@@ -139,7 +143,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
         type="button"
         onClick={() => onDelete(idea.id)}
         className="flex h-8 w-8 items-center justify-center rounded-lg hover:scale-110 active:scale-95 transition hover:bg-red-500/20"
-        title="Hapus"
+        title={t('common.delete', 'Hapus')}
       >
         <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
@@ -148,6 +152,7 @@ function NodeActionsDark({ idea, onDelete, onConnect, onDuplicate, onToggleLock 
 }
 
 export function NoteNode({ idea, isSelected, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock }) {
+  const { t } = useTranslation()
   return (
     <div 
       className={`flex flex-col h-full w-full rounded-xl overflow-hidden shadow-md ${idea.locked ? 'ring-1 ring-amber-500/40' : ''}`}
@@ -161,7 +166,7 @@ export function NoteNode({ idea, isSelected, onContentChange, onDelete, onConnec
         value={idea.content}
         onChange={(e) => onContentChange(idea.id, e.target.value)}
         className="flex-1 w-full resize-none bg-transparent p-4 text-black/80 placeholder-black/40 focus:outline-none text-[15px] leading-relaxed"
-        placeholder="Ketik sesuatu..."
+        placeholder={t('board.typeSomething', 'Ketik sesuatu...')}
         style={{ scrollbarWidth: 'none' }}
       />
     </div>
@@ -169,6 +174,7 @@ export function NoteNode({ idea, isSelected, onContentChange, onDelete, onConnec
 }
 
 export function ShapeNode({ idea, onContentChange, onDelete, onConnect, onColorChange, onDuplicate, onToggleLock, isSelected }) {
+  const { t } = useTranslation()
   const isCircle = idea.shapeType === 'circle'
   return (
     <div 
@@ -181,7 +187,7 @@ export function ShapeNode({ idea, onContentChange, onDelete, onConnect, onColorC
       <textarea
         value={idea.content}
         onChange={(e) => onContentChange(idea.id, e.target.value)}
-        placeholder="Teks..."
+        placeholder={t('board.textPlaceholder', 'Teks...')}
         className="flex-1 w-full h-full resize-none bg-transparent p-4 text-center font-bold text-black/80 placeholder-black/40 focus:outline-none"
         style={{ scrollbarWidth: 'none' }}
       />
@@ -193,6 +199,7 @@ export function ShapeNode({ idea, onContentChange, onDelete, onConnect, onColorC
 }
 
 export function FrameNode({ idea, onContentChange, onDelete }) {
+  const { t } = useTranslation()
   return (
     <div className="h-full w-full border-2 border-dashed border-[var(--muted)]/40 bg-transparent rounded-2xl relative">
       <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
@@ -201,13 +208,13 @@ export function FrameNode({ idea, onContentChange, onDelete }) {
           onChange={(e) => onContentChange(idea.id, e.target.value)}
           className="bg-[var(--panel-strong)]/80 backdrop-blur-sm font-bold text-[var(--fg)] outline-none px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm"
           style={{ minWidth: 80, maxWidth: 200 }}
-          placeholder="Nama Grup"
+          placeholder={t('board.groupNamePlaceholder', 'Nama Grup')}
         />
         <button
           type="button"
           onClick={() => onDelete(idea.id)}
           className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--panel-strong)]/80 backdrop-blur-sm border border-[var(--border)] hover:scale-110 active:scale-95 transition hover:bg-red-500/20"
-          title="Hapus Frame"
+          title={t('board.deleteFrame', 'Hapus Frame')}
         >
           <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
@@ -217,6 +224,7 @@ export function FrameNode({ idea, onContentChange, onDelete }) {
 }
 
 export function TextNode({ idea, onContentChange, onDelete, onDuplicate, onToggleLock, isSelected }) {
+  const { t } = useTranslation()
   return (
     <div className={`h-full w-full relative flex items-center justify-center ${idea.locked ? 'ring-1 ring-amber-500/40 rounded-lg' : ''}`}>
       <textarea
@@ -230,7 +238,7 @@ export function TextNode({ idea, onContentChange, onDelete, onDuplicate, onToggl
           scrollbarWidth: 'none',
           overflow: 'hidden'
         }}
-        placeholder="Ketik teks..."
+        placeholder={t('board.typeTextPlaceholder', 'Ketik teks...')}
       />
       <div className={`absolute -top-10 right-0 transition-opacity duration-150 z-20 ${isSelected ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <NodeActionsDark idea={idea} onDelete={onDelete} onDuplicate={onDuplicate} onToggleLock={onToggleLock} />
@@ -281,6 +289,7 @@ export function ImageNode({ idea, onDelete, onDuplicate, onToggleLock, isSelecte
 
 // Emoji/Sticker Node
 export function EmojiNode({ idea, onDelete, onContentChange, onDuplicate, onToggleLock, isSelected }) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   
   return (
@@ -293,7 +302,7 @@ export function EmojiNode({ idea, onDelete, onContentChange, onDuplicate, onTogg
           autoFocus
           className="w-full text-center bg-transparent outline-none border-none"
           style={{ fontSize: idea.fontSize || 64 }}
-          placeholder="😀"
+          placeholder={t('board.emojiPlaceholder', '😀')}
         />
       ) : (
         <div 
@@ -313,6 +322,7 @@ export function EmojiNode({ idea, onDelete, onContentChange, onDuplicate, onTogg
 
 // Checklist Node
 export function ChecklistNode({ idea, onDelete, onUpdate, onContentChange, onColorChange, onDuplicate, onToggleLock, isSelected }) {
+  const { t } = useTranslation()
   let items = []
   try {
     items = typeof idea.content === 'string' && idea.content.startsWith('[') 
@@ -367,7 +377,7 @@ export function ChecklistNode({ idea, onDelete, onUpdate, onContentChange, onCol
         <input
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Judul Checklist..."
+          placeholder={t('board.checklistTitlePlaceholder', 'Judul Checklist...')}
           className="bg-transparent font-bold text-xs text-black/80 placeholder-black/40 outline-none w-full pl-1"
         />
         <span className="text-xs font-semibold text-black/50 px-1 flex-shrink-0">
@@ -392,7 +402,7 @@ export function ChecklistNode({ idea, onDelete, onUpdate, onContentChange, onCol
             <input
               value={item.text}
               onChange={(e) => updateItemText(idx, e.target.value)}
-              placeholder="Item..."
+              placeholder={t('board.itemPlaceholder', 'Item...')}
               className={`flex-1 bg-transparent outline-none text-sm ${item.checked ? 'text-black/40 line-through' : 'text-black/80'} placeholder-black/30`}
             />
             <button

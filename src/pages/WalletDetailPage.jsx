@@ -338,16 +338,16 @@ export default function WalletDetailPage() {
                       ? 'text-amber-500 bg-amber-500/10'
                       : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
                   }`}
-                  title={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
-                  aria-label={wallet.isArchived ? 'Buka Arsip Akun' : 'Arsipkan Akun'}
+                  title={wallet.isArchived ? t('wallets.unarchive', 'Buka Arsip Akun') : t('wallets.archive', 'Arsipkan Akun')}
+                  aria-label={wallet.isArchived ? t('wallets.unarchive', 'Buka Arsip Akun') : t('wallets.archive', 'Arsipkan Akun')}
                 >
                   {wallet.isArchived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(true)} 
                   className="flex items-center justify-center w-8 h-8 rounded-full text-[var(--earthy-terra)]/80 hover:text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-soft)] transition active:scale-95"
-                  title="Hapus Akun"
-                  aria-label="Hapus Akun"
+                  title={t('common.delete', 'Hapus Akun')}
+                  aria-label={t('common.delete', 'Hapus Akun')}
                 >
                   <Trash2 size={16} strokeWidth={2} />
                 </button>
@@ -404,8 +404,8 @@ export default function WalletDetailPage() {
                   setIsEditBalanceModalOpen(true)
                 }}
                 className="w-6 h-6 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
-                title="Penyesuaian Saldo"
-                aria-label="Penyesuaian Saldo"
+                title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
+                aria-label={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
               >
                 <Edit2 size={11} strokeWidth={2} />
               </button>
@@ -451,7 +451,7 @@ export default function WalletDetailPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari transaksi..."
+                    placeholder={t('tx.search.placeholder', 'Cari transaksi...')}
                     className="w-full rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-1 pl-7 pr-6 text-[11px] text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
                   />
                   {searchQuery && (
@@ -565,7 +565,7 @@ export default function WalletDetailPage() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteWallet}
-        title="Hapus Dompet"
+        title={t('wallets.deleteTitle', 'Hapus Dompet')}
         message={
           <>
             Apakah Anda yakin ingin menghapus dompet <strong className="text-[var(--fg)]">{wallet?.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
@@ -573,7 +573,7 @@ export default function WalletDetailPage() {
         }
       />
 
-      <Modal isOpen={isEditBalanceModalOpen} onClose={() => setIsEditBalanceModalOpen(false)} title="Penyesuaian Saldo">
+      <Modal isOpen={isEditBalanceModalOpen} onClose={() => setIsEditBalanceModalOpen(false)} title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}>
         <form onSubmit={handleEditBalance} className="pt-1">
           <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-4">
             Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.

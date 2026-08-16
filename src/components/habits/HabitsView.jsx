@@ -10,6 +10,7 @@ import HabitStatsModal from './HabitStatsModal'
 import HabitColorPicker from './HabitColorPicker'
 import { db } from '../../lib/db'
 import useSwipeAction from '../../hooks/useSwipeAction'
+import useTranslation from '../../hooks/useTranslation'
 
 const HABIT_COLORS = ['#34d399', '#38bdf8', '#a855f7', '#fb7185', '#fcd34d', '#fb923c']
 const HABIT_CATEGORIES = ['Kesehatan', 'Belajar', 'Produktivitas', 'Keuangan', 'Lainnya']
@@ -166,6 +167,7 @@ const HabitItemCard = memo(function HabitItemCard({
 })
 
 export default function HabitsView() {
+  const { t } = useTranslation()
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState({ title: '', notes: '', color: HABIT_COLORS[0], category: 'Lainnya', frequencyType: 'daily', frequencyValue: [], reminderEnabled: false, reminderTime: '08:00' })
 
@@ -417,7 +419,7 @@ export default function HabitsView() {
       )}
 
       {/* Add Habit Modal */}
-      <Modal isOpen={addOpen} title="Buat Habit Baru" onClose={() => setAddOpen(false)}>
+      <Modal isOpen={addOpen} title={t('habits.createTitle', 'Buat Habit Baru')} onClose={() => setAddOpen(false)}>
         <form onSubmit={handleAddHabit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Nama Habit</label>
@@ -425,7 +427,7 @@ export default function HabitsView() {
               type="text"
               value={addForm.title}
               onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
-              placeholder="Misal: Olahraga, Baca buku"
+              placeholder={t('habits.titlePlaceholder', 'Misal: Olahraga, Baca buku')}
               className="ft-field mt-0 font-medium"
               required
             />
@@ -435,7 +437,7 @@ export default function HabitsView() {
             <textarea
               value={addForm.notes}
               onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
-              placeholder="Tujuan atau detail cara ngerjain habit ini..."
+              placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
               className="ft-field mt-0 font-medium min-h-[80px] resize-y"
             />
           </div>
@@ -470,7 +472,7 @@ export default function HabitsView() {
                 value={addForm.frequencyValue || ''}
                 onChange={(e) => setAddForm({ ...addForm, frequencyValue: Number(e.target.value) })}
                 className="ft-field mt-0 font-medium w-full"
-                placeholder="Misal: 3"
+                placeholder={t('habits.freqWeeklyPlaceholder', 'Misal: 3')}
               />
             </div>
           )}
@@ -552,7 +554,7 @@ export default function HabitsView() {
       </Modal>
 
       {/* Edit Habit Modal */}
-      <Modal isOpen={editOpen} title="Edit Habit" onClose={() => setEditOpen(false)}>
+      <Modal isOpen={editOpen} title={t('habits.editTitle', 'Edit Habit')} onClose={() => setEditOpen(false)}>
         <form onSubmit={handleEditHabit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Nama Habit</label>
@@ -569,7 +571,7 @@ export default function HabitsView() {
             <textarea
               value={editForm.notes}
               onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-              placeholder="Tujuan atau detail cara ngerjain habit ini..."
+              placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
               className="ft-field mt-0 font-medium min-h-[80px] resize-y"
             />
           </div>
@@ -604,7 +606,7 @@ export default function HabitsView() {
                 value={editForm.frequencyValue || ''}
                 onChange={(e) => setEditForm({ ...editForm, frequencyValue: Number(e.target.value) })}
                 className="ft-field mt-0 font-medium w-full"
-                placeholder="Misal: 3"
+                placeholder={t('habits.freqWeeklyPlaceholder', 'Misal: 3')}
               />
             </div>
           )}
@@ -692,7 +694,7 @@ export default function HabitsView() {
           handleDeleteHabit(confirmDeleteId)
           setConfirmDeleteId(null)
         }}
-        title="Hapus Habit?"
+        title={t('habits.deleteTitle', 'Hapus Habit?')}
         message="Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen."
       />
 

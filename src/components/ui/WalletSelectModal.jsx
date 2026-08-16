@@ -5,6 +5,7 @@ import { Wallet, Check, Search, X, Plus, ChevronDown } from 'lucide-react'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { formatCurrency } from '../../lib/utils'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
   const num = Number(val ?? 0)
@@ -109,6 +110,7 @@ export default function WalletSelectModal({
   allowNone = false,
   noneLabel = 'Tanpa Dompet (Manual Log)',
 }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [search, setSearch] = useState('')
@@ -179,7 +181,7 @@ export default function WalletSelectModal({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari nama dompet..."
+                placeholder={t('wallets.searchPlaceholder', 'Cari nama dompet...')}
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] pl-9 pr-3.5 py-2 text-xs font-bold text-[var(--fg)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>

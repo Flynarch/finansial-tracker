@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
+import useTranslation from '../../hooks/useTranslation'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const createWallet = useWalletStore((state) => state.createWallet)
 
@@ -69,7 +71,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
             type="button"
             onClick={onBack}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer active:scale-95"
-            aria-label="Kembali"
+            aria-label={t('common.back', 'Kembali')}
           >
             <ChevronLeft size={20} strokeWidth={2.2} />
           </button>
@@ -193,7 +195,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                   type="button"
                   onClick={clearBalance}
                   className="text-[var(--muted)] hover:text-[var(--fg)] transition p-1 cursor-pointer"
-                  title="Hapus"
+                  title={t('common.clear', 'Hapus')}
                 >
                   <XCircle size={20} />
                 </button>

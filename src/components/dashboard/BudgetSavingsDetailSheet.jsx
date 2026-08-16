@@ -7,6 +7,7 @@ import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { getCategoryColorClass, resolveTransactionIconKey } from '../../lib/categoryIcon'
 import CategoryIcon from '../ui/CategoryIcon'
 import useBottomSheet from '../../hooks/useBottomSheet'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function BudgetSavingsDetailSheet({
   isOpen,
@@ -18,6 +19,7 @@ export default function BudgetSavingsDetailSheet({
   onOpenQuickBudget,
   onOpenQuickGoal,
 }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
 
@@ -76,7 +78,7 @@ export default function BudgetSavingsDetailSheet({
           sheetVisible ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={closeSheet}
-        aria-label="Tutup"
+        aria-label={t('common.close', 'Tutup')}
       />
 
       {/* Sheet Container with Jumpy/Bouncy Spring Animation */}
@@ -136,7 +138,7 @@ export default function BudgetSavingsDetailSheet({
                 type="button"
                 onClick={closeSheet}
                 className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
-                aria-label="Tutup"
+                aria-label={t('common.close', 'Tutup')}
               >
                 <X className="h-4 w-4" />
               </button>

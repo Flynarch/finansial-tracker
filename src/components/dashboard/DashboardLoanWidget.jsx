@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HandCoins, Plus, ChevronRight, Scale, Clock } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
+import useTranslation from '../../hooks/useTranslation'
 
 export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   loanSummary,
@@ -9,6 +10,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   locale,
   onOpenLoanSheet,
 }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const {
     totalDebt = 0,
@@ -54,7 +56,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
               onOpenLoanSheet()
             }}
             className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
-            aria-label="Catat Hutang atau Piutang"
+            aria-label={t('loans.add', 'Catat Hutang atau Piutang')}
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
             <span>Catat</span>

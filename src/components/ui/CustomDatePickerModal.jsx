@@ -103,7 +103,7 @@ export default function CustomDatePickerModal({
   if (!isOpen) return null
 
   return (
-    <Modal isOpen={isOpen} title="Pilih Tanggal Transaksi" onClose={onClose}>
+    <Modal isOpen={isOpen} title={locale === 'en' ? 'Select Date Range' : 'Pilih Rentang Tanggal'} onClose={onClose}>
       <div className="space-y-4 py-1">
         {/* Quick Presets */}
         <div className="flex flex-wrap gap-1.5 pb-1">
@@ -167,7 +167,7 @@ export default function CustomDatePickerModal({
             type="button"
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
             className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95"
-            aria-label="Previous Month"
+            aria-label={locale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -178,7 +178,7 @@ export default function CustomDatePickerModal({
             type="button"
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
             className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95"
-            aria-label="Next Month"
+            aria-label={locale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
