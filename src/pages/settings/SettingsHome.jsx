@@ -14,7 +14,6 @@ import {
   ShieldCheck,
   Database,
   Compass,
-  CheckCircle2,
   Lock,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -29,13 +28,13 @@ import {
 } from './settingsComponents'
 
 const currencyDisplayMap = {
-  IDR: 'Rp • IDR (Rupiah)',
-  USD: '$ • USD (US Dollar)',
-  EUR: '€ • EUR (Euro)',
-  SGD: 'S$ • SGD (Singapore Dollar)',
-  MYR: 'RM • MYR (Ringgit)',
-  JPY: '¥ • JPY (Japanese Yen)',
-  GBP: '£ • GBP (British Pound)',
+  IDR: 'Rp • IDR',
+  USD: '$ • USD',
+  EUR: '€ • EUR',
+  SGD: 'S$ • SGD',
+  MYR: 'RM • MYR',
+  JPY: '¥ • JPY',
+  GBP: '£ • GBP',
 }
 
 export default function SettingsHome() {
@@ -120,13 +119,9 @@ export default function SettingsHome() {
     ? securityMethod === 'biometric'
       ? t('settings.lockMethod.biometric', 'Biometrik')
       : securityMethod === 'pattern'
-        ? t('settings.lockMethod.pattern', 'Pola Aktif')
-        : t('settings.lockMethod.pin', 'PIN Aktif')
+        ? t('settings.lockMethod.pattern', 'Pola')
+        : t('settings.lockMethod.pin', 'PIN')
     : t('settings.lockStatus.off', 'Nonaktif')
-
-  const securityBadgeColor = securityEnabled
-    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-    : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
 
   return (
     <>
@@ -139,23 +134,23 @@ export default function SettingsHome() {
         className="ft-settings-hero"
       />
 
-      {/* User Mini Profile Strip */}
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-card backdrop-blur-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white font-black text-sm shadow-sm">
-            {(profileName || 'FinTrack').slice(0, 2).toUpperCase()}
+      {/* User Mini Profile Strip - Clean & Compact */}
+      <div className="mb-3.5 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 shadow-card">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--fg)] text-[var(--bg)] font-black text-xs">
+            {(profileName || 'FT').slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-[var(--fg)]">
+            <p className="truncate text-xs font-bold text-[var(--fg)]">
               {profileName || 'Pengguna FinTrack'}
             </p>
-            <p className="text-[11px] font-medium text-[var(--muted)] flex items-center gap-1 mt-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <p className="text-[10px] font-medium text-[var(--muted)] flex items-center gap-1 mt-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-income)] shrink-0" />
               <span>Offline-First (IndexedDB)</span>
             </p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-[10px] font-extrabold text-[var(--muted)]">
+        <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9.5px] font-extrabold text-[var(--muted)]">
           v2.0.0
         </span>
       </div>
@@ -167,9 +162,8 @@ export default function SettingsHome() {
       >
         <SettingsSplitRow
           label={t('settings.language')}
-          description={t('settings.languageDesc', 'Bahasa tampilan menu & antarmuka')}
+          description={t('settings.languageDesc', 'Bahasa tampilan')}
           icon={Globe}
-          iconColor="text-blue-500 bg-blue-500/10 border-blue-500/20"
         >
           <SettingsSegmentControl
             options={languageOptions}
@@ -181,9 +175,8 @@ export default function SettingsHome() {
 
         <SettingsSplitRow
           label={t('settings.theme')}
-          description={t('settings.themeDesc', 'Mode visual terang atau gelap')}
+          description={t('settings.themeDesc', 'Mode visual')}
           icon={theme === 'dark' ? Moon : Sun}
-          iconColor="text-amber-500 bg-amber-500/10 border-amber-500/20"
         >
           <SettingsSegmentControl
             options={themeOptions}
@@ -195,14 +188,13 @@ export default function SettingsHome() {
 
         <SettingsSplitRow
           label={t('settings.defaultCurrency')}
-          description={t('settings.currencyDesc', 'Mata uang utama laporan & ringkasan')}
+          description={t('settings.currencyDesc', 'Mata uang utama')}
           icon={Coins}
-          iconColor="text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
         >
           <select
             value={defaultCurrency}
             onChange={(event) => setDefaultCurrency(event.target.value)}
-            className="ft-settings-field-compact font-semibold"
+            className="ft-settings-field-compact font-bold"
             aria-label={t('settings.defaultCurrency')}
           >
             {currencyOptions.map((currency) => (
@@ -215,9 +207,8 @@ export default function SettingsHome() {
 
         <SettingsSplitRow
           label={t('settings.motion')}
-          description={t('settings.motionDesc', 'Pengaturan efek transisi animasi')}
+          description={t('settings.motionDesc', 'Transisi animasi')}
           icon={Activity}
-          iconColor="text-purple-500 bg-purple-500/10 border-purple-500/20"
         >
           <SettingsSegmentControl
             options={motionOptions}
@@ -230,30 +221,29 @@ export default function SettingsHome() {
 
       {/* 2. Integrasi AI Gemini */}
       <SettingsSection label={t('settings.aiIntegration', 'Integrasi Asisten AI (Gemini)')}>
-        <div className="ft-settings-cell space-y-3">
+        <div className="ft-settings-cell space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
-                <Bot className="h-4 w-4" />
+              <div className="grid h-6 w-6 place-items-center rounded-md bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]">
+                <Bot className="h-3.5 w-3.5" />
               </div>
               <span className="text-xs font-bold text-[var(--fg)]">
                 {t('settings.aiKeyStatus', 'Status API Key')}
               </span>
             </div>
             {geminiApiKey ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10.5px] font-extrabold text-emerald-500 border border-emerald-500/20">
-                <CheckCircle2 className="h-3 w-3" />
-                <span>{t('settings.customKeyActive', 'Key Kustom Aktif')}</span>
+              <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--fg)] border border-[var(--border)]">
+                Key Kustom Aktif
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--field-bg)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--muted)] border border-[var(--border)]">
+              <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)] border border-[var(--border)]">
                 {t('settings.defaultKey', 'Bawaan Sistem')}
               </span>
             )}
           </div>
 
           {keyStatusMessage ? (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs font-bold text-emerald-500 animate-fadeIn">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] animate-fadeIn">
               {keyStatusMessage}
             </div>
           ) : null}
@@ -265,23 +255,23 @@ export default function SettingsHome() {
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 placeholder={t('settings.apiKeyPlaceholder', 'Masukkan Gemini API Key (opsional)...')}
-                className="ft-settings-field-compact w-full pr-10 text-xs font-mono"
+                className="ft-settings-field-compact w-full pr-8 text-xs font-mono"
                 aria-label={'Gemini API Key'}
               />
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-2.5 text-[var(--muted)] hover:text-[var(--fg)] transition p-1 rounded-md cursor-pointer"
+                className="absolute right-2 text-[var(--muted)] hover:text-[var(--fg)] transition p-0.5 rounded cursor-pointer"
                 aria-label={showKey ? 'Sembunyikan Key' : 'Tampilkan Key'}
               >
-                {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
               </button>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                className="flex-1 rounded-xl bg-[var(--fg)] py-2 px-3 text-xs font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 cursor-pointer shadow-xs"
+                className="flex-1 rounded-lg bg-[var(--fg)] py-1.5 px-3 text-xs font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
               >
                 {t('settings.saveApiKey', 'Simpan Key')}
               </button>
@@ -289,7 +279,7 @@ export default function SettingsHome() {
                 <button
                   type="button"
                   onClick={handleClearApiKey}
-                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 py-2 px-3 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-1.5 px-3 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
                 >
                   {t('settings.resetApiKey', 'Reset')}
                 </button>
@@ -297,15 +287,15 @@ export default function SettingsHome() {
             </div>
           </form>
 
-          <p className="text-[11px] leading-relaxed text-[var(--muted)] font-medium">
+          <p className="text-[10.5px] leading-relaxed text-[var(--muted)] font-medium">
             {t('settings.aiKeyFree', 'Dapatkan API Key gratis di')}{' '}
             <a
               href="https://aistudio.google.com"
               target="_blank"
               rel="noreferrer"
-              className="text-[var(--accent)] underline font-bold hover:opacity-80"
+              className="text-[var(--fg)] underline font-bold hover:opacity-80"
             >
-              Google AI Studio (aistudio.google.com)
+              aistudio.google.com
             </a>
             . {t('settings.aiKeyStoredLocal', 'Key tersimpan lokal di perangkat ini.')}
           </p>
@@ -319,37 +309,31 @@ export default function SettingsHome() {
           label={t('settings.expenseCategories', 'Kategori Transaksi')}
           subtitle={t('settings.categoriesSubtitle', 'Kelola kategori & subkategori')}
           icon={Tag}
-          iconColor="text-indigo-500 bg-indigo-500/10 border-indigo-500/20"
         />
         <SettingsLinkRow
           to="/settings/recurring"
           label={t('settings.recurringTitle', 'Transaksi Berulang')}
-          subtitle={t('settings.recurringSubtitle', 'Otomasi gaji, tagihan & langganan')}
+          subtitle={t('settings.recurringSubtitle', 'Otomasi tagihan & gaji')}
           icon={RefreshCw}
-          iconColor="text-teal-500 bg-teal-500/10 border-teal-500/20"
         />
         <SettingsLinkRow
           to="/settings/security"
           label={t('settings.appLock', 'Keamanan & Kunci Aplikasi')}
-          subtitle={t('settings.securitySubtitle', 'Lindungi privasi dengan PIN, Pola, atau Biometrik')}
+          subtitle={t('settings.securitySubtitle', 'PIN, Pola, atau Biometrik')}
           icon={securityEnabled ? ShieldCheck : Lock}
-          iconColor="text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
           badge={securityBadge}
-          badgeColor={securityBadgeColor}
         />
         <SettingsLinkRow
           to="/settings/data"
           label={t('settings.nav.data', 'Data & Cadangan')}
           subtitle={t('settings.dataSubtitle', 'Ekspor JSON, Impor data, dan Uji Coba')}
           icon={Database}
-          iconColor="text-amber-500 bg-amber-500/10 border-amber-500/20"
         />
         <SettingsLinkRow
           to="/settings/help"
           label={t('settings.helpTitle', 'Tur & Panduan Fitur')}
-          subtitle={t('settings.helpSubtitle', 'FAQ & panduan pengenalan fitur aplikasi')}
+          subtitle={t('settings.helpSubtitle', 'FAQ & panduan fitur aplikasi')}
           icon={Compass}
-          iconColor="text-sky-500 bg-sky-500/10 border-sky-500/20"
         />
       </SettingsSection>
     </>

@@ -15,7 +15,7 @@ import {
   INCOME_TREE,
   resetIncomeCategoryCustomizations,
 } from '../../lib/incomeCategories'
-import { getCategoryColorClass, resolveTransactionIconKey } from '../../lib/categoryIcon'
+import { resolveTransactionIconKey } from '../../lib/categoryIcon'
 import CategoryIcon from '../../components/ui/CategoryIcon'
 import useTranslation from '../../hooks/useTranslation'
 import { SettingsSection, SettingsSegmentControl } from './settingsComponents'
@@ -55,24 +55,24 @@ export default function SettingsCategories() {
     <>
       {statusMessage ? (
         <div
-          className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-500 animate-fadeIn"
+          className="mb-3.5 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs font-bold text-[var(--fg)] animate-fadeIn"
           role="status"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
           <span>{statusMessage}</span>
         </div>
       ) : null}
 
-      {/* Header Overview Card */}
-      <div className="mb-4 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-card">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
-            <Tag className="h-5 w-5" />
+      {/* Header Overview Card - Clean & Monochromatic */}
+      <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 shadow-card">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)]">
+            <Tag className="h-4 w-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-[var(--fg)]">Kategori Transaksi</h3>
-            <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5">
-              {EXPENSE_TREE.length} Kategori Pengeluaran • {INCOME_TREE.length} Kategori Pemasukan
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-[var(--fg)]">Kategori Transaksi</h3>
+            <p className="text-[10.5px] font-medium text-[var(--muted)] truncate mt-0.5">
+              {EXPENSE_TREE.length} Pengeluaran • {INCOME_TREE.length} Pemasukan
             </p>
           </div>
         </div>
@@ -80,16 +80,16 @@ export default function SettingsCategories() {
         <button
           type="button"
           onClick={() => setConfirmResetType(activeTab)}
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+          className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
           title={t('settings.resetDefault', 'Reset ke Bawaan')}
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{t('settings.resetDefault', 'Reset Bawaan')}</span>
+          <RotateCcw className="h-3 w-3" />
+          <span>{t('settings.resetDefault', 'Reset')}</span>
         </button>
       </div>
 
       {/* Segment Tab */}
-      <div className="mb-4">
+      <div className="mb-3">
         <SettingsSegmentControl
           options={tabOptions}
           value={activeTab}
@@ -106,20 +106,19 @@ export default function SettingsCategories() {
         {currentTree.map((cat) => {
           const catName = cat.names?.[locale] || cat.names?.id || cat.id
           const iconKey = resolveTransactionIconKey({ category: cat.id, type: activeTab })
-          const colorClass = getCategoryColorClass(cat.id, activeTab)
 
           return (
-            <div key={cat.id} className="ft-settings-cell space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${colorClass}`}>
-                    <CategoryIcon name={iconKey} className="h-4 w-4" />
+            <div key={cat.id} className="ft-settings-cell space-y-1.5">
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)]">
+                    <CategoryIcon name={iconKey} className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="block text-sm font-bold text-[var(--fg)] truncate">
+                    <span className="block text-xs font-bold text-[var(--fg)] truncate">
                       {catName}
                     </span>
-                    <span className="block text-[10.5px] font-medium text-[var(--muted)]">
+                    <span className="block text-[10px] font-medium text-[var(--muted)]">
                       {cat.children?.length || 0} subkategori
                     </span>
                   </div>
@@ -128,13 +127,13 @@ export default function SettingsCategories() {
 
               {/* Subcategories tags */}
               {cat.children && cat.children.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 pt-1 pl-10">
+                <div className="flex flex-wrap gap-1 pt-0.5 pl-9">
                   {cat.children.map((sub) => {
                     const subName = sub.names?.[locale] || sub.names?.id || sub.id
                     return (
                       <span
                         key={sub.id}
-                        className="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--muted)]"
+                        className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
                       >
                         {subName}
                       </span>

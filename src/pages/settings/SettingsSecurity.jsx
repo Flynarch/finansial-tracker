@@ -73,34 +73,28 @@ export default function SettingsSecurity() {
     <>
       {statusMessage ? (
         <div
-          className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-500 animate-fadeIn"
+          className="mb-3.5 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs font-bold text-[var(--fg)] animate-fadeIn"
           role="status"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
           <span>{statusMessage}</span>
         </div>
       ) : null}
 
-      {/* Security Status Card */}
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-card">
-        <div className="flex items-center gap-3">
-          <div
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${
-              securityEnabled
-                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-            }`}
-          >
-            {securityEnabled ? <ShieldCheck className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
+      {/* Security Status Card - Clean & Monochromatic */}
+      <div className="mb-3.5 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 shadow-card">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)]">
+            {securityEnabled ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-[var(--fg)]">
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-[var(--fg)]">
               {securityEnabled ? 'Aplikasi Terkunci' : 'Kunci Aplikasi Nonaktif'}
             </h3>
-            <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5">
+            <p className="text-[10.5px] font-medium text-[var(--muted)] truncate mt-0.5">
               {securityEnabled
-                ? `Menggunakan ${securityMethod.toUpperCase()} untuk proteksi data`
-                : 'Aktifkan kunci untuk melindungi privasi data keuangan Anda'}
+                ? `Proteksi menggunakan ${securityMethod.toUpperCase()}`
+                : 'Aktifkan kunci untuk melindungi privasi data keuangan'}
             </p>
           </div>
         </div>
@@ -115,9 +109,8 @@ export default function SettingsSecurity() {
       >
         <SettingsSplitRow
           label={t('settings.lockStatus', 'Status Kunci')}
-          description="Nyalakan atau matikan kunci privasi"
+          description="Nyalakan atau matikan kunci"
           icon={securityEnabled ? Lock : Unlock}
-          iconColor={securityEnabled ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-zinc-500 bg-zinc-500/10 border-zinc-500/20'}
         >
           <SettingsSegmentControl
             options={lockStatusOptions}
@@ -135,7 +128,7 @@ export default function SettingsSecurity() {
           <>
             <SettingsSplitRow
               label={t('settings.lockMethod', 'Metode Kunci')}
-              description="Pilih cara autentikasi Anda"
+              description="Pilih cara autentikasi"
               icon={KeyRound}
             >
               <SettingsSegmentControl
@@ -147,11 +140,11 @@ export default function SettingsSecurity() {
             </SettingsSplitRow>
 
             {securityForm.method === 'pattern' ? (
-              <div className="ft-settings-cell space-y-3">
+              <div className="ft-settings-cell space-y-2">
                 <p className="text-xs font-bold text-[var(--fg)]">
                   {t('settings.patternSecret', 'Buat Pola Kunci')}
                 </p>
-                <div className="flex justify-center py-2">
+                <div className="flex justify-center py-1">
                   <PatternPad
                     value={securityForm.secret}
                     onChange={(pattern) =>
@@ -163,12 +156,12 @@ export default function SettingsSecurity() {
             ) : null}
 
             {securityForm.method === 'pin' ? (
-              <div className="ft-settings-cell space-y-2">
+              <div className="ft-settings-cell space-y-1.5">
                 <label
                   className="block text-xs font-bold text-[var(--fg)]"
                   htmlFor="settings-pin-sub"
                 >
-                  {t('settings.pin', 'Kode PIN Rahasia')}
+                  {t('settings.pin', 'Kode PIN')}
                 </label>
                 <input
                   id="settings-pin-sub"
@@ -181,16 +174,16 @@ export default function SettingsSecurity() {
                     setSecurityForm((prev) => ({ ...prev, secret: event.target.value }))
                   }
                   onInput={() => setStatusMessage('')}
-                  className="ft-settings-field-compact font-mono text-center tracking-widest text-base"
+                  className="ft-settings-field-compact font-mono text-center tracking-widest text-sm"
                   autoComplete="off"
                 />
               </div>
             ) : null}
 
             {securityForm.method === 'biometric' ? (
-              <div className="ft-settings-cell flex items-center gap-3">
-                <Fingerprint className="h-8 w-8 text-emerald-500 shrink-0" />
-                <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
+              <div className="ft-settings-cell flex items-center gap-2.5">
+                <Fingerprint className="h-6 w-6 text-[var(--muted)] shrink-0" />
+                <p className="text-[11px] font-medium text-[var(--muted)] leading-relaxed">
                   Autentikasi biometrik perangkat (sidik jari atau face unlock) siap digunakan saat
                   membuka aplikasi.
                 </p>
@@ -203,7 +196,7 @@ export default function SettingsSecurity() {
           <button
             type="button"
             onClick={handleSaveSecurity}
-            className="w-full rounded-xl bg-[var(--fg)] py-2.5 px-4 text-xs font-extrabold text-[var(--bg)] shadow-md transition active:scale-95 hover:opacity-90 cursor-pointer"
+            className="w-full rounded-lg bg-[var(--fg)] py-2 px-3 text-xs font-extrabold text-[var(--bg)] shadow-sm transition active:scale-95 hover:opacity-90 cursor-pointer"
           >
             {t('settings.saveLockSettings', 'Simpan Pengaturan Kunci')}
           </button>

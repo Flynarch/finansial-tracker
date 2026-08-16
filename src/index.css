@@ -718,16 +718,16 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   }
 
   .ft-settings-section {
-    @apply mb-5;
+    @apply mb-4;
   }
 
   .ft-settings-section-label {
-    @apply mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.12em];
-    color: var(--muted-2);
+    @apply mb-1 px-1 text-[10.5px] font-bold uppercase tracking-[0.1em];
+    color: var(--muted);
   }
 
   .ft-settings-group {
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     background: var(--panel-strong);
     box-shadow: var(--shadow-card);
@@ -736,28 +736,28 @@ html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
   }
 
   .ft-settings-group > * + * {
-    border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   }
 
   .ft-settings-cell {
-    @apply px-4 py-3.5;
+    @apply px-3.5 py-2.5;
   }
 
   .ft-settings-split {
-    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4;
+    @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3;
   }
 
   .ft-settings-split-label {
-    @apply text-[15px] font-medium leading-snug;
+    @apply text-sm font-semibold leading-snug;
     color: var(--fg);
   }
 
   .ft-settings-split-control {
-    @apply w-full min-w-0 sm:max-w-[14rem];
+    @apply w-full min-w-0 sm:max-w-[13rem];
   }
 
   .ft-settings-field-compact {
-    @apply mt-0 w-full border px-3 py-2.5 text-sm outline-none transition;
+    @apply mt-0 w-full border px-2.5 py-1.5 text-xs outline-none transition;
     border-radius: var(--radius-md);
     background: var(--field-bg);
     border-color: var(--field-border);
