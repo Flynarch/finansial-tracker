@@ -1,8 +1,7 @@
 import { memo } from 'react'
-import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus, Calculator } from 'lucide-react'
+import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
-import { triggerHaptic } from '../../lib/haptics'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
   isDbLoading = false,
@@ -11,7 +10,6 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
   locale = 'id',
   onOpenBudgetDetail,
   onOpenSavingsDetail,
-  onOpenSplitBill,
 }) {
   const { t } = useTranslation()
 
@@ -223,29 +221,6 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
           </div>
         </div>
       </div>
-
-      {/* Quick Tool: Bagi Tagihan / Split Bill */}
-      {onOpenSplitBill && (
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light')
-            onOpenSplitBill()
-          }}
-          className="mt-2.5 w-full flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-xs hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-7 w-7 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-              <Calculator className="h-3.5 w-3.5 stroke-[2.2]" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-black text-[var(--fg)] leading-tight">Kalkulator Bagi Tagihan</div>
-              <div className="text-[10px] font-medium text-[var(--muted)]">Hitung patungan makan / grup dengan pajak & tip</div>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-[var(--muted)] opacity-60" />
-        </button>
-      )}
     </section>
   )
 })

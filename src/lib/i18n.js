@@ -867,9 +867,6 @@ const dictionaries = {
     'navbar.searchLabel': 'Cari Transaksi, Dompet & Menu',
     'reports.csvTitle': 'Ekspor Laporan Transaksi ke CSV/Excel',
     'search.placeholder': 'Cari transaksi, dompet, target, tugas, atau menu...',
-    'splitbill.titlePlaceholder': 'Contoh: Makan Siang Bersama, Sewa Lapangan',
-    'splitbill.amountPlaceholder': 'Nominal belanja',
-    'splitbill.paymentPlaceholder': 'Contoh: BCA 12345678 a/n Budi / GoPay 08123456',
   },
   en: {
     'common.back': 'Back',
@@ -1738,9 +1735,6 @@ const dictionaries = {
     'navbar.searchLabel': 'Search Transactions, Wallets & Menu',
     'reports.csvTitle': 'Export Transaction Report to CSV/Excel',
     'search.placeholder': 'Search transactions, wallets, goals, todos, or menu...',
-    'splitbill.titlePlaceholder': 'Example: Team Lunch, Court Rental',
-    'splitbill.amountPlaceholder': 'Expense amount',
-    'splitbill.paymentPlaceholder': 'Example: Bank Account / PayPal info',
   },
 }
 
