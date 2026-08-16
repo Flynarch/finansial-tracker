@@ -863,10 +863,7 @@ const dictionaries = {
     'settings.currency': 'Mata Uang',
     'loans.startDateTitle': 'Pilih Tanggal Pinjam',
     'loans.dueDateTitle': 'Pilih Jatuh Tempo',
-    'navbar.searchTitle': 'Cari Cepat (Ctrl+K)',
-    'navbar.searchLabel': 'Cari Transaksi, Dompet & Menu',
     'reports.csvTitle': 'Ekspor Laporan Transaksi ke CSV/Excel',
-    'search.placeholder': 'Cari transaksi, dompet, target, tugas, atau menu...',
   },
   en: {
     'common.back': 'Back',
@@ -1731,10 +1728,7 @@ const dictionaries = {
     'settings.currency': 'Currency',
     'loans.startDateTitle': 'Select Loan Date',
     'loans.dueDateTitle': 'Select Due Date',
-    'navbar.searchTitle': 'Quick Search (Ctrl+K)',
-    'navbar.searchLabel': 'Search Transactions, Wallets & Menu',
     'reports.csvTitle': 'Export Transaction Report to CSV/Excel',
-    'search.placeholder': 'Search transactions, wallets, goals, todos, or menu...',
   },
 }
 

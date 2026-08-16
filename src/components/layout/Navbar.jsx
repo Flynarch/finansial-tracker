@@ -16,11 +16,8 @@ import {
   Clock,
   HandCoins,
   Sparkles,
-  Search,
   X,
 } from 'lucide-react'
-import GlobalSearchModal from '../search/GlobalSearchModal'
-import { triggerHaptic } from '../../lib/haptics'
 
 /* ─── time-based greeting ─── */
 function getTimeBasedGreeting(locale = 'id') {
@@ -69,20 +66,7 @@ function Navbar() {
   const greetingText = getTimeBasedGreeting(locale)
   const compactDate = getCompactDate(locale)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const dropdownRef = useRef(null)
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        triggerHaptic('light')
-        setIsSearchOpen((prev) => !prev)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
   const notifications = useLiveQuery(async () => {
     const data = await db.notifications.toArray()
@@ -127,21 +111,21 @@ function Navbar() {
   const initials = profileName ? profileName.substring(0, 2).toUpperCase() : 'FT'
 
   return (
-    <header className="pt-[max(env(safe-area-inset-top,0px),1.25rem)] pb-2 px-4 sm:px-6">
+    <header className="pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-1 px-4 sm:px-6">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
 
-        {/* ── Left: Profile Identity ── */}
+        {/* ── Left: Compact Profile Identity ── */}
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          className="group flex min-w-0 items-center gap-3 text-left rounded-2xl py-1 pr-2.5 pl-1 -ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.97] transition-transform duration-150 cursor-pointer"
+          className="group flex min-w-0 items-center gap-2.5 text-left rounded-xl py-0.5 pr-2 pl-0.5 -ml-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.97] transition-transform duration-150 cursor-pointer"
           title={t('profile.title', 'Lihat Profil')}
           aria-label={t('profile.title', 'Lihat Profil')}
         >
-          {/* Avatar */}
+          {/* Avatar (Compact) */}
           <div className="relative shrink-0">
             <div
-              className="flex h-12 w-12 items-center justify-center rounded-[0.95rem] text-sm font-black tracking-wide transition-shadow duration-200 group-hover:shadow-md"
+              className="flex h-9.5 w-9.5 items-center justify-center rounded-xl text-xs font-black tracking-wide transition-shadow duration-200 group-hover:shadow-xs"
               style={{
                 background: 'linear-gradient(145deg, var(--fg), color-mix(in srgb, var(--fg) 75%, var(--accent)))',
                 color: 'var(--bg)',
@@ -150,47 +134,33 @@ function Navbar() {
               {initials}
             </div>
             {/* Online status indicator */}
-            <span className="absolute -bottom-[1px] -right-[1px] h-[11px] w-[11px] rounded-full bg-emerald-500 ring-[2.5px] ring-[var(--bg)]" />
+            <span className="absolute -bottom-[0.5px] -right-[0.5px] h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--bg)]" />
           </div>
 
           {/* Identity text */}
           <div className="min-w-0 flex flex-col justify-center">
-            <p className="truncate text-[11.5px] font-extrabold tracking-[0.08em] text-[var(--muted)] uppercase leading-none select-none mb-1">
+            <p className="truncate text-[10px] font-bold tracking-wider text-[var(--muted)] uppercase leading-none select-none mb-0.5">
               {greetingText}
             </p>
             <div className="flex items-center gap-1 min-w-0">
-              <h1 className="truncate text-base sm:text-lg font-black tracking-tight text-[var(--fg)] leading-tight">
+              <h1 className="truncate text-[14px] sm:text-base font-black tracking-tight text-[var(--fg)] leading-tight">
                 {profileName || 'FinTrack'}
               </h1>
               <ChevronRight
-                className="h-4 w-4 shrink-0 text-[var(--muted-2)] group-hover:text-[var(--fg)] group-hover:translate-x-0.5 transition-all duration-200"
+                className="h-3.5 w-3.5 shrink-0 text-[var(--muted-2)] group-hover:text-[var(--fg)] group-hover:translate-x-0.5 transition-all duration-200"
                 strokeWidth={2.5}
               />
             </div>
           </div>
         </button>
 
-        {/* ── Right: Action Icons ── */}
-        <div className="flex shrink-0 items-center gap-2" ref={dropdownRef}>
+        {/* ── Right: Action Icons (Compact) ── */}
+        <div className="flex shrink-0 items-center gap-1.5" ref={dropdownRef}>
 
           {/* Date chip — desktop only */}
-          <span className="hidden sm:inline-flex items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-2 text-[11px] font-bold tracking-wide text-[var(--muted)] mr-1">
+          <span className="hidden sm:inline-flex items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1 text-[10.5px] font-bold tracking-wide text-[var(--muted)] mr-1">
             {compactDate}
           </span>
-
-          {/* Search Button (Spotlight) */}
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic('light')
-              setIsSearchOpen(true)
-            }}
-            aria-label={t('navbar.searchLabel', 'Cari Transaksi, Dompet & Menu')}
-            title={t('navbar.searchTitle', 'Cari Cepat (Ctrl+K)')}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-[var(--shadow-soft)] transition-all duration-150 cursor-pointer"
-          >
-            <Search className="h-[18px] w-[18px]" strokeWidth={2.2} />
-          </button>
 
           {/* AI Chat */}
           <button
@@ -198,9 +168,9 @@ function Navbar() {
             onClick={() => useChatStore.getState().setIsOpen(true)}
             aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
             title={t('aiChat.title', 'Konsultasi AI Chat')}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-[var(--shadow-soft)] transition-all duration-150 cursor-pointer"
+            className="relative inline-flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-2xs transition-all duration-150 cursor-pointer"
           >
-            <Sparkles className="h-[18px] w-[18px]" strokeWidth={2.2} />
+            <Sparkles className="h-4 w-4" strokeWidth={2.2} />
           </button>
 
           {/* Notification Bell */}
@@ -211,15 +181,15 @@ function Navbar() {
               aria-label={t('navbar.notifications', 'Notifikasi')}
               aria-expanded={showNotifications}
               title={t('navbar.notifications', 'Notifikasi')}
-              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all duration-150 active:scale-[0.92] cursor-pointer ${
+              className={`relative inline-flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-all duration-150 active:scale-[0.92] cursor-pointer ${
                 showNotifications
-                  ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent shadow-md'
-                  : 'bg-[var(--panel-strong)] text-[var(--fg)] border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] shadow-[var(--shadow-soft)]'
+                  ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent shadow-xs'
+                  : 'bg-[var(--panel-strong)] text-[var(--fg)] border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] shadow-2xs'
               }`}
             >
-              <Bell className="h-[18px] w-[18px]" strokeWidth={2.2} />
+              <Bell className="h-4 w-4" strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-rose-500 px-[3px] text-[8.5px] font-black text-white ring-2 ring-[var(--bg)] tabular-nums">
+                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-black text-white ring-2 ring-[var(--bg)] tabular-nums">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -227,7 +197,7 @@ function Navbar() {
 
             {/* ── Notification Dropdown ── */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.22s_cubic-bezier(0.16,1,0.3,1)_both] will-change-[transform,opacity] [transform:translate3d(0,0,0)]">
+              <div className="absolute right-0 top-11 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.22s_cubic-bezier(0.16,1,0.3,1)_both] will-change-[transform,opacity] [transform:translate3d(0,0,0)]">
                 {/* Panel Header */}
                 <div className="flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5 mb-2.5 shrink-0">
                   <div className="flex items-center gap-2">
@@ -304,9 +274,9 @@ function Navbar() {
                               </span>
                               <span className="text-[9px] font-bold text-[var(--muted-2)] shrink-0">
                                 {formatDistanceToNow(new Date(n.createdAt), {
-                                  addSuffix: true,
-                                  locale: locale === 'en' ? undefined : localeId,
-                                })}
+                                   addSuffix: true,
+                                   locale: locale === 'en' ? undefined : localeId,
+                                 })}
                               </span>
                             </div>
                             <p className="text-[10.5px] font-medium leading-relaxed text-[var(--muted)] line-clamp-2">
@@ -332,9 +302,6 @@ function Navbar() {
           </div>
         </div>
       </div>
-
-      {/* Global Spotlight Search Modal */}
-      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   )
 }
