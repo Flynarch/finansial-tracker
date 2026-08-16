@@ -488,23 +488,17 @@ export default function WalletDetailPage() {
               groupedTransactions.map((group, idx) => (
                 <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
                   {/* Sticky Date Header Strip */}
-                  <div className="sticky top-0 z-20 flex items-center justify-between py-1 bg-[var(--bg)]/90 backdrop-blur-xs">
-                    <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 shadow-2xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] opacity-80" />
-                      <span className="text-[10.5px] font-extrabold tracking-wider text-[var(--fg)] uppercase">
-                        {group.dateLabel}
-                      </span>
-                    </div>
+                  <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]/95 backdrop-blur-xs">
+                    <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase shrink-0">
+                      {group.dateLabel}
+                    </span>
+                    <div className="h-px flex-1 bg-[var(--border)]/50" />
                     {group.dailySummaryText ? (
-                      <div className={`inline-flex items-center rounded-lg border px-2.5 py-1 shadow-2xs ${
-                        group.isPositive 
-                          ? 'border-emerald-500/25 bg-emerald-500/8 text-[var(--status-income)]' 
-                          : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)]'
+                      <span className={`text-[11px] font-black tabular-nums shrink-0 ${
+                        group.isPositive ? 'text-[var(--status-income)]' : 'text-[var(--muted)]'
                       }`}>
-                        <span className="text-[10.5px] font-black tabular-nums">
-                          {group.dailySummaryText}
-                        </span>
-                      </div>
+                        {group.dailySummaryText}
+                      </span>
                     ) : null}
                   </div>
 

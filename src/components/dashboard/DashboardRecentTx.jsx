@@ -66,11 +66,8 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
           return (
             <div className="flex flex-col gap-2 ft-smooth-in">
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 shadow-2xs">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] opacity-80" />
-                  <p className="text-[9.5px] font-extrabold uppercase tracking-wider text-[var(--fg)]">{dateLabel}</p>
-                </div>
-                <span className="rounded-lg border border-[var(--border)] bg-[var(--accent)] px-2 py-0.5 text-[9px] font-black tracking-wider text-[var(--bg)]">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{dateLabel}</p>
+                <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[var(--bg)]">
                   BARU
                 </span>
               </div>
