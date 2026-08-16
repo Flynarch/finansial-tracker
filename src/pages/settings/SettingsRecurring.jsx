@@ -1,137 +1,251 @@
 import { format } from 'date-fns'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import Button from '../../components/ui/Button'
-import EmptyState from '../../components/ui/EmptyState'
+import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react'
 import CustomDatePicker from '../../components/ui/CustomDatePicker'
 import { db } from '../../lib/db'
+import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
-import { SettingsSection } from './settingsComponents'
+import useSettingsStore from '../../store/useSettingsStore'
+import { SettingsSection, SettingsSegmentControl } from './settingsComponents'
 
 export default function SettingsRecurring() {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const recurringTransactions = useLiveQuery(() => db.recurringTransactions.toArray(), [], [])
+
   const [recurringForm, setRecurringForm] = useState({
     title: '',
-    type: 'income',
-    category: 'Salary',
+    type: 'expense',
+    category: 'tagihan/listrik',
     amount: '',
-    currency: 'IDR',
+    currency: defaultCurrency,
     notes: '',
     frequency: 'monthly',
     nextDate: format(new Date(), 'yyyy-MM-dd'),
   })
 
+  const typeOptions = useMemo(
+    () => [
+      { value: 'expense', label: 'Pengeluaran', icon: TrendingDown },
+      { value: 'income', label: 'Pemasukan', icon: TrendingUp },
+    ],
+    [],
+  )
+
+  const frequencyOptions = useMemo(
+    () => [
+      { value: 'monthly', label: t('settings.recurring.frequency.monthly', 'Bulanan') },
+      { value: 'weekly', label: t('settings.recurring.frequency.weekly', 'Mingguan') },
+      { value: 'daily', label: t('settings.recurring.frequency.daily', 'Harian') },
+    ],
+    [t],
+  )
+
   const recurringFrequencyLabel = (value) => {
-    if (value === 'daily') return t('settings.recurring.frequency.daily')
-    if (value === 'weekly') return t('settings.recurring.frequency.weekly')
-    return t('settings.recurring.frequency.monthly')
+    if (value === 'daily') return t('settings.recurring.frequency.daily', 'Harian')
+    if (value === 'weekly') return t('settings.recurring.frequency.weekly', 'Mingguan')
+    return t('settings.recurring.frequency.monthly', 'Bulanan')
   }
 
-  const handleAddRecurring = async () => {
+  const handleAddRecurring = async (e) => {
+    e.preventDefault()
+    if (!recurringForm.title || !recurringForm.amount) return
+
     await db.recurringTransactions.add({
       ...recurringForm,
       amount: Number(recurringForm.amount || 0),
+      currency: defaultCurrency,
       enabled: 1,
+      createdAt: new Date().toISOString(),
     })
-    setRecurringForm((prev) => ({ ...prev, title: '', amount: '', notes: '' }))
+    setRecurringForm((prev) => ({
+      ...prev,
+      title: '',
+      amount: '',
+      notes: '',
+    }))
   }
+
+  const totalMonthlyRecurringExpense = (recurringTransactions || [])
+    .filter((item) => item.type === 'expense')
+    .reduce((acc, curr) => acc + toSafeNumber(curr.amount), 0)
 
   return (
     <>
-      <SettingsSection label={t('settings.recurringTitle')}>
-        <div className="ft-settings-cell space-y-4">
+      {/* Header Overview Card */}
+      <div className="mb-4 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-card">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-500/10 text-teal-500 border border-teal-500/20 shadow-2xs">
+            <RefreshCw className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-[var(--fg)]">
+              {t('settings.recurringTitle', 'Transaksi Berulang')}
+            </h3>
+            <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5">
+              {(recurringTransactions || []).length} Jadwal Aktif • Estimasi{' '}
+              {formatCurrency(totalMonthlyRecurringExpense, defaultCurrency, locale)}/bln
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Add New Recurring Form */}
+      <SettingsSection label={t('settings.recurring.addTitle', 'Tambah Jadwal Otomatis')}>
+        <form onSubmit={handleAddRecurring} className="ft-settings-cell space-y-3">
+          <div className="mb-1">
+            <SettingsSegmentControl
+              options={typeOptions}
+              value={recurringForm.type}
+              onChange={(val) => setRecurringForm((prev) => ({ ...prev, type: val }))}
+              ariaLabel="Tipe Transaksi"
+            />
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.title')}</span>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-[var(--fg)]">
+                {t('settings.recurring.field.title', 'Nama Transaksi')}
+              </label>
               <input
                 type="text"
+                required
+                placeholder={t('settings.recurring.placeholder', 'Contoh: Gaji Bulanan, Tagihan WiFi, Netflix')}
                 value={recurringForm.title}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, title: event.target.value }))}
-                className="ft-settings-field-compact"
+                onChange={(event) =>
+                  setRecurringForm((prev) => ({ ...prev, title: event.target.value }))
+                }
+                className="ft-settings-field-compact font-medium"
               />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.type')}</span>
-              <select
-                value={recurringForm.type}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, type: event.target.value }))}
-                className="ft-settings-field-compact"
-              >
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.category')}</span>
-              <input
-                type="text"
-                value={recurringForm.category}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, category: event.target.value }))}
-                className="ft-settings-field-compact"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.amount')}</span>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold text-[var(--fg)]">
+                {t('settings.recurring.field.amount', 'Nominal')}
+              </label>
               <input
                 type="number"
+                required
+                placeholder="0"
                 value={recurringForm.amount}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, amount: event.target.value }))}
-                className="ft-settings-field-compact"
+                onChange={(event) =>
+                  setRecurringForm((prev) => ({ ...prev, amount: event.target.value }))
+                }
+                className="ft-settings-field-compact font-mono font-bold"
               />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.frequency')}</span>
-              <select
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold text-[var(--fg)]">
+                {t('settings.recurring.field.frequency', 'Frekuensi')}
+              </label>
+              <SettingsSegmentControl
+                options={frequencyOptions}
                 value={recurringForm.frequency}
-                onChange={(event) => setRecurringForm((prev) => ({ ...prev, frequency: event.target.value }))}
-                className="ft-settings-field-compact"
-              >
-                <option value="daily">{t('settings.recurring.frequency.daily')}</option>
-                <option value="weekly">{t('settings.recurring.frequency.weekly')}</option>
-                <option value="monthly">{t('settings.recurring.frequency.monthly')}</option>
-              </select>
-            </label>
-            <div className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t('settings.recurring.field.nextDate')}</span>
+                onChange={(val) => setRecurringForm((prev) => ({ ...prev, frequency: val }))}
+                ariaLabel="Frekuensi"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold text-[var(--fg)]">
+                {t('settings.recurring.field.nextDate', 'Tanggal Jatuh Tempo Berikutnya')}
+              </label>
               <CustomDatePicker
                 value={recurringForm.nextDate}
                 onChange={(val) => setRecurringForm((prev) => ({ ...prev, nextDate: val }))}
-                title={'Pilih Tanggal Berikutnya'}
+                title={'Pilih Tanggal'}
               />
             </div>
           </div>
-          <Button type="button" className="w-full sm:w-auto" onClick={handleAddRecurring}>
-            {t('settings.recurring.add')}
-          </Button>
-        </div>
-        <div className="ft-settings-cell bg-[var(--field-bg)]">
-          {recurringTransactions.length === 0 ? (
-            <EmptyState title={t('settings.recurring.empty')} />
-          ) : (
-            <ul className="space-y-2">
-              {recurringTransactions.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <p className="text-sm text-[var(--fg)]">
-                    {item.title} · {recurringFrequencyLabel(item.frequency)} · {t('settings.recurring.next')}{' '}
-                    {item.nextDate}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    className="shrink-0"
-                    onClick={() => db.recurringTransactions.delete(item.id)}
+
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[var(--fg)] py-2.5 px-4 text-xs font-extrabold text-[var(--bg)] shadow-sm transition active:scale-95 hover:opacity-90 cursor-pointer pt-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>{t('settings.recurring.add', 'Simpan Jadwal Berulang')}</span>
+          </button>
+        </form>
+      </SettingsSection>
+
+      {/* List Active Recurring Items */}
+      <SettingsSection
+        label={t('settings.recurring.activeList', 'Daftar Jadwal Transaksi')}
+        footnote={t(
+          'settings.recurring.footnote',
+          'Transaksi akan otomatis dibuat saat tanggal jatuh tempo tercapai.',
+        )}
+      >
+        {recurringTransactions.length === 0 ? (
+          <div className="ft-settings-cell py-8 text-center">
+            <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] mb-2 shadow-2xs">
+              <RefreshCw className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-bold text-[var(--fg)]">Belum Ada Transaksi Berulang</p>
+            <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5 max-w-xs mx-auto">
+              Jadwalkan pengeluaran rutin atau pemasukan gaji bulanan di atas agar tercatat
+              otomatis.
+            </p>
+          </div>
+        ) : (
+          recurringTransactions.map((item) => {
+            const isExpense = item.type === 'expense'
+            return (
+              <div
+                key={item.id}
+                className="ft-settings-cell flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${
+                      isExpense
+                        ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                    }`}
                   >
-                    {t('settings.delete')}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                    <RefreshCw className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-[var(--fg)]">{item.title}</p>
+                    <p className="text-[10.5px] font-medium text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
+                      <span className="inline-block rounded bg-[var(--field-bg)] px-1.5 py-0.2 border border-[var(--border)] text-[9.5px] font-bold uppercase">
+                        {recurringFrequencyLabel(item.frequency)}
+                      </span>
+                      <span>• Jatuh tempo: {item.nextDate}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span
+                    className={`text-xs font-bold font-mono ${
+                      isExpense ? 'text-rose-500' : 'text-emerald-500'
+                    }`}
+                  >
+                    {isExpense ? '-' : '+'}
+                    {formatCurrency(item.amount, defaultCurrency, locale)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => db.recurringTransactions.delete(item.id)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                    title={t('settings.delete', 'Hapus')}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        )}
       </SettingsSection>
     </>
   )

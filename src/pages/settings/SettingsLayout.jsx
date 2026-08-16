@@ -1,4 +1,5 @@
 import { matchPath, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 
 const ROUTES_META = [
@@ -6,7 +7,7 @@ const ROUTES_META = [
   { path: '/settings/categories', titleKey: 'settings.section.categories' },
   { path: '/settings/recurring', titleKey: 'settings.recurringTitle' },
   { path: '/settings/data', titleKey: 'settings.nav.data' },
-  { path: '/settings/help', titleKey: 'profile.help' },
+  { path: '/settings/help', titleKey: 'settings.helpTitle' },
   { path: '/settings/account', titleKey: 'settings.account.title' },
 ]
 
@@ -19,20 +20,20 @@ export default function SettingsLayout() {
   return (
     <div className="ft-settings-page">
       {meta ? (
-        <header className="sticky top-0 z-10 mb-6 flex items-center gap-3 bg-[var(--bg)]/95 py-4 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--bg)]/80">
+        <header className="sticky top-0 z-20 mb-4 flex items-center gap-3 bg-[var(--bg)]/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--bg)]/80">
           <button
             type="button"
             onClick={() => navigate('/settings')}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-sm transition hover:bg-[var(--field-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             aria-label={t('common.back')}
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
+            <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-lg font-bold tracking-tight text-[var(--fg)]">
-            {t(meta.titleKey)}
-          </h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-bold tracking-tight text-[var(--fg)]">
+              {t(meta.titleKey)}
+            </h1>
+          </div>
         </header>
       ) : null}
       <Outlet />
