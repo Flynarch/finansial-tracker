@@ -2191,21 +2191,170 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   animation: ft-receipt-item-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-/* ── View Transitions API: Diagonal Wind & Storm Reveal ────────────── */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-  display: block;
+/* ── High-Performance 60fps GPU Animation Engine ────────────── */
+@keyframes ft-page-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-::view-transition-old(root) {
-  z-index: 1;
+.ft-page-transition {
+  animation: ft-page-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  contain: layout style paint;
 }
 
-::view-transition-new(root) {
-  z-index: 999999;
+/* GPU acceleration helper */
+.ft-gpu {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
 }
+
+/* Ultra-smooth tactile micro-interaction */
+.ft-tap {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+  will-change: transform;
+}
+
+.ft-tap:active {
+  transform: scale(0.97);
+}
+
+/* Silky staggered card entrance */
+@keyframes ft-card-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.ft-animate-card {
+  animation: ft-card-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Hardware accelerated backdrop motion layer */
+.ft-motion-overlay {
+  will-change: opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* ── AI Chat & Quick Log Bottom Sheet Animations ─────────── */
+.ft-chat-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease-out;
+  will-change: opacity;
+}
+
+.ft-chat-backdrop--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ft-chat-sheet {
+  position: fixed;
+  inset-x: 0;
+  bottom: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  height: 88dvh;
+  max-height: 850px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: var(--panel-strong);
+  border-top-left-radius: 1.75rem;
+  border-top-right-radius: 1.75rem;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+  transform: translate3d(0, 100%, 0);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+
+.ft-chat-sheet--open {
+  transform: translate3d(0, 0, 0);
+}
+
+.ft-chat-drag-handle {
+  width: 2.75rem;
+  height: 0.3rem;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--border-strong) 60%, transparent);
+  margin: 0.5rem auto 0.25rem auto;
+  flex-shrink: 0;
+}
+
+.ft-quicklog-sheet {
+  transform: translate3d(0, 100%, 0);
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.ft-quicklog-sheet--open {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Reduced Motion Override for Accessibility & Performance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ft-page-transition,
+  .ft-animate-card {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+[data-motion='reduce'] *,
+[data-motion='reduce'] ::before,
+[data-motion='reduce'] ::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+[data-motion='reduce'] .ft-page-transition,
+[data-motion='reduce'] .ft-animate-card {
+  animation: none !important;
+  transform: none !important;
+}
+
 
 
 

@@ -197,7 +197,7 @@ function Navbar() {
 
             {/* ── Notification Dropdown ── */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.32s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+              <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-3.5 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.22s_cubic-bezier(0.16,1,0.3,1)_both] will-change-[transform,opacity] [transform:translate3d(0,0,0)]">
                 {/* Panel Header */}
                 <div className="flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5 mb-2.5 shrink-0">
                   <div className="flex items-center gap-2">

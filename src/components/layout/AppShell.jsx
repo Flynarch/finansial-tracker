@@ -210,7 +210,9 @@ function AppShell() {
             isDetailPage ? 'pb-8' : 'pb-[calc(10.5rem+env(safe-area-inset-bottom))]'
           }`}
         >
-          <Outlet />
+          <div key={location.pathname} className="ft-page-transition">
+            <Outlet />
+          </div>
         </main>
       </div>
       {!isDetailPage && <BottomNav />}

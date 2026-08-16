@@ -32,12 +32,12 @@ export default function BottomSheet({
       />
       <div className={`absolute inset-x-0 bottom-0 mx-auto w-full px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] ${maxWidth}`}>
         <div
-          className={`${maxHeight} overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-380 ft-hide-scrollbar ${
-            sheetVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'
+          className={`${maxHeight} overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-250 will-change-[transform,opacity] [transform:translate3d(0,0,0)] ft-hide-scrollbar ${
+            sheetVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-8 scale-98 opacity-0'
           } ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            transitionTimingFunction: sheetVisible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+            transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
           {showHandle ? <div className="mx-auto mb-2.5 h-1.5 w-12 rounded-full bg-[var(--border-strong)]/70" /> : null}

@@ -30,12 +30,12 @@ function Modal({ isOpen, title, children, onClose }) {
       onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
     >
       <div
-        className={`w-full max-w-md max-h-[90vh] overflow-y-auto hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-2xl transition-all duration-380 ${
-          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-92 translate-y-4 opacity-0'
+        className={`w-full max-w-md max-h-[90vh] overflow-y-auto hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-2xl transition-all duration-250 will-change-[transform,opacity] [transform:translate3d(0,0,0)] ${
+          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
         }`}
         style={{
           boxShadow: 'var(--shadow-card)',
-          transitionTimingFunction: isVisible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+          transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
         }}
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
