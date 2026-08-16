@@ -216,19 +216,16 @@ export default function SettingsHome() {
         <SettingsLinkRow
           to="/settings/categories"
           label={t('settings.categories', 'Kategori Transaksi')}
-          subtitle={t('settings.categoriesSubtitle', 'Kelola kategori pengeluaran, pemasukan & ikon')}
           icon={Tag}
         />
         <SettingsLinkRow
           to="/settings/recurring"
           label={t('settings.recurringTitle', 'Transaksi Berulang')}
-          subtitle={t('settings.recurringSubtitle', 'Otomasi tagihan rutin, cicilan, sewa & gaji')}
           icon={RefreshCw}
         />
         <SettingsLinkRow
           to="/settings/currency"
           label={t('settings.fxRatesTitle', 'Kurs & Konversi Mata Uang')}
-          subtitle={t('settings.fxSubtitle', 'Kalkulator konversi valas & live ticker nilai tukar')}
           icon={TrendingUp}
         />
       </SettingsSection>
@@ -238,19 +235,16 @@ export default function SettingsHome() {
         <SettingsLinkRow
           to="/settings/security"
           label={t('settings.appLock', 'Keamanan & Kunci Aplikasi')}
-          subtitle={t('settings.securitySubtitle', 'Sidik jari, Face ID, atau sandi layar HP')}
           icon={securityEnabled ? ShieldCheck : Lock}
         />
         <SettingsLinkRow
           to="/settings/ai"
           label={t('settings.aiIntegration', 'Integrasi Asisten AI (Gemini)')}
-          subtitle={t('settings.aiSubtitle', 'Atur Gemini API Key & fitur analisis finansial cerdas')}
           icon={Bot}
         />
         <SettingsLinkRow
           to="/settings/data"
           label={t('settings.nav.data', 'Data & Cadangan')}
-          subtitle={t('settings.dataSubtitle', 'Ekspor JSON, Impor data, dan mode Uji Coba')}
           icon={Database}
         />
       </SettingsSection>
@@ -260,7 +254,6 @@ export default function SettingsHome() {
         <SettingsLinkRow
           to="/settings/help"
           label={t('settings.helpTitle', 'Tur & Panduan Fitur')}
-          subtitle={t('settings.helpSubtitle', 'FAQ pertanyaan umum & panduan fitur')}
           icon={Compass}
         />
       </SettingsSection>
