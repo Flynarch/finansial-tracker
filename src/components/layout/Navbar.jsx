@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
@@ -10,6 +11,7 @@ import {
   Bell,
   BellOff,
   CheckCheck,
+  ChevronRight,
   Trash2,
   Clock,
   HandCoins,
@@ -46,6 +48,7 @@ function getNotificationIcon(title = '', message = '') {
 }
 
 function Navbar() {
+  const navigate = useNavigate()
   const { t, locale } = useTranslation()
   const profileName = useSettingsStore((state) => state.profileName)
   const greetingText = getTimeBasedGreeting(locale)
@@ -102,19 +105,34 @@ function Navbar() {
   return (
     <header className="pt-5 pb-2 px-4 sm:px-6 sm:pt-6">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--fg)] text-xs font-bold tracking-[0.15em] text-[var(--bg)] shadow-sm">
-            {profileName ? profileName.substring(0, 2).toUpperCase() : 'FT'}
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="group flex min-w-0 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-2xl p-1 -ml-1 active:scale-[0.98] transition cursor-pointer"
+          title={t('profile.title', 'Lihat Profil')}
+          aria-label={t('profile.title', 'Lihat Profil')}
+        >
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] shadow-xs transition group-hover:border-[var(--border-strong)]">
+            <span className="text-xs font-black tracking-wider text-[var(--fg)]">
+              {profileName ? profileName.substring(0, 2).toUpperCase() : 'FT'}
+            </span>
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--bg)]" />
           </div>
           <div className="min-w-0 flex flex-col justify-center">
-            <p className="truncate text-[10px] font-bold tracking-widest text-[var(--muted)] uppercase mb-0.5">
-              {greetingText}
-            </p>
-            <h1 className="truncate text-base font-bold tracking-tight text-[var(--fg)] leading-none">
-              {profileName || 'FinTrack'}
-            </h1>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] opacity-80" />
+              <p className="truncate text-[10px] font-extrabold tracking-widest text-[var(--muted)] uppercase leading-none">
+                {greetingText}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <h1 className="truncate text-sm sm:text-base font-black tracking-tight text-[var(--fg)] leading-tight">
+                {profileName || 'FinTrack'}
+              </h1>
+              <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </div>
           </div>
-        </div>
+        </button>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3" ref={dropdownRef}>
           <span className="hidden rounded-lg bg-[var(--field-bg)] px-3 py-1.5 text-[11px] font-bold tracking-wide text-[var(--muted)] sm:inline-block">
@@ -126,7 +144,7 @@ function Navbar() {
             onClick={() => useChatStore.getState().setIsOpen(true)}
             aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
             title={t('aiChat.title', 'Konsultasi AI Chat')}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)]/40 active:scale-95 shadow-xs transition-all duration-200 cursor-pointer"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] active:scale-95 shadow-2xs transition-all duration-200 cursor-pointer"
           >
             <Sparkles className="h-4.5 w-4.5 text-[var(--fg)]" strokeWidth={2.2} />
           </button>
@@ -135,25 +153,26 @@ function Navbar() {
             <button
               type="button"
               onClick={() => setShowNotifications((prev) => !prev)}
-              aria-label={t('navbar.notifications') || 'Notifikasi'}
+              aria-label={t('navbar.notifications', 'Notifikasi')}
               aria-expanded={showNotifications}
-              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-200 active:scale-95 cursor-pointer ${
+              title={t('navbar.notifications', 'Notifikasi')}
+              className={`relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs ${
                 showNotifications
                   ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent shadow-md'
-                  : 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border)] hover:bg-[var(--border)]/40 shadow-xs'
+                  : 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)]'
               }`}
             >
               <Bell className="h-4.5 w-4.5" strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
+                <span className="absolute top-2 right-2 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 ring-2 ring-[var(--panel-strong)]" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-[var(--bg)]" />
                 </span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-3xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-4 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.32s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+              <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-3xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-4 shadow-2xl shadow-black/15 max-h-[460px] flex flex-col origin-top-right animate-[ft-spring-dropdown_0.32s_cubic-bezier(0.34,1.56,0.64,1)_both]">
                 {/* Panel Header */}
                 <div className="flex items-center justify-between border-b border-[var(--border)]/60 pb-3 mb-3 shrink-0">
                   <div className="flex items-center gap-2">
