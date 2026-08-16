@@ -2,7 +2,7 @@ import { memo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ReceiptText, Plus } from 'lucide-react'
 import { convertCurrency, formatCurrency, toSafeNumber } from '../../lib/utils'
 import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../../lib/categoryIcon'
 import CategoryIcon from '../ui/CategoryIcon'
@@ -107,21 +107,40 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
             </div>
           )
         })() : isDbLoading ? (
-          <div className="flex items-center gap-3 py-3 px-2 animate-pulse">
-            <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--border)]" />
-            <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-2/3 rounded bg-[var(--border)]" />
-              <div className="h-2.5 w-1/2 rounded bg-[var(--border)]/60" />
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 animate-pulse">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <div className="h-8 w-8 shrink-0 rounded-lg bg-[var(--border)]/70" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3 w-28 rounded bg-[var(--border)]/80" />
+                  <div className="h-2 w-36 rounded bg-[var(--border)]/50" />
+                </div>
+              </div>
+              <div className="h-6 w-14 rounded-lg bg-[var(--border)]/60" />
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 py-3 px-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
-              <ChevronRight className="h-4 w-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.history.empty') || 'Belum ada transaksi'}</p>
-              <p className="text-[10px] mt-0.5 font-medium text-[var(--muted)]">Mulai catat pengeluaran pertamamu.</p>
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 transition-colors hover:border-[var(--border-strong)]">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
+                  <ReceiptText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-[var(--fg)]">
+                    {t('dashboard.history.empty', 'Belum Ada Transaksi')}
+                  </p>
+                  <p className="truncate text-[10px] font-medium text-[var(--muted)]">
+                    {t('dashboard.history.emptyDescCompact', 'Mulai catat transaksi pertamamu')}
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0">
+                <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15 border border-[var(--accent)]/25 px-2 py-1 text-[10px] font-extrabold text-[var(--accent)] shadow-2xs">
+                  <Plus className="h-3 w-3" strokeWidth={2.5} />
+                  <span>{t('dashboard.history.add', 'Catat')}</span>
+                </span>
+              </div>
             </div>
           </div>
         )}
