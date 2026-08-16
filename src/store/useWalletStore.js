@@ -4,7 +4,9 @@ import { db } from '../lib/db'
 const useWalletStore = create((set, get) => ({
   wallets: [],
   isLoading: false,
-  
+
+  setWallets: (wallets) => set({ wallets }),
+
   loadWallets: async () => {
     set({ isLoading: true })
     try {

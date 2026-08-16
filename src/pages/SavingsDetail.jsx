@@ -120,7 +120,8 @@ export default function SavingsDetail() {
   }
 
   const handleFundTransaction = async () => {
-    const val = parseMoneyInput(amountInput)
+    const targetCurrency = goal?.currency || defaultCurrency
+    const val = parseMoneyInput(amountInput, targetCurrency)
     if (val <= 0) return
 
     const isWithdraw = fundActionType === 'withdraw'
@@ -135,13 +136,6 @@ export default function SavingsDetail() {
     let walletObj = null
     if (walletIdNum) {
       walletObj = await db.wallets.get(walletIdNum)
-      if (walletObj) {
-        const currentBal = Number(walletObj.balance || 0)
-        const newWalletBal = isWithdraw
-          ? currentBal + val
-          : Math.max(0, currentBal - val)
-        await db.wallets.update(walletIdNum, { balance: newWalletBal })
-      }
     }
 
     const now = new Date()
@@ -201,11 +195,7 @@ export default function SavingsDetail() {
       status: 'completed',
     })
 
-    // 2. Update Wallet Balance
-    const newBal = Number(walletObj.balance || 0) + cashoutAmount
-    await db.wallets.update(walletIdNum, { balance: newBal })
-
-    // 3. Add Income Transaction to Wallet
+    // 2. Add Income Transaction to Wallet (computeWalletBalance dynamically reflects this)
     const now = new Date()
     const formattedDate = format(now, 'yyyy-MM-dd HH:mm:ss')
     await db.transactions.add({

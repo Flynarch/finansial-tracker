@@ -61,11 +61,13 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-black tracking-tight text-[var(--fg)] flex items-center gap-1">
-                Utang & Piutang
+                {t('loans.title', 'Utang & Piutang')}
                 <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
               </h3>
               <p className="text-[11px] font-bold text-[var(--muted)] truncate">
-                {activeCount > 0 ? `${activeCount} Catatan Aktif` : 'Kelola pinjaman & hak tagih'}
+                {activeCount > 0
+                  ? t('loans.activeRecords', { count: activeCount }, `${activeCount} Catatan Aktif`)
+                  : t('loans.manageLoans', 'Kelola pinjaman & hak tagih')}
               </p>
             </div>
           </div>
@@ -80,7 +82,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             aria-label={t('loans.add', 'Catat Hutang atau Piutang')}
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-            <span>Catat</span>
+            <span>{t('loans.record', 'Catat')}</span>
           </button>
         </div>
 
@@ -90,7 +92,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             <div className="grid grid-cols-2 gap-3 pt-0.5">
               <div className="min-w-0">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--status-expense)]">
-                  Utang Saya
+                  {t('loans.myDebt', 'Utang Saya')}
                 </span>
                 <p className="mt-0.5 text-base sm:text-lg font-black tabular-nums text-[var(--status-expense)] truncate">
                   {formatCurrency(totalDebt, defaultCurrency, locale)}
@@ -99,7 +101,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
 
               <div className="min-w-0 border-l border-[var(--border)]/60 pl-3">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--status-income)]">
-                  Piutang Saya
+                  {t('loans.myReceivable', 'Piutang Saya')}
                 </span>
                 <p className="mt-0.5 text-base sm:text-lg font-black tabular-nums text-[var(--status-income)] truncate">
                   {formatCurrency(totalReceivable, defaultCurrency, locale)}
@@ -122,7 +124,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             {/* Posisi Bersih Footer */}
             <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-dashed border-[var(--border)]">
               <span className="text-[var(--muted)] flex items-center gap-1">
-                <Scale className="h-3.5 w-3.5" /> Posisi Bersih
+                <Scale className="h-3.5 w-3.5" /> {t('loans.netPosition', 'Posisi Bersih')}
               </span>
 
               <div className="flex items-center gap-2">
@@ -135,7 +137,11 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
                       : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
                   }`}
                 >
-                  {isNetPositive ? 'Surplus' : isNetNegative ? 'Beban' : 'Seimbang'}
+                  {isNetPositive
+                    ? t('loans.surplus', 'Surplus')
+                    : isNetNegative
+                    ? t('loans.deficit', 'Beban')
+                    : t('loans.balanced', 'Seimbang')}
                 </span>
                 <span
                   className={`font-black tabular-nums ${
@@ -159,17 +165,19 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
                 <span className="truncate">
                   <strong className="font-bold">{mostUrgentItem.title}</strong>{' '}
                   {mostUrgentItem.isOverdue
-                    ? 'terlambat'
+                    ? t('loans.overdue', 'terlambat')
                     : mostUrgentItem.daysLeft === 0
-                    ? 'jatuh tempo hari ini'
-                    : `${mostUrgentItem.daysLeft} hari lagi`}
+                    ? t('loans.dueToday', 'jatuh tempo hari ini')
+                    : t('loans.daysLeft', { days: mostUrgentItem.daysLeft }, `${mostUrgentItem.daysLeft} hari lagi`)}
                 </span>
               </div>
             )}
           </>
         ) : (
           <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-3 text-center">
-            <p className="text-xs font-bold text-[var(--muted)]">Belum Ada Catatan Utang & Piutang</p>
+            <p className="text-xs font-bold text-[var(--muted)]">
+              {t('loans.empty', 'Belum Ada Catatan Utang & Piutang')}
+            </p>
           </div>
         )}
       </div>

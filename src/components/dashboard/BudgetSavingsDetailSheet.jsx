@@ -106,16 +106,16 @@ export default function BudgetSavingsDetailSheet({
               </div>
               <div className="min-w-0">
                 <h3 className="text-base font-black tracking-tight text-[var(--fg)] truncate">
-                  {isBudget ? 'Anggaran Bulan Ini' : 'Target Tabungan'}
+                  {isBudget ? t('dashboard.budgetThisMonth', 'Anggaran Bulan Ini') : t('dashboard.savings', 'Target Tabungan')}
                 </h3>
                 <p className="text-xs font-semibold text-[var(--muted)] truncate">
                   {isBudget
                     ? budgetCalc
-                      ? `${budgetCalc.count} Kategori Terpantau`
-                      : 'Pantau batas pengeluaran'
+                      ? `${budgetCalc.count} ${t('dashboard.categoriesMonitored', 'Kategori Terpantau')}`
+                      : t('dashboard.monitorLimits', 'Pantau batas pengeluaran')
                     : goalCalc
-                      ? `${goalCalc.count} Target Aktif`
-                      : 'Progres tujuan impian'}
+                      ? `${goalCalc.count} ${t('dashboard.activeGoals', 'Target Aktif')}`
+                      : t('dashboard.dreamProgress', 'Progres tujuan impian')}
                 </p>
               </div>
             </div>
@@ -131,7 +131,7 @@ export default function BudgetSavingsDetailSheet({
                 className="inline-flex items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                <span>{isBudget ? 'Anggaran' : 'Target'}</span>
+                <span>{isBudget ? t('budget.title', 'Anggaran') : t('savings.title', 'Target')}</span>
               </button>
 
               <button
@@ -155,7 +155,7 @@ export default function BudgetSavingsDetailSheet({
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
                     <div className="flex items-center justify-between gap-2 min-w-0">
                       <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
-                        Total Pengeluaran Anggaran
+                        {t('dashboard.totalBudgetSpent', 'Total Pengeluaran Anggaran')}
                       </span>
                       <span
                         className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide border ${
@@ -166,7 +166,7 @@ export default function BudgetSavingsDetailSheet({
                             : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
                         }`}
                       >
-                        {budgetCalc.overallPct}% Terpakai
+                        {budgetCalc.overallPct}% {t('dashboard.spentPct', 'Terpakai')}
                       </span>
                     </div>
 
@@ -179,7 +179,7 @@ export default function BudgetSavingsDetailSheet({
                           </span>
                         </p>
                         <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
-                          Sisa:{' '}
+                          {t('dashboard.budgetRemaining', 'Sisa')}:{' '}
                           <span
                             className={
                               budgetCalc.isOverBudget ? 'text-rose-500 font-black' : 'text-[var(--fg)] font-black'
@@ -209,7 +209,7 @@ export default function BudgetSavingsDetailSheet({
                   {budgetCalc.warningItems.length > 0 ? (
                     <div className="space-y-2">
                       <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Perlu Diperhatikan ({budgetCalc.warningItems.length})
+                        <AlertTriangle className="h-3.5 w-3.5" /> {t('dashboard.needsAttention', 'Perlu Diperhatikan')} ({budgetCalc.warningItems.length})
                       </p>
                       <div className="space-y-2">
                         {budgetCalc.warningItems.map((row) => {
@@ -258,7 +258,7 @@ export default function BudgetSavingsDetailSheet({
                   ) : (
                     <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-500 font-bold">
                       <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
-                      <span>Semua {budgetCalc.count} anggaran dalam batas aman</span>
+                      <span>{t('dashboard.allBudgetsSafe', { count: budgetCalc.count }, `Semua ${budgetCalc.count} anggaran dalam batas aman`)}</span>
                     </div>
                   )}
 
@@ -271,14 +271,14 @@ export default function BudgetSavingsDetailSheet({
                     }}
                     className="w-full py-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-center text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <span>Buka Halaman Anggaran Lengkap</span>
+                    <span>{t('dashboard.openFullBudget', 'Buka Halaman Anggaran Lengkap')}</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                  <p className="text-sm font-bold text-[var(--fg)]">Belum Ada Anggaran</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">Atur batas pengeluaran untuk mengendalikan keuangan bulananmu.</p>
+                  <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.noBudgetYet', 'Belum Ada Anggaran')}</p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.noBudgetDesc', 'Atur batas pengeluaran untuk mengendalikan keuangan bulananmu.')}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -288,7 +288,7 @@ export default function BudgetSavingsDetailSheet({
                     className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={2.5} />
-                    Buat Anggaran Sekarang
+                    {t('dashboard.createBudgetNow', 'Buat Anggaran Sekarang')}
                   </button>
                 </div>
               )}
@@ -302,10 +302,10 @@ export default function BudgetSavingsDetailSheet({
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
                     <div className="flex items-center justify-between gap-2 min-w-0">
                       <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
-                        Total Tabungan Terkumpul
+                        {t('dashboard.totalSavingsCollected', 'Total Tabungan Terkumpul')}
                       </span>
                       <span className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                        {goalCalc.overallPct}% Terkumpul
+                        {goalCalc.overallPct}% {t('dashboard.collectedPct', 'Terkumpul')}
                       </span>
                     </div>
 
@@ -318,7 +318,7 @@ export default function BudgetSavingsDetailSheet({
                           </span>
                         </p>
                         <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
-                          {goalCalc.count} Target Aktif
+                          {goalCalc.count} {t('dashboard.activeGoals', 'Target Aktif')}
                         </p>
                       </div>
                     </div>
@@ -334,7 +334,7 @@ export default function BudgetSavingsDetailSheet({
                   {/* Goals List */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
-                      <Target className="h-3.5 w-3.5" /> Daftar Target Tabungan ({goalCalc.count})
+                      <Target className="h-3.5 w-3.5" /> {t('dashboard.goalsList', 'Daftar Target Tabungan')} ({goalCalc.count})
                     </p>
                     <div className="space-y-2">
                       {goalCalc.topGoals.map((row) => (
@@ -378,14 +378,14 @@ export default function BudgetSavingsDetailSheet({
                     }}
                     className="w-full py-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-center text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <span>Buka Halaman Target Tabungan Lengkap</span>
+                    <span>{t('dashboard.openFullSavings', 'Buka Halaman Target Tabungan Lengkap')}</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                  <p className="text-sm font-bold text-[var(--fg)]">Belum Ada Target Tabungan</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">Pasang impian finansialmu dan mulai menabung sekarang.</p>
+                  <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.noGoalsYet', 'Belum Ada Target Tabungan')}</p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.noGoalsDesc', 'Pasang impian finansialmu dan mulai menabung sekarang.')}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -395,7 +395,7 @@ export default function BudgetSavingsDetailSheet({
                     className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
                   >
                     <Plus size={14} strokeWidth={2.5} />
-                    Tambah Target Sekarang
+                    {t('dashboard.addGoalNow', 'Tambah Target Sekarang')}
                   </button>
                 </div>
               )}

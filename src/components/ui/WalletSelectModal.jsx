@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, computeAllWalletBalances } from '../../lib/db'
 import { Wallet, Check, Search, X, Plus, ChevronDown } from 'lucide-react'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
-import { formatCurrency } from '../../lib/utils'
+import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
+import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 
@@ -12,15 +15,31 @@ function formatAbbreviatedBalance(val, currency = 'IDR') {
   if (!Number.isFinite(num) || num === 0) return `${currency === 'IDR' ? 'Rp' : currency} 0`
   const abs = Math.abs(num)
   const sign = num < 0 ? '-' : ''
+  const isIdr = currency === 'IDR'
+  const prefix = isIdr ? 'Rp ' : `${currency} `
+
+  if (isIdr) {
+    if (abs >= 1000000) {
+      const millions = (abs / 1000000).toFixed(1).replace(/\.0$/, '')
+      return `${sign}Rp ${millions}jt`
+    }
+    if (abs >= 1000) {
+      const thousands = Math.round(abs / 1000)
+      return `${sign}Rp ${thousands}rb`
+    }
+    return `${sign}Rp ${Math.round(abs)}`
+  }
+
+  // Non-IDR (USD, EUR, SGD, MYR, JPY, GBP, etc.)
   if (abs >= 1000000) {
     const millions = (abs / 1000000).toFixed(1).replace(/\.0$/, '')
-    return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${millions}jt`
+    return `${sign}${prefix}${millions}M`
   }
   if (abs >= 1000) {
-    const thousands = Math.round(abs / 1000)
-    return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${thousands}rb`
+    const thousands = (abs / 1000).toFixed(1).replace(/\.0$/, '')
+    return `${sign}${prefix}${thousands}k`
   }
-  return `${sign}${currency === 'IDR' ? 'Rp' : currency} ${abs}`
+  return `${sign}${prefix}${abs.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
 export function WalletSelectTrigger({
@@ -79,7 +98,7 @@ export function WalletSelectTrigger({
               {wallet.name}
             </p>
             <p className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5">
-              Saldo: {abbreviateBalance ? formatAbbreviatedBalance(wallet.balance ?? wallet.currentBalance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.balance ?? wallet.currentBalance ?? 0, wallet.currency || defaultCurrency)}
+              Saldo: {abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency)}
             </p>
           </div>
         </div>
@@ -102,9 +121,10 @@ export function WalletSelectTrigger({
 export default function WalletSelectModal({
   isOpen,
   onClose,
-  wallets = [],
+  wallets: propWallets,
   selectedWalletId,
   onSelectWallet,
+  onSelect,
   title = 'Pilih Dompet / Akun',
   subtitle = 'Pilih akun dompet untuk transaksi ini',
   allowNone = false,
@@ -115,9 +135,18 @@ export default function WalletSelectModal({
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [search, setSearch] = useState('')
 
+  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [], [])
+  const rates = useMemo(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }, [])
+
+  const enrichedWallets = useMemo(() => {
+    const rawWallets = propWallets && propWallets.length > 0 ? propWallets : (dbWallets || [])
+    return computeAllWalletBalances(rawWallets, allTransactions || [], rates)
+  }, [propWallets, dbWallets, allTransactions, rates])
+
   const activeWallets = useMemo(() => {
-    return (wallets || []).filter((w) => !w.isArchived)
-  }, [wallets])
+    return (enrichedWallets || []).filter((w) => !w.isArchived)
+  }, [enrichedWallets])
 
   const filteredWallets = useMemo(() => {
     if (!search.trim()) return activeWallets
@@ -132,7 +161,9 @@ export default function WalletSelectModal({
   if (!isOpen) return null
 
   const handleSelect = (id) => {
-    onSelectWallet(id)
+    const selectedObj = enrichedWallets.find((w) => String(w.id) === String(id)) || { id }
+    if (onSelectWallet) onSelectWallet(id)
+    if (onSelect) onSelect(selectedObj)
     onClose()
   }
 
@@ -231,7 +262,7 @@ export default function WalletSelectModal({
           ) : (
             filteredWallets.map((w) => {
               const isSelected = String(w.id) === String(selectedWalletId)
-              const balance = w.balance ?? w.currentBalance ?? 0
+              const balance = w.currentBalance ?? w.balance ?? 0
               const logoUrl = getWalletLogoUrl(w)
 
               return (

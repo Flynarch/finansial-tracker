@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import EmptyState from '../ui/EmptyState'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import ChartTooltip from './ChartTooltip'
 
@@ -59,21 +60,29 @@ function donutInsidePercentLabel({ cx, cy, midAngle, innerRadius, outerRadius, p
   )
 }
 
-function formatIdrCompact(amount, { locale = 'id' } = {}) {
+function formatCompactCurrency(amount, currency = 'IDR', { locale = 'id' } = {}) {
   const n = Number(amount || 0)
   const sign = n < 0 ? '-' : ''
   const abs = Math.abs(n)
-  const prefix = 'Rp '
   const fmt = (value, digits = 1) =>
     value.toLocaleString(locale === 'en' ? 'en-US' : 'id-ID', {
       minimumFractionDigits: 0,
       maximumFractionDigits: digits,
     })
 
-  if (abs >= 1_000_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000_000)} T`
-  if (abs >= 1_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000)} M`
-  if (abs >= 1_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000)} jt`
-  if (abs >= 1_000) return `${sign}${prefix}${fmt(Math.round(abs), 0)}`
+  if (currency === 'IDR') {
+    const prefix = 'Rp '
+    if (abs >= 1_000_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000_000)} T`
+    if (abs >= 1_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000)} M`
+    if (abs >= 1_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000)} jt`
+    if (abs >= 1_000) return `${sign}${prefix}${fmt(Math.round(abs), 0)}`
+    return `${sign}${prefix}${fmt(abs, 0)}`
+  }
+
+  const prefix = currency === 'USD' ? '$' : `${currency} `
+  if (abs >= 1_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000)}B`
+  if (abs >= 1_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000)}M`
+  if (abs >= 1_000) return `${sign}${prefix}${fmt(abs / 1_000)}k`
   return `${sign}${prefix}${fmt(abs, 0)}`
 }
 
@@ -96,9 +105,12 @@ export default function ReportDonutSection({
   compactDonut,
 }) {
   const { t, locale } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
   const safeActivePieIdx = donutData.length ? Math.min(activePieIdx, donutData.length - 1) : 0
-  const donutTotalText = compactDonut ? formatIdrCompact(donutTotal, { locale }) : formatCurrency(donutTotal, 'IDR')
+  const donutTotalText = compactDonut
+    ? formatCompactCurrency(donutTotal, defaultCurrency, { locale })
+    : formatCurrency(donutTotal, defaultCurrency)
   const categoriesList = donutKind === 'income' ? topIncomeCategories : topExpenseCategories
 
   return (
@@ -197,10 +209,10 @@ export default function ReportDonutSection({
                   startAngle={90}
                   endAngle={-270}
                   paddingAngle={3}
-                  outerRadius={80}
-                  innerRadius={54}
+                  outerRadius={compactDonut ? 82 : 88}
+                  innerRadius={compactDonut ? 56 : 62}
                   activeIndex={safeActivePieIdx}
-                  activeOuterRadius={90}
+                  activeOuterRadius={compactDonut ? 90 : 96}
                   onMouseEnter={(_, index) => setActivePieIdx(index)}
                   onTouchMove={(_, index) => setActivePieIdx(index)}
                   onClick={(_, index) => {
@@ -231,30 +243,28 @@ export default function ReportDonutSection({
                 <Tooltip content={<ChartTooltip />} />
                 <text
                   x="50%"
-                  y={compactDonut ? '43%' : '45%'}
+                  y="40%"
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="var(--muted-2)"
-                  fontSize={compactDonut ? 9 : 10}
+                  fontSize={9}
                   fontWeight={700}
-                  style={{ letterSpacing: compactDonut ? '0.08em' : '0.1em', textTransform: 'uppercase' }}
+                  style={{ letterSpacing: '0.1em', textTransform: 'uppercase' }}
                 >
-                  {compactDonut ? (
-                    <>
-                      <tspan x="50%" dy="0">{t('reports.total')}</tspan>
-                      <tspan x="50%" dy="12">{donutKind === 'income' ? t('reports.income') : t('reports.expense')}</tspan>
-                    </>
-                  ) : (
-                    donutCenterTitle
-                  )}
+                  <tspan x="50%" dy="0">{t('reports.total', 'Total')}</tspan>
+                  <tspan x="50%" dy="11" fontSize={8.5} fill="var(--muted)">
+                    {selectedDrilldownParent
+                      ? (donutCenterTitle.length > 12 ? `${donutCenterTitle.slice(0, 11)}…` : donutCenterTitle)
+                      : (donutKind === 'income' ? t('reports.income', 'Pemasukan') : t('reports.expense', 'Pengeluaran'))}
+                  </tspan>
                 </text>
                 <text
                   x="50%"
-                  y={compactDonut ? '57%' : '56%'}
+                  y="60%"
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="var(--fg)"
-                  fontSize={compactDonut ? 14 : 16}
+                  fontSize={String(donutTotalText).length > 14 ? 11.5 : String(donutTotalText).length > 10 ? 13 : 15}
                   fontWeight={800}
                 >
                   {donutTotalText}
@@ -309,7 +319,7 @@ export default function ReportDonutSection({
                           <p className="text-xs sm:text-sm font-semibold text-[var(--fg)] leading-snug break-words">{row.label || '-'}</p>
                         </div>
                         <p className="text-xs sm:text-sm font-bold tabular-nums tracking-tight text-[var(--fg)] shrink-0 mt-0.5">
-                          {formatCurrency(row.value, 'IDR')}
+                          {formatCurrency(row.value, defaultCurrency)}
                         </p>
                       </div>
                       {/* Row 2: Share % + Progress bar + Sub badge */}
@@ -339,7 +349,7 @@ export default function ReportDonutSection({
             <div className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-2.5 text-center">
               <p className="text-xs font-medium text-[var(--muted)]">
                 {t('reports.avgExpense')}:{' '}
-                <span className="font-bold tracking-tight text-[var(--fg)]">{formatCurrency(averageExpense, 'IDR')}</span>
+                <span className="font-bold tracking-tight text-[var(--fg)]">{formatCurrency(averageExpense, defaultCurrency)}</span>
               </p>
             </div>
           </div>

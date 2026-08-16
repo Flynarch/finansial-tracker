@@ -36,7 +36,7 @@ export const EXPENSE_TREE = [
     id: 'kebutuhan_harian',
     names: { id: 'Kebutuhan Harian', en: 'Daily Needs' },
     children: [
-      { id: 'belanja_bulanan', names: { id: 'Belanja Bulanan (Groceries)', en: 'Groceries' } },
+      { id: 'belanja_bulanan', names: { id: 'Belanja Bulanan', en: 'Groceries' } },
       { id: 'peralatan_rumah', names: { id: 'Peralatan Rumah', en: 'Household' } },
       { id: 'perlengkapan_mandi', names: { id: 'Perlengkapan Mandi', en: 'Toiletries' } },
       { id: 'laundry', names: { id: 'Laundry', en: 'Laundry' } },

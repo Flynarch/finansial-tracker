@@ -1,6 +1,8 @@
 import { Printer, Sparkles } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
+import { formatCurrency } from '../../lib/utils'
 
 const RANGE_OPTIONS = [
   { id: 3, label: '3M' },
@@ -10,6 +12,7 @@ const RANGE_OPTIONS = [
 
 export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncomeExpense }) {
   const { t, locale } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
   const handleOpenAiChat = () => {
     const store = useChatStore.getState()
@@ -21,8 +24,8 @@ export default function ReportHeader({ rangeMonths, setRangeMonths, monthlyIncom
       role: 'system',
       type: 'hidden',
       content: `[KONTEKS LAPORAN FINANSIAL: User sedang melihat Laporan Finansial rentang ${rangeMonths} bulan.\n` +
-        `- Bulan ini (${latestData.month}): Pemasukan Rp ${latestData.income.toLocaleString('id-ID')}, Pengeluaran Rp ${latestData.expense.toLocaleString('id-ID')}\n` +
-        `- Bulan lalu (${prevData.month}): Pemasukan Rp ${prevData.income.toLocaleString('id-ID')}, Pengeluaran Rp ${prevData.expense.toLocaleString('id-ID')}\n` +
+        `- Bulan ini (${latestData.month}): Pemasukan ${formatCurrency(latestData.income, defaultCurrency)}, Pengeluaran ${formatCurrency(latestData.expense, defaultCurrency)}\n` +
+        `- Bulan lalu (${prevData.month}): Pemasukan ${formatCurrency(prevData.income, defaultCurrency)}, Pengeluaran ${formatCurrency(prevData.expense, defaultCurrency)}\n` +
         `Bantu berikan analisis mendalam, perbandingan, dan saran penghematan konkret!]`,
     })
 

@@ -1,5 +1,6 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
 import ChartTooltip from './ChartTooltip'
 
@@ -10,7 +11,7 @@ function formatDelta(current, previous) {
   return `${sign}${pct.toFixed(1)}%`
 }
 
-function formatIdrCompact(amount, { locale = 'id' } = {}) {
+function formatCompactCurrency(amount, currency = 'IDR', { locale = 'id' } = {}) {
   const n = Number(amount || 0)
   const sign = n < 0 ? '-' : ''
   const abs = Math.abs(n)
@@ -20,21 +21,30 @@ function formatIdrCompact(amount, { locale = 'id' } = {}) {
       maximumFractionDigits: digits,
     })
 
-  if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000)} T`
-  if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000)} M`
-  if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000)} jt`
-  if (abs >= 1_000) return `${sign}${fmt(Math.round(abs), 0)}`
-  return `${sign}${fmt(abs, 0)}`
+  if (currency === 'IDR') {
+    if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000)} T`
+    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000)} M`
+    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000)} jt`
+    if (abs >= 1_000) return `${sign}${fmt(Math.round(abs), 0)}`
+    return `${sign}${fmt(abs, 0)}`
+  }
+
+  const prefix = currency === 'USD' ? '$' : `${currency} `
+  if (abs >= 1_000_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000_000)}B`
+  if (abs >= 1_000_000) return `${sign}${prefix}${fmt(abs / 1_000_000)}M`
+  if (abs >= 1_000) return `${sign}${prefix}${fmt(abs / 1_000)}k`
+  return `${sign}${prefix}${fmt(abs, 0)}`
 }
 
 export default function ReportNetWorthChart({ netWorthTrend }) {
   const { t, locale } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
   const netWorthLatest = netWorthTrend.at(-1)?.netWorth ?? 0
   const netWorthPrev = netWorthTrend.at(-2)?.netWorth ?? 0
   const deltaText = formatDelta(netWorthLatest, netWorthPrev)
 
-  const yAxisTickFormatter = (value) => formatIdrCompact(value, { locale })
+  const yAxisTickFormatter = (value) => formatCompactCurrency(value, defaultCurrency, { locale })
 
   return (
     <section className="overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
@@ -44,8 +54,8 @@ export default function ReportNetWorthChart({ netWorthTrend }) {
             {t('reports.netWorthTrend')}
           </h3>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            Saat ini:{' '}
-            <span className="font-extrabold text-[var(--accent)]">{formatCurrency(netWorthLatest, 'IDR')}</span>{' '}
+            {t('dashboard.gold.current', 'Saat ini')}:{' '}
+            <span className="font-extrabold text-[var(--accent)]">{formatCurrency(netWorthLatest, defaultCurrency)}</span>{' '}
             <span className="text-[11px] text-[var(--muted-2)]">({deltaText})</span>
           </p>
         </div>

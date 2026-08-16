@@ -15,7 +15,9 @@ import {
   convertCurrency,
   formatCurrency,
   toSafeNumber,
+  FALLBACK_EXCHANGE_RATES,
 } from '../lib/utils'
+import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { Plus, Minus, Target, Edit2, Trash2, ChevronLeft, Star, Archive, RotateCcw } from 'lucide-react'
 import { differenceInDays } from 'date-fns'
 
@@ -28,8 +30,21 @@ function Savings() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const [isEntering, setIsEntering] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+
+  useEffect(() => {
+    const loadRates = async () => {
+      try {
+        const fetchedRates = await fetchCurrencyRates('USD')
+        setRates(fetchedRates)
+      } catch {
+        setRates({ ...FALLBACK_EXCHANGE_RATES })
+      }
+    }
+    loadRates()
+  }, [])
 
   const showArchive = searchParams.get('view') === 'archive'
 
@@ -116,16 +131,16 @@ function Savings() {
   const totals = useMemo(() => {
     const rawActive = (goals ?? []).filter((g) => !g.isCompleted && !g.isArchived)
     const target = rawActive.reduce(
-      (sum, g) => sum + convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, {}),
+      (sum, g) => sum + convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, rates),
       0
     )
     const current = rawActive.reduce(
-      (sum, g) => sum + convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, {}),
+      (sum, g) => sum + convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, rates),
       0
     )
     const pct = target > 0 ? clampPercent((current / target) * 100) : 0
     return { target, current, pct }
-  }, [defaultCurrency, goals])
+  }, [defaultCurrency, goals, rates])
 
   const openAdd = useCallback(() => {
     setEditingId(null)

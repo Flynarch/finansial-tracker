@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Eye,
-  EyeOff,
   Sun,
   Moon,
+  Sparkles,
   Globe,
   Coins,
   Activity,
@@ -15,26 +14,30 @@ import {
   Database,
   Compass,
   Lock,
+  ChevronRight,
+  TrendingUp,
+  Check,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import PageHeader from '../../components/ui/PageHeader'
+import Modal from '../../components/ui/Modal'
 import { currencyOptions } from './settingsConstants'
 import {
+  SettingsBentoTile,
   SettingsLinkRow,
   SettingsSection,
-  SettingsSegmentControl,
-  SettingsSplitRow,
 } from './settingsComponents'
+import { executeThemeTransition } from '../../lib/themeTransition'
 
 const currencyDisplayMap = {
-  IDR: 'Rp • IDR',
-  USD: '$ • USD',
-  EUR: '€ • EUR',
-  SGD: 'S$ • SGD',
-  MYR: 'RM • MYR',
-  JPY: '¥ • JPY',
-  GBP: '£ • GBP',
+  IDR: { name: 'Rupiah Indonesia', symbol: 'Rp', code: 'IDR' },
+  USD: { name: 'US Dollar', symbol: '$', code: 'USD' },
+  EUR: { name: 'Euro', symbol: '€', code: 'EUR' },
+  SGD: { name: 'Singapore Dollar', symbol: 'S$', code: 'SGD' },
+  MYR: { name: 'Malaysian Ringgit', symbol: 'RM', code: 'MYR' },
+  JPY: { name: 'Japanese Yen', symbol: '¥', code: 'JPY' },
+  GBP: { name: 'British Pound', symbol: '£', code: 'GBP' },
 }
 
 export default function SettingsHome() {
@@ -45,297 +48,272 @@ export default function SettingsHome() {
   const locale = useSettingsStore((state) => state.locale)
   const theme = useSettingsStore((state) => state.theme)
   const motionPreference = useSettingsStore((state) => state.motionPreference)
-  const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const geminiApiKey = useSettingsStore((state) => state.geminiApiKey)
   const securityEnabled = useSettingsStore((state) => state.securityEnabled)
-  const securityMethod = useSettingsStore((state) => state.securityMethod)
   const profileName = useSettingsStore((state) => state.profileName)
 
   const setDefaultCurrency = useSettingsStore((state) => state.setDefaultCurrency)
   const setLocale = useSettingsStore((state) => state.setLocale)
   const setTheme = useSettingsStore((state) => state.setTheme)
   const setMotionPreference = useSettingsStore((state) => state.setMotionPreference)
-  const setGeminiApiKey = useSettingsStore((state) => state.setGeminiApiKey)
 
-  const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || '')
-  const [showKey, setShowKey] = useState(false)
-  const [keyStatusMessage, setKeyStatusMessage] = useState('')
-  const [prevGeminiApiKey, setPrevGeminiApiKey] = useState(geminiApiKey)
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false)
 
-  if (prevGeminiApiKey !== geminiApiKey) {
-    setPrevGeminiApiKey(geminiApiKey)
-    setApiKeyInput(geminiApiKey || '')
+  const handleToggleTheme = () => {
+    executeThemeTransition({
+      currentTheme: theme,
+      setTheme,
+      originX: typeof window !== 'undefined' ? window.innerWidth : 400,
+      originY: 0,
+    })
   }
 
-  const handleSaveApiKey = async (e) => {
-    e.preventDefault()
-    await setGeminiApiKey(apiKeyInput.trim())
-    setKeyStatusMessage(t('settings.apiKeySaved', 'API Key Gemini berhasil disimpan!'))
-    setTimeout(() => setKeyStatusMessage(''), 3000)
+  const handleToggleLocale = () => {
+    setLocale(locale === 'id' ? 'en' : 'id')
   }
 
-  const handleClearApiKey = async () => {
-    setApiKeyInput('')
-    await setGeminiApiKey('')
-    setKeyStatusMessage(t('settings.apiKeyCleared', 'API Key dikembalikan ke bawaan sistem.'))
-    setTimeout(() => setKeyStatusMessage(''), 3000)
+  const handleCycleMotion = () => {
+    const cycle = { system: 'full', full: 'reduce', reduce: 'system' }
+    setMotionPreference(cycle[motionPreference] || 'system')
   }
 
-  const languageOptions = useMemo(
-    () => [
-      { value: 'id', label: 'Indonesia' },
-      { value: 'en', label: 'English' },
-    ],
-    [],
-  )
+  const motionDisplay = useMemo(() => {
+    if (motionPreference === 'system') return t('settings.motion.system', 'Sistem (OS)')
+    if (motionPreference === 'reduce') return t('settings.motion.reduce', 'Hemat Gerak')
+    return t('settings.motion.full', 'Penuh (Full)')
+  }, [motionPreference, t])
 
-  const themeOptions = useMemo(
-    () => [
-      { value: 'light', label: t('settings.theme.light', 'Terang'), icon: Sun },
-      { value: 'dark', label: t('settings.theme.dark', 'Gelap'), icon: Moon },
-    ],
-    [t],
-  )
-
-  const motionOptions = useMemo(
-    () => [
-      { value: 'system', label: t('settings.motion.system', 'Sistem') },
-      { value: 'full', label: t('settings.motion.full', 'Penuh') },
-      { value: 'reduce', label: t('settings.motion.reduce', 'Hemat') },
-    ],
-    [t],
-  )
-
-  const motionSummary =
-    motionPreference === 'system'
-      ? t('settings.motion.current.system', {
-          value: reduceMotion ? t('settings.motion.state.reduce') : t('settings.motion.state.full'),
-        })
-      : motionPreference === 'reduce'
-        ? t('settings.motion.current.reduce')
-        : t('settings.motion.current.full')
-
-  const securityBadge = securityEnabled
-    ? securityMethod === 'biometric'
-      ? t('settings.lockMethod.biometric', 'Biometrik')
-      : securityMethod === 'pattern'
-        ? t('settings.lockMethod.pattern', 'Pola')
-        : t('settings.lockMethod.pin', 'PIN')
-    : t('settings.lockStatus.off', 'Nonaktif')
+  const currentCurrencyInfo = useMemo(() => {
+    return currencyDisplayMap[defaultCurrency] || { name: defaultCurrency, symbol: defaultCurrency, code: defaultCurrency }
+  }, [defaultCurrency])
 
   return (
-    <>
+    <div className="ft-settings-page max-w-2xl mx-auto pb-24 px-0">
       <PageHeader
-        title={t('nav.settings')}
-        subtitle={t('settings.pageSubtitle')}
-        titlePosition="left"
-        onBack={() => navigate('/profile')}
-        backAriaLabel={t('common.back')}
-        className="ft-settings-hero"
+        title={t('settings.title', 'Pengaturan')}
+        subtitle={t('settings.subtitle', 'Sesuaikan bahasa, tampilan, keamanan, dan cadangan data.')}
       />
 
-      {/* User Mini Profile Strip - Clean & Compact */}
-      <div className="mb-3.5 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3.5 py-2.5 shadow-card">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--fg)] text-[var(--bg)] font-black text-xs">
-            {(profileName || 'FT').slice(0, 2).toUpperCase()}
+      {/* 1. Profile / App Info Hero Card (Elevated Bento Header) */}
+      <div className="mb-6 rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-card">
+        {/* Profile trigger row */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/profile')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              navigate('/profile')
+            }
+          }}
+          className="group flex cursor-pointer items-center justify-between gap-4 pb-4 transition select-none"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
+              {profileName ? profileName.slice(0, 2).toUpperCase() : 'RI'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-extrabold text-base text-[var(--fg)] truncate tracking-tight">
+                  {profileName || 'Rico'}
+                </h3>
+                <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)]">
+                  v2.0.0
+                </span>
+              </div>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 inline-block" />
+                Offline-First Storage
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold text-[var(--fg)]">
-              {profileName || 'Pengguna FinTrack'}
-            </p>
-            <p className="text-[10px] font-medium text-[var(--muted)] flex items-center gap-1 mt-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-income)] shrink-0" />
-              <span>Offline-First (IndexedDB)</span>
-            </p>
+          <div className="flex items-center gap-1 text-xs font-bold text-[var(--muted)] group-hover:text-[var(--fg)] transition-colors shrink-0">
+            <span className="hidden sm:inline">{t('profile.title', 'Profil')}</span>
+            <ChevronRight className="h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
-        <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9.5px] font-extrabold text-[var(--muted)]">
-          v2.0.0
-        </span>
+
+        {/* Read-only quick status pill tags (non-interactive) */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-3 border-t border-[var(--border)]/60 text-center select-none">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 px-1.5 sm:px-2">
+            <span className="block text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.currency', 'Mata Uang')}
+            </span>
+            <span className="block text-[11.5px] sm:text-xs font-black text-[var(--fg)] truncate mt-0.5">
+              {currentCurrencyInfo.symbol} {currentCurrencyInfo.code}
+            </span>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 px-1.5 sm:px-2">
+            <span className="block text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.language', 'Bahasa')}
+            </span>
+            <span className="block text-[11.5px] sm:text-xs font-black text-[var(--fg)] truncate mt-0.5">
+              {locale === 'id' ? 'Indonesia' : 'English'}
+            </span>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 px-1.5 sm:px-2">
+            <span className="block text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.protection', 'Proteksi')}
+            </span>
+            <span className={`block text-[11.5px] sm:text-xs font-black truncate mt-0.5 ${
+              securityEnabled ? 'text-emerald-500' : 'text-[var(--muted)]'
+            }`}>
+              {securityEnabled ? t('settings.active', 'Aktif') : t('settings.inactive', 'Nonaktif')}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* 1. Preferensi Tampilan & Wilayah */}
-      <SettingsSection
-        label={t('settings.preferences')}
-        footnote={t('settings.motion.current', { value: motionSummary })}
-      >
-        <SettingsSplitRow
-          label={t('settings.language')}
-          description={t('settings.languageDesc', 'Bahasa tampilan')}
-          icon={Globe}
-        >
-          <SettingsSegmentControl
-            options={languageOptions}
-            value={locale}
-            onChange={(val) => setLocale(val)}
-            ariaLabel={t('settings.language')}
-          />
-        </SettingsSplitRow>
+      {/* 2. Quick Preference Bento Grid */}
+      <div className="mb-2 px-1">
+        <h2 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+          {t('settings.quickPrefs', 'Preferensi Cepat')}
+        </h2>
+      </div>
 
-        <SettingsSplitRow
-          label={t('settings.theme')}
-          description={t('settings.themeDesc', 'Mode visual')}
-          icon={theme === 'dark' ? Moon : Sun}
-        >
-          <SettingsSegmentControl
-            options={themeOptions}
-            value={theme}
-            onChange={(val) => setTheme(val)}
-            ariaLabel={t('settings.theme')}
-          />
-        </SettingsSplitRow>
+      <div className="ft-settings-bento-grid">
+        {/* Tile 1: 3-Theme Visual Toggle (Putih -> Arang -> Biru) */}
+        <SettingsBentoTile
+          label={t('settings.visualTheme', 'Tema Visual')}
+          value={
+            theme === 'midnight'
+              ? t('settings.themeMidnight', 'Mode Biru (Midnight)')
+              : theme === 'dark'
+              ? t('settings.themeDark', 'Mode Arang (Matte)')
+              : t('settings.themeLight', 'Mode Terang (Putih)')
+          }
+          icon={theme === 'midnight' ? Sparkles : theme === 'dark' ? Moon : Sun}
+          onClick={handleToggleTheme}
+        />
 
-        <SettingsSplitRow
-          label={t('settings.defaultCurrency')}
-          description={t('settings.currencyDesc', 'Mata uang utama')}
+        {/* Tile 2: Currency Selector Modal Trigger */}
+        <SettingsBentoTile
+          label={t('settings.mainCurrency', 'Mata Uang Utama')}
+          value={`${currentCurrencyInfo.symbol} • ${currentCurrencyInfo.code}`}
           icon={Coins}
-        >
-          <select
-            value={defaultCurrency}
-            onChange={(event) => setDefaultCurrency(event.target.value)}
-            className="ft-settings-field-compact font-bold"
-            aria-label={t('settings.defaultCurrency')}
-          >
-            {currencyOptions.map((currency) => (
-              <option key={currency} value={currency}>
-                {currencyDisplayMap[currency] || currency}
-              </option>
-            ))}
-          </select>
-        </SettingsSplitRow>
+          onClick={() => setIsCurrencyModalOpen(true)}
+        />
 
-        <SettingsSplitRow
-          label={t('settings.motion')}
-          description={t('settings.motionDesc', 'Transisi animasi')}
+        {/* Tile 3: Language Switcher */}
+        <SettingsBentoTile
+          label={t('settings.systemLanguage', 'Bahasa Sistem')}
+          value={locale === 'id' ? 'ID • Indonesia' : 'EN • English'}
+          icon={Globe}
+          onClick={handleToggleLocale}
+        />
+
+        {/* Tile 4: Motion Animation Preference */}
+        <SettingsBentoTile
+          label={t('settings.animationEffects', 'Efek Animasi')}
+          value={motionDisplay}
           icon={Activity}
-        >
-          <SettingsSegmentControl
-            options={motionOptions}
-            value={motionPreference}
-            onChange={(val) => setMotionPreference(val)}
-            ariaLabel={t('settings.motion')}
-          />
-        </SettingsSplitRow>
-      </SettingsSection>
+          onClick={handleCycleMotion}
+        />
+      </div>
 
-      {/* 2. Integrasi AI Gemini */}
-      <SettingsSection label={t('settings.aiIntegration', 'Integrasi Asisten AI (Gemini)')}>
-        <div className="ft-settings-cell space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="grid h-6 w-6 place-items-center rounded-md bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]">
-                <Bot className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-xs font-bold text-[var(--fg)]">
-                {t('settings.aiKeyStatus', 'Status API Key')}
-              </span>
-            </div>
-            {geminiApiKey ? (
-              <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--fg)] border border-[var(--border)]">
-                Key Kustom Aktif
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)] border border-[var(--border)]">
-                {t('settings.defaultKey', 'Bawaan Sistem')}
-              </span>
-            )}
-          </div>
-
-          {keyStatusMessage ? (
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] p-2 text-[11px] font-bold text-[var(--fg)] animate-fadeIn">
-              {keyStatusMessage}
-            </div>
-          ) : null}
-
-          <form onSubmit={handleSaveApiKey} className="space-y-2">
-            <div className="relative flex items-center">
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder={t('settings.apiKeyPlaceholder', 'Masukkan Gemini API Key (opsional)...')}
-                className="ft-settings-field-compact w-full pr-8 text-xs font-mono"
-                aria-label={'Gemini API Key'}
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey(!showKey)}
-                className="absolute right-2 text-[var(--muted)] hover:text-[var(--fg)] transition p-0.5 rounded cursor-pointer"
-                aria-label={showKey ? 'Sembunyikan Key' : 'Tampilkan Key'}
-              >
-                {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                className="flex-1 rounded-lg bg-[var(--fg)] py-1.5 px-3 text-xs font-bold text-[var(--bg)] transition hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
-              >
-                {t('settings.saveApiKey', 'Simpan Key')}
-              </button>
-              {geminiApiKey ? (
-                <button
-                  type="button"
-                  onClick={handleClearApiKey}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-1.5 px-3 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                >
-                  {t('settings.resetApiKey', 'Reset')}
-                </button>
-              ) : null}
-            </div>
-          </form>
-
-          <p className="text-[10.5px] leading-relaxed text-[var(--muted)] font-medium">
-            {t('settings.aiKeyFree', 'Dapatkan API Key gratis di')}{' '}
-            <a
-              href="https://aistudio.google.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--fg)] underline font-bold hover:opacity-80"
-            >
-              aistudio.google.com
-            </a>
-            . {t('settings.aiKeyStoredLocal', 'Key tersimpan lokal di perangkat ini.')}
-          </p>
-        </div>
-      </SettingsSection>
-
-      {/* 3. Manajemen Fitur & Data */}
-      <SettingsSection label={t('settings.section.features', 'Fitur & Personalisasi')}>
+      {/* 3. Directory Group 1: Fitur & Keuangan */}
+      <SettingsSection label={t('settings.section.features', 'Fitur & Keuangan')}>
         <SettingsLinkRow
           to="/settings/categories"
-          label={t('settings.expenseCategories', 'Kategori Transaksi')}
-          subtitle={t('settings.categoriesSubtitle', 'Kelola kategori & subkategori')}
+          label={t('settings.categories', 'Kategori Transaksi')}
+          subtitle={t('settings.categoriesSubtitle', 'Kelola kategori pengeluaran, pemasukan & ikon')}
           icon={Tag}
         />
         <SettingsLinkRow
           to="/settings/recurring"
           label={t('settings.recurringTitle', 'Transaksi Berulang')}
-          subtitle={t('settings.recurringSubtitle', 'Otomasi tagihan & gaji')}
+          subtitle={t('settings.recurringSubtitle', 'Otomasi tagihan rutin, cicilan, sewa & gaji')}
           icon={RefreshCw}
         />
         <SettingsLinkRow
+          to="/settings/currency"
+          label={t('settings.fxRatesTitle', 'Kurs & Konversi Mata Uang')}
+          subtitle={t('settings.fxSubtitle', 'Kalkulator konversi valas & live ticker nilai tukar')}
+          icon={TrendingUp}
+        />
+      </SettingsSection>
+
+      {/* 4. Directory Group 2: Keamanan & AI */}
+      <SettingsSection label={t('settings.section.security', 'Keamanan & Asisten AI')}>
+        <SettingsLinkRow
           to="/settings/security"
           label={t('settings.appLock', 'Keamanan & Kunci Aplikasi')}
-          subtitle={t('settings.securitySubtitle', 'PIN, Pola, atau Biometrik')}
+          subtitle={t('settings.securitySubtitle', 'Sidik jari, Face ID, atau sandi layar HP')}
           icon={securityEnabled ? ShieldCheck : Lock}
-          badge={securityBadge}
+        />
+        <SettingsLinkRow
+          to="/settings/ai"
+          label={t('settings.aiIntegration', 'Integrasi Asisten AI (Gemini)')}
+          subtitle={t('settings.aiSubtitle', 'Atur Gemini API Key & fitur analisis finansial cerdas')}
+          icon={Bot}
         />
         <SettingsLinkRow
           to="/settings/data"
           label={t('settings.nav.data', 'Data & Cadangan')}
-          subtitle={t('settings.dataSubtitle', 'Ekspor JSON, Impor data, dan Uji Coba')}
+          subtitle={t('settings.dataSubtitle', 'Ekspor JSON, Impor data, dan mode Uji Coba')}
           icon={Database}
         />
+      </SettingsSection>
+
+      {/* 5. Directory Group 3: Pusat Bantuan */}
+      <SettingsSection label={t('settings.section.support', 'Bantuan & Dukungan')}>
         <SettingsLinkRow
           to="/settings/help"
           label={t('settings.helpTitle', 'Tur & Panduan Fitur')}
-          subtitle={t('settings.helpSubtitle', 'FAQ & panduan fitur aplikasi')}
+          subtitle={t('settings.helpSubtitle', 'FAQ pertanyaan umum & panduan fitur')}
           icon={Compass}
         />
       </SettingsSection>
-    </>
+
+      {/* Modal Quick Currency Selector */}
+      <Modal
+        isOpen={isCurrencyModalOpen}
+        title={t('settings.selectDefaultCurrency', 'Pilih Mata Uang Utama')}
+        onClose={() => setIsCurrencyModalOpen(false)}
+      >
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          {currencyOptions.map((code) => {
+            const info = currencyDisplayMap[code] || { name: code, symbol: code, code }
+            const isSelected = defaultCurrency === code
+
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => {
+                  setDefaultCurrency(code)
+                  setIsCurrencyModalOpen(false)
+                }}
+                className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer text-left ${
+                  isSelected
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)]/20'
+                    : 'border-[var(--border)] bg-[var(--panel-strong)] hover:border-[var(--border-strong)]'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] font-black text-sm text-[var(--fg)]">
+                    {info.symbol}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-sm font-extrabold text-[var(--fg)] leading-tight">
+                      {info.name}
+                    </span>
+                    <span className="block text-xs font-bold text-[var(--muted)] leading-tight mt-0.5">
+                      {info.code}
+                    </span>
+                  </div>
+                </div>
+
+                {isSelected ? (
+                  <div className="grid h-6 w-6 place-items-center rounded-full bg-[var(--accent)] text-[var(--bg)]">
+                    <Check className="h-4 w-4 stroke-[3]" />
+                  </div>
+                ) : null}
+              </button>
+            )
+          })}
+        </div>
+      </Modal>
+    </div>
   )
 }

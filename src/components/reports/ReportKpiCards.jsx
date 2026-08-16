@@ -1,4 +1,5 @@
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
 
 function formatDelta(current, previous) {
@@ -10,6 +11,7 @@ function formatDelta(current, previous) {
 
 export default function ReportKpiCards({ thisMonth, previousMonth }) {
   const { t } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
   const incomeDelta = formatDelta(thisMonth.income, previousMonth.income)
   const expenseDelta = formatDelta(thisMonth.expense, previousMonth.expense)
@@ -41,9 +43,9 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
         </div>
         <p
           className="mt-3 text-lg font-black tracking-tight text-[var(--status-income)] truncate min-w-0 sm:text-xl md:text-2xl"
-          title={formatCurrency(thisMonth.income, 'IDR')}
+          title={formatCurrency(thisMonth.income, defaultCurrency)}
         >
-          {formatCurrency(thisMonth.income, 'IDR')}
+          {formatCurrency(thisMonth.income, defaultCurrency)}
         </p>
         <p className="mt-1 text-[11.5px] font-semibold text-[var(--muted)] truncate">
           {incomeDelta} <span className="font-normal text-[var(--muted-2)]">{t('reports.vsPrev')}</span>
@@ -75,9 +77,9 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
         </div>
         <p
           className="mt-3 text-lg font-black tracking-tight text-[var(--status-expense)] truncate min-w-0 sm:text-xl md:text-2xl"
-          title={formatCurrency(thisMonth.expense, 'IDR')}
+          title={formatCurrency(thisMonth.expense, defaultCurrency)}
         >
-          {formatCurrency(thisMonth.expense, 'IDR')}
+          {formatCurrency(thisMonth.expense, defaultCurrency)}
         </p>
         <p className="mt-1 text-[11.5px] font-semibold text-[var(--muted)] truncate">
           {expenseDelta} <span className="font-normal text-[var(--muted-2)]">{t('reports.vsPrev')}</span>

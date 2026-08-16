@@ -6,6 +6,8 @@ const ROUTES_META = [
   { path: '/settings/security', titleKey: 'settings.appLock' },
   { path: '/settings/categories', titleKey: 'settings.section.categories' },
   { path: '/settings/recurring', titleKey: 'settings.recurringTitle' },
+  { path: '/settings/currency', titleKey: 'settings.fxRatesTitle' },
+  { path: '/settings/ai', titleKey: 'settings.aiIntegration' },
   { path: '/settings/data', titleKey: 'settings.nav.data' },
   { path: '/settings/help', titleKey: 'settings.helpTitle' },
   { path: '/settings/account', titleKey: 'settings.account.title' },
@@ -20,17 +22,17 @@ export default function SettingsLayout() {
   return (
     <div className="ft-settings-page">
       {meta ? (
-        <header className="sticky top-0 z-20 mb-4 flex items-center gap-3 bg-[var(--bg)]/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--bg)]/80">
+        <header className="sticky top-0 z-20 mb-5 flex items-center gap-3.5 bg-[var(--bg)]/95 py-3.5 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--bg)]/80">
           <button
             type="button"
             onClick={() => navigate('/settings')}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             aria-label={t('common.back')}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4.5 w-4.5" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold tracking-tight text-[var(--fg)]">
+            <h1 className="truncate text-lg font-black tracking-tight text-[var(--fg)]">
               {t(meta.titleKey)}
             </h1>
           </div>

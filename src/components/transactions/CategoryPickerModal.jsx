@@ -165,12 +165,26 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
   return (
     <Modal
       isOpen={isOpen}
-      title={txType === 'expense' ? (lang === 'id' ? 'Pilih / Kelola Kategori Pengeluaran' : 'Select / Manage Expense Category') : (lang === 'id' ? 'Pilih / Kelola Kategori Pemasukan' : 'Select / Manage Income Category')}
+      title={
+        txType === 'expense'
+          ? lang === 'id'
+            ? 'Kategori Pengeluaran'
+            : 'Expense Category'
+          : lang === 'id'
+          ? 'Kategori Pemasukan'
+          : 'Income Category'
+      }
       onClose={onClose}
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2.5 bg-[var(--field-bg)]/40">
         <span className="text-xs font-bold text-[var(--muted)]">
-          {editMode ? (lang === 'id' ? 'Mode Kelola Kategori' : 'Manage Category Mode') : (lang === 'id' ? 'Pilih Kategori Transaksi' : 'Select Transaction Category')}
+          {editMode
+            ? lang === 'id'
+              ? 'Mode Kelola Kategori'
+              : 'Manage Category Mode'
+            : lang === 'id'
+            ? 'Pilih Kategori'
+            : 'Select Category'}
         </span>
         <button
           type="button"
@@ -181,7 +195,13 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
               : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
           }`}
         >
-          {editMode ? (lang === 'id' ? '✓ Selesai Kelola' : '✓ Done Managing') : (lang === 'id' ? '⚙️ Kelola Kategori' : '⚙️ Manage Categories')}
+          {editMode
+            ? lang === 'id'
+              ? 'Selesai'
+              : 'Done'
+            : lang === 'id'
+            ? 'Kelola'
+            : 'Manage'}
         </button>
       </div>
 

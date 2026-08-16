@@ -19,16 +19,28 @@ export default function TransactionEditSheet({
   onSubmit,
   t,
   locale,
+  wallets = [],
 }) {
   const amountInputRef = useRef(null)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
   const [editError, setEditError] = useState('')
+  const [categoryError, setCategoryError] = useState(false)
+  const [categoryShaking, setCategoryShaking] = useState(false)
+
+  const selectedWallet = (wallets || []).find((w) => String(w.id) === String(formData.walletId))
+  const isCashWallet =
+    !selectedWallet ||
+    selectedWallet.institutionType === 'cash' ||
+    String(selectedWallet.name || '').toLowerCase().includes('cash') ||
+    String(selectedWallet.name || '').toLowerCase().includes('tunai')
 
   return (
     <BottomSheet
       isOpen={isOpen}
       onClose={() => {
         setEditError('')
+        setCategoryError(false)
+        setCategoryShaking(false)
         onClose()
       }}
       title={t('tx.modal.editTitle') || 'Edit Transaksi'}
@@ -44,30 +56,35 @@ export default function TransactionEditSheet({
         onSubmit={(event) => {
           event.preventDefault()
           if (!formData.category || !formData.category.trim()) {
-            setEditError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
+            setCategoryError(true)
+            setCategoryShaking(true)
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try {
+                navigator.vibrate([30, 50, 30])
+              } catch {
+                // ignore
+              }
+            }
+            setTimeout(() => setCategoryShaking(false), 500)
             return
           }
           setEditError('')
-          onSubmit()
+          setCategoryError(false)
+          onSubmit(event)
         }}
       >
-        <div className="ft-label">
+        <div className="ft-label md:col-span-2">
           <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
             {t('tx.date', 'Tanggal')}
           </label>
           <CustomDatePicker
             value={formData.date}
-            onChange={(val) =>
-              setFormData((prev) => ({
-                ...prev,
-                date: val,
-              }))
-            }
-            title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
+            onChange={(val) => setFormData((prev) => ({ ...prev, date: val }))}
+            title={t('tx.dateSelectTitle', 'Pilih Tanggal Transaksi')}
           />
         </div>
 
-        <label className="ft-label">
+        <label className="ft-label md:col-span-2">
           {t('tx.amount', 'Jumlah')}
           <input
             ref={amountInputRef}
@@ -86,8 +103,9 @@ export default function TransactionEditSheet({
                 el.setSelectionRange(caret, caret)
               })
             }}
+            placeholder="0"
+            className="ft-field text-base font-extrabold"
             required
-            className="ft-field"
           />
         </label>
 
@@ -110,18 +128,44 @@ export default function TransactionEditSheet({
           </select>
         </label>
 
-        <div className="ft-label">
-          {t('tx.category', 'Kategori')}
+        <div className={`ft-label ${categoryShaking ? 'ft-shake' : ''}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('tx.category', 'Kategori')}
+            </span>
+            {categoryError && (
+              <span className="text-[10.5px] font-bold text-rose-500 flex items-center gap-1 animate-[ft-fade-in_0.2s_ease-out]">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                {t('addTx.selectCategoryRequired', 'Wajib dipilih')}
+              </span>
+            )}
+          </div>
           <button
             type="button"
-            onClick={() => setIsCatModalOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-left transition hover:border-[var(--border-strong)] mt-1"
+            onClick={() => {
+              setCategoryError(false)
+              setIsCatModalOpen(true)
+            }}
+            className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left transition-all cursor-pointer ${
+              categoryError
+                ? 'border border-rose-500/60 bg-rose-500/[0.08] shadow-[0_0_12px_rgba(244,63,94,0.18)] ring-2 ring-rose-500/30'
+                : 'border border-[var(--border)] bg-[var(--field-bg)] hover:border-[var(--border-strong)]'
+            }`}
           >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <span className="flex h-7 w-9 shrink-0 items-center justify-center">
-                <CategoryIcon icon={resolveTransactionIconKey(formData.category, formData.type)} className="h-5 w-5" />
-              </span>
-              <span className={`truncate text-sm ${!formData.category ? 'font-normal italic text-[var(--muted)]' : 'font-semibold text-[var(--fg)]'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <CategoryIcon
+                icon={resolveTransactionIconKey(formData.category, formData.type)}
+                className="h-6 w-6 shrink-0"
+              />
+              <span
+                className={`truncate text-sm ${
+                  !formData.category
+                    ? categoryError
+                      ? 'font-bold text-rose-500'
+                      : 'font-normal italic text-[var(--muted-2)]'
+                    : 'font-semibold text-[var(--fg)]'
+                }`}
+              >
                 {!formData.category
                   ? t('addTx.selectCategory', 'Pilih Kategori...')
                   : formData.type === 'expense'
@@ -136,29 +180,41 @@ export default function TransactionEditSheet({
             onClose={() => setIsCatModalOpen(false)}
             txType={formData.type || 'expense'}
             selectedCategory={formData.category}
-            onSelectCategory={(cat) => setFormData((prev) => ({ ...prev, category: cat }))}
+            onSelectCategory={(cat) => {
+              setCategoryError(false)
+              setFormData((prev) => ({ ...prev, category: cat }))
+            }}
           />
         </div>
 
         <label className="ft-label">
           {t('tx.currency', 'Mata Uang')}
-          <select
-            value={formData.currency}
-            onChange={(event) =>
-              setFormData((prev) => ({
-                ...prev,
-                currency: event.target.value,
-                amount: formatMoneyInput(prev.amount, event.target.value),
-              }))
-            }
-            className="ft-field"
-          >
-            {currencyOptions.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
+          {isCashWallet ? (
+            <select
+              value={formData.currency}
+              onChange={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  currency: event.target.value,
+                  amount: formatMoneyInput(prev.amount, event.target.value),
+                }))
+              }
+              className="ft-field"
+            >
+              {currencyOptions.map((currency) => (
+                <option key={currency} value={currency}>
+                  {currency}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex h-11 items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/80 px-3 text-sm font-bold text-[var(--fg)]">
+              <span>{formData.currency}</span>
+              <span className="text-[10.5px] font-semibold text-[var(--muted)]">
+                {selectedWallet?.name ? `Terkunci (${selectedWallet.name})` : 'Terkunci'}
+              </span>
+            </div>
+          )}
         </label>
 
         <label className="ft-label md:col-span-2">

@@ -47,7 +47,8 @@ export default function SavingsFundSheetModal({
   if (!goal) return null
 
   const handleSave = async () => {
-    const val = parseMoneyInput(amountInput)
+    const targetCurrency = goal.currency || defaultCurrency
+    const val = parseMoneyInput(amountInput, targetCurrency)
     if (val <= 0 || isSubmitting) return
 
     setIsSubmitting(true)
@@ -61,18 +62,11 @@ export default function SavingsFundSheetModal({
       // 1. Update goal balance
       await db.goals.update(goal.id, { currentAmount: newGoalAmount })
 
-      // 2. Update wallet balance if selected
+      // 2. Fetch wallet name if selected
       const walletIdNum = Number(selectedWalletId)
       let walletObj = null
       if (walletIdNum) {
         walletObj = await db.wallets.get(walletIdNum)
-        if (walletObj) {
-          const currentBal = Number(walletObj.balance || 0)
-          const newWalletBal = isWithdraw
-            ? currentBal + val
-            : Math.max(0, currentBal - val)
-          await db.wallets.update(walletIdNum, { balance: newWalletBal })
-        }
       }
 
       // 3. Add to goal logs

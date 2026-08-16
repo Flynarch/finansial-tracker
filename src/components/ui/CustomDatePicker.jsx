@@ -17,9 +17,15 @@ export default function CustomDatePicker({
   title = 'Pilih Tanggal',
   disabled = false,
 }) {
-  const { locale } = useTranslation()
+  const { t, locale } = useTranslation()
   const dateLocale = locale === 'en' ? enUS : idLocale
   const [isOpen, setIsOpen] = useState(false)
+
+  const weekDayHeaders = useMemo(() => {
+    return locale === 'en'
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      : ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+  }, [locale])
 
   const parsedValue = useMemo(() => {
     if (!value) return null
@@ -141,28 +147,28 @@ export default function CustomDatePicker({
               onClick={() => setQuickDate(0)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/60 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Hari Ini
+              {t('datepicker.today', 'Hari Ini')}
             </button>
             <button
               type="button"
               onClick={() => setQuickDate(1)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/60 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Besok
+              {t('datepicker.tomorrow', 'Besok')}
             </button>
             <button
               type="button"
               onClick={() => setQuickDate(7)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/60 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              +7 Hari
+              {t('datepicker.plus7Days', '+7 Hari')}
             </button>
             <button
               type="button"
               onClick={setEndOfMonthDate}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/60 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Akhir Bulan
+              {t('datepicker.endOfMonth', 'Akhir Bulan')}
             </button>
           </div>
 
@@ -192,7 +198,9 @@ export default function CustomDatePicker({
           {/* Calendar Grid */}
           <div className="select-none">
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-[var(--muted)] mb-1">
-              <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+              {weekDayHeaders.map((dayName) => (
+                <span key={dayName}>{dayName}</span>
+              ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day) => {
@@ -231,7 +239,7 @@ export default function CustomDatePicker({
             className="w-full py-2.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-extrabold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer mt-2"
           >
             <Check className="h-4 w-4" />
-            Selesai
+            {t('common.done', 'Selesai')}
           </button>
         </div>
       </BottomSheet>

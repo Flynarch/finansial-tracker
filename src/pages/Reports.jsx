@@ -36,7 +36,6 @@ export default function Reports() {
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD'))
 
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const initialBalance = useSettingsStore((s) => s.initialBalance)
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setIsEntering(true))
@@ -152,9 +151,26 @@ export default function Reports() {
   }, [locale, filteredTransactions, defaultCurrency, rates])
 
   const netWorthTrend = useMemo(() => {
-    let cumulativeNet = initialBalance || 0
+    let cumulativeNet = (wallets || []).reduce((sum, w) => {
+      return (
+        sum +
+        convertCurrency(
+          toSafeNumber(w.balance),
+          w.currency || defaultCurrency,
+          defaultCurrency,
+          rates,
+        )
+      )
+    }, 0)
     const investmentValue = (investments || []).reduce(
-      (acc, row) => acc + toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
+      (acc, row) =>
+        acc +
+        convertCurrency(
+          toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
+          row.purchaseCurrency || defaultCurrency,
+          defaultCurrency,
+          rates,
+        ),
       0,
     )
     return monthlyIncomeExpense.map((monthData) => {
@@ -164,7 +180,7 @@ export default function Reports() {
         netWorth: cumulativeNet + investmentValue,
       }
     })
-  }, [investments, monthlyIncomeExpense, initialBalance])
+  }, [wallets, investments, monthlyIncomeExpense, defaultCurrency, rates])
 
   const thisMonth = monthlyIncomeExpense.at(-1) ?? { income: 0, expense: 0 }
   const previousMonth = monthlyIncomeExpense.at(-2) ?? { income: 0, expense: 0 }

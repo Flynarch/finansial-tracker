@@ -1,9 +1,8 @@
 import { memo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import CategoryIcon from '../ui/CategoryIcon'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
-import { db } from '../../lib/db'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import useWalletStore from '../../store/useWalletStore'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -44,10 +43,14 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       if (setApiErrorTone) setApiErrorTone('error')
     }
   }
-  const walletsInternal = useLiveQuery(() => db.wallets.toArray(), [])
-  const wallets = walletsProp || walletsInternal
+  const storeWallets = useWalletStore((state) => state.wallets)
+  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : storeWallets
 
-  const getWalletName = (id) => wallets?.find(w => w.id === id)?.name || 'Wallet'
+  const getWalletName = (id) => {
+    if (!id) return 'Wallet'
+    const found = wallets?.find((w) => String(w.id) === String(id))
+    return found?.name || 'Wallet'
+  }
 
   let iconKey = resolveTransactionIconKey(transaction.category, transaction.type)
   let colorClass = getCategoryColorClass(iconKey, transaction.type, transaction.category)
@@ -77,18 +80,23 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     iconKey = 'arrow-right-left'
     if (contextWalletId && contextWalletId === transaction.targetWalletId) {
       colorClass = 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)]'
-      labels = { main: `Transfer dari ${getWalletName(transaction.walletId)}`, sub: 'Transfer Masuk' }
+      labels = { main: 'Transfer Masuk', sub: `Dari ${getWalletName(transaction.walletId)}` }
       amountPrefix = '+'
       amountColorClass = 'ft-income-text'
     } else if (contextWalletId && contextWalletId === transaction.walletId) {
       colorClass = 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)]'
-      labels = { main: `Transfer ke ${getWalletName(transaction.targetWalletId)}`, sub: 'Transfer Keluar' }
+      labels = { main: 'Transfer Keluar', sub: `Ke ${getWalletName(transaction.targetWalletId)}` }
       amountPrefix = '-'
       amountColorClass = 'ft-expense-text'
     } else {
       // Global view
       colorClass = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-      labels = { main: `Transfer: ${getWalletName(transaction.walletId)} ➔ ${getWalletName(transaction.targetWalletId)}`, sub: 'Transfer Antar Wallet' }
+      const fromName = getWalletName(transaction.walletId)
+      const toName = getWalletName(transaction.targetWalletId)
+      labels = {
+        main: locale === 'en' ? 'Transfer' : 'Transfer',
+        sub: `${fromName} ➔ ${toName}`,
+      }
       amountPrefix = ''
       amountColorClass = 'text-blue-600 dark:text-blue-400'
     }
@@ -100,9 +108,10 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     createdTime = format(new Date(createdAtMs), 'HH:mm')
   }
 
+  const isTransfer = transaction.type === 'transfer'
   const sub = labels.sub || null
   const noteStr = transaction.notes ? String(transaction.notes).trim() : ''
-  const walletName = transaction.type !== 'transfer' ? getWalletName(transaction.walletId) : null
+  const walletName = !isTransfer ? getWalletName(transaction.walletId) : null
   const isContextWalletMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))
   const displayWalletName = isContextWalletMatch ? null : walletName
 
@@ -176,33 +185,43 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             })()}
           </div>
 
-            {/* 2 or 3 Clean Text Lines */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <p className="truncate text-sm font-extrabold text-[var(--fg)] leading-tight">{labels.main}</p>
-                {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
-                  <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
-                    BARU
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Line 2: Wallet & Subcategory & Time */}
-              <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-[var(--muted)]">
-                {displayWalletName ? <span className="text-[var(--fg)]/80 font-bold">{displayWalletName}</span> : null}
-                {displayWalletName && (sub || createdTime) ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                {sub ? <span>{sub}</span> : null}
-                {sub && createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
-              </p>
-
-              {/* Line 3: Notes (Dedicated Line with line-clamp-2) */}
-              {noteStr ? (
-                <p className="mt-0.5 text-[11px] font-normal italic text-[var(--muted-2)] line-clamp-2 leading-snug break-words">
-                  "{noteStr}"
-                </p>
+          {/* 2 or 3 Clean Text Lines */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="truncate text-sm font-extrabold text-[var(--fg)] leading-tight">{labels.main}</p>
+              {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
+                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
+                  BARU
+                </span>
               ) : null}
             </div>
+
+            {/* Line 2: Wallet / Flow & Subcategory & Time */}
+            <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-[var(--muted)]">
+              {isTransfer ? (
+                <>
+                  <span className="text-[var(--fg)]/90 font-bold">{sub}</span>
+                  {createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                  {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
+                </>
+              ) : (
+                <>
+                  {displayWalletName ? <span className="text-[var(--fg)]/80 font-bold">{displayWalletName}</span> : null}
+                  {displayWalletName && (sub || createdTime) ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                  {sub ? <span>{sub}</span> : null}
+                  {sub && createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
+                  {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
+                </>
+              )}
+            </p>
+
+            {/* Line 3: Notes (Dedicated Line with line-clamp-2) */}
+            {noteStr ? (
+              <p className="mt-0.5 text-[11px] font-normal italic text-[var(--muted-2)] line-clamp-2 leading-snug break-words">
+                "{noteStr}"
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {/* Amount */}

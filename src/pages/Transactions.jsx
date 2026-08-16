@@ -27,6 +27,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import useSettingsStore from '../store/useSettingsStore'
 import useTransactionStore from '../store/useTransactionStore'
+import useWalletStore from '../store/useWalletStore'
 
 const initialFormData = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -96,7 +97,21 @@ function Transactions() {
   const cachedTransactions = useTransactionStore((state) => state.transactions)
   const setStoreTransactions = useTransactionStore((state) => state.setTransactions)
   const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
-  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const cachedWallets = useWalletStore((state) => state.wallets)
+  const setStoreWallets = useWalletStore((state) => state.setWallets)
+  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
+
+  useEffect(() => {
+    if (dbWallets && dbWallets.length > 0 && setStoreWallets) {
+      setStoreWallets(dbWallets)
+    }
+  }, [dbWallets, setStoreWallets])
+
+  const allWallets = useMemo(() => {
+    if (dbWallets !== undefined && dbWallets.length > 0) return dbWallets
+    if (cachedWallets && cachedWallets.length > 0) return cachedWallets
+    return dbWallets || []
+  }, [dbWallets, cachedWallets])
 
   useEffect(() => {
     if (transactionsRaw) {
@@ -388,15 +403,17 @@ function Transactions() {
 
   const openEditTransaction = useCallback((transaction) => {
     setEditingTransaction(transaction)
+    const matchingWallet = allWallets?.find((w) => String(w.id) === String(transaction.walletId))
+    const targetCurrency = transaction.currency || matchingWallet?.currency || defaultCurrency
     setEditFormData({
       date: transaction.date,
-      amount: formatMoneyValueForInput(transaction.amount, transaction.currency || 'IDR'),
+      amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
       notes: transaction.notes || '',
-      currency: transaction.currency || 'IDR',
+      currency: targetCurrency,
     })
-  }, [])
+  }, [allWallets, defaultCurrency])
 
   const handleExportCsv = () => {
     const csvContent = toTransactionsCsv(filteredTransactions)
@@ -714,6 +731,7 @@ function Transactions() {
         onSubmit={handleEditSubmit}
         t={t}
         locale={locale}
+        wallets={allWallets}
       />
 
       {/* ── Advanced Filter Panel (BottomSheet Overlay) ─────────── */}
@@ -1058,13 +1076,13 @@ function Transactions() {
                 className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <span>Kategori Utama</span>
+                  <span>{t('tx.filter.mainCategory', 'Kategori Utama')}</span>
                   <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
                     {(() => {
                       const list = draftFilters?.categories ?? filters.categories ?? usedCategories
-                      if (list.length === 0 || list.length === usedCategories.length) return 'Semua Kategori'
+                      if (list.length === 0 || list.length === usedCategories.length) return t('tx.filter.allCategories', 'Semua Kategori')
                       if (list.length === 1) return formatCategoryName(list[0], locale)
-                      return `${list.length} Dipilih`
+                      return t('tx.filter.selectedCount', { count: list.length }, `${list.length} Dipilih`)
                     })()}
                   </span>
                 </div>
@@ -1086,7 +1104,7 @@ function Transactions() {
                               : 'text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)]'
                           }`}
                         >
-                          <span>Semua Kategori</span>
+                          <span>{t('tx.filter.allCategories', 'Semua Kategori')}</span>
                           <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
                             isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                           }`}>
@@ -1171,7 +1189,7 @@ function Transactions() {
               onClick={selectAllVisible}
               className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
             >
-              Semua ({filteredTransactions.length})
+              {t('tx.bulk.all', 'Semua')} ({filteredTransactions.length})
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -1181,7 +1199,7 @@ function Transactions() {
               disabled={selectedTxIds.size === 0}
               className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40 transition active:scale-95 cursor-pointer"
             >
-              Ubah Kategori
+              {t('tx.bulk.changeCategory', 'Ubah Kategori')}
             </button>
             <button
               type="button"
@@ -1189,7 +1207,7 @@ function Transactions() {
               disabled={selectedTxIds.size === 0}
               className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40 transition active:scale-95 cursor-pointer"
             >
-              Hapus ({selectedTxIds.size})
+              {t('tx.bulk.delete', 'Hapus')} ({selectedTxIds.size})
             </button>
             <button
               type="button"
@@ -1209,7 +1227,11 @@ function Transactions() {
         onClose={() => setIsBatchDeleteModalOpen(false)}
         onConfirm={handleBatchDelete}
         title={t('tx.bulk.deleteTitle', 'Hapus Transaksi Terpilih')}
-        message={`Apakah Anda yakin ingin menghapus ${selectedTxIds.size} transaksi yang dipilih? Tindakan ini tidak dapat dibatalkan.`}
+        message={t(
+          'tx.bulk.deleteMessage',
+          { count: selectedTxIds.size },
+          `Apakah Anda yakin ingin menghapus ${selectedTxIds.size} transaksi yang dipilih? Tindakan ini tidak dapat dibatalkan.`
+        )}
       />
 
       {/* ── Category Picker Modal for Batch Category ────────────── */}

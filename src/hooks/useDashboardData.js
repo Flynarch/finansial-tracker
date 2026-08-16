@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, subMonths, differenceInDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../lib/db'
+import { db, computeAllWalletBalances } from '../lib/db'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
 import { calculateBudgetSpent } from '../lib/budgetUtils'
@@ -14,15 +14,17 @@ import {
   buildPaddedDomain,
 } from '../components/dashboard/DashboardChartHelpers'
 
-export const COMPACT_ITEMS = [
-  { id: '1d', label: '1H' },
-  { id: '1w', label: '1M' },
-  { id: '1m', label: '1B' },
-  { id: '3m', label: '3B' },
+export const getCompactItems = (locale = 'id') => [
+  { id: '1d', label: locale === 'en' ? '1D' : '1H' },
+  { id: '1w', label: locale === 'en' ? '1W' : '1M' },
+  { id: '1m', label: locale === 'en' ? '1M' : '1B' },
+  { id: '3m', label: locale === 'en' ? '3M' : '3B' },
   { id: 'ytd', label: 'YTD' },
-  { id: '1y', label: '1T' },
-  { id: 'all', label: 'ALL' },
+  { id: '1y', label: locale === 'en' ? '1Y' : '1T' },
+  { id: 'all', label: locale === 'en' ? 'ALL' : 'SEMUA' },
 ]
+
+export const COMPACT_ITEMS = getCompactItems('id')
 
 export const getSavedNetWorthRange = () => {
   try {
@@ -155,31 +157,23 @@ export function useDashboardData() {
     if (!wallets) {
       return []
     }
-    const txs = allTransactionsForBalance || []
-    return wallets.map((w) => {
-      let bal = Number(w.balance) || 0
-      for (const tx of txs) {
-        const amount = Number(tx.amount) || 0
-        if (tx.walletId === w.id) {
-          if (tx.type === 'income') bal += amount
-          else if (tx.type === 'expense') bal -= amount
-          else if (tx.type === 'transfer') bal -= amount
-          else if (tx.type === 'balance_adjustment') bal += amount
-        }
-        if (tx.targetWalletId === w.id) {
-          if (tx.type === 'transfer') bal += amount
-        }
-      }
-      return { ...w, currentBalance: bal }
-    })
-  }, [wallets, allTransactionsForBalance])
+    return computeAllWalletBalances(wallets, allTransactionsForBalance, rates)
+  }, [wallets, allTransactionsForBalance, rates])
 
   const totalWalletBalance = useMemo(() => {
     if (walletsWithBalance === undefined || walletsWithBalance === null) {
       return 0
     }
-    return walletsWithBalance.reduce((s, w) => s + w.currentBalance, 0)
-  }, [walletsWithBalance])
+    return walletsWithBalance.reduce((s, w) => {
+      const converted = convertCurrency(
+        w.currentBalance || 0,
+        w.currency || defaultCurrency,
+        defaultCurrency,
+        rates,
+      )
+      return s + converted
+    }, 0)
+  }, [walletsWithBalance, defaultCurrency, rates])
 
   const monthStats = useMemo(() => {
     if (transactions === null || investments === null) {

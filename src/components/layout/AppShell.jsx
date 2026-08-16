@@ -27,8 +27,6 @@ function AppShell() {
   const isLoaded = useSettingsStore((state) => state.isLoaded)
   const isUnlocked = useSettingsStore((state) => state.isUnlocked)
   const securityEnabled = useSettingsStore((state) => state.securityEnabled)
-  const securityMethod = useSettingsStore((state) => state.securityMethod)
-  const lockSecret = useSettingsStore((state) => state.lockSecret)
   const autoLockTimeout = useSettingsStore((state) => state.autoLockTimeout)
   const loadSettings = useSettingsStore((state) => state.loadSettings)
   const unlock = useSettingsStore((state) => state.unlock)
@@ -219,7 +217,7 @@ function AppShell() {
       <OnboardingFlow />
       <SpotlightTour />
       {isLoaded && securityEnabled && !isUnlocked ? (
-        <LockScreen method={securityMethod} secret={lockSecret} onUnlock={unlock} />
+        <LockScreen onUnlock={unlock} />
       ) : null}
 
       <AiTriggerBar

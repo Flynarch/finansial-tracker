@@ -36,13 +36,13 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
 
   const rangeLabelMap = {
-    '1d': '1 Hari',
-    '1w': '1 Minggu',
-    '1m': '1 Bulan',
-    '3m': '3 Bulan',
-    'ytd': 'YTD',
-    '1y': '1 Tahun',
-    'all': 'All Time',
+    '1d': t('dashboard.range.1d', '1 Hari'),
+    '1w': t('dashboard.range.1w', '1 Minggu'),
+    '1m': t('dashboard.range.1m', '1 Bulan'),
+    '3m': t('dashboard.range.3m', '3 Bulan'),
+    'ytd': t('dashboard.range.ytd', 'YTD'),
+    '1y': t('dashboard.range.1y', '1 Tahun'),
+    'all': t('dashboard.range.all', 'All Time'),
   }
 
   return (

@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { convertCurrency } from './utils'
 
 export const db = new Dexie('fintrackDB')
 
@@ -300,21 +301,30 @@ db.version(16).stores({
  * Compute the current balance of a single wallet given its initial balance and transaction list.
  * Single source of truth formula for computing a wallet's current balance.
  */
-export function computeWalletBalance(wallet, transactions = []) {
+export function computeWalletBalance(wallet, transactions = [], rates = null) {
   if (!wallet) return 0
   let bal = Number(wallet.balance) || 0
-  const walletId = wallet.id
+  const walletIdStr = String(wallet.id)
+  const walletCurrency = wallet.currency || 'IDR'
 
   for (const tx of transactions) {
     const amount = Number(tx.amount) || 0
-    if (tx.walletId === walletId) {
-      if (tx.type === 'income') bal += amount
-      else if (tx.type === 'expense') bal -= amount
-      else if (tx.type === 'transfer') bal -= amount
-      else if (tx.type === 'balance_adjustment') bal += amount
+    const txCurrency = tx.currency || walletCurrency
+    const converted =
+      txCurrency === walletCurrency
+        ? amount
+        : convertCurrency(amount, txCurrency, walletCurrency, rates || {})
+
+    if (String(tx.walletId) === walletIdStr) {
+      if (tx.type === 'income') bal += converted
+      else if (tx.type === 'expense') bal -= converted
+      else if (tx.type === 'transfer') bal -= converted
+      else if (tx.type === 'balance_adjustment') bal += converted
     }
-    if (tx.targetWalletId === walletId) {
-      if (tx.type === 'transfer') bal += amount
+    if (String(tx.targetWalletId) === walletIdStr) {
+      if (tx.type === 'transfer') {
+        bal += converted
+      }
     }
   }
   return bal
@@ -324,38 +334,54 @@ export function computeWalletBalance(wallet, transactions = []) {
  * Compute current balances for ALL wallets given wallet list and transaction list.
  * Returns a List of wallets with currentBalance property attached.
  */
-export function computeAllWalletBalances(wallets = [], transactions = []) {
+export function computeAllWalletBalances(wallets = [], transactions = [], rates = null) {
   const balanceMap = new Map()
+  const currencyMap = new Map()
 
   for (const w of wallets) {
-    balanceMap.set(w.id, Number(w.balance) || 0)
+    const idKey = String(w.id)
+    balanceMap.set(idKey, Number(w.balance) || 0)
+    currencyMap.set(idKey, w.currency || 'IDR')
   }
 
   for (const tx of transactions) {
     const amount = Number(tx.amount) || 0
-    const wId = tx.walletId
-    const tId = tx.targetWalletId
+    const wId = tx.walletId != null ? String(tx.walletId) : null
+    const tId = tx.targetWalletId != null ? String(tx.targetWalletId) : null
 
     if (wId && balanceMap.has(wId)) {
+      const sourceCurrency = currencyMap.get(wId) || 'IDR'
+      const txCurrency = tx.currency || sourceCurrency
+      const converted =
+        txCurrency === sourceCurrency
+          ? amount
+          : convertCurrency(amount, txCurrency, sourceCurrency, rates || {})
+
       if (tx.type === 'income') {
-        balanceMap.set(wId, balanceMap.get(wId) + amount)
+        balanceMap.set(wId, balanceMap.get(wId) + converted)
       } else if (tx.type === 'expense') {
-        balanceMap.set(wId, balanceMap.get(wId) - amount)
+        balanceMap.set(wId, balanceMap.get(wId) - converted)
       } else if (tx.type === 'transfer') {
-        balanceMap.set(wId, balanceMap.get(wId) - amount)
+        balanceMap.set(wId, balanceMap.get(wId) - converted)
       } else if (tx.type === 'balance_adjustment') {
-        balanceMap.set(wId, balanceMap.get(wId) + amount)
+        balanceMap.set(wId, balanceMap.get(wId) + converted)
       }
     }
 
     if (tId && balanceMap.has(tId)) {
-      balanceMap.set(tId, balanceMap.get(tId) + amount)
+      const targetCurrency = currencyMap.get(tId) || 'IDR'
+      const txCurrency = tx.currency || (wId ? currencyMap.get(wId) : targetCurrency) || targetCurrency
+      const converted =
+        txCurrency === targetCurrency
+          ? amount
+          : convertCurrency(amount, txCurrency, targetCurrency, rates || {})
+      balanceMap.set(tId, balanceMap.get(tId) + converted)
     }
   }
 
-  return wallets.map(w => ({
+  return wallets.map((w) => ({
     ...w,
-    currentBalance: balanceMap.get(w.id) ?? (Number(w.balance) || 0),
+    currentBalance: balanceMap.get(String(w.id)) ?? (Number(w.balance) || 0),
   }))
 }
 

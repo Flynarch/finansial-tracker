@@ -4,15 +4,27 @@ import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
 import useTranslation from '../../hooks/useTranslation'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
+import { formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const createWallet = useWalletStore((state) => state.createWallet)
 
+  const initialCurrency =
+    institution?.defaultCurrency ||
+    (institution?.id === 'paypal' ||
+    institution?.id === 'wise' ||
+    institution?.id === 'revolut' ||
+    institution?.id === 'binance' ||
+    institution?.id === 'bybit' ||
+    institution?.name?.toLowerCase().includes('paypal')
+      ? 'USD'
+      : 'IDR')
+
   const [name, setName] = useState(institution ? institution.name : 'Akun Baru')
   const [isEditingName, setIsEditingName] = useState(!institution)
-  const [currency, setCurrency] = useState('IDR')
+  const [currency, setCurrency] = useState(initialCurrency)
 
   const [displayBalance, setDisplayBalance] = useState('')
   const [rawBalance, setRawBalance] = useState(0)
@@ -20,15 +32,9 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const isCustomAccount = !institution
 
   const handleBalanceChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '')
-    if (!val) {
-      setDisplayBalance('')
-      setRawBalance(0)
-      return
-    }
-    const num = parseInt(val, 10)
-    setRawBalance(num)
-    setDisplayBalance(num.toLocaleString('id-ID'))
+    const formatted = formatMoneyInput(e.target.value, currency)
+    setDisplayBalance(formatted)
+    setRawBalance(parseMoneyInput(formatted, currency))
   }
 
   const clearBalance = () => {
@@ -40,6 +46,13 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
 
   const isFormValid = name.trim().length > 0
 
+  const isCashInstitution =
+    institution?.id === 'cash' ||
+    institution?.customIcon === 'dollar' ||
+    institution?.customIcon === 'cash' ||
+    String(institution?.name || name || '').toLowerCase().includes('uang tunai') ||
+    String(institution?.name || name || '').toLowerCase().includes('cash')
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isFormValid) return
@@ -47,8 +60,8 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
     const newId = await createWallet({
       name,
       institutionType: institution ? institution.type : 'lainnya',
-      logoUrl: institution ? institution.logoUrl : null,
-      customIcon: institution ? institution.customIcon : null,
+      logoUrl: isCashInstitution ? null : institution ? institution.logoUrl : null,
+      customIcon: isCashInstitution ? 'dollar' : institution ? institution.customIcon : null,
       currency,
       balance: rawBalance,
       createdAt: Date.now(),
@@ -88,9 +101,9 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           <div className="flex flex-col items-center gap-3">
             {/* Logo Circle */}
             <div className="w-14 h-14 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-              {institution?.customIcon === 'dollar' ? (
-                <div className="w-full h-full flex items-center justify-center text-amber-500">
-                  <MoneyBagIcon size={28} strokeWidth={2.5} />
+              {isCashInstitution ? (
+                <div className="w-full h-full flex items-center justify-center bg-white dark:bg-zinc-800 text-amber-500 p-2">
+                  <MoneyBagIcon size={30} />
                 </div>
               ) : institution?.logoUrl ? (
                 <img
@@ -105,7 +118,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
               ) : null}
               <div
                 className="w-full h-full flex items-center justify-center font-black text-lg text-[var(--fg)]"
-                style={{ display: institution?.customIcon === 'dollar' || institution?.logoUrl ? 'none' : 'flex' }}
+                style={{ display: isCashInstitution || institution?.logoUrl ? 'none' : 'flex' }}
               >
                 {getInitials(name)}
               </div>
@@ -161,7 +174,15 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
             <div className="relative">
               <select
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                onChange={(e) => {
+                  const nextCurr = e.target.value
+                  setCurrency(nextCurr)
+                  if (displayBalance) {
+                    const formatted = formatMoneyInput(displayBalance, nextCurr)
+                    setDisplayBalance(formatted)
+                    setRawBalance(parseMoneyInput(formatted, nextCurr))
+                  }
+                }}
                 className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl py-3 pl-4 pr-10 text-sm font-bold text-[var(--fg)] appearance-none outline-none focus:border-[var(--fg)] transition cursor-pointer shadow-xs"
               >
                 <option value="IDR">Indonesian Rupiah (IDR)</option>
@@ -180,7 +201,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
             </label>
             <div className="relative flex items-center bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] rounded-2xl p-4 shadow-sm focus-within:border-[var(--fg)] transition">
               <span className="pr-2 text-[var(--fg)] font-black text-2xl sm:text-3xl shrink-0 select-none">
-                Rp
+                {currency === 'IDR' ? 'Rp' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency}
               </span>
               <input
                 type="text"

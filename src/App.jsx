@@ -20,6 +20,8 @@ const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'))
 const SettingsSecurity = lazy(() => import('./pages/settings/SettingsSecurity'))
 const SettingsCategories = lazy(() => import('./pages/settings/SettingsCategories'))
 const SettingsRecurring = lazy(() => import('./pages/settings/SettingsRecurring'))
+const SettingsCurrency = lazy(() => import('./pages/settings/SettingsCurrency'))
+const SettingsAi = lazy(() => import('./pages/settings/SettingsAi'))
 const SettingsData = lazy(() => import('./pages/settings/SettingsData'))
 const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
 const AddAccountPage = lazy(() => import('./pages/AddAccountPage'))
@@ -45,6 +47,7 @@ function App() {
             <Route path="/savings/:id" element={<SavingsDetail />} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/add-account" element={<AddAccountPage />} />
+            <Route path="/wallet/add" element={<Navigate to="/add-account" replace />} />
             <Route path="/wallet/:id" element={<WalletDetailPage />} />
             <Route path="/todos/:id" element={<TodoDetailPage />} />
             <Route path="/settings" element={<SettingsLayout />}>
@@ -52,6 +55,8 @@ function App() {
               <Route path="security" element={<SettingsSecurity />} />
               <Route path="categories" element={<SettingsCategories />} />
               <Route path="recurring" element={<SettingsRecurring />} />
+              <Route path="currency" element={<SettingsCurrency />} />
+              <Route path="ai" element={<SettingsAi />} />
               <Route path="data" element={<SettingsData />} />
               <Route path="help" element={<SettingsHelp />} />
             </Route>

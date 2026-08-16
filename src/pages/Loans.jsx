@@ -11,7 +11,8 @@ import useSettingsStore from '../store/useSettingsStore'
 import useLoanStore from '../store/useLoanStore'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { convertCurrency, formatCurrency, toSafeNumber } from '../lib/utils'
+import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import {
   Plus,
   ChevronLeft,
@@ -32,10 +33,23 @@ export default function Loans() {
   const motionDelay = reduceMotion ? 0 : 220
   const navigate = useNavigate()
 
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const [isEntering, setIsEntering] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [activeTab, setActiveTab] = useState('debt') // 'debt' or 'receivable'
   const [statusFilter, setStatusFilter] = useState('active') // 'active' | 'paid' | 'all'
+
+  useEffect(() => {
+    const loadRates = async () => {
+      try {
+        const fetchedRates = await fetchCurrencyRates('USD')
+        setRates(fetchedRates)
+      } catch {
+        setRates({ ...FALLBACK_EXCHANGE_RATES })
+      }
+    }
+    loadRates()
+  }, [])
 
   // Swipe action hook
   const { swipedId, getSwipeHandlers } = useSwipeAction()
@@ -160,7 +174,7 @@ export default function Loans() {
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
     rows.forEach((r) => {
-      const val = convertCurrency(r.remaining, r.currency || defaultCurrency, defaultCurrency, {})
+      const val = convertCurrency(r.remaining, r.currency || defaultCurrency, defaultCurrency, rates)
       if (r.type === 'debt' && !r.isPaid) {
         totalDebt += val
       } else if (r.type === 'receivable' && !r.isPaid) {
@@ -178,7 +192,7 @@ export default function Loans() {
     const receivablePct = sum > 0 ? 100 - debtPct : 0
 
     return { totalDebt, totalReceivable, dueThisMonthCount, netPosition, debtPct, receivablePct }
-  }, [defaultCurrency, rows])
+  }, [rows, defaultCurrency, rates])
 
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
@@ -231,7 +245,7 @@ export default function Loans() {
             className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Catat Baru
+            {t('loans.recordNew', 'Catat Baru')}
           </button>
         </div>
 
@@ -242,7 +256,7 @@ export default function Loans() {
             <div className="min-w-0">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
                 <HandCoins className="h-3.5 w-3.5 text-[var(--earthy-terra)]" />
-                Utang Saya
+                {t('loans.myDebt', 'Utang Saya')}
               </span>
               <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-terra)]">
                 {formatCurrency(totals.totalDebt, defaultCurrency)}
@@ -253,7 +267,7 @@ export default function Loans() {
             <div className="min-w-0 pl-4">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
                 <Receipt className="h-3.5 w-3.5 text-[var(--earthy-green)]" />
-                Piutang Saya
+                {t('loans.myReceivable', 'Piutang Saya')}
               </span>
               <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-green)]">
                 {formatCurrency(totals.totalReceivable, defaultCurrency)}
@@ -267,31 +281,31 @@ export default function Loans() {
               <div
                 className="h-full bg-[var(--earthy-green)] transition-all duration-500"
                 style={{ width: `${totals.receivablePct}%` }}
-                title={`Piutang: ${totals.receivablePct}%`}
+                title={`${t('loans.myReceivable', 'Piutang')}: ${totals.receivablePct}%`}
               />
               <div
                 className="h-full bg-[var(--earthy-terra)] transition-all duration-500"
                 style={{ width: `${totals.debtPct}%` }}
-                title={`Utang: ${totals.debtPct}%`}
+                title={`${t('loans.myDebt', 'Utang')}: ${totals.debtPct}%`}
               />
             </div>
             <div className="flex items-center justify-between text-[10px] font-extrabold tabular-nums">
-              <span className="text-[var(--earthy-green)]">Piutang {totals.receivablePct}%</span>
+              <span className="text-[var(--earthy-green)]">{t('loans.myReceivable', 'Piutang')} {totals.receivablePct}%</span>
               <span className="text-[var(--muted)] font-semibold italic">
                 {totals.receivablePct === totals.debtPct
-                  ? 'seimbang'
+                  ? t('loans.balanced', 'seimbang')
                   : totals.receivablePct > totals.debtPct
-                    ? 'surplus'
-                    : 'beban'}
+                    ? t('loans.surplus', 'surplus')
+                    : t('loans.deficit', 'beban')}
               </span>
-              <span className="text-[var(--earthy-terra)]">Utang {totals.debtPct}%</span>
+              <span className="text-[var(--earthy-terra)]">{t('loans.myDebt', 'Utang')} {totals.debtPct}%</span>
             </div>
           </div>
 
           {/* Posisi Bersih Row */}
           <div className="pt-2.5 border-t border-dashed border-[var(--border)] flex items-center justify-between text-xs font-bold">
             <span className="text-[var(--muted)] flex items-center gap-1.5">
-              <Scale className="h-3.5 w-3.5" /> Posisi Bersih
+              <Scale className="h-3.5 w-3.5" /> {t('loans.netPosition', 'Posisi Bersih')}
             </span>
             <span
               className={`font-black tabular-nums ${
@@ -310,7 +324,7 @@ export default function Loans() {
           {totals.dueThisMonthCount > 0 && (
             <div className="pt-2 border-t border-[var(--border)]/60 flex items-center gap-1.5 text-xs font-bold text-amber-500">
               <Clock className="h-3.5 w-3.5 shrink-0" />
-              <span>{totals.dueThisMonthCount} pinjaman jatuh tempo bulan ini</span>
+              <span>{t('loans.dueThisMonth', { count: totals.dueThisMonthCount }, `${totals.dueThisMonthCount} pinjaman jatuh tempo bulan ini`)}</span>
             </div>
           )}
         </div>
@@ -324,7 +338,7 @@ export default function Loans() {
               activeTab === 'debt' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            Utang Saya ({rows.filter((r) => r.type === 'debt' && !r.isPaid).length})
+            {t('loans.myDebt', 'Utang Saya')} ({rows.filter((r) => r.type === 'debt' && !r.isPaid).length})
             {activeTab === 'debt' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-terra)]" />
             )}
@@ -337,7 +351,7 @@ export default function Loans() {
               activeTab === 'receivable' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            Piutang Saya ({rows.filter((r) => r.type === 'receivable' && !r.isPaid).length})
+            {t('loans.myReceivable', 'Piutang Saya')} ({rows.filter((r) => r.type === 'receivable' && !r.isPaid).length})
             {activeTab === 'receivable' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-green)]" />
             )}
@@ -355,7 +369,7 @@ export default function Loans() {
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
-            Aktif ({activeCountInTab})
+            {t('loans.filter.active', { count: activeCountInTab }, `Aktif (${activeCountInTab})`)}
           </button>
 
           <button
@@ -367,7 +381,7 @@ export default function Loans() {
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
-            Lunas ({paidCountInTab})
+            {t('loans.filter.paid', { count: paidCountInTab }, `Lunas (${paidCountInTab})`)}
           </button>
 
           <button
@@ -379,7 +393,7 @@ export default function Loans() {
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
-            Semua ({totalCountInTab})
+            {t('loans.filter.all', { count: totalCountInTab }, `Semua (${totalCountInTab})`)}
           </button>
         </div>
 
@@ -389,17 +403,17 @@ export default function Loans() {
             <EmptyState
               title={
                 statusFilter === 'paid'
-                  ? 'Belum Ada Catatan Lunas'
+                  ? t('loans.empty.paid.title', 'Belum Ada Catatan Lunas')
                   : activeTab === 'debt'
-                    ? 'Belum Ada Catatan Utang Aktif'
-                    : 'Belum Ada Catatan Piutang Aktif'
+                    ? t('loans.empty.debt.title', 'Belum Ada Catatan Utang Aktif')
+                    : t('loans.empty.receivable.title', 'Belum Ada Catatan Piutang Aktif')
               }
               description={
                 statusFilter === 'paid'
-                  ? 'Catatan pinjaman yang sudah lunas 100% akan tersimpan di sini.'
+                  ? t('loans.empty.paid.desc', 'Catatan pinjaman yang sudah lunas 100% akan tersimpan di sini.')
                   : activeTab === 'debt'
-                    ? 'Tekan "Catat Baru" untuk menambah catatan utang Anda.'
-                    : 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.'
+                    ? t('loans.empty.debt.desc', 'Tekan "Catat Baru" untuk menambah catatan utang Anda.')
+                    : t('loans.empty.receivable.desc', 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.')
               }
               action={
                 <button
@@ -408,7 +422,7 @@ export default function Loans() {
                   className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 mx-auto cursor-pointer"
                 >
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Catat Baru
+                  {t('loans.recordNew', 'Catat Baru')}
                 </button>
               }
             />
@@ -447,7 +461,7 @@ export default function Loans() {
                       {/* Circular LUNAS Stamp for Paid Items */}
                       {isPaid && (
                         <div className={`loan-stamp ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'}`}>
-                          <b className="loan-stamp-text">LUNAS</b>
+                          <b className="loan-stamp-text">{t('loans.badge.paid', 'LUNAS')}</b>
                           <span className="loan-stamp-sub">{item.dueDate || '100%'}</span>
                         </div>
                       )}
@@ -469,7 +483,7 @@ export default function Loans() {
                             {isPaid && (
                               <span
                                 className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-[var(--panel-strong)]"
-                                title={'Lunas'}
+                                title={t('loans.paid', 'Lunas')}
                               >
                                 <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={3} />
                               </span>
@@ -491,7 +505,7 @@ export default function Loans() {
                               )}
                               {statusFilter === 'paid' && (
                                 <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                                  <CheckCircle2 className="h-2.5 w-2.5" /> Lunas
+                                  <CheckCircle2 className="h-2.5 w-2.5" /> {t('loans.paid', 'Lunas')}
                                 </span>
                               )}
                             </div>
@@ -542,7 +556,7 @@ export default function Loans() {
                             className="ft-input text-xs font-semibold py-1 px-2.5 rounded-xl flex-1"
                             value={noteInputText}
                             onChange={(e) => setNoteInputText(e.target.value)}
-                            placeholder={'Tulis catatan singkat...'}
+                            placeholder={t('loans.notes.placeholder', 'Tulis catatan singkat...')}
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveInlineNote(item.id)
@@ -554,14 +568,14 @@ export default function Loans() {
                             onClick={() => handleSaveInlineNote(item.id)}
                             className="px-2.5 py-1 rounded-xl bg-[var(--accent)] text-white text-[11px] font-extrabold cursor-pointer hover:opacity-90 shrink-0"
                           >
-                            Simpan
+                            {t('common.save', 'Simpan')}
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingNoteId(null)}
                             className="px-2 py-1 rounded-xl border border-[var(--border)] text-[var(--muted)] text-[11px] font-bold cursor-pointer shrink-0"
                           >
-                            Batal
+                            {t('common.cancel', 'Batal')}
                           </button>
                         </div>
                       ) : (
@@ -572,7 +586,7 @@ export default function Loans() {
                               <div
                                 onClick={(e) => startEditNote(item, e)}
                                 className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted)] hover:text-[var(--fg)] cursor-pointer truncate max-w-full group/note"
-                                title={'Klik untuk mengedit catatan'}
+                                title={t('common.edit', 'Edit')}
                               >
                                 <StickyNote className="h-3 w-3 text-amber-500 shrink-0" />
                                 <span className="truncate font-medium">{item.notes}</span>
@@ -584,7 +598,7 @@ export default function Loans() {
                                 onClick={(e) => startEditNote(item, e)}
                                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--muted)] hover:text-[var(--fg)] cursor-pointer"
                               >
-                                <Plus className="h-2.5 w-2.5" /> Catatan
+                                <Plus className="h-2.5 w-2.5" /> {t('loans.modal.notes', 'Catatan')}
                               </button>
                             )}
                           </div>
@@ -601,7 +615,7 @@ export default function Loans() {
                               }`}
                             >
                               <Plus className="h-3 w-3" strokeWidth={3} />
-                              {isDebt ? 'Bayar' : 'Terima'}
+                              {isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')}
                             </button>
                           )}
                         </div>
@@ -634,8 +648,8 @@ export default function Loans() {
             setDeletingLoan(null)
           }
         }}
-        title={'Hapus Catatan Pinjaman'}
-        message="Apakah Anda yakin ingin menghapus catatan pinjaman ini beserta seluruh riwayat pembayarannya?"
+        title={t('loans.delete.title', 'Hapus Catatan Pinjaman')}
+        message={t('loans.delete.message', 'Apakah Anda yakin ingin menghapus catatan pinjaman ini beserta seluruh riwayat pembayarannya?')}
       />
     </div>
   )

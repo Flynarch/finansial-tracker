@@ -8,7 +8,7 @@ import { formatCurrency } from '../../lib/utils'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import HabitHeatmapWidget from '../habits/HabitHeatmapWidget'
 import { ChartToggle, ProgressBar } from './DashboardStatComponents'
-import { COMPACT_ITEMS } from '../../hooks/useDashboardData'
+import { getCompactItems } from '../../hooks/useDashboardData'
 
 export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   zoomedChart,
@@ -66,13 +66,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   }
 
   const rangeTitleMap = {
-    '1d': 'Total Hari Ini',
-    '1w': 'Total 7 Hari',
-    '1m': 'Total 30 Hari',
-    '3m': 'Total 90 Hari',
-    'ytd': 'Total Tahun Ini',
-    '1y': 'Total 1 Tahun',
-    'all': 'Total Semua Waktu',
+    '1d': t('dashboard.rangeTitle.1d', 'Total Hari Ini'),
+    '1w': t('dashboard.rangeTitle.1w', 'Total 7 Hari'),
+    '1m': t('dashboard.rangeTitle.1m', 'Total 30 Hari'),
+    '3m': t('dashboard.rangeTitle.3m', 'Total 90 Hari'),
+    'ytd': t('dashboard.rangeTitle.ytd', 'Total Tahun Ini'),
+    '1y': t('dashboard.rangeTitle.1y', 'Total 1 Tahun'),
+    'all': t('dashboard.rangeTitle.all', 'Total Semua Waktu'),
   }
 
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
@@ -105,8 +105,12 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
             <>
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">Aktivitas Kebiasaan</h3>
-                  <p className="text-[10px] font-semibold text-[var(--muted)]">Riwayat dan konsistensi harian</p>
+                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">
+                    {t('habits.activityTitle', 'Aktivitas Kebiasaan')}
+                  </h3>
+                  <p className="text-[10px] font-semibold text-[var(--muted)]">
+                    {t('habits.activitySubtitle', 'Riwayat dan konsistensi harian')}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -121,7 +125,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
               <div className="mt-4">
                 <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Tren Penyelesaian Rata-Rata
+                  {t('habits.averageCompletionTrend', 'Tren Penyelesaian Rata-Rata')}
                 </h4>
                 <div className="h-40 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] p-3 text-[var(--fg)]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -135,7 +139,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} />
                       <Tooltip
-                        formatter={(val) => [`${val}%`, 'Rata-Rata Penyelesaian']}
+                        formatter={(val) => [`${val}%`, t('habits.averageCompletion', 'Rata-Rata Penyelesaian')]}
                         contentStyle={{
                           borderRadius: 12,
                           border: '1px solid var(--border)',
@@ -183,7 +187,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     }}
                     className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] cursor-pointer"
                   >
-                    + Target
+                    + {t('savings.title', 'Target')}
                   </button>
                   <button
                     type="button"
@@ -234,7 +238,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     }}
                     className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] cursor-pointer"
                   >
-                    + Anggaran
+                    + {t('budget.title', 'Anggaran')}
                   </button>
                   <button
                     type="button"
@@ -284,8 +288,12 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     <TrendingUp className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2.5} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">Kekayaan Bersih</h3>
-                    <p className="text-[10px] font-semibold text-[var(--muted)]">Ringkasan & Fluktuasi Aset</p>
+                    <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">
+                      {t('dashboard.netWorth', 'Kekayaan Bersih')}
+                    </h3>
+                    <p className="text-[10px] font-semibold text-[var(--muted)]">
+                      {t('dashboard.netWorthSubtitle', 'Ringkasan & Fluktuasi Aset')}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -301,7 +309,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
               {/* — Hero Balance & Growth Badge — */}
               <div className="mb-3">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  {rangeTitleMap[zoomRevenueRange] || 'Total Periode'}
+                  {rangeTitleMap[zoomRevenueRange] || t('dashboard.totalPeriod', 'Total Periode')}
                 </p>
                 <div className="mt-0.5 flex items-center gap-2.5">
                   <p className="text-[20px] sm:text-[26px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
@@ -335,7 +343,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                   <ChartToggle
                     value={zoomRevenueRange}
                     onChange={setZoomRevenueRange}
-                    items={COMPACT_ITEMS}
+                    items={getCompactItems(locale)}
                   />
                 </div>
                 <button
@@ -348,7 +356,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                   }`}
                 >
                   <GitCompare className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
-                  <span>Bandingkan</span>
+                  <span>{t('dashboard.compare', 'Bandingkan')}</span>
                 </button>
               </div>
 
@@ -423,11 +431,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                           <div className="pointer-events-none rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-3 py-2 text-xs shadow-[var(--shadow-soft)] text-[var(--fg)]">
                             <p className="text-[10px] font-semibold text-[var(--muted)]">{labelStr}</p>
                             <p className="mt-0.5 font-bold text-[var(--fg)] tabular-nums">
-                              Kekayaan Bersih: <span className="text-[var(--accent)]">{valStr}</span>
+                              {t('dashboard.netWorth', 'Kekayaan Bersih')}: <span className="text-[var(--accent)]">{valStr}</span>
                             </p>
                             {comparePrevious && props.payload[1]?.value !== undefined && (
                               <p className="mt-0.5 text-[11px] font-medium text-[var(--muted)] tabular-nums">
-                                Periode Lalu: <span>{formatCurrency(props.payload[1].value, defaultCurrency, locale)}</span>
+                                {t('dashboard.prevPeriod', 'Periode Lalu')}: <span>{formatCurrency(props.payload[1].value, defaultCurrency, locale)}</span>
                               </p>
                             )}
                           </div>
@@ -465,9 +473,9 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
               {/* — Contextual Summary Cards — */}
               <div className="mt-3.5 grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Masuk', value: rangedSummaryStats?.income ?? 0, positive: true, icon: ArrowDownRight, iconColor: 'text-[var(--status-income)]' },
-                  { label: 'Keluar', value: rangedSummaryStats?.expense ?? 0, positive: false, icon: ArrowUpRight, iconColor: 'text-[var(--status-expense)]' },
-                  { label: 'Selisih', value: rangedSummaryStats?.net ?? 0, positive: (rangedSummaryStats?.net ?? 0) >= 0, icon: Wallet, iconColor: 'text-[var(--accent)]' },
+                  { label: t('dashboard.income', 'Masuk'), value: rangedSummaryStats?.income ?? 0, positive: true, icon: ArrowDownRight, iconColor: 'text-[var(--status-income)]' },
+                  { label: t('dashboard.expense', 'Keluar'), value: rangedSummaryStats?.expense ?? 0, positive: false, icon: ArrowUpRight, iconColor: 'text-[var(--status-expense)]' },
+                  { label: t('dashboard.net', 'Selisih'), value: rangedSummaryStats?.net ?? 0, positive: (rangedSummaryStats?.net ?? 0) >= 0, icon: Wallet, iconColor: 'text-[var(--accent)]' },
                 ].map(({ label, value, positive, icon: Icon, iconColor }) => (
                   <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2.5 shadow-2xs">
                     <div className="flex items-center gap-1">
@@ -475,13 +483,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{label}</span>
                     </div>
                     <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight ${
-                      label === 'Selisih'
+                      label === t('dashboard.net', 'Selisih')
                         ? positive
                           ? 'text-[var(--status-income)]'
                           : 'text-[var(--status-expense)]'
                         : 'text-[var(--fg)]'
                     }`}>
-                      {label === 'Selisih' && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency, locale)}
+                      {label === t('dashboard.net', 'Selisih') && value > 0 ? '+' : ''}{formatCurrency(value, defaultCurrency, locale)}
                     </p>
                   </div>
                 ))}
@@ -495,11 +503,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
               >
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
-                  <span>Statistik & Komposisi Aset</span>
+                  <span>{t('dashboard.statsComposition', 'Statistik & Komposisi Aset')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-semibold text-[var(--muted-2)]">
-                    {showDetailedAnalytics ? 'Sembunyikan' : 'Tampilkan'}
+                    {showDetailedAnalytics ? t('common.hide', 'Sembunyikan') : t('common.show', 'Tampilkan')}
                   </span>
                   <ChevronDown
                     className={`h-4 w-4 text-[var(--muted)] shrink-0 transition-transform duration-300 ${
@@ -518,7 +526,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
                       <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
                         <ArrowUpRight className="h-3.5 w-3.5 text-[var(--status-income)] shrink-0" strokeWidth={2.5} />
-                        <span className="truncate">Tertinggi</span>
+                        <span className="truncate">{t('dashboard.peak', 'Tertinggi')}</span>
                       </div>
                       <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)] truncate">
                         {formatCurrency(zoomPeakAndFloor?.max ?? 0, defaultCurrency, locale)}
@@ -528,7 +536,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
                       <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
                         <ArrowDownRight className="h-3.5 w-3.5 text-[var(--status-expense)] shrink-0" strokeWidth={2.5} />
-                        <span className="truncate">Terendah</span>
+                        <span className="truncate">{t('dashboard.floor', 'Terendah')}</span>
                       </div>
                       <p className="mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight text-[var(--fg)] truncate">
                         {formatCurrency(zoomPeakAndFloor?.min ?? 0, defaultCurrency, locale)}
@@ -538,7 +546,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-left">
                       <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[var(--muted)]">
                         <Activity className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.5} />
-                        <span className="truncate">Laju Rata-rata</span>
+                        <span className="truncate">{t('dashboard.avgRate', 'Laju Rata-rata')}</span>
                       </div>
                       <p className={`mt-1 text-xs sm:text-sm font-black tabular-nums tracking-tight truncate ${
                         (zoomPeakAndFloor?.netRate ?? 0) > 0
@@ -548,7 +556,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                           : 'text-[var(--fg)]'
                       }`}>
                         {(zoomPeakAndFloor?.netRate ?? 0) > 0 ? '+' : ''}
-                        {formatCurrency(zoomPeakAndFloor?.netRate ?? 0, defaultCurrency, locale)} / {zoomPeakAndFloor?.unitLabel || 'hari'}
+                        {formatCurrency(zoomPeakAndFloor?.netRate ?? 0, defaultCurrency, locale)} / {zoomPeakAndFloor?.unitLabel || (locale === 'en' ? 'day' : 'hari')}
                       </p>
                     </div>
                   </div>
@@ -559,10 +567,12 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <PieChart className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Komposisi Sumber Aset</h4>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+                            {t('dashboard.assetSourceComposition', 'Komposisi Sumber Aset')}
+                          </h4>
                         </div>
                         <span className="text-[10px] font-semibold text-[var(--muted)]">
-                          {assetBreakdownData.items.length} Dompet Aktif
+                          {assetBreakdownData.items.length} {t('dashboard.activeWallets', 'Dompet Aktif')}
                         </span>
                       </div>
 

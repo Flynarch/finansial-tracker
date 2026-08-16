@@ -1,5 +1,14 @@
-/** When live FX fetch fails: 1 USD = IDR (approximate fallback). */
-export const FALLBACK_EXCHANGE_RATES = Object.freeze({ USD: 1, IDR: 17400 })
+/** When live FX fetch fails: 1 USD = currency rates (approximate fallback). */
+export const FALLBACK_EXCHANGE_RATES = Object.freeze({
+  USD: 1,
+  IDR: 16800,
+  EUR: 0.95,
+  SGD: 1.34,
+  MYR: 4.45,
+  JPY: 154.0,
+  GBP: 0.79,
+  AUD: 1.55,
+})
 
 /** Cache for Intl.NumberFormat instances keyed by locale+currency to avoid re-instantiation on every call. */
 const _fmtCache = new Map()
@@ -99,13 +108,14 @@ export function getMoneyInputCaret(rawValue, formattedValue, rawCaret, currency 
   return formatted.length
 }
 
-export function convertCurrency(amount, fromCurrency, toCurrency, rates = {}) {
+export function convertCurrency(amount, fromCurrency = 'IDR', toCurrency = 'IDR', rates = {}) {
   const numericAmount = toSafeNumber(amount)
   if (!fromCurrency || !toCurrency) return numericAmount
   if (fromCurrency === toCurrency) return numericAmount
 
-  const fromRate = toSafeNumber(rates[fromCurrency])
-  const toRate = toSafeNumber(rates[toCurrency])
+  const effectiveRates = { ...FALLBACK_EXCHANGE_RATES, ...(rates || {}) }
+  const fromRate = toSafeNumber(effectiveRates[fromCurrency])
+  const toRate = toSafeNumber(effectiveRates[toCurrency])
   if (fromRate <= 0 || toRate <= 0) return numericAmount
 
   const amountInUsd = numericAmount / fromRate

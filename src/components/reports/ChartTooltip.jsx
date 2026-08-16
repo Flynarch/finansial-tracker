@@ -1,6 +1,10 @@
+import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
 
-export default function ChartTooltip({ active, payload, label, valuePrefix = '' }) {
+export default function ChartTooltip({ active, payload, label, valuePrefix = '', currency }) {
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const activeCurrency = currency || defaultCurrency
+
   if (!active || !payload?.length) return null
 
   return (
@@ -15,7 +19,7 @@ export default function ChartTooltip({ active, payload, label, valuePrefix = '' 
             </span>
             <span className="font-semibold text-[var(--fg)]">
               {valuePrefix}
-              {formatCurrency(Number(entry?.value || 0), 'IDR')}
+              {formatCurrency(Number(entry?.value || 0), activeCurrency)}
             </span>
           </div>
         ))}

@@ -65,12 +65,14 @@ const getTools = () => ([
                   amount: { type: "NUMBER" },
                   date: { type: "STRING", description: "YYYY-MM-DD" },
                   notes: { type: "STRING" },
+                  merchant: { type: "STRING", description: "Nama toko/merchant jika ada (misal: Indomaret, Alfamart, Starbucks)." },
                   walletId: { type: "NUMBER", description: "ID dompet (wallet) yang digunakan." },
                   targetWalletId: { type: "NUMBER", description: "ID dompet tujuan JIKA type='transfer'." }
                 },
                 required: ["type", "category", "amount", "date", "notes"]
               }
             },
+            merchantName: { type: "STRING", description: "Nama toko/merchant utama yang tertera pada struk." },
             replyMessage: { type: "STRING", description: "Pesan sukses ramah." },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
@@ -276,7 +278,7 @@ const getTools = () => ([
 ])
 
 export async function parseTransactionFromText(userMessage, context) {
-  const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null } = context
+  const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null, scanMode = 'all' } = context
 
   const normUserText = String(userMessage || '').toLowerCase()
   if (
@@ -495,10 +497,11 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
 PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Berikan peringatan halus jika pengeluaran tampak terburu-buru atau besar.
 - Jawab langsung, jelas, dan solutif. Dilarang kata pembuka klise seperti "Tentu", "Baiklah", "Tentu saja".
-- SELALU tebalkan nominal uang (contoh: **Rp 50.000**).
+- SELALU tebalkan nominal uang (contoh: **Rp 50.000** atau **$50**).
+- Bila transaksi dicatat pada dompet tertentu, gunakan mata uang (currency) yang sesuai dengan dompet tersebut.
 
 Daftar Dompet (Wallets):
-${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
+${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Mata Uang: ${w.currency || defaultCurrency} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
 
 Daftar Kategori:
 ${buildCategoryContext(locale)}`
@@ -527,7 +530,24 @@ ${buildCategoryContext(locale)}`
     }
   })
   
-  const currentUserText = userMessage || "Lihat gambar struk ini"
+  let receiptVisionInstruction = ''
+  if (imageData) {
+    if (scanMode === 'per_item') {
+      receiptVisionInstruction = `\n[INSTRUKSI SCAN STRUK - MODE PER ITEM]:
+1. Ekstrak SETIAP BARIS ITEM BELANJA secara terpisah dari gambar struk ini.
+2. Untuk setiap item: tentukan nama barang spesifik di field 'notes', nominal harga riil per item di field 'amount', dan KATEGORISASIKAN SECARA MANDIRI ke ID kategori pengeluaran yang paling cocok dari daftar kategori.
+3. Ekstrak nama toko/merchant dari struk (misal: 'Indomaret', 'Alfamart', 'Superindo', 'Starbucks', dll) dan isi di field 'merchantName' serta 'merchant' tiap item.
+4. Panggil 'record_transactions' dengan array 'transactions' berisi SEMUA item tersebut secara rinci.`
+    } else {
+      receiptVisionInstruction = `\n[INSTRUKSI SCAN STRUK - MODE SEMUA (TOTAL)]:
+1. Ambil TOTAL KESELURUHAN belanja (Grand Total / Total Akhir) dari gambar struk ini.
+2. Catat sebagai 1 transaksi pengeluaran (type: 'expense') dengan total harga di 'amount', nama toko/merchant di field 'merchantName' & 'merchant', dan notes ringkasan belanja (contoh: 'Belanja di Indomaret').
+3. Kategori harus dipilih sesuai jenis toko/merchant tersebut (misal: 'belanja_harian/supermarket' atau 'makanan_minuman/restoran').
+4. Panggil 'record_transactions' dengan 1 transaksi total tersebut.`
+    }
+  }
+
+  const currentUserText = (userMessage || (imageData ? 'Lihat dan proses gambar struk ini' : 'Halo FinTrack AI')) + receiptVisionInstruction
   if (lastRole === 'user') {
     // Merge with previous user message
     const userParts = contents[contents.length - 1].parts
@@ -606,7 +626,7 @@ ${buildCategoryContext(locale)}`
                 if (p.functionCall) {
                   if (!functionCall) functionCall = { name: p.functionCall.name, args: {} }
                   if (p.functionCall.args) {
-                     Object.assign(functionCall.args, p.functionCall.args)
+                    Object.assign(functionCall.args, p.functionCall.args)
                   }
                 }
               }
@@ -642,19 +662,30 @@ ${buildCategoryContext(locale)}`
       
       if (fnCall.name === 'record_transactions') {
         const defaultWalletId = wallets[0]?.id || 1
+        const extractedMerchant = fnCall.args.merchantName || fnCall.args.transactions?.[0]?.merchant || ''
         const txs = fnCall.args.transactions?.map(t => {
           let resolvedWalletId = t.walletId
           if (!resolvedWalletId || (wallets.length > 0 && !wallets.some(w => String(w.id) === String(resolvedWalletId)))) {
             resolvedWalletId = defaultWalletId
           }
+          const resolvedWallet = wallets.find(w => String(w.id) === String(resolvedWalletId))
+          const txCurrency = resolvedWallet?.currency || defaultCurrency
           return {
             ...t,
             category: sanitizeCategoryPath(t.category, t.type),
-            currency: defaultCurrency,
+            currency: txCurrency,
+            merchant: t.merchant || extractedMerchant || undefined,
             walletId: resolvedWalletId,
           }
         }) || []
-        return { type: 'transactions', action: 'create', transactions: txs, text: fnCall.args.replyMessage || "Berhasil dicatat!", chips: fnCall.args.suggestedChips }
+        return {
+          type: 'transactions',
+          action: 'create',
+          transactions: txs,
+          merchant: extractedMerchant,
+          text: fnCall.args.replyMessage || "Berhasil dicatat!",
+          chips: fnCall.args.suggestedChips
+        }
       }
       
       if (fnCall.name === 'update_transaction') {

@@ -11,9 +11,10 @@ import { getCategoryColorClass, resolveTransactionIconKey } from '../lib/categor
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import { formatCurrency, toSafeNumber, clampPercent } from '../lib/utils'
+import { formatCurrency, toSafeNumber, clampPercent, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { calculateBudgetSpent } from '../lib/budgetUtils'
+import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
 import { ChevronLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react'
@@ -26,8 +27,21 @@ function Budget() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const [isEntering, setIsEntering] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+
+  useEffect(() => {
+    const loadRates = async () => {
+      try {
+        const fetchedRates = await fetchCurrencyRates('USD')
+        setRates(fetchedRates)
+      } catch {
+        setRates({ ...FALLBACK_EXCHANGE_RATES })
+      }
+    }
+    loadRates()
+  }, [])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -54,7 +68,7 @@ function Budget() {
 
   const sortedMonthBudgets = useMemo(() => {
     const list = (monthBudgets ?? []).map((b) => {
-      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency)
+      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
       const limit = toSafeNumber(b.limit)
       const pct = limit > 0 ? (spent / limit) * 100 : 0
       const remaining = Math.max(0, limit - spent)
@@ -69,7 +83,7 @@ function Budget() {
       }
     })
     return list.sort((a, b) => b.pct - a.pct)
-  }, [monthBudgets, monthExpenseTxs, defaultCurrency])
+  }, [monthBudgets, monthExpenseTxs, defaultCurrency, rates])
 
   const summary = useMemo(() => {
     let totalSpent = 0
@@ -171,8 +185,8 @@ function Budget() {
               />
             </div>
             <div className="text-right">
-              <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">{t('budget.totalCategories')}</span>
-              <p className="text-xs font-black tabular-nums text-[var(--fg)]">{monthBudgets.length} Kategori</p>
+              <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">{t('budget.totalCategories', 'Total Kategori')}</span>
+              <p className="text-xs font-black tabular-nums text-[var(--fg)]">{monthBudgets.length} {locale === 'en' ? 'Categories' : 'Kategori'}</p>
             </div>
           </div>
 
@@ -180,7 +194,7 @@ function Budget() {
           <div className="flex items-end justify-between gap-3 relative z-10 pt-1">
             <div className="min-w-0">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                Total Terpakai
+                {t('budget.totalSpent', 'Total Terpakai')}
               </span>
               <p className="mt-0.5 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
                 {formatCurrency(summary.totalSpent, defaultCurrency)}
@@ -189,7 +203,7 @@ function Budget() {
                 {t('budget.of')} <span className="font-extrabold text-[var(--fg)]">{formatCurrency(summary.totalLimit, defaultCurrency)}</span>
                 {summary.totalLimit > 0 && (
                   <span className={`ml-2 font-bold ${summary.isOver ? 'text-rose-500' : 'text-[var(--muted)]'}`}>
-                    ({summary.isOver ? `Kelebihan: ${formatCurrency(summary.overAmount, defaultCurrency)}` : `Sisa: ${formatCurrency(summary.remaining, defaultCurrency)}`})
+                    ({summary.isOver ? `${t('budget.overLimit', 'Kelebihan')}: ${formatCurrency(summary.overAmount, defaultCurrency)}` : `${t('budget.remaining', 'Sisa')}: ${formatCurrency(summary.remaining, defaultCurrency)}`})
                   </span>
                 )}
               </p>
@@ -324,7 +338,7 @@ function Budget() {
 
                       <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
                         <span className="text-[var(--muted)]">
-                          {isOver ? 'Kelebihan anggaran' : 'Sisa anggaran'}
+                          {isOver ? t('budget.overBudget', 'Kelebihan anggaran') : t('budget.remainingBudget', 'Sisa anggaran')}
                         </span>
                         <span className={isOver ? 'text-rose-500 font-extrabold' : 'text-[var(--fg)]'}>
                           {isOver ? formatCurrency(spent - limit, defaultCurrency) : formatCurrency(remaining, defaultCurrency)}

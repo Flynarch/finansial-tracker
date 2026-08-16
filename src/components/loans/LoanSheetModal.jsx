@@ -94,19 +94,19 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   const save = async () => {
     const total = parseMoneyInput(form.totalAmount, form.currency)
     if (!form.title.trim()) {
-      setSheetError('Judul pinjaman wajib diisi.')
+      setSheetError(t('loans.error.titleRequired', 'Judul pinjaman wajib diisi.'))
       return
     }
     if (!form.personName.trim()) {
-      setSheetError('Nama pemberi/peminjam wajib diisi.')
+      setSheetError(t('loans.error.personRequired', 'Nama pemberi/peminjam wajib diisi.'))
       return
     }
     if (total <= 0) {
-      setSheetError('Nominal pinjaman harus lebih dari 0.')
+      setSheetError(t('loans.error.amountPositive', 'Nominal pinjaman harus lebih dari 0.'))
       return
     }
     if (!form.walletId) {
-      setSheetError('Dompet / akun wajib dipilih.')
+      setSheetError(t('loans.error.walletRequired', 'Dompet / akun wajib dipilih.'))
       return
     }
 
@@ -131,7 +131,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       onSaved?.()
       closeSheet()
     } catch (err) {
-      setSheetError(err.message || 'Gagal menyimpan data pinjaman. Silakan coba lagi.')
+      setSheetError(err.message || t('loans.error.saveFailed', 'Gagal menyimpan data pinjaman. Silakan coba lagi.'))
     }
   }
 
@@ -144,7 +144,15 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       isOpen={isOpen}
       onClose={closeSheet}
       maxHeight="max-h-[88dvh]"
-      title={editingLoan ? 'Edit Pinjaman' : isDebt ? 'Catat Hutang Saya' : 'Catat Piutang Saya'}
+      title={
+        editingLoan
+          ? isDebt
+            ? t('loans.modal.editDebt', 'Edit Hutang Saya')
+            : t('loans.modal.editReceivable', 'Edit Piutang Saya')
+          : isDebt
+          ? t('loans.modal.createDebt', 'Catat Hutang Saya')
+          : t('loans.modal.createReceivable', 'Catat Piutang Saya')
+      }
     >
       <div className="space-y-4">
         {sheetError ? <ToastBanner message={sheetError} type="error" onDismiss={() => setSheetError('')} /> : null}
@@ -164,7 +172,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            Hutang Saya
+            {t('loans.myDebt', 'Hutang Saya')}
           </button>
           <button
             type="button"
@@ -175,7 +183,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            Piutang Saya
+            {t('loans.myReceivable', 'Piutang Saya')}
           </button>
         </div>
 
@@ -188,7 +196,9 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             : 'border-[var(--border)] bg-[var(--field-bg)]'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Nominal Pinjaman</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+              {t('loans.modal.amount', 'Nominal Pinjaman')}
+            </span>
             <span className="text-[11px] font-bold text-[var(--muted)]">{form.currency}</span>
           </div>
           <input
@@ -207,7 +217,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           />
           {hasPaymentsRecorded && (
             <p className="text-[10px] font-semibold text-amber-500">
-              Nominal dan tipe tidak dapat diubah setelah ada pembayaran.
+              {t('loans.error.paymentLocked', 'Nominal dan tipe tidak dapat diubah setelah ada pembayaran.')}
             </p>
           )}
         </div>
@@ -215,11 +225,17 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
         {/* 3. Detail Pinjaman */}
         <div className="space-y-2.5">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-[var(--muted)]">Judul Pinjaman</label>
+            <label className="text-[11px] font-bold text-[var(--muted)]">
+              {t('loans.modal.titleLabel', 'Judul Pinjaman')}
+            </label>
             <input
               type="text"
               className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
-              placeholder={isDebt ? 'Motor, Laptop, dll' : 'Pinjamkan ke Andi'}
+              placeholder={
+                isDebt
+                  ? t('loans.modal.titlePlaceholderDebt', 'Motor, Laptop, dll')
+                  : t('loans.modal.titlePlaceholderReceivable', 'Pinjamkan ke Andi')
+              }
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
@@ -227,12 +243,18 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
 
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-[var(--muted)]">
-              {isDebt ? 'Pemberi Pinjaman' : 'Nama Peminjam'}
+              {isDebt
+                ? t('loans.modal.personDebt', 'Pemberi Pinjaman')
+                : t('loans.modal.personReceivable', 'Nama Peminjam')}
             </label>
             <input
               type="text"
               className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
-              placeholder={isDebt ? 'BCA, Budi, dll' : 'Andi, Rina, dll'}
+              placeholder={
+                isDebt
+                  ? t('loans.modal.personPlaceholderDebt', 'BCA, Budi, dll')
+                  : t('loans.modal.personPlaceholderReceivable', 'Andi, Rina, dll')
+              }
               value={form.personName}
               onChange={(e) => setForm((prev) => ({ ...prev, personName: e.target.value }))}
             />
@@ -241,7 +263,9 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
 
         {/* 4. Wallet (Wajib) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-bold text-[var(--muted)]">Dompet / Akun (Wajib)</label>
+          <label className="text-[11px] font-bold text-[var(--muted)]">
+            {t('loans.modal.wallet', 'Dompet / Akun (Wajib)')}
+          </label>
           <WalletSelectTrigger
             wallet={selectedWallet}
             disabled={!!editingLoan}
@@ -253,7 +277,16 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             onClose={() => setWalletModalOpen(false)}
             wallets={wallets}
             selectedWalletId={form.walletId}
-            onSelectWallet={(id) => setForm((prev) => ({ ...prev, walletId: id }))}
+            onSelectWallet={(id) => {
+              const matching = (wallets || []).find((w) => String(w.id) === String(id))
+              const nextCurr = matching?.currency || defaultCurrency
+              setForm((prev) => ({
+                ...prev,
+                walletId: id,
+                currency: nextCurr,
+                totalAmount: formatMoneyInput(prev.totalAmount, nextCurr),
+              }))
+            }}
             allowNone={false}
             title={t('wallets.selectTitle', 'Pilih Dompet')}
           />
@@ -262,7 +295,9 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
         {/* 5. Jadwal -- 2 column dates */}
         <div className="grid grid-cols-2 gap-2.5">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-[var(--muted)]">Tanggal Pinjam</label>
+            <label className="text-[11px] font-bold text-[var(--muted)]">
+              {t('loans.startDateLabel', 'Tanggal Pinjam')}
+            </label>
             <CustomDatePicker
               value={form.startDate}
               onChange={(val) => setForm((prev) => ({ ...prev, startDate: val }))}
@@ -270,12 +305,14 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-[var(--muted)]">Jatuh Tempo</label>
+            <label className="text-[11px] font-bold text-[var(--muted)]">
+              {t('loans.dueDateLabel', 'Jatuh Tempo')}
+            </label>
             <CustomDatePicker
               value={form.dueDate}
               onChange={(val) => setForm((prev) => ({ ...prev, dueDate: val }))}
               allowClear
-              clearLabel="Tanpa Jatuh Tempo"
+              clearLabel={t('loans.noDueDate', 'Tanpa Jatuh Tempo')}
               placeholder={t('common.optional', 'Opsional')}
               title={t('loans.dueDateTitle', 'Pilih Jatuh Tempo')}
             />
@@ -284,7 +321,9 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
 
         {/* 6. Catatan (Opsional) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-bold text-[var(--muted)]">Catatan (Opsional)</label>
+          <label className="text-[11px] font-bold text-[var(--muted)]">
+            {t('loans.modal.notes', 'Catatan (Opsional)')}
+          </label>
           <input
             type="text"
             className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
@@ -297,7 +336,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
         {/* 6. Submit Buttons */}
         <div className="flex items-center justify-end gap-2 pt-1 border-t border-[var(--border)]/40">
           <Button type="button" variant="secondary" onClick={closeSheet} className="!py-2.5 !px-4 text-xs active:scale-95 transition-all">
-            Batal
+            {t('common.cancel', 'Batal')}
           </Button>
           <Button
             type="button"
@@ -306,7 +345,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
               isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'
             }`}
           >
-            {editingLoan ? 'Simpan Perubahan' : 'Simpan'}
+            {editingLoan ? t('common.saveChanges', 'Simpan Perubahan') : t('loans.modal.save', 'Simpan')}
           </Button>
         </div>
       </div>

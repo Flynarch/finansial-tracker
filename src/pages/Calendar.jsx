@@ -1,5 +1,5 @@
 import { format, getDay, parse, startOfWeek } from 'date-fns'
-import { enUS } from 'date-fns/locale'
+import { enUS, id } from 'date-fns/locale'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Calendar as ReactBigCalendar } from 'react-big-calendar'
@@ -24,7 +24,7 @@ const localizer = dateFnsLocalizer({
   parse,
   startOfWeek,
   getDay,
-  locales: { 'en-US': enUS },
+  locales: { 'en-US': enUS, en: enUS, id },
 })
 
 function toDateOnlyString(date) {
@@ -284,6 +284,7 @@ function Calendar() {
         <div className="ft-cal-shell">
           <ReactBigCalendar
             localizer={localizer}
+            culture={locale === 'id' ? 'id' : 'en-US'}
             events={calendarEvents}
             startAccessor="start"
             endAccessor="end"
@@ -332,7 +333,7 @@ function Calendar() {
       {/* ── Premium Day Modal ── */}
       <Modal
         isOpen={isDayModalOpen}
-        title={format(selectedDate, 'dd MMMM yyyy')}
+        title={format(selectedDate, 'dd MMMM yyyy', { locale: locale === 'id' ? id : enUS })}
         onClose={() => setIsDayModalOpen(false)}
       >
         <div className="space-y-4">

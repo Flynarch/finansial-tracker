@@ -6,8 +6,8 @@ import {
   Zap,
   AlertTriangle,
   CheckCircle2,
-  Database,
   RefreshCw,
+  HardDrive,
 } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import { db } from '../../lib/db'
@@ -126,109 +126,159 @@ export default function SettingsData() {
     <>
       {statusMessage ? (
         <div
-          className="mb-3.5 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs font-bold text-[var(--fg)] animate-fadeIn"
+          className="mb-5 flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-fadeIn"
           role="status"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+          <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-emerald-500" />
           <span>{statusMessage}</span>
         </div>
       ) : null}
 
-      {/* Cadangan & Pulihkan - Clean & Monochromatic */}
+      {/* Storage Metrics Hero Card */}
+      <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-card">
+        <div className="flex items-center gap-3.5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--badge-bg)] text-[var(--badge-icon)] border border-[var(--badge-border)] shadow-2xs">
+            <HardDrive className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base sm:text-lg font-black text-[var(--fg)] leading-tight">
+              Penyimpanan & Cadangan Lokal
+            </h3>
+            <p className="text-xs font-medium text-[var(--muted)] mt-1">
+              Data tersimpan langsung di browser (IndexedDB) dengan enkripsi lokal
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)]/60 text-center">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Format</span>
+            <span className="block text-xs font-black text-[var(--fg)] mt-0.5">JSON Standar</span>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Status</span>
+            <span className="block text-xs font-black text-emerald-500 mt-0.5">Offline Ready</span>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Tabel</span>
+            <span className="block text-xs font-black text-[var(--fg)] mt-0.5">{db.tables.length} Entitas</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Backup & Restore Action Cards */}
       <SettingsSection
         label={t('settings.backup.title', 'Cadangan & Pemulihan')}
         footnote={t(
           'settings.backup.footnote',
-          'File cadangan JSON berisi seluruh riwayat transaksi, dompet, anggaran, dan tabungan.',
+          'File cadangan JSON berisi seluruh riwayat transaksi, dompet, anggaran, dan tabungan Anda.',
         )}
       >
-        <div className="ft-settings-cell space-y-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)]">
-              <Database className="h-4 w-4" />
+        {/* Ekspor JSON Card */}
+        <div className="ft-settings-cell space-y-3.5">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-2xs">
+              <Download className="h-5.5 w-5.5" />
             </div>
-            <div>
-              <h3 className="text-xs font-bold text-[var(--fg)]">
-                {t('settings.backup.jsonTitle', 'Format Standar JSON')}
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
+                {t('settings.backup.jsonTitle', 'Ekspor Salinan Data (JSON)')}
               </h3>
-              <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5">
-                Simpan salinan cadangan ke penyimpanan perangkat atau cloud drive Anda.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-0.5">
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={handleExportJson}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-[var(--fg)] py-2 px-3 text-xs font-extrabold text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>
-                {isBusy && busyAction === 'export'
-                  ? t('common.loading', 'Mengekspor...')
-                  : t('settings.backup.export', 'Ekspor JSON')}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3 text-xs font-bold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
-            >
-              <UploadCloud className="h-3.5 w-3.5" />
-              <span>
-                {isBusy && busyAction === 'import'
-                  ? t('common.loading', 'Mengimpor...')
-                  : t('settings.backup.import', 'Impor JSON')}
-              </span>
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleImportJson}
-              className="hidden"
-            />
-          </div>
-        </div>
-      </SettingsSection>
-
-      {/* Generator Data Uji Coba */}
-      <SettingsSection
-        label="Data Uji Coba & Performa"
-        footnote="Generate ratusan transaksi realistis untuk menguji performa dashboard dan grafik."
-      >
-        <div className="ft-settings-cell space-y-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)]">
-              <Zap className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-[var(--fg)]">Stress Test Data Generator</h3>
-              <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5">
-                Generate 600+ transaksi, 8 dompet, 10 anggaran, dan target tabungan.
+              <p className="text-xs font-medium text-[var(--muted)] mt-1">
+                Unduh file cadangan lengkap ke memori perangkat atau cloud drive Anda.
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3 text-xs font-bold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
+            disabled={isBusy}
+            onClick={handleExportJson}
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl bg-[var(--fg)] px-4 text-sm font-black text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer"
+          >
+            <Download className="h-4.5 w-4.5" />
+            <span>
+              {isBusy && busyAction === 'export'
+                ? t('common.loading', 'Mengekspor Data...')
+                : t('settings.backup.export', 'Unduh Cadangan JSON')}
+            </span>
+          </button>
+        </div>
+
+        {/* Impor JSON Card */}
+        <div className="ft-settings-cell space-y-3.5">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
+              <UploadCloud className="h-5.5 w-5.5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
+                {t('settings.backup.importTitle', 'Pulihkan Data (Impor JSON)')}
+              </h3>
+              <p className="text-xs font-medium text-[var(--muted)] mt-1">
+                Pilih file backup .json sebelumnya untuk mengembalikan riwayat data.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
+          >
+            <UploadCloud className="h-4.5 w-4.5" />
+            <span>
+              {isBusy && busyAction === 'import'
+                ? t('common.loading', 'Mengimpor Data...')
+                : t('settings.backup.import', 'Pilih File Cadangan JSON')}
+            </span>
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleImportJson}
+            className="hidden"
+          />
+        </div>
+      </SettingsSection>
+
+      {/* Generator Data Uji Coba */}
+      <SettingsSection
+        label="Data Uji Coba & Performa"
+        footnote="Generate ratusan transaksi realistis untuk menguji performa dashboard dan visualisasi analitik."
+      >
+        <div className="ft-settings-cell space-y-3.5">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-2xs">
+              <Zap className="h-5.5 w-5.5" />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
+                Stress Test Data Generator
+              </h3>
+              <p className="text-xs font-medium text-[var(--muted)] mt-1">
+                Generate 600+ transaksi acak, 8 dompet, 10 anggaran, dan target tabungan.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
             disabled={isBusy}
             onClick={handleSeedStressTestData}
           >
             {isBusy && busyAction === 'seed' ? (
               <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <RefreshCw className="h-4.5 w-4.5 animate-spin text-[var(--accent)]" />
                 <span>Men-generate 600+ Data...</span>
               </>
             ) : (
               <>
-                <Zap className="h-3.5 w-3.5" />
+                <Zap className="h-4.5 w-4.5 text-amber-500" />
                 <span>Generate 600+ Data Stress Test</span>
               </>
             )}
@@ -236,7 +286,7 @@ export default function SettingsData() {
         </div>
       </SettingsSection>
 
-      {/* Danger Zone */}
+      {/* Zona Berbahaya */}
       <SettingsSection
         label={t('settings.dangerZone', 'Zona Berbahaya')}
         footnote={t(
@@ -244,28 +294,29 @@ export default function SettingsData() {
           'Tindakan ini akan menghapus seluruh data lokal secara permanen dan tidak dapat dibatalkan.',
         )}
       >
-        <div className="ft-settings-cell flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--field-bg)] text-rose-500 border border-rose-500/20">
-              <AlertTriangle className="h-4 w-4" />
+        <div className="ft-settings-cell space-y-3.5">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-2xs">
+              <AlertTriangle className="h-5.5 w-5.5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-xs font-bold text-rose-500">
+              <h3 className="text-[15px] font-extrabold text-rose-500 leading-tight">
                 {t('settings.reset.title', 'Reset Seluruh Database')}
               </h3>
-              <p className="text-[10.5px] font-medium text-[var(--muted)] truncate">
-                Hapus semua akun, riwayat, dan preferensi
+              <p className="text-xs font-medium text-[var(--muted)] mt-1">
+                Hapus semua akun, riwayat transaksi, anggaran, dan preferensi aplikasi.
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            className="shrink-0 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer"
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-black text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
             disabled={isBusy}
             onClick={() => setIsClearModalOpen(true)}
           >
-            {t('settings.reset.button', 'Reset Data')}
+            <AlertTriangle className="h-4.5 w-4.5 text-rose-500" />
+            <span>{t('settings.reset.button', 'Hapus Semua Riwayat Finansial')}</span>
           </button>
         </div>
       </SettingsSection>
@@ -279,7 +330,7 @@ export default function SettingsData() {
           setIsClearModalOpen(false)
         }}
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
           <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
             {t('settings.reset.modalDesc', 'Seluruh data transaksi dan akun akan dihapus. Ketik')}
             <span className="mx-1 font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
@@ -292,14 +343,14 @@ export default function SettingsData() {
             value={resetConfirmText}
             onChange={(event) => setResetConfirmText(event.target.value)}
             onInput={() => setStatusMessage('')}
-            className="ft-settings-field-compact font-mono text-center tracking-widest text-sm"
+            className="ft-settings-field-compact font-mono text-center tracking-widest text-sm h-12"
             placeholder={t('settings.reset.modalType', 'Ketik RESET')}
           />
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2.5 pt-1">
             <button
               type="button"
               disabled={!canConfirmReset || isBusy}
-              className={`flex-1 rounded-lg py-2 px-3 text-xs font-bold transition active:scale-95 cursor-pointer ${
+              className={`flex-1 h-12 rounded-2xl py-2.5 px-4 text-sm font-bold transition active:scale-95 cursor-pointer ${
                 canConfirmReset
                   ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-500'
                   : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
@@ -311,7 +362,7 @@ export default function SettingsData() {
             <button
               type="button"
               disabled={isBusy}
-              className="rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
+              className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-4 text-sm font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
               onClick={() => {
                 if (isBusy) return
                 setIsClearModalOpen(false)

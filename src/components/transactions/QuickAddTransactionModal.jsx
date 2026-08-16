@@ -38,9 +38,9 @@ import {
   removeIncomeSubcategory,
   setIncomeCategoryColor,
 } from '../../lib/incomeCategories'
-import { fetchGoldPricePerGramIDR, getGoldPriceHistory } from '../../lib/api'
-import { db } from '../../lib/db'
-import { formatMoneyInput, getMoneyInputCaret, parseMoneyInput, toSafeNumber } from '../../lib/utils'
+import { fetchGoldPricePerGramIDR, getGoldPriceHistory, fetchCurrencyRates, getCachedCurrencyRates } from '../../lib/api'
+import { db, computeAllWalletBalances } from '../../lib/db'
+import { formatMoneyInput, getMoneyInputCaret, parseMoneyInput, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 const investmentTypeOptions = ['Emas', 'Crypto', 'Saham']
@@ -88,10 +88,49 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     fundingSource: 'balance',
   }))
   const ownedInvestments = useLiveQuery(() => db.investments.toArray(), [], [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const rawWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [], [])
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
+
+  useEffect(() => {
+    fetchCurrencyRates('USD')
+      .then((r) => r && setRates(r))
+      .catch(() => {})
+  }, [])
+
+  const wallets = useMemo(() => {
+    return computeAllWalletBalances(rawWallets || [], allTransactions || [], rates)
+  }, [rawWallets, allTransactions, rates])
+
   const [walletModalMode, setWalletModalMode] = useState(null) // null | 'walletId' | 'targetWalletId'
   const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
   const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
+  const isCashWallet = useMemo(
+    () =>
+      Boolean(
+        selectedWallet &&
+          (selectedWallet.institutionType === 'cash' ||
+            selectedWallet.customIcon === 'dollar' ||
+            selectedWallet.customIcon === 'cash' ||
+            String(selectedWallet.name || '').toLowerCase().includes('cash') ||
+            String(selectedWallet.name || '').toLowerCase().includes('tunai')),
+      ),
+    [selectedWallet],
+  )
+
+  const [prevInitialWalletId, setPrevInitialWalletId] = useState(initialWalletId || '')
+  const normalizedInitialWalletId = initialWalletId || ''
+  if (normalizedInitialWalletId !== prevInitialWalletId) {
+    setPrevInitialWalletId(normalizedInitialWalletId)
+    const matching = wallets?.find((w) => String(w.id) === String(initialWalletId))
+    const nextCurr = matching?.currency || defaultCurrency
+    setForm((p) => ({
+      ...p,
+      walletId: initialWalletId || '',
+      currency: nextCurr,
+      amount: formatMoneyInput(p.amount, nextCurr),
+    }))
+  }
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
@@ -104,6 +143,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const [, setNewIncomeCatName] = useState('')
   const [categoryCustomVersion, setCategoryCustomVersion] = useState(0)
   const [submitError, setSubmitError] = useState('')
+  const [categoryError, setCategoryError] = useState(false)
+  const [categoryShaking, setCategoryShaking] = useState(false)
+  const categoryButtonRef = useRef(null)
   const [goldAutoPrice, setGoldAutoPrice] = useState(0)
   const [isAmountFocused, setIsAmountFocused] = useState(false)
   const amountInputRef = useRef(null)
@@ -184,6 +226,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     setPrevOpen(isOpen)
     if (isOpen) {
       setTxType('expense')
+      setCategoryError(false)
+      setCategoryShaking(false)
+      setSubmitError('')
       setForm((prev) => ({
         ...prev,
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -246,6 +291,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }, [])
 
   const openCategorySheet = () => {
+    setCategoryError(false)
+    setCategoryShaking(false)
+    setSubmitError('')
     setCategoryEditMode(false)
     setIncomeEditMode(false)
     setNewSubName('')
@@ -403,7 +451,18 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         }
       } else {
         if (txType !== 'transfer' && (!form.category || !form.category.trim())) {
-          setSubmitError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
+          setCategoryError(true)
+          setCategoryShaking(true)
+          setSubmitError('')
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            try {
+              navigator.vibrate([30, 50, 30])
+            } catch {
+              // ignore
+            }
+          }
+          categoryButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          setTimeout(() => setCategoryShaking(false), 500)
           return
         }
         if (!form.walletId) {
@@ -412,11 +471,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         }
         if (txType === 'transfer') {
           if (!form.targetWalletId) {
-            setSubmitError('Silakan pilih wallet tujuan.')
+            setSubmitError(t('tx.selectTargetWallet', 'Silakan pilih wallet tujuan.'))
             return
           }
-          if (form.walletId === form.targetWalletId) {
-            setSubmitError('Wallet asal dan tujuan tidak boleh sama.')
+          if (String(form.walletId) === String(form.targetWalletId)) {
+            setSubmitError(t('tx.sameWalletTransfer', 'Wallet asal dan tujuan tidak boleh sama.'))
             return
           }
         }
@@ -444,6 +503,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       ? 'var(--income)'
       : txType === 'expense'
       ? 'var(--expense)'
+      : txType === 'transfer'
+      ? '#2563eb'
       : 'var(--accent)'
 
   return (
@@ -475,7 +536,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           <div className="relative mb-5 flex items-center rounded-xl bg-[var(--field-bg)] p-1">
             {/* Sliding Background Indicator */}
             <div
-              className="absolute top-1 bottom-1 rounded-lg bg-[var(--panel)] border border-[var(--border)] shadow-2xs transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none"
+              className={`absolute top-1 bottom-1 rounded-lg bg-[var(--panel)] border transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none ${
+                txType === 'transfer' ? 'border-blue-500/30 shadow-[0_0_12px_rgba(37,99,235,0.15)]' : 'border-[var(--border)] shadow-2xs'
+              }`}
               style={{
                 width: `calc((100% - 0.5rem) / ${tabs.length})`,
                 left: `calc(0.25rem + (${activeIdx} * (100% - 0.5rem) / ${tabs.length}))`,
@@ -488,6 +551,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   ? 'text-[var(--income)]'
                   : tab.id === 'expense'
                   ? 'text-[var(--expense)]'
+                  : tab.id === 'transfer'
+                  ? 'text-blue-600 dark:text-blue-400 font-extrabold'
                   : 'text-[var(--fg)]'
 
               return (
@@ -791,30 +856,38 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               <div className="flex items-baseline gap-2.5">
                 {/* Inline Currency Prefix */}
                 <div className="relative shrink-0 flex items-center">
-                  <select
-                    value={form.currency}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        currency: e.target.value,
-                        amount: formatMoneyInput(p.amount, e.target.value),
-                      }))
-                    }
-                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 min-h-[44px] min-w-[44px]"
-                    aria-label={t('addTx.currency')}
-                  >
-                    {currencyOptions.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-1 select-none pointer-events-none text-base font-extrabold text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
-                    <span>{form.currency}</span>
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
+                  {isCashWallet ? (
+                    <>
+                      <select
+                        value={form.currency}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            currency: e.target.value,
+                            amount: formatMoneyInput(p.amount, e.target.value),
+                          }))
+                        }
+                        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 min-h-[44px] min-w-[44px]"
+                        aria-label={t('addTx.currency')}
+                      >
+                        {currencyOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1 select-none pointer-events-none text-base font-extrabold text-[var(--fg)] bg-[var(--field-bg)] px-2 py-0.5 rounded-lg border border-[var(--border)] transition-colors shadow-2xs">
+                        <span>{form.currency}</span>
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center select-none text-base font-extrabold text-[var(--muted-2)] px-1 py-0.5">
+                      <span>{form.currency}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Hero Numeric Input */}
@@ -861,115 +934,153 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 }}
               />
             </div>
-
-            {/* Compact Row: Tanggal + Wallet */}
-            <div className="flex items-stretch gap-2">
-              <div className="shrink-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">{t('addTx.date')}</div>
-                <div className="bg-[var(--field-bg)] rounded-xl px-0.5">
-                  <CustomDatePicker
-                    value={form.date}
-                    onChange={(val) => setForm((p) => ({ ...p, date: val }))}
-                    title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
-                    buttonClassName="border-none bg-transparent shadow-none px-3 py-2 min-h-[42px]"
-                  />
-                </div>
-              </div>
-
-              {txType === 'transfer' ? (
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">Transfer</div>
-                  <div className="flex flex-col gap-1.5">
-                    <WalletSelectTrigger
-                      wallet={selectedWallet}
-                      placeholder={t('tx.transferFrom', 'Wallet Asal')}
-                      compact
-                      abbreviateBalance
-                      onClick={() => setWalletModalMode('walletId')}
-                    />
-                    <div className="flex items-center justify-center">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M12 19l-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                    <WalletSelectTrigger
-                      wallet={selectedTargetWallet}
-                      placeholder={t('tx.transferTo', 'Wallet Tujuan')}
-                      compact
-                      abbreviateBalance
-                      onClick={() => setWalletModalMode('targetWalletId')}
+            {/* Form Fields Container - Fixed height to prevent jumping between tabs */}
+            <div className="space-y-3" style={{ minHeight: '192px' }}>
+              {/* Row 1: Tanggal + Dompet Asal */}
+              <div className="flex items-stretch gap-2">
+                <div className="shrink-0 min-w-[125px] sm:min-w-[135px]">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
+                    {t('addTx.date')}
+                  </div>
+                  <div className="bg-[var(--field-bg)] rounded-xl px-0.5 h-[42px]">
+                    <CustomDatePicker
+                      value={form.date}
+                      onChange={(val) => setForm((p) => ({ ...p, date: val }))}
+                      title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
+                      buttonClassName="border-none bg-transparent shadow-none px-3 py-2 min-h-[42px]"
                     />
                   </div>
                 </div>
-              ) : (
+
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">{t('addTx.wallet', 'Dompet')}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
+                    {txType === 'transfer' ? t('tx.transferFrom', 'Dari Dompet') : t('addTx.wallet', 'Dompet')}
+                  </div>
                   <WalletSelectTrigger
                     wallet={selectedWallet}
-                    placeholder={t('loans.selectWallet', 'Pilih Wallet / Akun')}
+                    placeholder={txType === 'transfer' ? t('tx.transferFrom', 'Pilih Dompet Asal') : t('loans.selectWallet', 'Pilih Wallet / Akun')}
                     compact
                     abbreviateBalance
                     onClick={() => setWalletModalMode('walletId')}
+                    className="!h-[42px]"
                   />
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Kategori Trigger Button */}
-            {txType !== 'transfer' && (
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1.5">
-                  {t('addTx.category')}
-                </div>
-                <button
-                  type="button"
-                  onClick={openCategorySheet}
-                  className="w-full flex items-center justify-between gap-2 rounded-xl bg-[var(--field-bg)] px-3.5 py-3 text-left min-w-0 transition-all hover:bg-[var(--panel-strong)] active:scale-[0.99] cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {form.category && form.category.trim() ? (
-                      <CategoryIcon
-                        icon={resolveParentIcon(form.category.split('/')[0])}
-                        className="h-4 w-4 shrink-0 text-[var(--fg)]/70"
-                      />
-                    ) : (
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.75">
-                        <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" strokeLinecap="round" strokeLinejoin="round" />
+              {/* Row 2: Kategori (Expense/Income) OR Dompet Tujuan (Transfer) */}
+              <div style={{ minHeight: '60px' }}>
+                {txType === 'transfer' ? (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1 h-[18px]">
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 5v14M12 19l-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                    )}
-                    <span className={`min-w-0 flex-1 leading-snug truncate text-xs sm:text-sm ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted-2)]' : 'font-semibold text-[var(--fg)]'}`}>
-                      {txType === 'expense' ? (
-                        form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
-                      ) : (
-                        form.category ? formatIncomeCategory(form.category, locale) : 'Pilih Kategori'
-                      )}
-                    </span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        {t('tx.transferTo', 'Ke Dompet Tujuan')}
+                      </span>
+                    </div>
+                    <WalletSelectTrigger
+                      wallet={selectedTargetWallet}
+                      placeholder={t('tx.transferTo', 'Pilih Dompet Tujuan')}
+                      compact
+                      abbreviateBalance
+                      onClick={() => setWalletModalMode('targetWalletId')}
+                      className="!h-[42px]"
+                    />
                   </div>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                ) : (
+                  <div className={categoryShaking ? 'ft-shake' : ''}>
+                    <div className="flex items-center justify-between mb-1 h-[18px]">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                        {t('addTx.category')}
+                      </div>
+                      {categoryError && (
+                        <span className="text-[10.5px] font-bold text-rose-500 flex items-center gap-1 animate-[ft-fade-in_0.2s_ease-out]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                          {t('addTx.selectCategoryRequired', 'Pilih kategori terlebih dahulu')}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      ref={categoryButtonRef}
+                      type="button"
+                      onClick={openCategorySheet}
+                      className={`w-full h-[42px] flex items-center justify-between gap-2 rounded-xl px-3.5 text-left min-w-0 transition-all active:scale-[0.99] cursor-pointer ${
+                        categoryError
+                          ? 'border border-rose-500/60 bg-rose-500/[0.08] shadow-[0_0_12px_rgba(244,63,94,0.18)] ring-2 ring-rose-500/30'
+                          : 'bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {form.category && form.category.trim() ? (
+                          <CategoryIcon
+                            icon={resolveParentIcon(form.category.split('/')[0])}
+                            className="h-4 w-4 shrink-0 text-[var(--fg)]/70"
+                          />
+                        ) : (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className={`h-4 w-4 shrink-0 transition-colors ${
+                              categoryError ? 'text-rose-500' : 'text-[var(--muted)]'
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.75"
+                          >
+                            <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        <span
+                          className={`min-w-0 flex-1 leading-snug truncate text-xs sm:text-sm ${
+                            !form.category || !form.category.trim()
+                              ? categoryError
+                                ? 'font-bold text-rose-500'
+                                : 'font-normal italic text-[var(--muted-2)]'
+                              : 'font-semibold text-[var(--fg)]'
+                          }`}
+                        >
+                          {txType === 'expense' ? (
+                            form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
+                          ) : (
+                            form.category ? formatIncomeCategory(form.category, locale) : 'Pilih Kategori'
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {categoryError ? (
+                          <span className="rounded-lg bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-500 border border-rose-500/30">
+                            Pilih {'>'}
+                          </span>
+                        ) : (
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Catatan */}
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1.5">
-                {t('addTx.notes', 'Catatan')}
+              {/* Row 3: Catatan */}
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
+                  {t('addTx.notes', 'Catatan')}
+                </div>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, notes: e.target.value }))
+                    // Auto-resize
+                    const el = e.target
+                    el.style.height = 'auto'
+                    el.style.height = `${Math.min(el.scrollHeight, 80)}px`
+                  }}
+                  placeholder={t('addTx.notesPlaceholder')}
+                  rows={1}
+                  className="w-full bg-[var(--field-bg)] rounded-xl border-none py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:ring-1 focus:ring-[var(--border-strong)] transition-all resize-none"
+                />
               </div>
-              <textarea
-                value={form.notes}
-                onChange={(e) => {
-                  setForm((p) => ({ ...p, notes: e.target.value }))
-                  // Auto-resize
-                  const el = e.target
-                  el.style.height = 'auto'
-                  el.style.height = `${Math.min(el.scrollHeight, 80)}px`
-                }}
-                placeholder={t('addTx.notesPlaceholder')}
-                rows={1}
-                className="w-full bg-[var(--field-bg)] rounded-xl border-none py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:ring-1 focus:ring-[var(--border-strong)] transition-all resize-none"
-              />
             </div>
           </>
         )}
@@ -981,9 +1092,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             style={{
               backgroundColor: modeAccent,
             }}
-            className="w-full rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] cursor-pointer"
+            className={`w-full h-[48px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
+              txType === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
+            }`}
           >
-            {t('addTx.save')}
+            {t('addTx.save', 'Simpan')}
           </button>
           <button
             type="button"
@@ -1308,7 +1421,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           if (walletModalMode === 'targetWalletId') {
             setForm((p) => ({ ...p, targetWalletId: Number(id) }))
           } else {
-            setForm((p) => ({ ...p, walletId: Number(id) }))
+            const chosen = wallets?.find((w) => String(w.id) === String(id))
+            const newCurr = chosen?.currency || defaultCurrency
+            setForm((p) => ({
+              ...p,
+              walletId: Number(id),
+              currency: newCurr,
+              amount: formatMoneyInput(p.amount, newCurr),
+            }))
           }
         }}
         title={

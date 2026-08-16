@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
@@ -17,7 +17,8 @@ import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
-import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import { formatCurrency, formatMoneyInput, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../lib/categoryIcon'
@@ -28,14 +29,44 @@ export default function WalletDetailPage() {
   const navigate = useNavigate()
   const [pageError, setPageError] = useState('')
   
-  const wallet = useLiveQuery(() => db.wallets.get(walletId), [walletId])
-  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const wallet = useLiveQuery(() => (walletId && !isNaN(walletId) ? db.wallets.get(walletId) : null), [walletId])
+  const cachedWallets = useWalletStore((state) => state.wallets)
+  const setStoreWallets = useWalletStore((state) => state.setWallets)
+  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
+
+  useEffect(() => {
+    if (dbWallets && dbWallets.length > 0 && setStoreWallets) {
+      setStoreWallets(dbWallets)
+    }
+  }, [dbWallets, setStoreWallets])
+
+  const allWallets = useMemo(() => {
+    if (dbWallets !== undefined && dbWallets.length > 0) return dbWallets
+    if (cachedWallets && cachedWallets.length > 0) return cachedWallets
+    return dbWallets || []
+  }, [dbWallets, cachedWallets])
+
   const allTransactions = useLiveQuery(async () => {
+    if (!walletId || isNaN(walletId)) return []
     const txs = await db.transactions
       .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
       .toArray()
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
   }, [walletId])
+
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
+
+  useEffect(() => {
+    const loadRates = async () => {
+      try {
+        const fetched = await fetchCurrencyRates('USD')
+        setRates(fetched)
+      } catch {
+        setRates({ ...FALLBACK_EXCHANGE_RATES })
+      }
+    }
+    loadRates()
+  }, [])
 
   const handleToggleArchive = async () => {
     if (!wallet) return
@@ -77,15 +108,16 @@ export default function WalletDetailPage() {
 
   const openEditTransaction = useCallback((transaction) => {
     setEditingTransaction(transaction)
+    const targetCurrency = transaction.currency || wallet?.currency || defaultCurrency
     setEditFormData({
       date: transaction.date,
-      amount: formatMoneyValueForInput(transaction.amount, transaction.currency || 'IDR'),
+      amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
       notes: transaction.notes || '',
-      currency: transaction.currency || 'IDR',
+      currency: targetCurrency,
     })
-  }, [])
+  }, [wallet?.currency, defaultCurrency])
 
   const handleEditSubmit = async () => {
     if (!editingTransaction?.id) return
@@ -153,13 +185,26 @@ export default function WalletDetailPage() {
       group.items.push(tx)
 
       const amount = Number(tx.amount) || 0
+      const txCurr = tx.currency || defaultCurrency
+      const walletCurr = wallet?.currency || defaultCurrency
+      const convertedAmt =
+        txCurr === walletCurr
+          ? amount
+          : convertCurrency(amount, txCurr, walletCurr, rates || {})
+
       if (tx.type === 'expense') {
-        group.totalExpense += amount
+        group.totalExpense += convertedAmt
       } else if (tx.type === 'income') {
-        group.totalIncome += amount
+        group.totalIncome += convertedAmt
       } else if (tx.type === 'transfer') {
-        if (tx.walletId === walletId) group.totalExpense += amount
-        if (tx.targetWalletId === walletId) group.totalIncome += amount
+        if (String(tx.walletId) === String(walletId)) group.totalExpense += convertedAmt
+        if (String(tx.targetWalletId) === String(walletId)) group.totalIncome += convertedAmt
+      } else if (tx.type === 'balance_adjustment') {
+        if (amount >= 0) {
+          group.totalIncome += convertedAmt
+        } else {
+          group.totalExpense += Math.abs(convertedAmt)
+        }
       }
     }
 
@@ -199,12 +244,12 @@ export default function WalletDetailPage() {
         isPositive: net > 0,
       }
     })
-  }, [filteredTransactions, locale, walletId, wallet?.currency, defaultCurrency])
+  }, [filteredTransactions, locale, walletId, wallet?.currency, defaultCurrency, rates])
 
   const currentBalance = useMemo(() => {
     if (!wallet) return 0
-    return computeWalletBalance(wallet, allTransactions || [])
-  }, [wallet, allTransactions])
+    return computeWalletBalance(wallet, allTransactions || [], rates)
+  }, [wallet, allTransactions, rates])
 
   const handleDeleteWallet = async () => {
     try {
@@ -230,7 +275,8 @@ export default function WalletDetailPage() {
 
   const handleEditBalance = async (e) => {
     e.preventDefault()
-    const newBal = parseInt(newBalanceRaw.replace(/\D/g, ''), 10)
+    const targetCurrency = wallet?.currency || defaultCurrency
+    const newBal = parseMoneyInput(newBalanceRaw, targetCurrency)
     if (isNaN(newBal)) return
 
     const diff = newBal - currentBalance
@@ -241,7 +287,7 @@ export default function WalletDetailPage() {
         category: 'Penyesuaian Saldo',
         notes: 'Edit Saldo',
         amount: diff,
-        currency: wallet.currency,
+        currency: targetCurrency,
         walletId: wallet.id,
       })
     }
@@ -280,13 +326,36 @@ export default function WalletDetailPage() {
 
     return {
       background: `
-        radial-gradient(ellipse at 50% 0%, rgba(${tintRgb}, 0.14) 0%, transparent 68%),
-        linear-gradient(180deg, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%)
-      `
+        radial-gradient(ellipse at 50% 0%, rgba(${tintRgb}, 0.15) 0%, transparent 70%),
+        linear-gradient(180deg, var(--panel-strong) 0%, var(--bg) 100%)
+      `,
+      borderBottom: '1px solid var(--border)',
     }
   }, [wallet])
 
-  if (!wallet) return <div className="min-h-screen bg-[var(--bg)]" />
+  if (wallet === null || (dbWallets !== undefined && !wallet)) {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] p-4 max-w-2xl mx-auto flex flex-col">
+        <PageHeader title={t('wallets.notFound', 'Akun Tidak Ditemukan')} onBack={() => navigate('/dashboard')} />
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 mt-12 rounded-3xl border border-[var(--border)] bg-[var(--panel)] shadow-card">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--badge-bg)] text-[var(--badge-icon)] border border-[var(--badge-border)] flex items-center justify-center mb-4">
+            <Archive className="h-7 w-7" />
+          </div>
+          <h3 className="text-lg font-black text-[var(--fg)]">{t('wallets.notFoundTitle', 'Akun Tidak Ditemukan')}</h3>
+          <p className="text-xs text-[var(--muted)] mt-1.5 max-w-xs">{t('wallets.notFoundDesc', 'Akun atau dompet yang Anda cari tidak tersedia atau mungkin telah dihapus.')}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="mt-5 px-5 py-2.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs hover:opacity-90 active:scale-95 transition cursor-pointer"
+          >
+            {t('common.backToDashboard', 'Kembali ke Dashboard')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (wallet === undefined) return <div className="min-h-screen bg-[var(--bg)]" />
 
   const formatAccountType = (type, name) => {
     const rawType = String(type || '').toLowerCase().trim()
@@ -400,7 +469,7 @@ export default function WalletDetailPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setNewBalanceRaw(currentBalance.toString())
+                  setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
                   setIsEditBalanceModalOpen(true)
                 }}
                 className="w-6 h-6 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
@@ -516,8 +585,8 @@ export default function WalletDetailPage() {
                         getCategoryColorClass={getCategoryColorClass}
                         resolveTransactionIconKey={resolveTransactionIconKey}
                         getTransactionCategoryLabels={getTransactionCategoryLabels}
-                        convertCurrency={() => 0}
-                        rates={FALLBACK_EXCHANGE_RATES}
+                        convertCurrency={convertCurrency}
+                        rates={rates}
                         openEditTransaction={openEditTransaction}
                         deleteTransaction={deleteTransaction}
                         swipedTransactionId={swipedTransactionId}
@@ -556,6 +625,7 @@ export default function WalletDetailPage() {
         onSubmit={handleEditSubmit}
         t={t}
         locale={locale}
+        wallets={allWallets}
       />
 
       <QuickAddTransactionModal 
@@ -582,12 +652,14 @@ export default function WalletDetailPage() {
             Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.
           </p>
           <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] focus-within:border-[var(--accent)] transition-colors mb-5">
-            <span className="pl-4 text-[var(--muted)] font-bold text-sm">Rp</span>
+            <span className="pl-4 text-[var(--muted)] font-bold text-sm select-none">
+              {(wallet?.currency || defaultCurrency) === 'IDR' ? 'Rp' : (wallet?.currency || defaultCurrency) === 'USD' ? '$' : wallet?.currency || defaultCurrency}
+            </span>
             <input
               type="text"
               inputMode="numeric"
-              value={newBalanceRaw ? Number(newBalanceRaw.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
-              onChange={(e) => setNewBalanceRaw(e.target.value.replace(/\D/g, ''))}
+              value={newBalanceRaw}
+              onChange={(e) => setNewBalanceRaw(formatMoneyInput(e.target.value, wallet?.currency || defaultCurrency))}
               className="w-full bg-transparent py-3.5 pl-3 pr-4 font-black text-xl text-[var(--fg)] outline-none"
               autoFocus
             />

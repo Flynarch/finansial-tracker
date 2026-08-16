@@ -1,12 +1,15 @@
 import { memo } from 'react'
 import { Flame } from 'lucide-react'
 import MiniHabitHeatmap from '../habits/MiniHabitHeatmap'
+import useTranslation from '../../hooks/useTranslation'
 
 export const DashboardHabitWidget = memo(function DashboardHabitWidget({
   isDbLoading = false,
   globalConsistencyStreak = 0,
   onOpenHabitsZoom,
 }) {
+  const { t } = useTranslation()
+
   if (isDbLoading) {
     return (
       <section className="ft-stagger-in" style={{ '--stagger': 3 }}>
@@ -38,8 +41,12 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between mb-1">
             <div className="min-w-0">
-              <p className="text-sm font-bold tracking-tight text-[var(--fg)]">Konsistensi Kebiasaan</p>
-              <p className="text-[11px] font-semibold text-[var(--muted)] mt-0.5">14 Hari Terakhir</p>
+              <p className="text-sm font-bold tracking-tight text-[var(--fg)]">
+                {t('habits.title', 'Konsistensi Kebiasaan')}
+              </p>
+              <p className="text-[11px] font-semibold text-[var(--muted)] mt-0.5">
+                {t('habits.subtitle', '14 Hari Terakhir')}
+              </p>
             </div>
             <div className="flex flex-col items-end">
               <div className="flex items-center gap-1">
@@ -49,7 +56,7 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
                 </span>
               </div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-0.5">
-                Hari Beruntun
+                {t('habits.streak', 'Hari Beruntun')}
               </span>
             </div>
           </div>

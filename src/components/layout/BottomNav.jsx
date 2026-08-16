@@ -5,11 +5,11 @@ import useTranslation from '../../hooks/useTranslation'
 import { navItems } from './navItems'
 
 function linkClassName({ isActive }) {
-  return `ft-interactive-card flex min-w-0 flex-col items-center justify-center rounded-[var(--radius-sm)] px-2 py-2 text-[11px] leading-tight ${
+  return `flex min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1.5 text-[11px] leading-tight transition-all duration-200 ${
     isActive
-      ? 'text-[var(--nav-item-active)]'
-      : 'text-[var(--nav-item-inactive)] hover:text-[var(--nav-item-hover)]'
-  } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.99]`
+      ? 'text-[var(--nav-item-active)] bg-[var(--panel-strong)] shadow-2xs font-black'
+      : 'text-[var(--nav-item-inactive)] hover:text-[var(--nav-item-hover)] font-medium'
+  } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.98]`
 }
 
 function NavIcon({ name, isActive }) {

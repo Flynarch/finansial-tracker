@@ -157,6 +157,7 @@ export default function Dashboard() {
             monthExpense={monthExpense}
             wallets={walletsWithBalance}
             defaultCurrency={defaultCurrency}
+            rates={rates}
           />
         </div>
 
@@ -167,6 +168,7 @@ export default function Dashboard() {
           defaultCurrency={defaultCurrency}
           locale={locale}
           rates={rates}
+          wallets={walletsWithBalance}
           t={t}
         />
 

@@ -6,7 +6,7 @@ import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 
 export default function HabitHeatmapWidget({ habitId }) {
-  const { locale } = useTranslation()
+  const { t, locale } = useTranslation()
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
 
   const activeHabit = useLiveQuery(() => habitId ? db.habits.get(habitId) : null, [habitId])
@@ -111,7 +111,7 @@ export default function HabitHeatmapWidget({ habitId }) {
           <svg viewBox="0 0 24 24" className="h-3 w-3 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
           </svg>
-          {activityMap.size} Hari
+          {t('habits.days', { count: activityMap.size }, `${activityMap.size} Hari`)}
         </div>
       </div>
       
@@ -132,7 +132,7 @@ export default function HabitHeatmapWidget({ habitId }) {
             return (
               <div key={dayStr} className="flex flex-col items-center gap-1">
                 <div
-                  title={`${dayStr}: ${count >= 1 ? 'Selesai' : 'Belum/Kosong'}`}
+                  title={`${dayStr}: ${count >= 1 ? t('habits.completed', 'Selesai') : t('habits.empty', 'Belum/Kosong')}`}
                   className={`flex items-center justify-center h-9 w-full rounded-lg transition-colors ${appearance.className} ${today ? 'ring-2 ring-[var(--fg)] ring-offset-2 ring-offset-[var(--panel-strong)]' : ''}`}
                   style={appearance.style}
                 >

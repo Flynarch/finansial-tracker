@@ -18,11 +18,14 @@ import {
   ArrowUpRight,
   ArrowLeftRight,
   Pencil,
+  Store,
+  Layers,
+  Sparkles,
 } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import TransactionEditSheet from '../transactions/TransactionEditSheet'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
-import { formatCurrency, formatMoneyInput } from '../../lib/utils'
+import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
@@ -41,6 +44,7 @@ function generateReceiptRef() {
 export default function AiDigitalReceipt({
   transactions = [],
   rawPrompt = '',
+  merchant = '',
   onLogAnother,
   onClose,
   wallets = [],
@@ -148,6 +152,12 @@ export default function AiDigitalReceipt({
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
   const netTotal = totalIncome - totalExpense
 
+  // Barcode line width pattern generator (deterministic based on refCode)
+  const barcodeLines = useMemo(() => {
+    const widths = [2, 1, 3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 3, 1, 4, 2, 1, 3, 2, 1]
+    return widths.map((w, i) => ({ width: w, isSpace: i % 5 === 0 }))
+  }, [])
+
   const handleUndo = async () => {
     setIsUndoing(true)
     try {
@@ -196,10 +206,7 @@ export default function AiDigitalReceipt({
 
   const handleSaveEdit = async () => {
     if (!editingTx?.id) return
-    const rawAmt = typeof editFormData.amount === 'string'
-      ? editFormData.amount.replace(/[^0-9.-]+/g, '')
-      : editFormData.amount
-    const numericAmt = parseFloat(rawAmt) || 0
+    const numericAmt = parseMoneyInput(editFormData.amount, editFormData.currency)
 
     const updated = {
       date: editFormData.date,
@@ -252,33 +259,59 @@ export default function AiDigitalReceipt({
     )
   }
 
+  const activeMerchant = merchant || singleTx.merchant || txList.find((t) => t.merchant)?.merchant || ''
+
   return (
-    <div className="space-y-4 ft-mode-enter">
+    <div className="space-y-3 ft-mode-enter">
       {/* ── DIGITAL RECEIPT CARD (Authentic Perforated Ticket) ────── */}
       <div className="relative rounded-3xl border border-[var(--border)] bg-[var(--panel)] shadow-xl overflow-hidden">
         {/* Decorative Top Accent Glow Line */}
         <div className={`h-1.5 w-full bg-gradient-to-r ${contextualTheme.line}`} />
 
-        {/* Receipt Header Banner */}
-        <div className="p-4 sm:p-5 pb-3 border-b border-[var(--border)]/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-xl ${contextualTheme.badge} border flex items-center justify-center shadow-2xs`}>
-              <CheckCircle2 className="h-4 w-4" />
+        {/* Merchant / Store Top Banner (if detected) */}
+        {activeMerchant ? (
+          <div className="px-3.5 py-2.5 bg-[var(--field-bg)] border-b border-[var(--border)]/60 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20">
+                <Store className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                  {locale === 'en' ? 'Merchant / Store' : 'Toko / Merchant'}
+                </span>
+                <h3 className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
+                  {activeMerchant}
+                </h3>
+              </div>
             </div>
-            <span className="text-xs font-black tracking-tight text-[var(--fg)]">
+
+            <div className="flex items-center gap-1 shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 text-[9px] font-bold text-emerald-500">
+              <Sparkles className="h-2.5 w-2.5" />
+              <span>{locale === 'en' ? 'Verified' : 'Struk Terdeteksi'}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Receipt Header Banner */}
+        <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-[var(--border)]/40 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`p-1.5 rounded-xl ${contextualTheme.badge} border flex items-center justify-center shadow-2xs shrink-0`}>
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </div>
+            <span className="text-xs font-black tracking-tight text-[var(--fg)] truncate">
               {contextualTheme.title}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--muted)] tabular-nums">
-            <Calendar className="h-3 w-3 text-[var(--muted)]" />
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-[10.5px] font-bold text-[var(--muted)] tabular-nums pl-6 sm:pl-0 truncate">
+            <Calendar className="h-3 w-3 text-[var(--muted)] shrink-0" />
             <span>{receiptDate} • {receiptTime}</span>
           </div>
         </div>
 
         {/* Prompt Citation if available */}
         {rawPrompt ? (
-          <div className="px-5 py-2 bg-[var(--field-bg)]/20 border-b border-[var(--border)]/30 text-[11px] text-[var(--muted)] italic truncate">
+          <div className="px-4 py-1.5 bg-[var(--field-bg)]/20 border-b border-[var(--border)]/30 text-[10.5px] text-[var(--muted)] italic truncate">
             "{rawPrompt}"
           </div>
         ) : null}
@@ -297,14 +330,14 @@ export default function AiDigitalReceipt({
           const targetWalletLogo = targetWalletObj ? getWalletLogoUrl(targetWalletObj) : null
 
           return (
-            <div className="p-5 flex flex-col">
+            <div className="p-3.5 sm:p-4 flex flex-col">
               {/* Hero Amount & Category Icon */}
-              <div className="flex flex-col items-center text-center pb-4 border-b border-[var(--border)]/40">
-                <div className={`grid h-12 w-12 place-items-center rounded-2xl ${colorClass} mb-2.5 shadow-sm`}>
-                  <CategoryIcon icon={iconKey} className="h-6 w-6" />
+              <div className="flex flex-col items-center text-center pb-2.5 border-b border-[var(--border)]/40">
+                <div className={`grid h-10 w-10 place-items-center rounded-xl ${colorClass} mb-1.5 shadow-sm`}>
+                  <CategoryIcon icon={iconKey} className="h-5 w-5" />
                 </div>
 
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider mb-1 ${
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider mb-0.5 ${
                   isIncome
                     ? 'bg-emerald-500/15 text-emerald-500'
                     : isTransfer
@@ -324,59 +357,63 @@ export default function AiDigitalReceipt({
               </div>
 
               {/* Transaction Specs (FinTech Key-Value Grid) */}
-              <div className="py-3.5 space-y-2 text-xs">
+              <div className="py-2.5 space-y-2 text-xs min-w-0">
                 {/* Category */}
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium">
+                <div className="flex items-start justify-between gap-3 min-w-0">
+                  <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium pt-1 shrink-0">
                     <Tag className="h-3.5 w-3.5 text-[var(--muted)]" />
                     <span>Kategori</span>
                   </span>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/70 shadow-2xs">
-                    <span className="font-extrabold text-[var(--fg)]">{labels.main || tx.category}</span>
+                  <div className="flex flex-col items-end min-w-0 text-right">
+                    <span className="font-extrabold text-xs text-[var(--fg)] leading-tight truncate max-w-[200px] sm:max-w-xs">
+                      {labels.main || tx.category}
+                    </span>
                     {labels.sub ? (
-                      <span className="text-[10px] text-[var(--muted)] font-bold">({labels.sub})</span>
+                      <span className="text-[10.5px] text-[var(--muted)] font-semibold mt-0.5 truncate max-w-[200px] sm:max-w-xs">
+                        {labels.sub}
+                      </span>
                     ) : null}
                   </div>
                 </div>
 
                 {/* Wallet Account */}
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium">
+                <div className="flex items-center justify-between gap-3 min-w-0">
+                  <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium shrink-0">
                     <WalletIcon className="h-3.5 w-3.5 text-[var(--muted)]" />
                     <span>{isTransfer ? 'Sumber Saldo' : 'Akun / Dompet'}</span>
                   </span>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/70 font-bold text-[var(--fg)] shadow-2xs">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/70 font-bold text-[var(--fg)] shadow-2xs max-w-[200px] truncate">
                     {walletLogo ? (
-                      <img src={walletLogo} alt="" className="h-3.5 w-3.5 rounded-full object-contain" />
+                      <img src={walletLogo} alt="" className="h-3.5 w-3.5 rounded-full object-contain shrink-0" />
                     ) : null}
-                    <span>{walletObj?.name || 'Dompet Utama'}</span>
+                    <span className="truncate">{walletObj?.name || 'Dompet Utama'}</span>
                   </div>
                 </div>
 
                 {/* Target Wallet for Transfer */}
                 {isTransfer && targetWalletObj ? (
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium">
+                  <div className="flex items-center justify-between gap-3 min-w-0">
+                    <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium shrink-0">
                       <ArrowLeftRight className="h-3.5 w-3.5 text-sky-500" />
                       <span>Dompet Tujuan</span>
                     </span>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/20 font-bold text-sky-500 shadow-2xs">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/20 font-bold text-sky-500 shadow-2xs max-w-[200px] truncate">
                       {targetWalletLogo ? (
-                        <img src={targetWalletLogo} alt="" className="h-3.5 w-3.5 rounded-full object-contain" />
+                        <img src={targetWalletLogo} alt="" className="h-3.5 w-3.5 rounded-full object-contain shrink-0" />
                       ) : null}
-                      <span>{targetWalletObj.name}</span>
+                      <span className="truncate">{targetWalletObj.name}</span>
                     </div>
                   </div>
                 ) : null}
 
                 {/* User Notes */}
                 {tx.notes ? (
-                  <div className="flex items-start justify-between gap-3 pt-2 mt-1 border-t border-[var(--border)]/40">
+                  <div className="flex items-start justify-between gap-3 pt-2 mt-1 border-t border-[var(--border)]/40 min-w-0">
                     <span className="flex items-center gap-1.5 text-[var(--muted)] font-medium shrink-0 pt-0.5">
                       <FileText className="h-3.5 w-3.5 text-[var(--muted)]" />
                       <span>Catatan</span>
                     </span>
-                    <span className="italic text-[var(--fg)] text-right font-normal break-words line-clamp-2 bg-[var(--field-bg)]/40 px-2.5 py-1 rounded-xl border border-[var(--border)]/40 text-[11.5px]">
+                    <span className="italic text-[var(--fg)] text-right font-normal break-words line-clamp-2 bg-[var(--field-bg)]/40 px-2.5 py-1 rounded-xl border border-[var(--border)]/40 text-[11.5px] max-w-[200px] sm:max-w-xs">
                       "{tx.notes}"
                     </span>
                   </div>
@@ -385,9 +422,20 @@ export default function AiDigitalReceipt({
             </div>
           )
         })() : (
-          /* ── MULTI TRANSACTION ITEMIZED VIEW ────────────────── */
+          /* ── MULTI TRANSACTION ITEMIZED VIEW (Scan Per Item Mode) ── */
           <div className="p-4 flex flex-col">
-            <div className="space-y-2 max-h-56 overflow-y-auto overscroll-contain ft-hide-scrollbar pr-0.5">
+            {/* Header info for multi-items */}
+            <div className="mb-2.5 flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--muted)]">
+                <Layers className="h-3.5 w-3.5 text-[var(--accent)]" />
+                <span>{locale === 'en' ? 'Itemized Breakdown' : 'Rincian Item Belanja'}</span>
+              </div>
+              <span className="rounded-full bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--fg)] border border-[var(--border)]">
+                {txList.length} {locale === 'en' ? 'items' : 'item'}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto overscroll-contain ft-hide-scrollbar pr-0.5">
               {txList.map((tx, idx) => {
                 const isIncome = tx.type === 'income'
                 const isTransfer = tx.type === 'transfer'
@@ -396,31 +444,66 @@ export default function AiDigitalReceipt({
                 const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                 const walletObj = getWalletInfo(tx.walletId)
                 const walletLogo = walletObj ? getWalletLogoUrl(walletObj) : null
+                const itemName = tx.notes || labels.main || tx.category
 
                 return (
                   <div
                     key={tx.id || idx}
-                    className="flex items-center justify-between gap-2.5 py-2 border-b border-[var(--border)]/40 last:border-0"
+                    style={{ animationDelay: `${idx * 40}ms` }}
+                    className="ft-receipt-item-enter flex items-center justify-between gap-2.5 p-2.5 rounded-2xl bg-[var(--field-bg)]/60 border border-[var(--border)]/70 hover:border-[var(--accent)]/50 transition"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${colorClass}`}>
-                        <CategoryIcon icon={iconKey} className="h-4 w-4" />
+                      {/* Item Number Badge */}
+                      <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--panel)] border border-[var(--border)] text-[10px] font-mono font-black text-[var(--muted)]">
+                        {idx + 1}
+                      </span>
+
+                      {/* Category Icon with Micro Wallet Logo Badge */}
+                      <div className="relative shrink-0">
+                        <div className={`grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl ${colorClass}`}>
+                          <CategoryIcon icon={iconKey} className="h-4 w-4" />
+                        </div>
+                        {walletObj && (
+                          <div
+                            className="absolute -bottom-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--panel-strong)] bg-[var(--field-bg)] shadow-2xs"
+                            title={walletObj.name}
+                          >
+                            {walletLogo ? (
+                              <img
+                                src={walletLogo}
+                                alt={walletObj.name}
+                                className="h-full w-full object-contain p-[0.5px] rounded-full"
+                                onError={(e) => {
+                                  e.target.style.display = 'none'
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className="text-[6.5px] font-black leading-none text-[var(--fg)] flex items-center justify-center"
+                              style={{ display: walletLogo ? 'none' : 'flex' }}
+                            >
+                              {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}
+                            </span>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Title & Category Sub-label */}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
-                          {labels.main || tx.category}
+                          {itemName}
                         </p>
-                        <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--muted)] mt-0.5 truncate">
+                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--muted)] mt-0.5 truncate">
+                          <span className="font-semibold text-[var(--accent)]">
+                            {labels.main || tx.category}
+                          </span>
+                          {labels.sub ? <span>• {labels.sub}</span> : null}
                           {walletObj ? (
-                            <span className="flex items-center gap-1 font-semibold text-[var(--fg)] shrink-0">
-                              {walletLogo ? (
-                                <img src={walletLogo} alt="" className="h-2.5 w-2.5 rounded-full object-contain" />
-                              ) : null}
-                              {walletObj.name}
+                            <span className="font-medium text-[var(--muted)] shrink-0">
+                              • {walletObj.name}
                             </span>
                           ) : null}
-                          {labels.sub ? <span>• {labels.sub}</span> : null}
-                          {tx.notes ? <span className="italic truncate">"{tx.notes}"</span> : null}
                         </div>
                       </div>
                     </div>
@@ -437,7 +520,7 @@ export default function AiDigitalReceipt({
                       <button
                         type="button"
                         onClick={() => handleStartEdit(tx)}
-                        className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--field-bg)] transition cursor-pointer"
+                        className="p-1.5 rounded-xl text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--panel)] transition cursor-pointer"
                         title={t('tx.modal.editTitle', 'Edit Transaksi')}
                       >
                         <Pencil className="h-3 w-3" />
@@ -450,7 +533,10 @@ export default function AiDigitalReceipt({
 
             {/* Subtotals Breakdown */}
             <div className="mt-3 pt-3 border-t border-[var(--border)]/60 flex items-center justify-between text-xs font-bold">
-              <span className="text-[var(--muted)]">Total Transaksi</span>
+              <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                <span>{locale === 'en' ? 'Total Amount' : 'Total Keseluruhan'}</span>
+                <span className="text-[10px] font-normal">({txList.length} item)</span>
+              </div>
               <div className="text-right">
                 <span className={`text-sm font-black tabular-nums ${netTotal >= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
                   {netTotal >= 0 ? '+' : '-'}
@@ -462,43 +548,59 @@ export default function AiDigitalReceipt({
         )}
 
         {/* ── Perforated Ticket Notches & Tear Line ────────────── */}
-        <div className="relative flex items-center px-4 py-1">
+        <div className="relative flex items-center px-4 py-0.5">
           {/* Left Notch Cutout */}
-          <div className="absolute -left-2.5 h-5 w-5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)]" />
+          <div className="absolute -left-2.5 h-4.5 w-4.5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)]" />
           {/* Authentic Dashed Tear Line */}
           <div className="w-full border-t border-dashed border-[var(--border-strong)]/60" />
           {/* Right Notch Cutout */}
-          <div className="absolute -right-2.5 h-5 w-5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)]" />
+          <div className="absolute -right-2.5 h-4.5 w-4.5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)]" />
         </div>
 
-        {/* ── Receipt Ticket Footer ───────────────────────────── */}
-        <div className="px-5 py-3 bg-[var(--field-bg)]/40 flex items-center justify-between text-[10.5px]">
-          <div className="flex items-center gap-1.5 font-mono text-[var(--muted)]">
-            <Receipt className="h-3 w-3 text-[var(--accent)]" />
-            <span>{refCode}</span>
-            <button
-              type="button"
-              onClick={handleCopyRef}
-              className="p-0.5 hover:text-[var(--fg)] transition cursor-pointer"
-              title={t('common.copyRef', 'Salin No. Referensi')}
-            >
-              {copiedRef ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            </button>
+        {/* ── Decorative Barcode & Receipt Ticket Footer ───────── */}
+        <div className="px-4 py-2 bg-[var(--field-bg)]/40 space-y-1.5">
+          {/* Decorative CSS Barcode */}
+          <div className="ft-receipt-barcode h-7">
+            {barcodeLines.map((line, idx) => (
+              <div
+                key={idx}
+                className="ft-receipt-barcode-line"
+                style={{
+                  width: `${line.width}px`,
+                  opacity: line.isSpace ? 0.3 : 0.85,
+                }}
+              />
+            ))}
           </div>
 
-          <span className={`font-bold text-[10px] uppercase tracking-wider ${contextualTheme.tag}`}>
-            FinTrack Verified
-          </span>
+          <div className="flex items-center justify-between text-[10px]">
+            <div className="flex items-center gap-1.5 font-mono text-[var(--muted)]">
+              <Receipt className="h-3 w-3 text-[var(--accent)]" />
+              <span>{refCode}</span>
+              <button
+                type="button"
+                onClick={handleCopyRef}
+                className="p-0.5 hover:text-[var(--fg)] transition cursor-pointer"
+                title={t('common.copyRef', 'Salin No. Referensi')}
+              >
+                {copiedRef ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
+
+            <span className={`font-bold text-[9.5px] uppercase tracking-wider ${contextualTheme.tag}`}>
+              FinTrack Verified
+            </span>
+          </div>
         </div>
       </div>
 
       {/* ── Ergonomic Action Buttons ────────────────────────────── */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {/* Primary CTA */}
         <button
           type="button"
           onClick={onLogAnother}
-          className="ft-btn-primary w-full py-3 px-4 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.99] transition"
+          className="ft-btn-primary w-full py-2.5 px-4 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.99] transition"
         >
           <Plus className="h-4 w-4" strokeWidth={3} />
           <span>Catat Transaksi Lagi</span>
@@ -506,15 +608,17 @@ export default function AiDigitalReceipt({
 
         {/* Secondary CTAs */}
         <div className="flex items-center gap-2">
-          {/* Edit Detail Button */}
-          <button
-            type="button"
-            onClick={() => handleStartEdit(singleTx)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--field-bg)] active:scale-95 transition cursor-pointer"
-          >
-            <Pencil className="h-3 w-3 text-[var(--accent)]" />
-            <span>Edit Detail</span>
-          </button>
+          {/* Edit Detail Button: Only render for single transaction */}
+          {isSingle && (
+            <button
+              type="button"
+              onClick={() => handleStartEdit(singleTx)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--field-bg)] active:scale-95 transition cursor-pointer"
+            >
+              <Pencil className="h-3 w-3 text-[var(--accent)]" />
+              <span>Edit Detail</span>
+            </button>
+          )}
 
           {/* Undo Button */}
           <button
@@ -549,6 +653,7 @@ export default function AiDigitalReceipt({
           onSubmit={handleSaveEdit}
           t={t}
           locale={locale}
+          wallets={wallets}
         />
       )}
     </div>

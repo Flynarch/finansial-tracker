@@ -42,11 +42,18 @@ const getAvatarColor = (name) => {
 }
 
 function CircularInstitutionLogo({ inst }) {
+  const isCash =
+    inst.id === 'cash' ||
+    inst.customIcon === 'dollar' ||
+    inst.customIcon === 'cash' ||
+    String(inst.name || '').toLowerCase().includes('uang tunai') ||
+    String(inst.name || '').toLowerCase().includes('cash')
+
   return (
     <div className="w-11 h-11 rounded-full bg-[var(--field-bg)] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-      {inst.customIcon === 'dollar' ? (
-        <div className="w-full h-full flex items-center justify-center bg-[var(--field-bg)] text-amber-500">
-          <MoneyBagIcon size={20} strokeWidth={2.5} />
+      {isCash ? (
+        <div className="w-full h-full flex items-center justify-center bg-white dark:bg-zinc-800 text-amber-500 p-1.5">
+          <MoneyBagIcon size={22} />
         </div>
       ) : getWalletLogoUrl(inst) ? (
         <img
@@ -62,7 +69,7 @@ function CircularInstitutionLogo({ inst }) {
       ) : null}
       <div
         className={`w-full h-full items-center justify-center font-black text-xs ${getAvatarColor(inst.name)}`}
-        style={{ display: inst.customIcon || getWalletLogoUrl(inst) ? 'none' : 'flex' }}
+        style={{ display: isCash || getWalletLogoUrl(inst) ? 'none' : 'flex' }}
       >
         {inst.name.substring(0, 2).toUpperCase()}
       </div>

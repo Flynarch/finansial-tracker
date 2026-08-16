@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatCurrency } from '../../lib/utils'
+import { formatCurrency, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
@@ -10,7 +10,8 @@ export default function WalletCarousel({
   monthIncome, 
   monthExpense, 
   wallets, 
-  defaultCurrency 
+  defaultCurrency,
+  rates = FALLBACK_EXCHANGE_RATES,
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -24,7 +25,10 @@ export default function WalletCarousel({
 
   const activeWallets = wallets?.filter(w => !w.isArchived) || []
   const sisaKeuangan = monthIncome - monthExpense
-  const totalSaldo = activeWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0)
+  const totalSaldo = activeWallets.reduce((sum, w) => {
+    const bal = Number(w.currentBalance) || 0
+    return sum + convertCurrency(bal, w.currency || defaultCurrency, defaultCurrency, rates)
+  }, 0)
 
   const scrollTo = (index) => {
     if (!scrollRef.current) return
@@ -89,7 +93,9 @@ export default function WalletCarousel({
     return (
       <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
         <div className="ft-hero-card flex flex-col items-center justify-center text-center" style={{ minHeight: '200px' }}>
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">Total Saldo</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
+            {t('dashboard.totalBalance', 'Total Saldo')}
+          </p>
           <p className="ft-display mt-2 text-[2.25rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)]">
             {formatCurrency(0, defaultCurrency)}
           </p>
@@ -98,7 +104,7 @@ export default function WalletCarousel({
             className="mt-6 w-full flex items-center justify-center gap-2 bg-[var(--accent)] text-[var(--bg)] rounded-xl py-3 font-bold transition active:scale-[0.98]"
           >
             <Plus size={18} strokeWidth={2.5} />
-            Tambah Akun
+            {t('wallet.addAccount', 'Tambah Akun')}
           </button>
         </div>
       </section>
@@ -135,7 +141,7 @@ export default function WalletCarousel({
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-                Sisa Keuangan
+                {t('dashboard.sisaKeuangan', 'Sisa Keuangan')}
               </p>
               {/* Inline Slide Indicator */}
               <div className="flex items-center gap-1 ml-0.5">
@@ -154,7 +160,7 @@ export default function WalletCarousel({
               </div>
             </div>
             <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-              Bulan Ini
+              {t('dashboard.thisMonth', 'Bulan Ini')}
             </span>
           </div>
 
@@ -172,7 +178,7 @@ export default function WalletCarousel({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-green)' }}>
-                  Pemasukan
+                  {t('dashboard.income', 'Pemasukan')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-green)' }}>
                   {formatCurrency(monthIncome, defaultCurrency)}
@@ -187,7 +193,7 @@ export default function WalletCarousel({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-terra)' }}>
-                  Pengeluaran
+                  {t('dashboard.expense', 'Pengeluaran')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-terra)' }}>
                   {formatCurrency(monthExpense, defaultCurrency)}
@@ -204,7 +210,7 @@ export default function WalletCarousel({
             <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-                  Total Saldo
+                  {t('dashboard.totalBalance', 'Total Saldo')}
                 </p>
                 {/* Inline Slide Indicator */}
                 <div className="flex items-center gap-1 ml-0.5">
@@ -223,7 +229,7 @@ export default function WalletCarousel({
                 </div>
               </div>
               <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-                {activeWallets.length} Akun
+                {t('dashboard.accountCount', '{{count}} Akun', { count: activeWallets.length })}
               </span>
             </div>
 
@@ -240,7 +246,7 @@ export default function WalletCarousel({
                 key={w.id}
                 onClick={() => navigate(`/wallet/${w.id}`)}
                 className="ft-wallet-mini"
-                title={`${w.name} - ${formatCurrency(w.currentBalance, defaultCurrency)}`}
+                title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
               >
                 {/* Logo (prominent) */}
                 <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
@@ -272,7 +278,7 @@ export default function WalletCarousel({
                     {w.name}
                   </span>
                   <span className="ft-wallet-mini-balance">
-                    {formatCurrency(w.currentBalance, defaultCurrency)}
+                    {formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
                   </span>
                 </div>
               </button>
@@ -288,8 +294,12 @@ export default function WalletCarousel({
                 <Plus size={16} strokeWidth={2.5} />
               </div>
               <div className="min-w-0 flex flex-col text-left gap-0.5">
-                <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] leading-tight">Akun Baru</span>
-                <span className="ft-wallet-mini-balance" style={{ color: 'var(--muted)', fontSize: '12px' }}>Tambah</span>
+                <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] leading-tight">
+                  {t('wallet.newAccount', 'Akun Baru')}
+                </span>
+                <span className="ft-wallet-mini-balance" style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                  {t('common.add', 'Tambah')}
+                </span>
               </div>
             </button>
           </div>

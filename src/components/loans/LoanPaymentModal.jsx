@@ -100,12 +100,18 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   const handleSave = async () => {
     const payAmt = parseMoneyInput(amount, currency)
     if (payAmt <= 0) {
-      setSheetError('Nominal pembayaran harus lebih dari 0.')
+      setSheetError(t('loans.payment.amountPositive', 'Nominal pembayaran harus lebih dari 0.'))
       return
     }
 
     if (payAmt > remaining) {
-      setSheetError(`Nominal pembayaran (${formatCurrency(payAmt, currency)}) tidak boleh melebihi sisa tagihan (${formatCurrency(remaining, currency)}).`)
+      setSheetError(
+        t(
+          'loans.payment.exceedsRemaining',
+          { payAmt: formatCurrency(payAmt, currency), remaining: formatCurrency(remaining, currency) },
+          `Nominal pembayaran (${formatCurrency(payAmt, currency)}) tidak boleh melebihi sisa tagihan (${formatCurrency(remaining, currency)}).`
+        )
+      )
       return
     }
 
@@ -114,7 +120,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
       onSaved?.()
       closeSheet()
     } catch (err) {
-      setSheetError(err.message || 'Gagal mencatat pembayaran. Silakan coba lagi.')
+      setSheetError(err.message || t('loans.payment.saveFailed', 'Gagal mencatat pembayaran. Silakan coba lagi.'))
     }
   }
 
@@ -122,7 +128,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
     <BottomSheet
       isOpen={isOpen}
       onClose={closeSheet}
-      title={isDebt ? 'Bayar Cicilan Hutang' : 'Terima Pembayaran Piutang'}
+      title={isDebt ? t('loans.payment.titleDebt', 'Bayar Cicilan Hutang') : t('loans.payment.titleReceivable', 'Terima Pembayaran Piutang')}
     >
       <div className="space-y-2.5 pt-0.5 pb-2">
         {sheetError ? <ToastBanner message={sheetError} type="error" onDismiss={() => setSheetError('')} /> : null}
@@ -143,14 +149,16 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
               <div className="min-w-0">
                 <h4 className="truncate text-sm font-extrabold text-[var(--fg)]">{loan.title}</h4>
                 <p className="text-[11px] font-semibold text-[var(--muted)] truncate">
-                  {isDebt ? 'Pemberi: ' : 'Peminjam: '}
+                  {isDebt ? `${t('loans.modal.personDebt', 'Pemberi')}: ` : `${t('loans.modal.personReceivable', 'Peminjam')}: `}
                   <span className="text-[var(--fg)]">{loan.personName}</span>
                 </p>
               </div>
             </div>
 
             <div className="text-right shrink-0">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Sisa Tagihan</span>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                {t('loans.payment.remainingLabel', 'Sisa Tagihan')}
+              </span>
               <p className={`text-sm sm:text-base font-black tabular-nums ${isDebt ? 'text-rose-500' : 'text-emerald-500'}`}>
                 {formatCurrency(remaining, currency)}
               </p>
@@ -162,11 +170,11 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
             <Wallet className="h-3 w-3 text-[var(--accent)] shrink-0" />
             {connectedWallet ? (
               <span className="text-[var(--fg)]">
-                Terhubung ke Wallet: <strong className="text-[var(--accent)]">{connectedWallet.name}</strong> (Transaksi ledger otomatis)
+                {t('loans.payment.connectedWallet', { name: connectedWallet.name }, `Terhubung ke Wallet: ${connectedWallet.name} (Transaksi ledger otomatis)`)}
               </span>
             ) : (
               <span className="text-[var(--muted)]">
-                Pinjaman ini hanya catatan memo (tidak terhubung ke wallet)
+                {t('loans.payment.unconnectedWallet', 'Pinjaman ini hanya catatan memo (tidak terhubung ke wallet)')}
               </span>
             )}
           </div>
@@ -174,7 +182,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
           {/* Progress Bar Dynamic Preview */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px] font-extrabold text-[var(--muted)]">
-              <span>Progress Pelunasan</span>
+              <span>{t('loans.payment.progressLabel', 'Progress Pelunasan')}</span>
               <span className="tabular-nums">{Math.round(nextPct)}%</span>
             </div>
             <div className="relative h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)] overflow-hidden">
@@ -204,7 +212,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
         }`}>
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
-              Nominal {isDebt ? 'Pembayaran' : 'Penerimaan'}
+              {t('loans.payment.amountLabel', 'Nominal Pembayaran')}
             </label>
             <span className="text-[11px] font-black text-[var(--muted)]">{currency}</span>
           </div>
@@ -219,7 +227,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
                   ? isDebt
                     ? 'text-rose-500 placeholder-rose-300'
                     : 'text-emerald-500 placeholder-emerald-300'
-                  : 'text-[var(--fg)] placeholder-[var(--muted)]'
+                  : 'text-[var(--fg)] placeholder:[var(--muted)]'
               }`}
               placeholder="0"
               value={amount}
@@ -231,7 +239,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
           <div className="pt-1 space-y-2 border-t border-[var(--border)]/40">
             {/* Set Value Group */}
             <div className="space-y-1">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Set Nominal:</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                {t('loans.payment.setNominal', 'Set Nominal:')}
+              </span>
               <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
@@ -239,7 +249,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
                   className="py-1 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-extrabold hover:bg-[var(--accent)]/20 transition-colors cursor-pointer active:scale-95 flex items-center justify-center gap-1"
                 >
                   <Sparkles className="h-3 w-3" />
-                  Lunas (100%)
+                  {t('loans.paid', 'Lunas')} (100%)
                 </button>
                 <button
                   type="button"
@@ -260,7 +270,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
 
             {/* Incremental Add Group */}
             <div className="space-y-1">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Tambah Nominal:</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                {t('loans.payment.addNominal', 'Tambah Nominal:')}
+              </span>
               <div className="grid grid-cols-3 gap-1.5">
                 {[50000, 100000, 500000].map((amt) => (
                   <button
@@ -281,24 +293,30 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
         {currentPayValue > 0 && (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 flex items-center justify-between text-xs">
             <div className="space-y-0.5">
-              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">Sebelum</span>
+              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">
+                {t('loans.payment.before', 'Sebelum')}
+              </span>
               <span className="font-bold tabular-nums text-[var(--fg)]">{formatCurrency(remaining, currency)}</span>
             </div>
 
             <ArrowRight className="h-3.5 w-3.5 text-[var(--muted)] shrink-0 mx-1" />
 
             <div className="space-y-0.5">
-              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">Bayar</span>
+              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">
+                {isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')}
+              </span>
               <span className="font-black tabular-nums text-[var(--accent)]">-{formatCurrency(currentPayValue, currency)}</span>
             </div>
 
             <ArrowRight className="h-3.5 w-3.5 text-[var(--muted)] shrink-0 mx-1" />
 
             <div className="space-y-0.5 text-right">
-              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">Sisa Baru</span>
+              <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">
+                {t('loans.payment.newRemaining', 'Sisa Baru')}
+              </span>
               {isWillBePaidFull ? (
                 <span className="inline-flex items-center gap-1 text-emerald-500 font-black">
-                  <CheckCircle2 className="h-3 w-3" /> Lunas!
+                  <CheckCircle2 className="h-3 w-3" /> {t('loans.badge.paid', 'Lunas!')}
                 </span>
               ) : (
                 <span className={`font-black tabular-nums ${isDebt ? 'text-rose-500' : 'text-emerald-500'}`}>
@@ -315,7 +333,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-[var(--fg)] flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-[var(--muted)]" />
-                Tanggal
+                {t('loans.payment.dateLabel', 'Tanggal')}
               </label>
               <CustomDatePicker
                 value={date}
@@ -327,7 +345,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-[var(--fg)] flex items-center gap-1">
                 <FileText className="h-3 w-3 text-[var(--muted)]" />
-                Catatan
+                {t('loans.payment.notesLabel', 'Catatan')}
               </label>
               <input
                 type="text"
@@ -345,13 +363,13 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 space-y-1.5">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
               <History className="h-3 w-3" />
-              Riwayat Pembayaran ({paymentLogs.length})
+              {t('loans.payment.historyCount', { count: paymentLogs.length }, `Riwayat Pembayaran (${paymentLogs.length})`)}
             </span>
             <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
               {paymentLogs.map((log) => (
                 <div key={log.id} className="flex items-center justify-between text-xs py-1 border-b border-[var(--border)]/40 last:border-0">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[var(--fg)] truncate">{log.notes || 'Pembayaran Cicilan'}</p>
+                    <p className="font-semibold text-[var(--fg)] truncate">{log.notes || t('loans.payment.defaultLog', 'Pembayaran Cicilan')}</p>
                     <p className="text-[9px] text-[var(--muted)]">{log.date}</p>
                   </div>
                   <span className="font-extrabold tabular-nums text-emerald-500 shrink-0">
@@ -366,14 +384,14 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button type="button" variant="secondary" onClick={closeSheet}>
-            Batal
+            {t('common.cancel', 'Batal')}
           </Button>
           <Button
             type="button"
             onClick={handleSave}
             className={isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'}
           >
-            {isDebt ? 'Konfirmasi Pembayaran' : 'Konfirmasi Penerimaan'}
+            {isDebt ? t('loans.payment.save', 'Konfirmasi Pembayaran') : t('loans.payment.saveReceivable', 'Konfirmasi Penerimaan')}
           </Button>
         </div>
       </div>

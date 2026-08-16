@@ -16,6 +16,7 @@ import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble
 import TransactionSuccess from './TransactionSuccess'
 import ActionSuccessCard from './ActionSuccessCard'
 import QuickChips from './QuickChips'
+import ReceiptScanModePicker from './ReceiptScanModePicker'
 import useChatStore from '../../store/useChatStore'
 
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
@@ -39,6 +40,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
   
   const [selectedImage, setSelectedImage] = useState(null)
+  const [showScanModePicker, setShowScanModePicker] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
@@ -182,7 +184,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     const file = e.target.files[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = (ev) => setSelectedImage(ev.target.result)
+      reader.onload = (ev) => {
+        setSelectedImage(ev.target.result)
+        setShowScanModePicker(true)
+      }
       reader.readAsDataURL(file)
     }
   }
@@ -216,7 +221,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     recognition.onend = () => setIsRecording(false)
   }
 
-  const handleSend = async (text = inputValue, image = selectedImage) => {
+  const handleSend = async (text = inputValue, image = selectedImage, scanMode = 'all', targetWalletId = null) => {
     if (!text?.trim() && !image) return
     
     const userMsg = {
@@ -229,6 +234,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     
     setInputValue('')
     setSelectedImage(null)
+    setShowScanModePicker(false)
     if (inputRef.current) inputRef.current.style.height = 'auto'
     setIsLoading(true)
     setConsecutiveErrors(0)
@@ -246,6 +252,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         previousMessages: messages,
         imageData: image,
         wallets,
+        scanMode,
         onStream: (chunk) => {
           streamBufferRef.current += chunk
           if (!streamRafRef.current) {
@@ -292,15 +299,18 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
         if (result.action === 'create' && result.transactions?.length > 0) {
           const savedTxs = []
           for (const tx of result.transactions) {
-             let finalWalletId = tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null)
+             let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null))
              if (finalWalletId !== null && !wallets.find(w => w.id === finalWalletId)) {
                 finalWalletId = wallets.length > 0 ? wallets[0].id : null
              }
+             const matchedWallet = wallets.find(w => w.id === finalWalletId)
+             const txCurrency = matchedWallet?.currency || tx.currency || defaultCurrency
              
              const txToSave = {
                ...tx,
                category: sanitizeCategoryPath(tx.category, tx.type),
                walletId: finalWalletId,
+               currency: txCurrency,
                id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
                createdAt: new Date().toISOString()
              }
@@ -897,14 +907,33 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
 
         {/* Input Dock Bar */}
         <div className="p-3 border-t border-[var(--border)] bg-[var(--panel-strong)] flex flex-col gap-2 shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-          {selectedImage && (
+          {showScanModePicker && selectedImage ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3 shadow-md mb-1">
+              <ReceiptScanModePicker
+                image={selectedImage}
+                wallets={wallets}
+                locale={locale}
+                onConfirm={(mode, walletId) => {
+                  setShowScanModePicker(false)
+                  handleSend(inputValue, selectedImage, mode, walletId)
+                }}
+                onCancel={() => {
+                  setShowScanModePicker(false)
+                  setSelectedImage(null)
+                }}
+                onChangeImage={() => {
+                  cameraInputRef.current?.click()
+                }}
+              />
+            </div>
+          ) : selectedImage ? (
              <div className="relative inline-block self-start">
                <img src={selectedImage} alt="Preview" className="h-16 rounded-xl border border-[var(--border)] shadow-xs" />
                <button type="button" onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 shadow-xs cursor-pointer">
                   <X size={12} />
                </button>
              </div>
-          )}
+          ) : null}
 
           {isRecording && (
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold animate-fade-in">

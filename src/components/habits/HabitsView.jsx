@@ -403,13 +403,17 @@ export default function HabitsView() {
         <>
           {todayHabits.length > 0 ? renderHabitList(todayHabits) : (
             <div className="p-4 text-center rounded-[1.25rem] border border-dashed border-[var(--border)]">
-              <p className="text-[13px] font-medium text-[var(--muted)]">Tidak ada habit yang dijadwalkan hari ini.</p>
+              <p className="text-[13px] font-medium text-[var(--muted)]">
+                {t('habits.noScheduledToday', 'Tidak ada habit yang dijadwalkan hari ini.')}
+              </p>
             </div>
           )}
           
           {otherHabits.length > 0 && (
             <div className="pt-6">
-              <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-3 px-1">Jadwal Lainnya</h3>
+              <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-3 px-1">
+                {t('habits.otherSchedules', 'Jadwal Lainnya')}
+              </h3>
               <div className="opacity-60 grayscale-[30%]">
                 {renderHabitList(otherHabits, false)}
               </div>
@@ -422,7 +426,9 @@ export default function HabitsView() {
       <Modal isOpen={addOpen} title={t('habits.createTitle', 'Buat Habit Baru')} onClose={() => setAddOpen(false)}>
         <form onSubmit={handleAddHabit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Nama Habit</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.name', 'Nama Habit')}
+            </label>
             <input
               type="text"
               value={addForm.title}
@@ -433,7 +439,9 @@ export default function HabitsView() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Catatan (Opsional)</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.notes', 'Catatan (Opsional)')}
+            </label>
             <textarea
               value={addForm.notes}
               onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
@@ -442,21 +450,32 @@ export default function HabitsView() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Kategori</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.category', 'Kategori')}
+            </label>
             <CustomSelect
               value={addForm.category}
-              options={HABIT_CATEGORIES.map(cat => ({ label: cat, value: cat }))}
+              options={HABIT_CATEGORIES.map(cat => ({
+                label: cat === 'Kesehatan' ? t('habits.categoryHealth', 'Kesehatan')
+                  : cat === 'Belajar' ? t('habits.categoryLearning', 'Belajar')
+                  : cat === 'Produktivitas' ? t('habits.categoryProductivity', 'Produktivitas')
+                  : cat === 'Keuangan' ? t('habits.categoryFinance', 'Keuangan')
+                  : t('habits.categoryOther', 'Lainnya'),
+                value: cat
+              }))}
               onChange={(val) => setAddForm({ ...addForm, category: val })}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Frekuensi</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.frequency', 'Frekuensi')}
+            </label>
             <CustomSelect
               value={addForm.frequencyType}
               options={[
-                { label: 'Harian (Setiap Hari)', value: 'daily' },
-                { label: 'X Kali Seminggu', value: 'weekly' },
-                { label: 'Hari Tertentu', value: 'specific_days' }
+                { label: t('habits.freqDaily', 'Harian (Setiap Hari)'), value: 'daily' },
+                { label: t('habits.freqWeekly', 'X Kali Seminggu'), value: 'weekly' },
+                { label: t('habits.freqSpecific', 'Hari Tertentu'), value: 'specific_days' }
               ]}
               onChange={(val) => setAddForm({ ...addForm, frequencyType: val, frequencyValue: val === 'weekly' ? 3 : [] })}
             />
@@ -464,7 +483,9 @@ export default function HabitsView() {
           
           {addForm.frequencyType === 'weekly' && (
             <div className="animate-dropdown">
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Berapa Kali Seminggu?</label>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('habits.timesPerWeek', 'Berapa Kali Seminggu?')}
+              </label>
               <input
                 type="number"
                 min="1"
@@ -479,7 +500,9 @@ export default function HabitsView() {
 
           {addForm.frequencyType === 'specific_days' && (
             <div className="animate-dropdown">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Pilih Hari</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('habits.selectDays', 'Pilih Hari')}
+              </label>
               <div className="flex justify-between gap-1">
                 {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, idx) => {
                   // 0 = Sunday, 1 = Monday
@@ -507,7 +530,9 @@ export default function HabitsView() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-sky-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+                  {t('habits.reminder', 'Pengingat Jam')}
+                </span>
               </div>
               <button
                 type="button"
@@ -525,7 +550,9 @@ export default function HabitsView() {
             </div>
             {addForm.reminderEnabled && (
               <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 animate-dropdown">
-                <span className="text-xs font-medium text-[var(--muted)]">Waktu Notifikasi</span>
+                <span className="text-xs font-medium text-[var(--muted)]">
+                  {t('habits.reminderTime', 'Waktu Notifikasi')}
+                </span>
                 <input 
                   type="time" 
                   value={addForm.reminderTime || '08:00'} 
@@ -547,7 +574,7 @@ export default function HabitsView() {
               disabled={!addForm.title.trim()}
               className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              Simpan Habit
+              {t('habits.save', 'Simpan Habit')}
             </button>
           </div>
         </form>
@@ -557,7 +584,9 @@ export default function HabitsView() {
       <Modal isOpen={editOpen} title={t('habits.editTitle', 'Edit Habit')} onClose={() => setEditOpen(false)}>
         <form onSubmit={handleEditHabit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Nama Habit</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.name', 'Nama Habit')}
+            </label>
             <input
               type="text"
               value={editForm.title}
@@ -567,7 +596,9 @@ export default function HabitsView() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Catatan (Opsional)</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.notes', 'Catatan (Opsional)')}
+            </label>
             <textarea
               value={editForm.notes}
               onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
@@ -576,21 +607,32 @@ export default function HabitsView() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Kategori</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.category', 'Kategori')}
+            </label>
             <CustomSelect
               value={editForm.category}
-              options={HABIT_CATEGORIES.map(cat => ({ label: cat, value: cat }))}
+              options={HABIT_CATEGORIES.map(cat => ({
+                label: cat === 'Kesehatan' ? t('habits.categoryHealth', 'Kesehatan')
+                  : cat === 'Belajar' ? t('habits.categoryLearning', 'Belajar')
+                  : cat === 'Produktivitas' ? t('habits.categoryProductivity', 'Produktivitas')
+                  : cat === 'Keuangan' ? t('habits.categoryFinance', 'Keuangan')
+                  : t('habits.categoryOther', 'Lainnya'),
+                value: cat
+              }))}
               onChange={(val) => setEditForm({ ...editForm, category: val })}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Frekuensi</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              {t('habits.frequency', 'Frekuensi')}
+            </label>
             <CustomSelect
               value={editForm.frequencyType}
               options={[
-                { label: 'Harian (Setiap Hari)', value: 'daily' },
-                { label: 'X Kali Seminggu', value: 'weekly' },
-                { label: 'Hari Tertentu', value: 'specific_days' }
+                { label: t('habits.freqDaily', 'Harian (Setiap Hari)'), value: 'daily' },
+                { label: t('habits.freqWeekly', 'X Kali Seminggu'), value: 'weekly' },
+                { label: t('habits.freqSpecific', 'Hari Tertentu'), value: 'specific_days' }
               ]}
               onChange={(val) => setEditForm({ ...editForm, frequencyType: val, frequencyValue: val === 'weekly' ? 3 : [] })}
             />
@@ -598,7 +640,9 @@ export default function HabitsView() {
           
           {editForm.frequencyType === 'weekly' && (
             <div className="animate-dropdown">
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Berapa Kali Seminggu?</label>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('habits.timesPerWeek', 'Berapa Kali Seminggu?')}
+              </label>
               <input
                 type="number"
                 min="1"
@@ -613,7 +657,9 @@ export default function HabitsView() {
 
           {editForm.frequencyType === 'specific_days' && (
             <div className="animate-dropdown">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">Pilih Hari</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                {t('habits.selectDays', 'Pilih Hari')}
+              </label>
               <div className="flex justify-between gap-1">
                 {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, idx) => {
                   const isSelected = Array.isArray(editForm.frequencyValue) && editForm.frequencyValue.includes(idx)
@@ -640,7 +686,9 @@ export default function HabitsView() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-sky-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">Pengingat Jam</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+                  {t('habits.reminder', 'Pengingat Jam')}
+                </span>
               </div>
               <button
                 type="button"
@@ -658,7 +706,9 @@ export default function HabitsView() {
             </div>
             {editForm.reminderEnabled && (
               <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 animate-dropdown">
-                <span className="text-xs font-medium text-[var(--muted)]">Waktu Notifikasi</span>
+                <span className="text-xs font-medium text-[var(--muted)]">
+                  {t('habits.reminderTime', 'Waktu Notifikasi')}
+                </span>
                 <input 
                   type="time" 
                   value={editForm.reminderTime || '08:00'} 
@@ -680,7 +730,7 @@ export default function HabitsView() {
               disabled={!editForm.title.trim()}
               className="w-full rounded-xl bg-[var(--fg)] py-3.5 text-sm font-bold text-[var(--bg)] shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              Simpan Perubahan
+              {t('common.saveChanges', 'Simpan Perubahan')}
             </button>
           </div>
         </form>
@@ -695,7 +745,7 @@ export default function HabitsView() {
           setConfirmDeleteId(null)
         }}
         title={t('habits.deleteTitle', 'Hapus Habit?')}
-        message="Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen."
+        message={t('habits.deleteConfirm', 'Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen.')}
       />
 
       {/* Stats Modal */}
