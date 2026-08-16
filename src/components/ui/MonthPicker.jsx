@@ -204,12 +204,11 @@ export default function MonthPicker({ value, onChange, className = '', compact =
   const [selectedYear, setSelectedYear] = useState(parsedValue.year)
   const [selectedMonth, setSelectedMonth] = useState(parsedValue.month)
 
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedYear(parsedValue.year)
-      setSelectedMonth(parsedValue.month)
-    }
-  }, [isOpen, parsedValue.year, parsedValue.month])
+  const handleOpenPicker = useCallback(() => {
+    setSelectedYear(parsedValue.year)
+    setSelectedMonth(parsedValue.month)
+    openSheet()
+  }, [parsedValue.year, parsedValue.month, openSheet])
 
   const handleApply = useCallback(() => {
     const formattedMonth = String(selectedMonth + 1).padStart(2, '0')
@@ -279,7 +278,7 @@ export default function MonthPicker({ value, onChange, className = '', compact =
     <>
       <button
         type="button"
-        onClick={openSheet}
+        onClick={handleOpenPicker}
         className={`flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] transition hover:border-[var(--fg)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] cursor-pointer ${
           isCompact
             ? 'h-8.5 px-2.5 text-xs'

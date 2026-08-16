@@ -27,16 +27,16 @@ const TOUR_STEPS = [
 
 export default function ProductTourOverlay() {
   const [currentStep, setCurrentStep] = useState(0)
-  const [isVisible, setIsVisible] = useState(false)
-  const [rect, setRect] = useState(null)
-
-  useEffect(() => {
-    const shouldShow = localStorage.getItem('ft_show_product_tour')
-    const completed = localStorage.getItem('ft_product_tour_completed')
-    if (shouldShow === 'true' && completed !== 'true') {
-      setIsVisible(true)
+  const [isVisible, setIsVisible] = useState(() => {
+    try {
+      const shouldShow = localStorage.getItem('ft_show_product_tour')
+      const completed = localStorage.getItem('ft_product_tour_completed')
+      return shouldShow === 'true' && completed !== 'true'
+    } catch {
+      return false
     }
-  }, [])
+  })
+  const [rect, setRect] = useState(null)
 
   useEffect(() => {
     if (!isVisible) return

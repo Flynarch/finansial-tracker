@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -6,8 +6,10 @@ import Modal from '../ui/Modal'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { calculateHabitStats, calculateWeeklyTrend } from '../../lib/habitStats'
 import HabitHeatmapWidget from './HabitHeatmapWidget'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }) {
+  const { t } = useTranslation()
   const liveHabit = useLiveQuery(() => habit ? db.habits.get(habit.id) : null, [habit])
   const activeHabit = liveHabit || habit
 
@@ -23,11 +25,14 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
 
   const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [tempNotes, setTempNotes] = useState('')
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevHabitId, setPrevHabitId] = useState(activeHabit?.id)
 
-  // Reset states when modal opens/closes or habit changes
-  useEffect(() => {
+  if (prevOpen !== isOpen || prevHabitId !== activeHabit?.id) {
+    setPrevOpen(isOpen)
+    setPrevHabitId(activeHabit?.id)
     if (!isOpen) setIsEditingNotes(false)
-  }, [isOpen, activeHabit?.id])
+  }
 
   if (!activeHabit || !stats) return null
 
@@ -48,7 +53,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
   }
 
   return (
-    <Modal isOpen={isOpen} title="Statistik Habit" onClose={onClose}>
+    <Modal isOpen={isOpen} title={t('habits.statsTitle', 'Statistik Habit')} onClose={onClose}>
       <div className="space-y-6">
         {/* Header Info */}
         <div className="flex items-center gap-4">
@@ -80,7 +85,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
               <textarea
                 value={tempNotes}
                 onChange={(e) => setTempNotes(e.target.value)}
-                placeholder="Tujuan atau detail cara ngerjain habit ini..."
+                placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
                 className="ft-field mt-0 w-full font-medium min-h-[80px] resize-y text-sm bg-[var(--field-bg)] border-[color-mix(in_srgb,var(--border)_50%,transparent)]"
                 autoFocus
               />

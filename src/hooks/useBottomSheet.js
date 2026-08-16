@@ -50,14 +50,12 @@ export default function useBottomSheet(configOrState = false) {
         window.clearTimeout(closeTimeoutRef.current)
         closeTimeoutRef.current = null
       }
-      if (controlledIsOpen) {
-        setInternalOpen(true)
-        window.requestAnimationFrame(() => setIsVisible(true))
-      } else {
-        setIsVisible(false)
-        setInternalOpen(false)
-      }
+      const frame = window.requestAnimationFrame(() => {
+        setIsVisible(Boolean(controlledIsOpen))
+      })
+      return () => window.cancelAnimationFrame(frame)
     }
+    return undefined
   }, [isControlled, controlledIsOpen])
 
   // Lock body scroll while sheet is open

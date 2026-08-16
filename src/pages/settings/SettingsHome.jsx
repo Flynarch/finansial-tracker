@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -25,10 +25,12 @@ export default function SettingsHome() {
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || '')
   const [showKey, setShowKey] = useState(false)
   const [keyStatusMessage, setKeyStatusMessage] = useState('')
+  const [prevGeminiApiKey, setPrevGeminiApiKey] = useState(geminiApiKey)
 
-  useEffect(() => {
+  if (prevGeminiApiKey !== geminiApiKey) {
+    setPrevGeminiApiKey(geminiApiKey)
     setApiKeyInput(geminiApiKey || '')
-  }, [geminiApiKey])
+  }
 
   const handleSaveApiKey = async (e) => {
     e.preventDefault()

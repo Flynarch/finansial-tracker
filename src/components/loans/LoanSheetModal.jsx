@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
@@ -8,6 +8,7 @@ import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import {
   formatMoneyInput,
@@ -17,14 +18,15 @@ import {
 } from '../../lib/utils'
 
 export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, defaultType = 'debt', onSaved }) {
+  const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const { addLoan, updateLoan } = useLoanStore()
   const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
+  const [walletModalOpen, setWalletModalOpen] = useState(false)
   const totalAmountInputRef = useRef(null)
 
   const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [], [])
-  const [walletModalOpen, setWalletModalOpen] = useState(false)
 
   const [form, setForm] = useState({
     type: defaultType,
@@ -44,7 +46,12 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     ? (editingLoan.paymentTransactionIds?.length > 0 || editingLoan.remainingAmount < editingLoan.totalAmount)
     : false
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevEditingLoan, setPrevEditingLoan] = useState(editingLoan)
+
+  if (prevOpen !== isOpen || prevEditingLoan !== editingLoan) {
+    setPrevOpen(isOpen)
+    setPrevEditingLoan(editingLoan)
     if (isOpen) {
       setSheetError('')
       if (editingLoan) {
@@ -73,7 +80,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
         })
       }
     }
-  }, [isOpen, editingLoan, defaultType, defaultCurrency, wallets])
+  }
 
   const handleTotalAmountChange = (e) => {
     if (hasPaymentsRecorded) return
@@ -238,7 +245,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           <WalletSelectTrigger
             wallet={selectedWallet}
             disabled={!!editingLoan}
-            placeholder="Pilih Dompet / Akun"
+            placeholder={t('loans.selectWallet', 'Pilih Dompet / Akun')}
             onClick={() => setWalletModalOpen(true)}
           />
           <WalletSelectModal
@@ -248,7 +255,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             selectedWalletId={form.walletId}
             onSelectWallet={(id) => setForm((prev) => ({ ...prev, walletId: id }))}
             allowNone={false}
-            title="Pilih Dompet"
+            title={t('wallets.selectTitle', 'Pilih Dompet')}
           />
         </div>
 
@@ -259,7 +266,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
             <CustomDatePicker
               value={form.startDate}
               onChange={(val) => setForm((prev) => ({ ...prev, startDate: val }))}
-              title="Pilih Tanggal Pinjam"
+              title={t('loans.startDateTitle', 'Pilih Tanggal Pinjam')}
             />
           </div>
           <div className="space-y-1">
@@ -269,8 +276,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
               onChange={(val) => setForm((prev) => ({ ...prev, dueDate: val }))}
               allowClear
               clearLabel="Tanpa Jatuh Tempo"
-              placeholder="Opsional"
-              title="Pilih Jatuh Tempo"
+              placeholder={t('common.optional', 'Opsional')}
+              title={t('loans.dueDateTitle', 'Pilih Jatuh Tempo')}
             />
           </div>
         </div>
@@ -281,7 +288,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           <input
             type="text"
             className="ft-input w-full text-sm font-semibold py-2.5 px-3 rounded-xl"
-            placeholder="Nomor rekening, keterangan, dll"
+            placeholder={t('loans.notesPlaceholder', 'Nomor rekening, keterangan, dll')}
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           />

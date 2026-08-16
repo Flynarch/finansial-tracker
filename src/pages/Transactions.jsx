@@ -37,6 +37,57 @@ const initialFormData = {
   currency: 'IDR',
 }
 
+const ALL_TYPES = ['income', 'expense', 'transfer']
+
+function computeFilteredTransactions(transactions, filters, userWalletsCount, usedCategoriesCount) {
+  const activeTypes = filters.types
+  const isAllTypes = !activeTypes || activeTypes.length === 0 || activeTypes.length === ALL_TYPES.length
+
+  const activeWalletIds = filters.walletIds
+  const isAllWallets = !activeWalletIds || activeWalletIds.length === 0 || activeWalletIds.length === userWalletsCount
+
+  const activeCategories = filters.categories
+  const isAllCategories = !activeCategories || activeCategories.length === 0 || activeCategories.length === usedCategoriesCount
+
+  const searchLower = (filters.search || '').toLowerCase().trim()
+  const startDate = filters.startDate
+  const endDate = filters.endDate
+
+  return transactions
+    .filter((item) => {
+      if (searchLower) {
+        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''}`.toLowerCase()
+        if (!searchTarget.includes(searchLower)) return false
+      }
+
+      if (!isAllTypes && !activeTypes.includes(item.type)) return false
+
+      if (!isAllWallets) {
+        const wId = String(item.walletId)
+        const twId = String(item.targetWalletId)
+        const matchWallet = activeWalletIds.some((id) => String(id) === wId || String(id) === twId)
+        if (!matchWallet) return false
+      }
+
+      if (!isAllCategories) {
+        const itemCat = item.category ? (String(item.category).includes('/') ? String(item.category).split('/')[0].trim() : String(item.category).trim()) : ''
+        if (!activeCategories.includes(itemCat)) return false
+      }
+
+      if (startDate && item.date < startDate) return false
+      if (endDate && item.date > endDate) return false
+
+      return true
+    })
+    .sort((a, b) => {
+      const byDate = String(b.date || '').localeCompare(String(a.date || ''))
+      if (byDate !== 0) return byDate
+      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
+      if (byCreatedAt !== 0) return byCreatedAt
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
+}
+
 function Transactions() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -224,8 +275,6 @@ function Transactions() {
 
   const [activeFilterSection, setActiveFilterSection] = useState('type')
 
-  const ALL_TYPES = useMemo(() => ['income', 'expense', 'transfer'], [])
-
   const toggleTypeFilter = (typeKey) => {
     const currentTypes = draftFilters?.types ?? filters.types ?? ALL_TYPES
     const isCurrentlyAll = currentTypes.length === ALL_TYPES.length
@@ -276,44 +325,12 @@ function Transactions() {
     setDraftFilters((p) => ({ ...(p || filters), categories: nextCats }))
   }
 
-  const filteredTransactions = useMemo(() => {
-    const activeTypes = filters.types ?? ALL_TYPES
-    const isAllTypes = activeTypes.length === 0 || activeTypes.length === ALL_TYPES.length
-
-    const allWalletIds = userWallets.map((w) => String(w.id))
-    const activeWalletIds = (filters.walletIds ?? allWalletIds).map(String)
-    const isAllWallets = activeWalletIds.length === 0 || activeWalletIds.length === allWalletIds.length
-
-    const activeCategories = filters.categories ?? usedCategories
-    const isAllCategories = activeCategories.length === 0 || activeCategories.length === usedCategories.length
-
-    return transactions.filter((item) => {
-      const searchTarget = `${item.notes ?? ''} ${item.category ?? ''}`.toLowerCase()
-      const searchPass = searchTarget.includes(filters.search.toLowerCase())
-      
-      const typePass = isAllTypes ? true : activeTypes.includes(item.type)
-      
-      const walletPass = isAllWallets
-        ? true
-        : activeWalletIds.includes(String(item.walletId)) || activeWalletIds.includes(String(item.targetWalletId))
-
-      const itemParentCat = item.category ? (String(item.category).includes('/') ? String(item.category).split('/')[0].trim() : String(item.category).trim()) : ''
-      const categoryPass = isAllCategories
-        ? true
-        : activeCategories.includes(itemParentCat)
-
-      const startPass = filters.startDate ? item.date >= filters.startDate : true
-      const endPass = filters.endDate ? item.date <= filters.endDate : true
-
-      return searchPass && typePass && walletPass && categoryPass && startPass && endPass
-    }).sort((a, b) => {
-      const byDate = String(b.date || '').localeCompare(String(a.date || ''))
-      if (byDate !== 0) return byDate
-      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
-      if (byCreatedAt !== 0) return byCreatedAt
-      return String(b.id || '').localeCompare(String(a.id || ''))
-    })
-  }, [filters, transactions, userWallets, usedCategories, ALL_TYPES])
+  const filteredTransactions = computeFilteredTransactions(
+    transactions,
+    filters,
+    userWallets.length,
+    usedCategories.length,
+  )
 
   const getDatesForQuickRange = (rangeKey) => {
     const now = new Date()
@@ -521,7 +538,7 @@ function Transactions() {
                   : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
               }`}
               aria-label={t('tx.search.placeholder') || 'Cari'}
-              title="Cari Transaksi"
+              title={t('tx.search.placeholder', 'Cari Transaksi')}
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
@@ -544,7 +561,7 @@ function Transactions() {
                   : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
               }`}
               aria-label={t('tx.filter.open')}
-              title="Filter Lengkap"
+              title={t('tx.filter.open', 'Filter Lengkap')}
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M4 6h16" strokeLinecap="round" />

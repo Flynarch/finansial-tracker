@@ -1,19 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function Minimap({ ideas, transform }) {
   const [collapsed, setCollapsed] = useState(true)
   const [active, setActive] = useState(false)
-  const timerRef = useRef(null)
+  const [prevTransform, setPrevTransform] = useState(transform)
+
+  if (prevTransform.x !== transform.x || prevTransform.y !== transform.y || prevTransform.zoom !== transform.zoom) {
+    setPrevTransform(transform)
+    if (!collapsed) setActive(true)
+  }
 
   useEffect(() => {
-    if (collapsed) return
-    setActive(true)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
+    if (!active) return
+    const timer = setTimeout(() => {
       setActive(false)
     }, 2500)
-    return () => clearTimeout(timerRef.current)
-  }, [transform.x, transform.y, transform.zoom, collapsed])
+    return () => clearTimeout(timer)
+  }, [active, transform.x, transform.y, transform.zoom])
   
   if (!ideas || ideas.length === 0) return null
 

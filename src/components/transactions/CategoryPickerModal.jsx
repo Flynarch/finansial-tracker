@@ -35,7 +35,14 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
   const [newSubName, setNewSubName] = useState('')
   const [renameParentVal, setRenameParentVal] = useState('')
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevTxType, setPrevTxType] = useState(txType)
+  const [prevSelectedCategory, setPrevSelectedCategory] = useState(selectedCategory)
+
+  if (prevOpen !== isOpen || prevTxType !== txType || prevSelectedCategory !== selectedCategory) {
+    setPrevOpen(isOpen)
+    setPrevTxType(txType)
+    setPrevSelectedCategory(selectedCategory)
     if (isOpen) {
       setEditMode(false)
       setNewSubName('')
@@ -54,7 +61,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
         setIncomeParentId(null)
       }
     }
-  }, [isOpen, txType, selectedCategory])
+  }
 
   useEffect(() => {
     const handleChanged = () => setCategoryVersion((v) => v + 1)
@@ -86,11 +93,15 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
     return activeTree.find((p) => p.id === activeParentId) || null
   }, [activeTree, activeParentId])
 
-  useEffect(() => {
+  const [prevActiveParent, setPrevActiveParent] = useState(activeParent)
+  const [prevLang, setPrevLang] = useState(lang)
+  if (prevActiveParent !== activeParent || prevLang !== lang) {
+    setPrevActiveParent(activeParent)
+    setPrevLang(lang)
     if (activeParent) {
       setRenameParentVal(activeParent.names[lang] || '')
     }
-  }, [activeParent, lang])
+  }
 
   const handleAddSub = () => {
     if (!activeParent) return
@@ -244,7 +255,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
                       type="text"
                       value={renameParentVal}
                       onChange={(e) => setRenameParentVal(e.target.value)}
-                      placeholder="Nama baru..."
+                      placeholder={lang === 'id' ? 'Nama baru...' : 'New name...'}
                       className="ft-field flex-1 text-xs px-2 py-1"
                     />
                     <Button type="button" size="sm" className="text-xs py-1 px-2.5 shrink-0" onClick={handleRenameParent}>

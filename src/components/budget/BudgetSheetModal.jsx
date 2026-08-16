@@ -174,7 +174,12 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
     setIsCategoryOpen(false)
   }, [])
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevEditingBudget, setPrevEditingBudget] = useState(editingBudget)
+
+  if (prevOpen !== isOpen || prevEditingBudget !== editingBudget) {
+    setPrevOpen(isOpen)
+    setPrevEditingBudget(editingBudget)
     if (isOpen) {
       setSheetError('')
       if (editingBudget) {
@@ -198,7 +203,7 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
       }
       setIsCategoryOpen(false)
     }
-  }, [isOpen, editingBudget, initialMonth])
+  }
 
 
 

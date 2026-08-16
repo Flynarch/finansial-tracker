@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
@@ -70,9 +70,11 @@ export default function AiDigitalReceipt({
     currency: defaultCurrency,
   })
 
-  useEffect(() => {
+  const [prevTxs, setPrevTxs] = useState(transactions)
+  if (prevTxs !== transactions) {
+    setPrevTxs(transactions)
     setLocalTxs(Array.isArray(transactions) ? transactions : [transactions])
-  }, [transactions])
+  }
 
   const txList = localTxs
   const isSingle = txList.length === 1
@@ -436,7 +438,7 @@ export default function AiDigitalReceipt({
                         type="button"
                         onClick={() => handleStartEdit(tx)}
                         className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--field-bg)] transition cursor-pointer"
-                        title="Edit Transaksi"
+                        title={t('tx.modal.editTitle', 'Edit Transaksi')}
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
@@ -478,7 +480,7 @@ export default function AiDigitalReceipt({
               type="button"
               onClick={handleCopyRef}
               className="p-0.5 hover:text-[var(--fg)] transition cursor-pointer"
-              title="Salin No. Referensi"
+              title={t('common.copyRef', 'Salin No. Referensi')}
             >
               {copiedRef ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
             </button>

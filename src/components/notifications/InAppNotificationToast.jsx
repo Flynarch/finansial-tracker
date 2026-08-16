@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { Bell, Clock, HandCoins, Sparkles, X, CheckCircle2 } from 'lucide-react'
+import useTranslation from '../../hooks/useTranslation'
 
 function getToastIcon(type = '', title = '', message = '') {
   const text = (title + ' ' + message).toLowerCase()
@@ -22,6 +23,7 @@ function getToastIcon(type = '', title = '', message = '') {
 }
 
 export default function InAppNotificationToast() {
+  const { t } = useTranslation()
   const [activeToast, setActiveToast] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
   const lastProcessedIdRef = useRef(null)
@@ -73,11 +75,15 @@ export default function InAppNotificationToast() {
     }
 
     lastProcessedIdRef.current = notifId
-    showToast({
+    const toastInfo = {
       title: latestNotification.title || 'Notifikasi Baru',
       message: latestNotification.message || '',
       type: latestNotification.type,
+    }
+    const frameId = requestAnimationFrame(() => {
+      showToast(toastInfo)
     })
+    return () => cancelAnimationFrame(frameId)
   }, [latestNotification, showToast])
 
   // Custom Event Listener for instant manual toasts
@@ -132,7 +138,7 @@ export default function InAppNotificationToast() {
           type="button"
           onClick={dismissToast}
           className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition shrink-0 cursor-pointer"
-          title="Tutup"
+          title={t('common.close', 'Tutup')}
         >
           <X size={14} />
         </button>

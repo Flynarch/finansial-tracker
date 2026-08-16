@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState } from 'react'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function NodeWrapper({ 
   idea, zoom, snapToGrid, isSelected, groupDragOffset, 
@@ -6,15 +7,18 @@ export default function NodeWrapper({
   onDragAlign, onDragEndAlign,
   children 
 }) {
+  const { t } = useTranslation()
   const [pos, setPos] = useState({ x: idea.x, y: idea.y })
   const [size, setSize] = useState({ w: idea.width || 200, h: idea.height || 200 })
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   
-  useEffect(() => {
+  const [prevIdea, setPrevIdea] = useState({ x: idea.x, y: idea.y, width: idea.width, height: idea.height })
+  if (prevIdea.x !== idea.x || prevIdea.y !== idea.y || prevIdea.width !== idea.width || prevIdea.height !== idea.height) {
+    setPrevIdea({ x: idea.x, y: idea.y, width: idea.width, height: idea.height })
     setPos({ x: idea.x, y: idea.y })
     setSize({ w: idea.width || 200, h: idea.height || 200 })
-  }, [idea.x, idea.y, idea.width, idea.height])
+  }
   
   const dragRef = useRef({ startX: 0, startY: 0, initX: 0, initY: 0 })
   const resizeRef = useRef({ startX: 0, startY: 0, initW: 0, initH: 0, initX: 0, initY: 0, handle: '' })
@@ -189,7 +193,7 @@ export default function NodeWrapper({
       onPointerMove={handleResizeMove}
       onPointerUp={handleResizeEnd}
       onPointerCancel={handleResizeEnd}
-      title="Ubah Ukuran"
+      title={t('board.resize', 'Ubah Ukuran')}
     >
       <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-md flex items-center justify-center">
         <div className="w-1 h-1 bg-white rounded-full" />

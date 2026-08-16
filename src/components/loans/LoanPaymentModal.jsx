@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
@@ -7,6 +7,7 @@ import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import {
   formatCurrency,
@@ -19,6 +20,7 @@ import {
 import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History } from 'lucide-react'
 
 export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved }) {
+  const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const { recordPayment } = useLoanStore()
   const { closeSheet } = useBottomSheet({ isOpen, onClose })
@@ -47,14 +49,19 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
     [],
   )
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevLoanId, setPrevLoanId] = useState(loan?.id)
+
+  if (prevOpen !== isOpen || prevLoanId !== loan?.id) {
+    setPrevOpen(isOpen)
+    setPrevLoanId(loan?.id)
     if (isOpen) {
       setSheetError('')
       setAmount('')
       setDate(new Date().toISOString().split('T')[0])
       setNotes('')
     }
-  }, [isOpen, loan])
+  }
 
   if (!loan) return null
 
@@ -313,7 +320,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
               <CustomDatePicker
                 value={date}
                 onChange={(val) => setDate(val)}
-                title="Pilih Tanggal Pembayaran"
+                title={t('loans.paymentDateTitle', 'Pilih Tanggal Pembayaran')}
               />
             </div>
 
@@ -325,7 +332,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
               <input
                 type="text"
                 className="ft-input w-full text-xs font-semibold py-1.5"
-                placeholder="Transfer BCA, dsb..."
+                placeholder={t('loans.paymentNotesPlaceholder', 'Transfer BCA, dsb...')}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />

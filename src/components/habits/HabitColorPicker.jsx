@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Check, Palette, ChevronRight, Pipette } from 'lucide-react'
 import BottomSheet from '../ui/BottomSheet'
+import useTranslation from '../../hooks/useTranslation'
 
 const PRESET_PALETTES = [
   { name: 'Emerald', hex: '#10b981' },
@@ -14,13 +15,14 @@ const PRESET_PALETTES = [
 ]
 
 function hslToHex(h, s, l) {
-  s /= 100
   l /= 100
-  const a = s * Math.min(l, 1 - l)
+  const a = (s * Math.min(l, 1 - l)) / 100
   const f = (n) => {
     const k = (n + h / 30) % 12
     const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
-    return Math.round(255 * color).toString(16).padStart(2, '0')
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0')
   }
   return `#${f(0)}${f(8)}${f(4)}`
 }
@@ -52,18 +54,21 @@ function hexToHsl(hex) {
 }
 
 export default function HabitColorPicker({ selectedColor = '#10b981', onChangeColor }) {
+  const { t } = useTranslation()
   const [showSheet, setShowSheet] = useState(false)
   const [hue, setHue] = useState(() => hexToHsl(selectedColor).h)
   const [hexInput, setHexInput] = useState(selectedColor)
+  const [prevColor, setPrevColor] = useState(selectedColor)
+
+  if (prevColor !== selectedColor) {
+    setPrevColor(selectedColor)
+    setHue(hexToHsl(selectedColor).h)
+    setHexInput(selectedColor)
+  }
 
   const activePreset = PRESET_PALETTES.find(
     (p) => p.hex.toLowerCase() === String(selectedColor || '').toLowerCase(),
   )
-
-  useEffect(() => {
-    setHue(hexToHsl(selectedColor).h)
-    setHexInput(selectedColor)
-  }, [selectedColor])
 
   const handleHueChange = (h) => {
     setHue(h)
@@ -114,7 +119,7 @@ export default function HabitColorPicker({ selectedColor = '#10b981', onChangeCo
       <BottomSheet
         isOpen={showSheet}
         onClose={() => setShowSheet(false)}
-        title="Pilih Warna Habit"
+        title={t('habits.colorPickerTitle', 'Pilih Warna Habit')}
         maxWidth="max-w-sm"
       >
         <div className="space-y-3 pt-1 pb-2">
@@ -185,7 +190,7 @@ export default function HabitColorPicker({ selectedColor = '#10b981', onChangeCo
               type="text"
               value={hexInput}
               onChange={(e) => handleHexInputChange(e.target.value)}
-              placeholder="#10B981"
+              placeholder={'#10B981'}
               className="w-full flex-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--fg)] outline-none focus:border-[var(--accent)] text-center"
             />
             <button

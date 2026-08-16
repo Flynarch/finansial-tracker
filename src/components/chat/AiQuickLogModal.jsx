@@ -8,6 +8,7 @@ import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
 import useChatStore from '../../store/useChatStore'
+import useTranslation from '../../hooks/useTranslation'
 import AiDigitalReceipt from './AiDigitalReceipt'
 import AiIntentSwitchDialog from './AiIntentSwitchDialog'
 
@@ -47,12 +48,13 @@ export default function AiQuickLogModal() {
   const closeQuickLog = useChatStore((s) => s.closeQuickLog)
   const switchToFullChat = useChatStore((s) => s.switchToFullChat)
 
+  const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
   const addTransaction = useTransactionStore((s) => s.addTransaction)
-  const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
-  const sampleChips = useMemo(() => generateSampleChips(wallets), [wallets])
+  const sampleChips = useMemo(() => generateSampleChips(wallets || []), [wallets])
 
   // UI state machine: 'input' | 'analyzing' | 'receipt' | 'intent_switch'
   const [modalMode, setModalMode] = useState('input')
@@ -62,8 +64,18 @@ export default function AiQuickLogModal() {
   const [recordedTransactions, setRecordedTransactions] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
-  const [shouldRender, setShouldRender] = useState(false)
+  const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
+
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen)
+    if (isOpen) {
+      setShouldRender(true)
+    } else {
+      setIsAnimatingIn(false)
+    }
+  }
 
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -78,12 +90,10 @@ export default function AiQuickLogModal() {
     let frameId
 
     if (isOpen) {
-      setShouldRender(true)
       frameId = requestAnimationFrame(() => {
         setIsAnimatingIn(true)
       })
     } else {
-      setIsAnimatingIn(false)
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
@@ -91,9 +101,9 @@ export default function AiQuickLogModal() {
           // ignore
         }
       }
-      setIsRecording(false)
       timeoutId = setTimeout(() => {
         setShouldRender(false)
+        setIsRecording(false)
         setModalMode('input')
         setInputValue('')
         setSelectedImage(null)
@@ -333,7 +343,7 @@ function isObviousNonTransaction(text) {
           isAnimatingIn ? 'bg-black/50 opacity-100' : 'bg-black/0 opacity-0'
         }`}
         onClick={closeQuickLog}
-        aria-label="Tutup Modal AI"
+        aria-label={t('common.close', 'Tutup Modal AI')}
       />
 
       {/* Slide-Up Bottom Sheet */}
@@ -364,9 +374,9 @@ function isObviousNonTransaction(text) {
               <button
                 type="button"
                 onClick={() => switchToFullChat(inputValue)}
-                title="Buka AI Finance Chat"
+                title={t('aiChat.title', 'Buka AI Finance Chat')}
                 className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer flex items-center gap-1"
-                aria-label="Buka AI Finance Chat"
+                aria-label={t('aiChat.title', 'Buka AI Finance Chat')}
               >
                 <MessageSquare className="h-4 w-4" />
               </button>
@@ -374,7 +384,7 @@ function isObviousNonTransaction(text) {
                 type="button"
                 onClick={closeQuickLog}
                 className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
-                aria-label="Tutup"
+                aria-label={t('common.close', 'Tutup')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -431,7 +441,7 @@ function isObviousNonTransaction(text) {
                       handleSubmit()
                     }
                   }}
-                  placeholder="Contoh: Makan siang 35rb & bensin 25rb pakai GoPay..."
+                  placeholder={t('aiQuickLog.placeholder', 'Contoh: Makan siang 35rb & bensin 25rb pakai GoPay...')}
                   rows={2}
                   className="w-full resize-none bg-transparent text-[15px] sm:text-sm font-medium text-[var(--fg)] placeholder:text-[var(--muted)]/80 focus:outline-none min-h-[64px] leading-relaxed"
                 />
@@ -463,7 +473,7 @@ function isObviousNonTransaction(text) {
                           ? 'border-rose-500 bg-rose-500/20 text-rose-500 animate-pulse'
                           : 'border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)]'
                       }`}
-                      title={isRecording ? 'Berhenti Merekam' : 'Rekam Suara (Voice Input)'}
+                      title={isRecording ? (locale === 'en' ? 'Stop recording' : 'Berhenti Merekam') : (locale === 'en' ? 'Voice input' : 'Rekam Suara (Voice Input)')}
                     >
                       {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </button>
@@ -481,7 +491,7 @@ function isObviousNonTransaction(text) {
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
                       className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                      title="Foto Struk Fisik (Kamera)"
+                      title={t('aiQuickLog.camera', 'Foto Struk Fisik (Kamera)')}
                     >
                       <Camera className="h-4 w-4" />
                     </button>
@@ -498,7 +508,7 @@ function isObviousNonTransaction(text) {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                      title="Pilih Struk dari Galeri"
+                      title={t('aiQuickLog.gallery', 'Pilih Struk dari Galeri')}
                     >
                       <ImageIcon className="h-4 w-4" />
                     </button>

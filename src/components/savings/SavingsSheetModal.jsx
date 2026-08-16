@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
@@ -28,7 +28,12 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
     currency: defaultCurrency,
   })
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevEditingGoal, setPrevEditingGoal] = useState(editingGoal)
+
+  if (prevOpen !== isOpen || prevEditingGoal !== editingGoal) {
+    setPrevOpen(isOpen)
+    setPrevEditingGoal(editingGoal)
     if (isOpen) {
       setSheetError('')
       if (editingGoal) {
@@ -47,7 +52,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
         })
       }
     }
-  }, [isOpen, editingGoal, defaultCurrency])
+  }
 
 
 

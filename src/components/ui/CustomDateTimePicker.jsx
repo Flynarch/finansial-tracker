@@ -15,14 +15,15 @@ function DrumWheelColumn({ items, value, onChange, label, formatLabel }) {
     const idx = items.indexOf(value)
     return idx >= 0 ? idx : 0
   })
+  const [prevValue, setPrevValue] = useState(value)
 
-  // Sync external value changes to local state
-  useEffect(() => {
+  if (prevValue !== value) {
+    setPrevValue(value)
     const idx = items.indexOf(value)
     if (idx >= 0 && idx !== localIndex) {
       setLocalIndex(idx)
     }
-  }, [value, items])
+  }
 
   // Sync scroll position when localIndex changes
   useEffect(() => {
@@ -110,15 +111,12 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
   const [tempTime, setTempTime] = useState(timeValue || '')
   const [viewDate, setViewDate] = useState(() => (dateValue ? new Date(dateValue) : new Date()))
 
-  useEffect(() => {
-    if (isOpen) {
-      setTempDate(dateValue || '')
-      setTempTime(timeValue || '')
-      if (dateValue) {
-        setViewDate(new Date(dateValue))
-      }
-    }
-  }, [isOpen, dateValue, timeValue])
+  const handleOpen = () => {
+    setTempDate(dateValue || '')
+    setTempTime(timeValue || '')
+    setViewDate(dateValue ? new Date(dateValue) : new Date())
+    setIsOpen(true)
+  }
 
   const selectedDate = useMemo(() => (dateValue ? new Date(dateValue) : null), [dateValue])
   const tempSelectedDate = useMemo(() => (tempDate ? new Date(tempDate) : null), [tempDate])
@@ -175,7 +173,10 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
       {label && <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">{label}</label>}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) handleOpen()
+          else setIsOpen(false)
+        }}
         className="flex w-full items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3 text-left text-sm font-semibold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all shadow-2xs cursor-pointer"
       >
         <div className="flex items-center gap-2.5 min-w-0">

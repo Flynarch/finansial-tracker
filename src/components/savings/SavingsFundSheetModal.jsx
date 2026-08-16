@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import BottomSheet from '../ui/BottomSheet'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
-import { formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../../lib/utils'
+import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret } from '../../lib/utils'
 import useSettingsStore from '../../store/useSettingsStore'
+import useTranslation from '../../hooks/useTranslation'
 import { Plus, Minus, Calendar, FileText, Wallet, Check } from 'lucide-react'
 
 export default function SavingsFundSheetModal({
@@ -16,6 +17,7 @@ export default function SavingsFundSheetModal({
   initialAction = 'add', // 'add' | 'withdraw'
   onGoalCompleted,
 }) {
+  const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [fundActionType, setFundActionType] = useState(initialAction)
   const [amountInput, setAmountInput] = useState('')
@@ -29,7 +31,9 @@ export default function SavingsFundSheetModal({
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const selectedWallet = useMemo(() => (wallets || []).find((w) => String(w.id) === String(selectedWalletId)), [wallets, selectedWalletId])
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen)
     if (isOpen) {
       setFundActionType(initialAction)
       setAmountInput('')
@@ -38,7 +42,7 @@ export default function SavingsFundSheetModal({
       setSelectedWalletId('')
       setIsSubmitting(false)
     }
-  }, [isOpen, initialAction])
+  }
 
   if (!goal) return null
 
@@ -192,7 +196,7 @@ export default function SavingsFundSheetModal({
           </label>
           <WalletSelectTrigger
             wallet={selectedWallet}
-            placeholder="Tanpa Potong Dompet (Manual Log)"
+            placeholder={t('savings.noWalletDeduct', 'Tanpa Potong Dompet (Manual Log)')}
             onClick={() => setWalletModalOpen(true)}
           />
           <WalletSelectModal
@@ -202,8 +206,8 @@ export default function SavingsFundSheetModal({
             selectedWalletId={selectedWalletId}
             onSelectWallet={(id) => setSelectedWalletId(id)}
             allowNone
-            noneLabel="Tanpa Potong Dompet (Manual Log)"
-            title={fundActionType === 'withdraw' ? 'Pilih Dompet Tujuan' : 'Pilih Sumber Dompet'}
+            noneLabel={t('savings.noWalletDeduct', 'Tanpa Potong Dompet (Manual Log)')}
+            title={fundActionType === 'withdraw' ? t('savings.selectTargetWallet', 'Pilih Dompet Tujuan') : t('savings.selectSourceWallet', 'Pilih Sumber Dompet')}
           />
         </div>
 
@@ -216,7 +220,7 @@ export default function SavingsFundSheetModal({
           <CustomDatePicker
             value={dateInput}
             onChange={(val) => setDateInput(val)}
-            title="Pilih Tanggal Transaksi"
+            title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
           />
         </div>
 

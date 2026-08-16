@@ -179,7 +179,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     }
   }, [])
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen)
     if (isOpen) {
       setTxType('expense')
       setForm((prev) => ({
@@ -197,7 +199,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       setExpenseParentId(null)
       setIncomeParentId(null)
     }
-  }, [isOpen, defaultCurrency, initialWalletId, wallets, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
+  }
 
   useEffect(() => {
     if (txType !== 'investment') return
@@ -588,7 +590,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               <CustomDatePicker
                 value={investmentForm.date}
                 onChange={(val) => setInvestmentForm((p) => ({ ...p, date: val }))}
-                title="Pilih Tanggal Investasi"
+                title={t('invest.dateSelectTitle', 'Pilih Tanggal Investasi')}
               />
             </div>
             {investmentForm.action === 'buy' ? (
@@ -849,51 +851,62 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 />
               </div>
 
-              {/* Dynamic Focus Underline Gradient & Glow */}
+              {/* Dynamic Focus Underline Gradient */}
               <div
                 className="mt-3.5 h-[2px] rounded-full transition-all duration-300"
                 style={{
                   background: isAmountFocused
                     ? `linear-gradient(90deg, ${modeAccent}, color-mix(in srgb, ${modeAccent} 40%, transparent) 65%, transparent)`
                     : 'var(--border)',
-                  boxShadow: isAmountFocused ? `0 1px 14px color-mix(in srgb, ${modeAccent} 45%, transparent)` : 'none',
                 }}
               />
             </div>
 
-            {/* Compact Two-Chip Row: Tanggal + Wallet */}
-            <div className="flex items-center gap-2">
-              <div className="shrink-0 bg-[var(--field-bg)] rounded-xl px-0.5">
-                <CustomDatePicker
-                  value={form.date}
-                  onChange={(val) => setForm((p) => ({ ...p, date: val }))}
-                  title="Pilih Tanggal Transaksi"
-                  buttonClassName="border-none bg-transparent shadow-none px-3 py-2 min-h-[42px]"
-                />
+            {/* Compact Row: Tanggal + Wallet */}
+            <div className="flex items-stretch gap-2">
+              <div className="shrink-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">{t('addTx.date')}</div>
+                <div className="bg-[var(--field-bg)] rounded-xl px-0.5">
+                  <CustomDatePicker
+                    value={form.date}
+                    onChange={(val) => setForm((p) => ({ ...p, date: val }))}
+                    title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
+                    buttonClassName="border-none bg-transparent shadow-none px-3 py-2 min-h-[42px]"
+                  />
+                </div>
               </div>
 
               {txType === 'transfer' ? (
-                <div className="grid grid-cols-2 gap-2 flex-1 min-w-0">
-                  <WalletSelectTrigger
-                    wallet={selectedWallet}
-                    placeholder="Asal"
-                    compact
-                    abbreviateBalance
-                    onClick={() => setWalletModalMode('walletId')}
-                  />
-                  <WalletSelectTrigger
-                    wallet={selectedTargetWallet}
-                    placeholder="Tujuan"
-                    compact
-                    abbreviateBalance
-                    onClick={() => setWalletModalMode('targetWalletId')}
-                  />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">Transfer</div>
+                  <div className="flex flex-col gap-1.5">
+                    <WalletSelectTrigger
+                      wallet={selectedWallet}
+                      placeholder={t('tx.transferFrom', 'Wallet Asal')}
+                      compact
+                      abbreviateBalance
+                      onClick={() => setWalletModalMode('walletId')}
+                    />
+                    <div className="flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 5v14M12 19l-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <WalletSelectTrigger
+                      wallet={selectedTargetWallet}
+                      placeholder={t('tx.transferTo', 'Wallet Tujuan')}
+                      compact
+                      abbreviateBalance
+                      onClick={() => setWalletModalMode('targetWalletId')}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1">{t('addTx.wallet', 'Dompet')}</div>
                   <WalletSelectTrigger
                     wallet={selectedWallet}
-                    placeholder="Pilih Wallet / Akun"
+                    placeholder={t('loans.selectWallet', 'Pilih Wallet / Akun')}
                     compact
                     abbreviateBalance
                     onClick={() => setWalletModalMode('walletId')}
@@ -913,13 +926,25 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   onClick={openCategorySheet}
                   className="w-full flex items-center justify-between gap-2 rounded-xl bg-[var(--field-bg)] px-3.5 py-3 text-left min-w-0 transition-all hover:bg-[var(--panel-strong)] active:scale-[0.99] cursor-pointer"
                 >
-                  <span className={`min-w-0 flex-1 leading-snug truncate text-xs sm:text-sm ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted-2)]' : 'font-semibold text-[var(--fg)]'}`}>
-                    {txType === 'expense' ? (
-                      form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {form.category && form.category.trim() ? (
+                      <CategoryIcon
+                        icon={resolveParentIcon(form.category.split('/')[0])}
+                        className="h-4 w-4 shrink-0 text-[var(--fg)]/70"
+                      />
                     ) : (
-                      form.category ? formatIncomeCategory(form.category, locale) : 'Pilih Kategori'
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.75">
+                        <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     )}
-                  </span>
+                    <span className={`min-w-0 flex-1 leading-snug truncate text-xs sm:text-sm ${!form.category || !form.category.trim() ? 'font-normal italic text-[var(--muted-2)]' : 'font-semibold text-[var(--fg)]'}`}>
+                      {txType === 'expense' ? (
+                        form.category ? formatExpenseCategory(form.category, locale) : 'Pilih Kategori'
+                      ) : (
+                        form.category ? formatIncomeCategory(form.category, locale) : 'Pilih Kategori'
+                      )}
+                    </span>
+                  </div>
                   <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -927,14 +952,23 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               </div>
             )}
 
-            {/* Catatan Ghost Underline */}
+            {/* Catatan */}
             <div>
-              <input
-                type="text"
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1.5">
+                {t('addTx.notes', 'Catatan')}
+              </div>
+              <textarea
                 value={form.notes}
-                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, notes: e.target.value }))
+                  // Auto-resize
+                  const el = e.target
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.min(el.scrollHeight, 80)}px`
+                }}
                 placeholder={t('addTx.notesPlaceholder')}
-                className="w-full bg-transparent border-b border-[var(--border)] py-2 px-0 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:border-[var(--border-strong)] transition-colors"
+                rows={1}
+                className="w-full bg-[var(--field-bg)] rounded-xl border-none py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:ring-1 focus:ring-[var(--border-strong)] transition-all resize-none"
               />
             </div>
           </>
@@ -946,9 +980,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             type="submit"
             style={{
               backgroundColor: modeAccent,
-              boxShadow: `0 10px 22px color-mix(in srgb, ${modeAccent} 45%, transparent)`,
             }}
-            className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all active:scale-[0.99] cursor-pointer"
+            className="w-full rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] cursor-pointer"
           >
             {t('addTx.save')}
           </button>

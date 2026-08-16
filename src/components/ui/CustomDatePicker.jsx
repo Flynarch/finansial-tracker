@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { format, addDays, startOfMonth, startOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parse } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
 import { Calendar, ChevronLeft, ChevronRight, Check, Trash2, ChevronDown } from 'lucide-react'
@@ -33,16 +33,11 @@ export default function CustomDatePicker({
   const [tempDate, setTempDate] = useState(value || '')
   const [viewDate, setViewDate] = useState(() => (parsedValue || new Date()))
 
-  useEffect(() => {
-    if (isOpen) {
-      setTempDate(value || '')
-      if (parsedValue) {
-        setViewDate(parsedValue)
-      } else {
-        setViewDate(new Date())
-      }
-    }
-  }, [isOpen, value, parsedValue])
+  const handleOpen = () => {
+    setTempDate(value || '')
+    setViewDate(parsedValue || new Date())
+    setIsOpen(true)
+  }
 
   const tempSelectedDate = useMemo(() => {
     if (!tempDate) return null
@@ -103,7 +98,7 @@ export default function CustomDatePicker({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className={`flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-left text-xs font-semibold transition-all shadow-2xs cursor-pointer hover:border-[var(--border-strong)] active:scale-[0.99] ${
           disabled ? 'opacity-60 cursor-not-allowed' : ''
         } ${buttonClassName}`}
