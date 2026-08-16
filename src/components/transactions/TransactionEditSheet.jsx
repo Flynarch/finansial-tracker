@@ -22,22 +22,32 @@ export default function TransactionEditSheet({
 }) {
   const amountInputRef = useRef(null)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
+  const [editError, setEditError] = useState('')
 
   return (
     <BottomSheet
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => {
+        setEditError('')
+        onClose()
+      }}
       title={t('tx.modal.editTitle') || 'Edit Transaksi'}
       maxHeight="max-h-[88dvh]"
     >
+      {editError ? (
+        <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-[ft-fade-in_0.2s_ease-out]">
+          {editError}
+        </div>
+      ) : null}
       <form
         className="grid gap-3 md:grid-cols-2 pt-1 pb-2"
         onSubmit={(event) => {
           event.preventDefault()
           if (!formData.category || !formData.category.trim()) {
-            alert(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
+            setEditError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
             return
           }
+          setEditError('')
           onSubmit()
         }}
       >

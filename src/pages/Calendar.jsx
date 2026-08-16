@@ -213,11 +213,17 @@ function Calendar() {
     }
   }, [importantEvents, selectedDate, transactions])
 
+  const [txSubmitError, setTxSubmitError] = useState('')
+
   const handleAddTransactionFromDate = async () => {
+    setTxSubmitError('')
     const parsedAmount = parseMoneyInput(amountInput, txForm.currency)
-    if (!(parsedAmount > 0)) return
+    if (!(parsedAmount > 0)) {
+      setTxSubmitError(t('addTx.amountRequired', 'Nominal harus lebih dari 0.'))
+      return
+    }
     if (!txForm.category || !txForm.category.trim()) {
-      alert(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
+      setTxSubmitError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
       return
     }
     await db.transactions.add({
@@ -231,6 +237,7 @@ function Calendar() {
     })
     setAmountInput('')
     setTxForm((prev) => ({ ...prev, notes: '' }))
+    setTxSubmitError('')
     setDayTab('items')
   }
 
@@ -457,6 +464,11 @@ function Calendar() {
                 <h5 className="mb-4 text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--muted-2)]">
                   {t('calendar.addTransaction')}
                 </h5>
+                {txSubmitError && (
+                  <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-[ft-fade-in_0.2s_ease-out]">
+                    {txSubmitError}
+                  </div>
+                )}
                 <div className="space-y-3.5">
                   <div className="inline-flex w-full rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_40%,transparent)] p-1">
                     <button

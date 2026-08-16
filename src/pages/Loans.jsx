@@ -68,18 +68,6 @@ export default function Loans() {
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
 
-  // Auto cleanup dummy/test data if present
-  useEffect(() => {
-    if (loans && loans.length > 0) {
-      const dummy = loans.find(
-        (l) => (l.title === 'm' && l.personName === 'gg') || l.title === 'm' || l.personName === 'gg'
-      )
-      if (dummy) {
-        db.loans.delete(dummy.id)
-      }
-    }
-  }, [loans])
-
   const handleBack = () => {
     if (isLeaving) return
     setIsLeaving(true)
