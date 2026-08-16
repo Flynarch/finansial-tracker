@@ -153,12 +153,12 @@ export default function BudgetSavingsDetailSheet({
                 <>
                   {/* Overall Total Spent Card */}
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
                         Total Pengeluaran Anggaran
                       </span>
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide border ${
+                        className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide border ${
                           budgetCalc.isOverBudget
                             ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                             : budgetCalc.overallPct >= 80
@@ -300,11 +300,11 @@ export default function BudgetSavingsDetailSheet({
                 <>
                   {/* Overall Total Collected Card */}
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
                         Total Tabungan Terkumpul
                       </span>
-                      <span className="rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                      <span className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
                         {goalCalc.overallPct}% Terkumpul
                       </span>
                     </div>
