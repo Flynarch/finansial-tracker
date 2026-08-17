@@ -121,7 +121,7 @@ export default function SettingsHome() {
                   {profileName || 'Rico'}
                 </h3>
                 <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)]">
-                  v2.0.0
+                  v4.2.0
                 </span>
               </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
