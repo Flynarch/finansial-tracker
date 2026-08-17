@@ -245,7 +245,7 @@ export default function SettingsHome() {
                   ? `Google • ${authUserEmail || 'Connected'}`
                   : authProvider === 'email'
                   ? `Email • ${authUserEmail || 'Registered'}`
-                  : 'Mode Tamu (Offline)'}
+                  : 'Mode Tamu'}
               </p>
             </div>
           </div>
@@ -298,14 +298,11 @@ export default function SettingsHome() {
                 <h4 className="font-extrabold text-sm text-[var(--fg)]">
                   {t('settings.guestBannerTitle', 'Mode Tamu Aktif')}
                 </h4>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black text-[9px] font-black uppercase tracking-wider">
-                  Offline
-                </span>
               </div>
               <p className="text-xs text-[var(--muted)] leading-relaxed">
                 {t(
                   'settings.guestBannerSubtitle',
-                  'Hubungkan akun Google atau Email Anda agar catatan transaksi aman & tersinkronisasi.'
+                  'Hubungkan akun Google Anda agar catatan transaksi aman & tersinkronisasi.'
                 )}
               </p>
             </div>
@@ -422,7 +419,7 @@ export default function SettingsHome() {
               ? `Google • ${authUserEmail || 'Connected'}`
               : authProvider === 'email'
               ? `Email • ${authUserEmail || 'Registered'}`
-              : 'Mode Tamu (Offline)'
+              : 'Mode Tamu'
           }
           icon={LogOut}
           iconColor="text-red-500 bg-red-500/10 border-red-500/20"
@@ -498,7 +495,7 @@ export default function SettingsHome() {
               <p className="text-xs text-[var(--muted)] leading-relaxed">
                 {t(
                   'settings.guestWarningDesc',
-                  'Anda saat ini menggunakan Mode Tamu (Offline). Jika Anda keluar tanpa menghubungkan akun Google atau Email, data transaksi Anda di perangkat ini tidak akan tersinkronisasi ke cloud. Ayo hubungkan akun sekarang agar data Anda aman!'
+                  'Anda saat ini menggunakan Mode Tamu. Jika Anda keluar tanpa menghubungkan akun Google, data transaksi Anda di perangkat ini tidak akan tersinkronisasi ke cloud. Ayo hubungkan akun sekarang agar data Anda aman!'
                 )}
               </p>
             </div>

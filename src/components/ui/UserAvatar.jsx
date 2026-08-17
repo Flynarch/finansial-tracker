@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { User } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 
 const SIZE_MAP = {
@@ -12,7 +13,7 @@ const SIZE_MAP = {
 
 function getProfileInitials(name) {
   const clean = String(name || '').trim()
-  if (!clean) return 'FT'
+  if (!clean) return ''
   const parts = clean.split(/\s+/).filter(Boolean)
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase()
@@ -83,10 +84,10 @@ const UserAvatar = memo(function UserAvatar({
         ) : null}
 
         <div
-          className="w-full h-full items-center justify-center font-black"
+          className="w-full h-full flex items-center justify-center font-black"
           style={{ display: finalPhoto ? 'none' : 'flex' }}
         >
-          {initials}
+          {initials || <User className="w-1/2 h-1/2 opacity-80" strokeWidth={2.2} />}
         </div>
       </div>
 

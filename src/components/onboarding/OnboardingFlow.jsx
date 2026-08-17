@@ -148,6 +148,7 @@ export default function OnboardingFlow() {
 
   // Auth UI states
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [googleError, setGoogleError] = useState('')
   const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false)
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
@@ -225,31 +226,25 @@ export default function OnboardingFlow() {
 
   /* ── Google Sign In Handler ────────────────────────────────────── */
   const handleGoogleSignIn = async () => {
+    setGoogleError('')
     setIsGoogleLoading(true)
     try {
       const res = await signInWithGoogle()
-      let userObj = res.success && res.user ? res.user : null
-      if (!userObj && res.code !== 'auth/popup-closed-by-user') {
-        // Fallback demo account for testing / offline environments
-        userObj = {
-          uid: `google_${Date.now()}`,
-          displayName: 'Pengguna Google',
-          email: 'user@gmail.com',
-          photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
-          provider: 'google',
+      if (res.success && res.user) {
+        await restoreUserSnapshot(res.user.uid, true)
+        await setAuthUser(res.user)
+        if (res.user.displayName) {
+          setUsername(res.user.displayName)
         }
-      }
-
-      if (userObj) {
-        await restoreUserSnapshot(userObj.uid, true)
-        await setAuthUser(userObj)
-        if (userObj.displayName) {
-          setUsername(userObj.displayName)
+        if (res.user.photoURL) {
+          setProfilePhoto(res.user.photoURL)
         }
         goTo(1)
+      } else if (!res.cancelled) {
+        setGoogleError(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google'))
       }
     } catch {
-      goTo(1)
+      setGoogleError(t('auth.googleFailed', 'Terjadi kesalahan saat masuk dengan Google'))
     } finally {
       setIsGoogleLoading(false)
     }
@@ -257,6 +252,7 @@ export default function OnboardingFlow() {
 
   /* ── Guest Mode Handler ────────────────────────────────────────── */
   const handleGuestSignIn = async () => {
+    setGoogleError('')
     const res = await signInAsGuest()
     if (res.user) {
       await setAuthUser(res.user)
@@ -410,9 +406,11 @@ export default function OnboardingFlow() {
                 <button
                   type="button"
                   onClick={() => setLocale(locale === 'id' ? 'en' : 'id')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-xs font-black text-[var(--fg)] hover:border-[var(--border-strong)] transition-all cursor-pointer shadow-2xs active:scale-95"
+                  aria-label={t('settings.language', 'Bahasa')}
+                  title={t('settings.language', 'Bahasa')}
                 >
-                  <Globe size={13} className="text-[var(--muted)]" />
+                  <Globe size={13} className="text-[var(--accent)]" />
                   <span>{locale === 'id' ? 'ID' : 'EN'}</span>
                 </button>
               </div>
@@ -458,8 +456,15 @@ export default function OnboardingFlow() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-[var(--muted)] font-semibold text-xs hover:text-[var(--fg)] transition-colors cursor-pointer"
                 >
                   <UserCheck size={15} />
-                  <span>{t('auth.continueAsGuest', 'Lanjutkan sebagai Tamu (Mode Offline)')}</span>
+                  <span>{t('auth.continueAsGuest', 'Lanjutkan sebagai Tamu')}</span>
                 </button>
+
+                {googleError && (
+                  <div className="p-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{googleError}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -495,7 +500,7 @@ export default function OnboardingFlow() {
                     aria-label={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                   >
                     <UserAvatar
-                      name={username || 'Pengguna'}
+                      name={username || ''}
                       photo={profilePhoto}
                       size="2xl"
                       shape="circle"
@@ -514,7 +519,7 @@ export default function OnboardingFlow() {
                   <button
                     type="button"
                     onClick={() => setIsChangePhotoOpen(true)}
-                    className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="absolute -bottom-1 -right-1 z-10 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     aria-label={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                     title={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                   >
@@ -778,7 +783,7 @@ export default function OnboardingFlow() {
                 <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
                   <div className="flex items-center gap-3">
                     <UserAvatar
-                      name={username || 'Pengguna'}
+                      name={username || ''}
                       photo={profilePhoto}
                       size="md"
                       shape="circle"
@@ -791,8 +796,8 @@ export default function OnboardingFlow() {
                         {authProvider === 'google'
                           ? 'Akun Google'
                           : authProvider === 'email'
-                          ? 'Akun Email / Gmail'
-                          : 'Mode Tamu Offline'}
+                          ? 'Akun Email'
+                          : 'Mode Tamu'}
                       </p>
                     </div>
                   </div>
@@ -908,6 +913,7 @@ export default function OnboardingFlow() {
         onClose={() => setIsChangePhotoOpen(false)}
         currentPhoto={profilePhoto}
         onSavePhoto={(photoDataUrl) => setProfilePhoto(photoDataUrl)}
+        zIndex="z-[10000]"
       />
     </div>,
     document.body

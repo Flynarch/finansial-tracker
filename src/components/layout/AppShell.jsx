@@ -6,6 +6,7 @@ import { getParentRoute } from '../../lib/navigationHierarchy'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
+import LoadingScreen from '../ui/LoadingScreen'
 import LockScreen from '../ui/LockScreen'
 import OnboardingFlow from '../onboarding/OnboardingFlow'
 import SpotlightTour from '../onboarding/SpotlightTour'
@@ -201,6 +202,20 @@ function AppShell() {
     }
   }, [securityEnabled, autoLockTimeout, lock])
 
+  const hasCompletedOnboarding = useSettingsStore((state) => state.hasCompletedOnboarding)
+
+  if (!isLoaded) {
+    return <LoadingScreen />
+  }
+
+  if (!hasCompletedOnboarding) {
+    return (
+      <div className="ft-app-shell min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+        <OnboardingFlow />
+      </div>
+    )
+  }
+
   return (
     <div className="ft-app-shell min-h-screen text-[var(--fg)]">
       {(location.pathname === '/dashboard' || location.pathname === '/') && <Navbar />}
@@ -221,9 +236,8 @@ function AppShell() {
         </main>
       </div>
       {!isDetailPage && <BottomNav />}
-      <OnboardingFlow />
       <SpotlightTour />
-      {isLoaded && securityEnabled && !isUnlocked ? (
+      {securityEnabled && !isUnlocked ? (
         <LockScreen onUnlock={unlock} />
       ) : null}
 

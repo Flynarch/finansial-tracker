@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 
-function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md' }) {
+function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md', zIndex = 'z-50' }) {
   const { isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const { t } = useTranslation()
 
@@ -21,7 +21,7 @@ function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md' }) {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       // Prevent background scroll without breaking inner scroll containers.

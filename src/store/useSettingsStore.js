@@ -3,16 +3,24 @@ import { db } from '../lib/db'
 
 const SETTINGS_KEY = 'preferences'
 
+function detectSystemLocale() {
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    const lang = navigator.language.toLowerCase()
+    if (lang.startsWith('en')) return 'en'
+  }
+  return 'id'
+}
+
 const useSettingsStore = create((set, get) => ({
   theme: 'light',
-  locale: 'id',
+  locale: detectSystemLocale(),
   defaultCurrency: 'IDR',
   defaultWalletId: null,
   motionPreference: 'system',
   reduceMotion: false,
   profileName: '',
   profilePhoto: '',
-  authProvider: 'guest', // 'google' | 'email' | 'guest'
+  authProvider: 'guest', // 'google' | 'guest'
   authUserEmail: '',
   authUserId: '',
   initialBalance: 0,
@@ -159,7 +167,14 @@ const useSettingsStore = create((set, get) => ({
     const oldOnboardingSeen = typeof window !== 'undefined' && window.localStorage.getItem('ft_onboarding_seen_v1') === '1'
     if (!record) {
       // No settings record: new user OR user who saw old onboarding but never changed settings
-      set({ isLoaded: true, isUnlocked: true, hasCompletedOnboarding: oldOnboardingSeen, hasCompletedSpotlightTour: oldOnboardingSeen })
+      const detectedLocale = detectSystemLocale()
+      set({
+        isLoaded: true,
+        isUnlocked: true,
+        locale: detectedLocale,
+        hasCompletedOnboarding: oldOnboardingSeen,
+        hasCompletedSpotlightTour: oldOnboardingSeen,
+      })
       return
     }
     const securityEnabled = Boolean(record.securityEnabled)
@@ -173,7 +188,7 @@ const useSettingsStore = create((set, get) => ({
       : onboardingDone
     set({
       theme: record.theme || 'light',
-      locale: record.locale === 'en' ? 'en' : 'id',
+      locale: record.locale ? (record.locale === 'en' ? 'en' : 'id') : detectSystemLocale(),
       defaultCurrency: record.defaultCurrency || 'IDR',
       defaultWalletId: record.defaultWalletId ? Number(record.defaultWalletId) : null,
       motionPreference: ['system', 'reduce', 'full'].includes(record.motionPreference)

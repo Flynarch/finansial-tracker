@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* ── 120 FPS Buttery-Smooth View Transitions ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 99999;
+}
+
 @theme {
   --animate-dropdown: dropdown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-collapse-in: collapse-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;

@@ -38,6 +38,8 @@ export async function signInWithGoogle() {
   try {
     const auth = getFirebaseAuth()
     const provider = new GoogleAuthProvider()
+    provider.addScope('email')
+    provider.addScope('profile')
     provider.setCustomParameters({ prompt: 'select_account' })
     const result = await signInWithPopup(auth, provider)
     const u = result.user
@@ -52,10 +54,28 @@ export async function signInWithGoogle() {
       },
     }
   } catch (error) {
+    const code = error?.code || 'UNKNOWN_ERROR'
+    const isCancelled =
+      code === 'auth/popup-closed-by-user' ||
+      code === 'auth/cancelled-popup-request' ||
+      code === 'auth/user-cancelled'
+
+    let message = 'Gagal masuk dengan Google'
+    if (code === 'auth/popup-blocked') {
+      message = 'Jendela popup diblokir oleh browser. Izinkan popup untuk melanjutkan.'
+    } else if (code === 'auth/unauthorized-domain') {
+      message = 'Domain aplikasi belum diizinkan di Firebase Auth Console.'
+    } else if (code === 'auth/network-request-failed') {
+      message = 'Gagal terhubung ke Google. Periksa koneksi internet Anda.'
+    } else if (code === 'auth/operation-not-allowed') {
+      message = 'Metode login Google belum diaktifkan di Firebase Console.'
+    }
+
     return {
       success: false,
-      code: error.code || 'UNKNOWN_ERROR',
-      message: error.message || 'Gagal masuk dengan Google',
+      cancelled: isCancelled,
+      code,
+      message,
     }
   }
 }
