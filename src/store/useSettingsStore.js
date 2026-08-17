@@ -7,6 +7,7 @@ const useSettingsStore = create((set, get) => ({
   theme: 'light',
   locale: 'id',
   defaultCurrency: 'IDR',
+  defaultWalletId: null,
   motionPreference: 'system',
   reduceMotion: false,
   profileName: '',
@@ -28,6 +29,7 @@ const useSettingsStore = create((set, get) => ({
       theme: next.theme,
       locale: next.locale,
       defaultCurrency: next.defaultCurrency,
+      defaultWalletId: next.defaultWalletId,
       motionPreference: next.motionPreference,
       profileName: next.profileName,
       initialBalance: next.initialBalance,
@@ -47,6 +49,11 @@ const useSettingsStore = create((set, get) => ({
   setDefaultCurrency: async (defaultCurrency) => {
     set({ defaultCurrency })
     await get().persist({ defaultCurrency })
+  },
+  setDefaultWalletId: async (defaultWalletId) => {
+    const next = defaultWalletId ? Number(defaultWalletId) : null
+    set({ defaultWalletId: next })
+    await get().persist({ defaultWalletId: next })
   },
   setLocale: async (locale) => {
     const next = locale === 'en' ? 'en' : 'id'
@@ -123,6 +130,7 @@ const useSettingsStore = create((set, get) => ({
       theme: record.theme || 'light',
       locale: record.locale === 'en' ? 'en' : 'id',
       defaultCurrency: record.defaultCurrency || 'IDR',
+      defaultWalletId: record.defaultWalletId ? Number(record.defaultWalletId) : null,
       motionPreference: ['system', 'reduce', 'full'].includes(record.motionPreference)
         ? record.motionPreference
         : 'system',

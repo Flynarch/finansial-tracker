@@ -62,6 +62,7 @@ function getInvestmentNameByType(type) {
 function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const addTransaction = useTransactionStore((state) => state.addTransaction)
 
   const [txType, setTxType] = useState(() => 'expense')
@@ -71,7 +72,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     category: getDefaultExpenseCategoryPath(),
     notes: '',
     currency: defaultCurrency,
-    walletId: initialWalletId || '',
+    walletId: initialWalletId || defaultWalletId || '',
     targetWalletId: '',
   }))
   const [investmentForm, setInvestmentForm] = useState(() => ({

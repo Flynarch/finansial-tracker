@@ -2,9 +2,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
-import { format, subDays } from 'date-fns'
-import { enUS, id as idLocale } from 'date-fns/locale'
-import { Edit2, Trash2, Receipt, Search, Archive, ArchiveRestore } from 'lucide-react'
+import { format } from 'date-fns'
+import {
+  Trash2,
+  Receipt,
+  Search,
+  MoreVertical,
+  Star,
+  Sliders,
+  Plus,
+  Check,
+  X,
+  Wallet as WalletIcon
+} from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
@@ -13,6 +23,7 @@ import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
 import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
+import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 import ToastBanner from '../components/ui/ToastBanner'
@@ -68,22 +79,20 @@ export default function WalletDetailPage() {
     loadRates()
   }, [])
 
-  const handleToggleArchive = async () => {
-    if (!wallet) return
-    const nextArchived = !wallet.isArchived
-    await db.wallets.update(walletId, { isArchived: nextArchived })
-  }
-
-  const deleteWallet = useWalletStore(state => state.deleteWallet)
-  const addTransaction = useTransactionStore(state => state.addTransaction)
-  const updateTransaction = useTransactionStore(state => state.updateTransaction)
-  const deleteTransaction = useTransactionStore(state => state.deleteTransaction)
+  const deleteWallet = useWalletStore((state) => state.deleteWallet)
+  const addTransaction = useTransactionStore((state) => state.addTransaction)
+  const updateTransaction = useTransactionStore((state) => state.updateTransaction)
+  const deleteTransaction = useTransactionStore((state) => state.deleteTransaction)
 
   const { locale, t } = useTranslation()
-  const defaultCurrency = useSettingsStore(state => state.defaultCurrency)
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
+  const setDefaultWalletId = useSettingsStore((state) => state.setDefaultWalletId)
+  const isDefaultWallet = defaultWalletId === walletId
   
   const [activeTab, setActiveTab] = useState('all') // all, expense, income
   const [searchQuery, setSearchQuery] = useState('')
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
@@ -133,11 +142,24 @@ export default function WalletDetailPage() {
     }
   }
 
+  const handleToggleDefaultWallet = async () => {
+    try {
+      if (isDefaultWallet) {
+        await setDefaultWalletId(null)
+      } else {
+        await setDefaultWalletId(walletId)
+      }
+      setIsActionMenuOpen(false)
+    } catch (err) {
+      console.error('Failed to set default wallet', err)
+    }
+  }
+
   const filteredTransactions = useMemo(() => {
     if (!allTransactions) return []
     const query = searchQuery.trim().toLowerCase()
 
-    return allTransactions.filter(tx => {
+    return allTransactions.filter((tx) => {
       // Tab Filter
       let matchesTab = true
       if (activeTab !== 'all') {
@@ -150,101 +172,77 @@ export default function WalletDetailPage() {
           matchesTab = false
         }
       }
-      if (!matchesTab) return false
 
-      // Search Query Filter
+      // Search Filter
+      let matchesSearch = true
       if (query) {
-        const notesMatch = tx.notes ? tx.notes.toLowerCase().includes(query) : false
-        const categoryMatch = tx.category ? tx.category.toLowerCase().includes(query) : false
-        const amountMatch = String(tx.amount).includes(query)
-        return notesMatch || categoryMatch || amountMatch
+        const catLabels = getTransactionCategoryLabels(tx.type, tx.category, locale)
+        const catName = (catLabels?.categoryName || tx.category || '').toLowerCase()
+        const subName = (catLabels?.subcategoryName || '').toLowerCase()
+        const notes = (tx.notes || '').toLowerCase()
+        const amountStr = String(tx.amount || '')
+        matchesSearch = catName.includes(query) || subName.includes(query) || notes.includes(query) || amountStr.includes(query)
       }
-      return true
+
+      return matchesTab && matchesSearch
     })
-  }, [allTransactions, activeTab, searchQuery, walletId])
+  }, [allTransactions, activeTab, searchQuery, walletId, locale])
 
   const groupedTransactions = useMemo(() => {
-    if (!filteredTransactions || filteredTransactions.length === 0) return []
+    if (!filteredTransactions.length) return []
+    const groups = {}
     
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
-    
-    const groupsMap = new Map()
-
-    for (const tx of filteredTransactions) {
-      const dateKey = tx.date || 'Lainnya'
-      if (!groupsMap.has(dateKey)) {
-        groupsMap.set(dateKey, {
-          dateKey,
-          items: [],
-          totalExpense: 0,
-          totalIncome: 0,
-        })
+    filteredTransactions.forEach((tx) => {
+      const dateKey = tx.date
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
       }
-      const group = groupsMap.get(dateKey)
-      group.items.push(tx)
-
-      const amount = Number(tx.amount) || 0
-      const txCurr = tx.currency || defaultCurrency
-      const walletCurr = wallet?.currency || defaultCurrency
-      const convertedAmt =
-        txCurr === walletCurr
-          ? amount
-          : convertCurrency(amount, txCurr, walletCurr, rates || {})
-
-      if (tx.type === 'expense') {
-        group.totalExpense += convertedAmt
-      } else if (tx.type === 'income') {
-        group.totalIncome += convertedAmt
-      } else if (tx.type === 'transfer') {
-        if (String(tx.walletId) === String(walletId)) group.totalExpense += convertedAmt
-        if (String(tx.targetWalletId) === String(walletId)) group.totalIncome += convertedAmt
-      } else if (tx.type === 'balance_adjustment') {
-        if (amount >= 0) {
-          group.totalIncome += convertedAmt
-        } else {
-          group.totalExpense += Math.abs(convertedAmt)
-        }
-      }
-    }
-
-    return Array.from(groupsMap.values()).map(group => {
-      let dateLabel
-      if (group.dateKey === todayStr) {
-        dateLabel = 'HARI INI'
-      } else if (group.dateKey === yesterdayStr) {
-        dateLabel = 'KEMARIN'
-      } else if (group.dateKey !== 'Lainnya') {
-        try {
-          const dateObj = new Date(`${group.dateKey}T12:00:00`)
-          dateLabel = format(dateObj, 'EEEE, d MMMM yyyy', {
-            locale: locale === 'en' ? enUS : idLocale
-          }).toUpperCase()
-        } catch {
-          dateLabel = group.dateKey
-        }
-      } else {
-        dateLabel = 'LAINNYA'
-      }
-
-      const net = group.totalIncome - group.totalExpense
-      let dailySummaryText = ''
-      if (net > 0) {
-        dailySummaryText = `+${formatCurrency(net, wallet?.currency || defaultCurrency)}`
-      } else if (net < 0) {
-        dailySummaryText = `-${formatCurrency(Math.abs(net), wallet?.currency || defaultCurrency)}`
-      } else if (group.totalExpense > 0) {
-        dailySummaryText = `-${formatCurrency(group.totalExpense, wallet?.currency || defaultCurrency)}`
-      }
-
-      return {
-        ...group,
-        dateLabel,
-        dailySummaryText,
-        isPositive: net > 0,
-      }
+      groups[dateKey].push(tx)
     })
-  }, [filteredTransactions, locale, walletId, wallet?.currency, defaultCurrency, rates])
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const yesterdayDate = new Date()
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterdayStr = format(yesterdayDate, 'yyyy-MM-dd')
+
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map((dateKey) => {
+        let dateLabel
+        if (dateKey === todayStr) {
+          dateLabel = t('common.today', 'Hari Ini')
+        } else if (dateKey === yesterdayStr) {
+          dateLabel = t('common.yesterday', 'Kemarin')
+        } else {
+          try {
+            dateLabel = format(new Date(dateKey), 'dd MMMM yyyy')
+          } catch {
+            dateLabel = dateKey
+          }
+        }
+
+        const items = groups[dateKey]
+        let net = 0
+        items.forEach((tx) => {
+          const amt = convertCurrency(tx.amount, tx.currency || defaultCurrency, wallet?.currency || defaultCurrency, rates)
+          if (tx.type === 'income' || (tx.type === 'transfer' && tx.targetWalletId === walletId)) {
+            net += amt
+          } else if (tx.type === 'expense' || (tx.type === 'transfer' && tx.walletId === walletId)) {
+            net -= amt
+          }
+        })
+
+        const dailySummaryText = net !== 0 ? `${net > 0 ? '+' : ''}${formatCurrency(net, wallet?.currency || defaultCurrency)}` : null
+
+        return {
+          dateKey,
+          dateLabel,
+          items,
+          dailySummaryText,
+          isPositive: net > 0,
+        }
+      })
+  }, [filteredTransactions, t, defaultCurrency, wallet?.currency, rates, walletId])
 
   const currentBalance = useMemo(() => {
     if (!wallet) return 0
@@ -261,7 +259,7 @@ export default function WalletDetailPage() {
 
       if (activeLoans && activeLoans.length > 0) {
         setIsDeleteModalOpen(false)
-        setPageError('Tidak bisa menghapus wallet ini karena masih terdapat catatan utang/piutang aktif yang terhubung. Selesaikan atau hapus catatan utang/piutang terlebih dahulu.')
+        setPageError('Tidak bisa menghapus akun ini karena masih terdapat catatan utang/piutang aktif yang terhubung. Selesaikan atau hapus catatan utang/piutang terlebih dahulu.')
         return
       }
 
@@ -269,7 +267,7 @@ export default function WalletDetailPage() {
       navigate('/dashboard', { replace: true })
     } catch (err) {
       console.error('Failed to delete wallet', err)
-      setPageError('Gagal menghapus wallet')
+      setPageError('Gagal menghapus akun dompet.')
     }
   }
 
@@ -295,11 +293,12 @@ export default function WalletDetailPage() {
     setIsEditBalanceModalOpen(false)
   }
 
-  const getInitials = (text) => text ? text.substring(0, 2).toUpperCase() : ''
+  const getInitials = (text) => (text ? text.substring(0, 2).toUpperCase() : '')
 
   const counts = useMemo(() => {
     if (!allTransactions) return { all: 0, expense: 0, income: 0 }
-    let expense = 0, income = 0
+    let expense = 0
+    let income = 0
     for (const tx of allTransactions) {
       if (tx.type === 'expense') expense++
       else if (tx.type === 'income') income++
@@ -311,7 +310,6 @@ export default function WalletDetailPage() {
     return { all: allTransactions.length, expense, income }
   }, [allTransactions, walletId])
 
-  // Idea B: Dynamic ambient tint color based on wallet category/type/name
   const heroAmbientStyle = useMemo(() => {
     if (!wallet) return {}
     const wType = String(wallet.type || '').toLowerCase()
@@ -339,7 +337,7 @@ export default function WalletDetailPage() {
         <PageHeader title={t('wallets.notFound', 'Akun Tidak Ditemukan')} onBack={() => navigate('/dashboard')} />
         <div className="flex-1 flex flex-col items-center justify-center text-center p-6 mt-12 rounded-3xl border border-[var(--border)] bg-[var(--panel)] shadow-card">
           <div className="w-14 h-14 rounded-2xl bg-[var(--badge-bg)] text-[var(--badge-icon)] border border-[var(--badge-border)] flex items-center justify-center mb-4">
-            <Archive className="h-7 w-7" />
+            <WalletIcon className="h-7 w-7" />
           </div>
           <h3 className="text-lg font-black text-[var(--fg)]">{t('wallets.notFoundTitle', 'Akun Tidak Ditemukan')}</h3>
           <p className="text-xs text-[var(--muted)] mt-1.5 max-w-xs">{t('wallets.notFoundDesc', 'Akun atau dompet yang Anda cari tidak tersedia atau mungkin telah dihapus.')}</p>
@@ -369,7 +367,7 @@ export default function WalletDetailPage() {
       return 'Bank'
     }
     if (rawType.includes('cash') || rawType.includes('tunai') || rawName.includes('cash') || rawName.includes('tunai')) {
-      return 'Akun Manual'
+      return 'Kas Fisik'
     }
     if (rawType === 'investasi' || rawType === 'investment') return 'Investasi'
     if (!type || type === 'lainnya') return 'Akun Manual'
@@ -388,47 +386,35 @@ export default function WalletDetailPage() {
     <>
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-28 relative">
         {pageError ? <ToastBanner message={pageError} type="error" onDismiss={() => setPageError('')} /> : null}
-        {/* ── 1. Curved Hero Section with Wallet Icon & Accent Glow ────────────── */}
+
+        {/* ── 1. Curved Hero Section with Wallet Icon & Ambient Glow ────────────── */}
         <div 
-          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-9 pt-3 px-4 text-center relative overflow-hidden"
+          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-8 pt-3 px-4 text-center relative overflow-hidden"
           style={heroAmbientStyle}
         >
-          {/* Top Nav Bar */}
+          {/* Top Nav Bar with 3-Dots Action Button */}
           <PageHeader
             title={wallet.name}
             titleUppercase={true}
             onBack={() => navigate('/dashboard')}
             rightAction={
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={handleToggleArchive} 
-                  className={`flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 ${
-                    wallet.isArchived
-                      ? 'text-amber-500 bg-amber-500/10'
-                      : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--fg)]/10'
-                  }`}
-                  title={wallet.isArchived ? t('wallets.unarchive', 'Buka Arsip Akun') : t('wallets.archive', 'Arsipkan Akun')}
-                  aria-label={wallet.isArchived ? t('wallets.unarchive', 'Buka Arsip Akun') : t('wallets.archive', 'Arsipkan Akun')}
-                >
-                  {wallet.isArchived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
-                </button>
-                <button 
-                  onClick={() => setIsDeleteModalOpen(true)} 
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-[var(--earthy-terra)]/80 hover:text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-soft)] transition active:scale-95"
-                  title={t('common.delete', 'Hapus Akun')}
-                  aria-label={t('common.delete', 'Hapus Akun')}
-                >
-                  <Trash2 size={16} strokeWidth={2} />
-                </button>
-              </div>
+              <button 
+                type="button"
+                onClick={() => setIsActionMenuOpen(true)} 
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer shadow-xs"
+                title={t('wallets.options', 'Opsi Akun')}
+                aria-label={t('wallets.options', 'Opsi Akun')}
+              >
+                <MoreVertical size={16} strokeWidth={2.5} />
+              </button>
             }
           />
 
           {/* Centered Circular Logo */}
-          <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto mt-2.5 mb-2">
+          <div className="relative z-10 w-13 h-13 rounded-full bg-[var(--panel-strong)] flex items-center justify-center overflow-hidden border border-[var(--border)] shadow-md mx-auto mt-2.5 mb-2">
             {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
               <div className="w-full h-full flex items-center justify-center text-amber-500">
-                <MoneyBagIcon size={24} strokeWidth={2.5} />
+                <MoneyBagIcon size={26} strokeWidth={2.5} />
               </div>
             ) : getWalletLogoUrl(wallet) ? (
               <img 
@@ -436,8 +422,8 @@ export default function WalletDetailPage() {
                 alt={wallet.name} 
                 className="w-full h-full object-contain p-[2px] rounded-full"
                 onError={(e) => {
-                  e.target.style.display = 'none';
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                  e.target.style.display = 'none'
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
                 }}
               />
             ) : null}
@@ -449,22 +435,54 @@ export default function WalletDetailPage() {
             </div>
           </div>
 
-          {/* Subtitles: Account Type Pill Badge */}
-          <div className="relative z-10 flex flex-col items-center mb-1">
-            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-strong)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
+          {/* Subtitles: Account Type Pill Badge & Primary Wallet Pill */}
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-1.5 mb-1">
+            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-strong)]/90 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] shadow-xs">
               <span>{formatAccountType(wallet.institutionType, wallet.name)}</span>
             </div>
+
+            {isDefaultWallet && (
+              <div className="inline-flex items-center gap-1 rounded-full border border-amber-500/35 bg-amber-500/15 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-black text-amber-500 shadow-xs animate-in fade-in">
+                <Star size={10} className="fill-amber-500 text-amber-500" />
+                <span>{t('wallets.primaryBadge', 'Akun Utama')}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── 2. Overlapping Balance Card with Pencil Edit Icon (Compact) ─────── */}
+        {/* ── 2. Overlapping Balance Card with Direct Actions ─────── */}
         <div className="px-4 -mt-3 relative z-20">
-          <div className="-mx-3.5 sm:mx-0 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-md space-y-1">
-            {/* Top Row: Label Caption & Edit Pencil Button */}
+          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-3">
+            {/* Top Row: Label Caption & Currency Badge */}
             <div className="flex items-center justify-between">
-              <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-[var(--muted-2)]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
                 Saldo Akun Saat Ini
               </span>
+              <span className="rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 font-black text-[10px] text-[var(--muted)] uppercase tracking-wider">
+                {wallet.currency || defaultCurrency}
+              </span>
+            </div>
+
+            {/* Middle Row: Crisp Bold Balance Display */}
+            <div>
+              <p className="ft-display text-2xl sm:text-3xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
+                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
+              </p>
+              <p className="mt-1.5 text-[10px] font-semibold text-[var(--muted)]">
+                Terakhir update: {updatedAt}
+              </p>
+            </div>
+
+            {/* Bottom Row: Quick Ergonomic Action Buttons */}
+            <div className="pt-2 border-t border-[var(--border)]/40 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsQuickAddOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs hover:opacity-90 active:scale-95 transition cursor-pointer"
+              >
+                <Plus size={14} strokeWidth={3} />
+                <span>Catat Transaksi</span>
+              </button>
 
               <button
                 type="button"
@@ -472,98 +490,82 @@ export default function WalletDetailPage() {
                   setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
                   setIsEditBalanceModalOpen(true)
                 }}
-                className="w-6 h-6 rounded-md bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 shrink-0"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-xs font-bold hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shrink-0"
                 title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
-                aria-label={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
               >
-                <Edit2 size={11} strokeWidth={2} />
+                <Sliders size={13} strokeWidth={2} />
+                <span className="hidden xs:inline">Edit Saldo</span>
               </button>
-            </div>
-
-            {/* Middle Row: Crisp Bold Balance Display */}
-            <div>
-              <p className="ft-display text-lg sm:text-xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
-                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
-              </p>
-            </div>
-
-            {/* Bottom Row: Timestamp Sub-info & Currency Badge */}
-            <div className="pt-1 border-t border-[var(--border)]/30 flex items-center justify-between text-[9px] text-[var(--muted-2)]">
-              <span>Update {updatedAt}</span>
-              <span className="font-extrabold text-[var(--muted)] uppercase tracking-wider">
-                {wallet.currency || defaultCurrency}
-              </span>
             </div>
           </div>
         </div>
 
         {/* ── 3. Content Section: Unified Transaction Feed Card ─────── */}
-        <div className="px-4 mt-2.5">
-          {/* Transactions Feed Card Wrapper with Integrated Controls */}
-          <div className="mt-1.5 -mx-3.5 sm:mx-0 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-2.5 sm:p-3 shadow-sm space-y-2.5">
-            {/* Unified Card Header & Control Section */}
-            <div className="space-y-2 pb-2 border-b border-[var(--border)]/40">
+        <div className="px-4 mt-3">
+          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 sm:p-3.5 shadow-sm space-y-3">
+            {/* Card Header & Controls */}
+            <div className="space-y-2.5 pb-2.5 border-b border-[var(--border)]/40">
               <div className="flex items-center justify-between px-0.5">
-                <h3 className="ft-display text-xs font-extrabold text-[var(--fg)] tracking-tight">
+                <h3 className="ft-display text-sm font-black text-[var(--fg)] tracking-tight">
                   Riwayat Transaksi
                 </h3>
-                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[9.5px] font-extrabold tabular-nums text-[var(--muted)]">
+                <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
                   {filteredTransactions?.length || 0} transaksi
                 </span>
               </div>
 
-              {/* Compact Search & Filter Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                <div className="relative sm:col-span-6">
-                  <Search size={13} strokeWidth={2} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
+              {/* Search & Tab Filter Row */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search size={14} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('tx.search.placeholder', 'Cari transaksi...')}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--field-bg)] py-1 pl-7 pr-6 text-[11px] text-[var(--fg)] placeholder-[var(--muted-2)] outline-none focus:border-[var(--accent)] transition-colors"
+                    placeholder={t('tx.search.placeholder', 'Cari kategori, nominal, atau catatan...')}
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-1.5 pl-8 pr-7 text-xs text-[var(--fg)] placeholder-[var(--muted)] outline-none focus:border-[var(--accent)] transition-colors"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--muted)] hover:text-[var(--fg)]"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] cursor-pointer"
                     >
-                      ✕
+                      <X size={12} strokeWidth={2.5} />
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 overflow-x-auto ft-hide-scrollbar sm:col-span-6">
+                <div className="flex items-center gap-1.5 overflow-x-auto ft-hide-scrollbar">
                   {TABS.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition flex items-center gap-1 shrink-0 ${
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
                         activeTab === tab.id
                           ? 'bg-[var(--fg)] text-[var(--bg)] shadow-xs'
                           : 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                       }`}
                     >
                       <span>{tab.label}</span>
-                      <span className="text-[9px] opacity-75">({tab.count})</span>
+                      <span className="text-[10px] font-black opacity-80">({tab.count})</span>
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
+            {/* Grouped Transaction List */}
             {groupedTransactions && groupedTransactions.length > 0 ? (
               groupedTransactions.map((group, idx) => (
                 <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
                   {/* Sticky Date Header Strip */}
-                  <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]/95 backdrop-blur-xs">
-                    <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase shrink-0">
+                  <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)]/95 backdrop-blur-xs rounded-lg">
+                    <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">
                       {group.dateLabel}
                     </span>
-                    <div className="h-px flex-1 bg-[var(--border)]/50" />
                     {group.dailySummaryText ? (
-                      <span className={`text-[11px] font-black tabular-nums shrink-0 ${
+                      <span className={`text-[11px] font-black tabular-nums ${
                         group.isPositive ? 'text-[var(--status-income)]' : 'text-[var(--muted)]'
                       }`}>
                         {group.dailySummaryText}
@@ -571,8 +573,8 @@ export default function WalletDetailPage() {
                     ) : null}
                   </div>
 
-                  {/* Feed Group Card */}
-                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] divide-y divide-[var(--border)]/40 shadow-xs">
+                  {/* Transaction Cards Container */}
+                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] divide-y divide-[var(--border)]/40 shadow-xs">
                     {group.items.map((tx) => (
                       <TransactionItemCard
                         key={tx.id}
@@ -602,21 +604,122 @@ export default function WalletDetailPage() {
               ))
             ) : (
               <div className="py-10 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center mx-auto mb-3 text-[var(--muted-2)]">
-                  <Receipt size={28} strokeWidth={1.5} />
+                <div className="w-14 h-14 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center mx-auto mb-3 text-[var(--muted)]">
+                  <Receipt size={26} strokeWidth={1.5} />
                 </div>
                 <h3 className="text-sm font-bold text-[var(--fg)] mb-1">Belum ada transaksi</h3>
-                <p className="text-[11px] text-[var(--muted)] max-w-xs mx-auto">
-                  Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} tercatat di akun ini.
+                <p className="text-xs text-[var(--muted)] max-w-xs mx-auto mb-4">
+                  Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} di akun ini.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAddOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs hover:opacity-90 active:scale-95 transition cursor-pointer"
+                >
+                  <Plus size={14} strokeWidth={3} />
+                  <span>Catat Transaksi Pertama</span>
+                </button>
               </div>
             )}
           </div>
         </div>
-
       </div>
 
-      {/* Modals */}
+      {/* ── 3-Dots Action BottomSheet ────────────────────────────────── */}
+      <BottomSheet
+        isOpen={isActionMenuOpen}
+        onClose={() => setIsActionMenuOpen(false)}
+        title={t('wallets.optionsTitle', 'Opsi Akun Dompet')}
+      >
+        <div className="space-y-2 pb-2">
+          {/* Header Info Inside Sheet */}
+          <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] mb-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--panel)] border border-[var(--border)] flex items-center justify-center font-black text-xs text-[var(--fg)] shrink-0">
+              {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
+                <MoneyBagIcon size={20} className="text-amber-500" />
+              ) : getWalletLogoUrl(wallet) ? (
+                <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-contain p-1 rounded-full" />
+              ) : (
+                getInitials(wallet.name)
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-black text-sm text-[var(--fg)] truncate">{wallet.name}</h4>
+              <p className="text-xs text-[var(--muted)] font-semibold">{formatAccountType(wallet.institutionType, wallet.name)} • {wallet.currency || defaultCurrency}</p>
+            </div>
+            {isDefaultWallet && (
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-black text-amber-500 shrink-0">
+                Utama
+              </span>
+            )}
+          </div>
+
+          {/* Action 1: Set/Unset Default Wallet */}
+          <button
+            type="button"
+            onClick={handleToggleDefaultWallet}
+            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                isDefaultWallet ? 'bg-amber-500/15 text-amber-500' : 'bg-[var(--field-bg)] text-[var(--muted)]'
+              }`}>
+                <Star size={18} className={isDefaultWallet ? 'fill-amber-500' : ''} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[var(--fg)]">
+                  {isDefaultWallet ? 'Lepas Status Akun Utama' : 'Jadikan Akun Utama'}
+                </p>
+                <p className="text-[10px] text-[var(--muted)]">
+                  {isDefaultWallet ? 'Akun ini sedang menjadi akun default' : 'Pilihan utama saat mencatat transaksi baru'}
+                </p>
+              </div>
+            </div>
+            {isDefaultWallet ? (
+              <Check size={16} className="text-amber-500 shrink-0" strokeWidth={3} />
+            ) : null}
+          </button>
+
+          {/* Action 2: Adjust Balance */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsActionMenuOpen(false)
+              setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
+              setIsEditBalanceModalOpen(true)
+            }}
+            className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
+              <Sliders size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[var(--fg)]">Penyesuaian Saldo</p>
+              <p className="text-[10px] text-[var(--muted)]">Koreksi total saldo fisik riil akun</p>
+            </div>
+          </button>
+
+          {/* Action 3: Delete Wallet */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsActionMenuOpen(false)
+              setIsDeleteModalOpen(true)
+            }}
+            className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/15 transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center">
+              <Trash2 size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-rose-500">Hapus Akun Dompet</p>
+              <p className="text-[10px] text-rose-500/80">Hapus akun ini dan seluruh riwayat transaksinya</p>
+            </div>
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* ── Existing Modals ─────────────────────────────────────────── */}
       <TransactionEditSheet
         isOpen={Boolean(editingTransaction)}
         onClose={() => setEditingTransaction(null)}
@@ -668,13 +771,13 @@ export default function WalletDetailPage() {
             <button 
               type="button"
               onClick={() => setIsEditBalanceModalOpen(false)}
-              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98]"
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
             >
               Batal
             </button>
             <button 
               type="submit"
-              className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98]"
+              className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
             >
               Simpan Saldo
             </button>
