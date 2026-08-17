@@ -144,5 +144,5 @@ export const walletInstitutions = [
   { id: 'bcasekuritas', name: 'BCA Sekuritas (BEST)', type: 'investasi', domain: 'bcasekuritas.co.id', logoUrl: getLogoUrl('bcasekuritas.co.id'), isRecommended: false },
 
   // ── 4. Kas Utama & Lainnya ──────────────────────────────────────────────
-  { id: 'cash', name: 'Uang Tunai (Cash)', type: 'lainnya', logoUrl: CASH_CUSTOM_LOGO, isRecommended: true, subtitle: 'Kas Fisik', customIcon: 'dollar' },
+  { id: 'cash', name: 'Cash', type: 'lainnya', logoUrl: CASH_CUSTOM_LOGO, isRecommended: true, subtitle: 'Kas Fisik', customIcon: 'dollar' },
 ]

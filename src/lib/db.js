@@ -283,6 +283,18 @@ db.version(16).stores({
   loanPayments: '++id, loanId, amount, date, notes, transactionId, createdAt',
 })
 
+// Auto-migrate legacy wallet names (e.g. "Uang Tunai (Cash)" -> "Cash")
+db.on('ready', async () => {
+  try {
+    const legacyCashWallets = await db.wallets.filter((w) => w.name === 'Uang Tunai (Cash)').toArray()
+    for (const w of legacyCashWallets) {
+      await db.wallets.update(w.id, { name: 'Cash' })
+    }
+  } catch {
+    // Ignore error if database not ready
+  }
+})
+
 
 
 /**
