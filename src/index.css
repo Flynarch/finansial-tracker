@@ -484,34 +484,24 @@
   }
 }
 
-/* ── Scrollbar ────────────────────────────────────────────────────────── */
+/* ── Global Scrollbar Hiding (Native App Look) ────────────────────────── */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent !important;
 }
 
 ::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-}
-
-html:not([data-theme="light"]) ::-webkit-scrollbar-thumb {
-  background: rgba(232, 237, 245, 0.12);
-}
-
-html:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 237, 245, 0.22);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.15);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.28);
+  background: transparent !important;
 }
 
 /* ── Components ───────────────────────────────────────────────────────── */
