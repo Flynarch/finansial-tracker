@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication'
 import {
   onAuthStateChanged,
   signOut,
@@ -23,18 +25,58 @@ export function subscribeAuth(listener) {
 
 export async function signOutCurrentUser() {
   try {
+    if (Capacitor.isNativePlatform()) {
+      await FirebaseAuthentication.signOut().catch(() => {})
+    }
     const auth = getFirebaseAuth()
-    await signOut(auth)
+    if (auth) {
+      await signOut(auth).catch(() => {})
+    }
   } catch {
     // Graceful logout even if offline or Firebase unconfigured
   }
 }
 
 /**
- * Sign in with Google Popup
+ * Sign in with Google (Native Play Services on Android/iOS, Popup on Web)
  * Returns clean user details: { displayName, email, photoURL, uid, provider: 'google' }
  */
 export async function signInWithGoogle() {
+  const isNative = Capacitor.isNativePlatform()
+
+  // 1. NATIVE ANDROID / IOS FLOW
+  if (isNative) {
+    try {
+      const result = await FirebaseAuthentication.signInWithGoogle()
+      const u = result?.user
+      if (u) {
+        return {
+          success: true,
+          user: {
+            uid: u.uid,
+            displayName: u.displayName || '',
+            email: u.email || '',
+            photoURL: u.photoUrl || u.photoURL || '',
+            provider: 'google',
+          },
+        }
+      }
+    } catch (nativeError) {
+      const msg = String(nativeError?.message || '')
+      const code = String(nativeError?.code || '')
+      const isCancelled =
+        msg.toLowerCase().includes('cancel') ||
+        code === 'auth/user-cancelled' ||
+        code === '16' ||
+        code === '12501'
+      if (isCancelled) {
+        return { success: false, cancelled: true, message: 'Login Google dibatalkan.' }
+      }
+      console.warn('Native Google Auth encountered error, trying web fallback:', nativeError)
+    }
+  }
+
+  // 2. WEB / DEV ENVIRONMENT FLOW
   try {
     const auth = getFirebaseAuth()
     if (!auth) {
