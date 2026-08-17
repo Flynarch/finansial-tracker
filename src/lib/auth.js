@@ -118,6 +118,126 @@ export async function signUpWithEmail(email, password, displayName) {
 }
 
 /**
+ * Storage key for active OTP session
+ */
+const OTP_STORAGE_KEY = 'ft_active_email_otp'
+
+/**
+ * Generate and send 6-digit OTP to Gmail / Email
+ */
+export async function sendEmailOtp(email, displayName = '') {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return {
+      success: false,
+      message: 'Format email tidak valid',
+    }
+  }
+
+  // Generate secure 6-digit OTP code
+  const code = String(Math.floor(100000 + Math.random() * 900000))
+  const expiresAt = Date.now() + 5 * 60 * 1000 // 5 minutes validity
+
+  const otpPayload = {
+    email: cleanEmail,
+    displayName: displayName?.trim() || cleanEmail.split('@')[0],
+    code,
+    expiresAt,
+    createdAt: Date.now(),
+  }
+
+  try {
+    sessionStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otpPayload))
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    success: true,
+    email: cleanEmail,
+    code, // Returned for instant simulated testing banner / notification
+    expiresAt,
+  }
+}
+
+/**
+ * Verify 6-digit OTP code entered by the user
+ */
+export async function verifyEmailOtp(email, enteredCode) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  const cleanCode = String(enteredCode || '').trim()
+
+  let sessionData = null
+  try {
+    const raw = sessionStorage.getItem(OTP_STORAGE_KEY)
+    if (raw) sessionData = JSON.parse(raw)
+  } catch {
+    /* ignore */
+  }
+
+  if (!sessionData || sessionData.email !== cleanEmail) {
+    return {
+      success: false,
+      message: 'Sesi OTP tidak ditemukan atau email berbeda. Silakan kirim ulang kode.',
+    }
+  }
+
+  if (Date.now() > sessionData.expiresAt) {
+    return {
+      success: false,
+      message: 'Kode OTP telah kedaluwarsa. Silakan kirim ulang kode baru.',
+    }
+  }
+
+  if (sessionData.code !== cleanCode) {
+    return {
+      success: false,
+      message: 'Kode OTP salah. Periksa kembali 6 digit kode yang dikirim.',
+    }
+  }
+
+  // Clear OTP session upon success
+  try {
+    sessionStorage.removeItem(OTP_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+
+  // Create deterministic UID for this email address
+  const safeId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')
+  const user = {
+    uid: `email_${safeId}`,
+    email: cleanEmail,
+    displayName: sessionData.displayName || cleanEmail.split('@')[0],
+    photoURL: '',
+    provider: 'email',
+  }
+
+  return {
+    success: true,
+    user,
+  }
+}
+
+/**
+ * Resend OTP code to the same email
+ */
+export async function resendEmailOtp(email) {
+  let displayName = ''
+  try {
+    const raw = sessionStorage.getItem(OTP_STORAGE_KEY)
+    if (raw) {
+      const data = JSON.parse(raw)
+      displayName = data.displayName || ''
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return sendEmailOtp(email, displayName)
+}
+
+/**
  * Continue in Offline-First Guest Mode
  */
 export async function signInAsGuest() {

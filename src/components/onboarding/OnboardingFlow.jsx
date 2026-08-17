@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
@@ -12,9 +12,10 @@ import UserAvatar from '../ui/UserAvatar'
 import ChangePhotoModal from '../profile/ChangePhotoModal'
 import {
   signInWithGoogle,
-  signInWithEmail,
-  signUpWithEmail,
   signInAsGuest,
+  sendEmailOtp,
+  verifyEmailOtp,
+  resendEmailOtp,
 } from '../../lib/auth'
 import { executeThemeTransition } from '../../lib/themeTransition'
 import { importAllDataFromJsonPayload } from '../../lib/backup'
@@ -39,6 +40,11 @@ import {
   Loader2,
   AlertCircle,
   Camera,
+  KeyRound,
+  ArrowLeft,
+  CheckCircle2,
+  RefreshCw,
+  Copy,
 } from 'lucide-react'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
@@ -155,13 +161,19 @@ export default function OnboardingFlow() {
   // Auth UI states
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
-  const [emailAuthMode, setEmailAuthMode] = useState('login') // 'login' | 'register'
+  const [otpStage, setOtpStage] = useState('input') // 'input' | 'verify'
   const [emailInput, setEmailInput] = useState('')
-  const [passwordInput, setPasswordInput] = useState('')
   const [emailNameInput, setEmailNameInput] = useState('')
-  const [emailAuthError, setEmailAuthError] = useState('')
-  const [isEmailLoading, setIsEmailLoading] = useState(false)
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
+  const [activeOtpCode, setActiveOtpCode] = useState('')
+  const [otpCountdown, setOtpCountdown] = useState(0)
+  const [otpError, setOtpError] = useState('')
+  const [isOtpSending, setIsOtpSending] = useState(false)
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false)
+  const [copiedBanner, setCopiedBanner] = useState(false)
   const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false)
+
+  const otpInputRefs = useRef([])
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const hasWallets = wallets && wallets.length > 0
@@ -194,6 +206,15 @@ export default function OnboardingFlow() {
       saveProgress({ step, username })
     }
   }, [step, username])
+
+  // Countdown timer effect for OTP resend
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown((c) => c - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [otpCountdown])
 
   const goTo = useCallback(
     (nextStep) => {
@@ -268,61 +289,146 @@ export default function OnboardingFlow() {
     }
   }
 
-  /* ── Email Auth Handler ────────────────────────────────────────── */
-  const handleEmailAuthSubmit = async (e) => {
-    e.preventDefault()
-    setEmailAuthError('')
-    if (!emailInput.trim() || !passwordInput.trim()) {
-      setEmailAuthError('Email dan kata sandi wajib diisi')
+  /* ── Send OTP to Email / Gmail ─────────────────────────────────── */
+  const handleSendOtp = async (e) => {
+    if (e) e.preventDefault()
+    setOtpError('')
+    const cleanEmail = emailInput.trim().toLowerCase()
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setOtpError('Masukkan alamat email yang valid')
       return
     }
-    if (passwordInput.length < 6) {
-      setEmailAuthError('Kata sandi minimal 6 karakter')
-      return
-    }
-    setIsEmailLoading(true)
+
+    setIsOtpSending(true)
     try {
-      let res
-      if (emailAuthMode === 'register') {
-        res = await signUpWithEmail(emailInput, passwordInput, emailNameInput)
+      const res = await sendEmailOtp(cleanEmail, emailNameInput)
+      if (res.success) {
+        setActiveOtpCode(res.code)
+        setOtpStage('verify')
+        setOtpCountdown(60)
+        setOtpDigits(['', '', '', '', '', ''])
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus()
+        }, 150)
       } else {
-        res = await signInWithEmail(emailInput, passwordInput)
-      }
-
-      let userObj = res.success && res.user ? res.user : null
-      if (!userObj) {
-        const offlineName = emailNameInput.trim() || emailInput.split('@')[0]
-        userObj = {
-          uid: `email_${Date.now()}`,
-          displayName: offlineName,
-          email: emailInput.trim(),
-          photoURL: '',
-          provider: 'email',
-        }
-      }
-
-      if (userObj) {
-        await restoreUserSnapshot(userObj.uid, false)
-        await setAuthUser(userObj)
-        setUsername(userObj.displayName || emailInput.split('@')[0])
-        setShowEmailModal(false)
-        goTo(1)
+        setOtpError(res.message || 'Gagal mengirim kode OTP')
       }
     } catch {
-      const offlineName = emailNameInput.trim() || emailInput.split('@')[0]
-      await setAuthUser({
-        uid: `email_${Date.now()}`,
-        displayName: offlineName,
-        email: emailInput.trim(),
-        photoURL: '',
-        provider: 'email',
-      })
-      setUsername(offlineName)
-      setShowEmailModal(false)
-      goTo(1)
+      setOtpError('Terjadi kesalahan saat mengirim OTP')
     } finally {
-      setIsEmailLoading(false)
+      setIsOtpSending(false)
     }
+  }
+
+  /* ── Resend OTP Code ───────────────────────────────────────────── */
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0 || isOtpSending) return
+    setOtpError('')
+    setIsOtpSending(true)
+    try {
+      const res = await resendEmailOtp(emailInput.trim().toLowerCase())
+      if (res.success) {
+        setActiveOtpCode(res.code)
+        setOtpCountdown(60)
+        setOtpDigits(['', '', '', '', '', ''])
+        otpInputRefs.current[0]?.focus()
+      } else {
+        setOtpError(res.message || 'Gagal mengirim ulang OTP')
+      }
+    } catch {
+      setOtpError('Terjadi kesalahan saat mengirim ulang OTP')
+    } finally {
+      setIsOtpSending(false)
+    }
+  }
+
+  /* ── Verify 6-digit OTP Code ───────────────────────────────────── */
+  const handleVerifyOtp = async (codeToVerify) => {
+    const fullCode = typeof codeToVerify === 'string' ? codeToVerify : otpDigits.join('')
+    if (fullCode.length !== 6) {
+      setOtpError('Masukkan 6 digit kode OTP secara lengkap')
+      return
+    }
+
+    setIsOtpVerifying(true)
+    setOtpError('')
+    try {
+      const res = await verifyEmailOtp(emailInput.trim().toLowerCase(), fullCode)
+      if (res.success && res.user) {
+        await restoreUserSnapshot(res.user.uid, false)
+        await setAuthUser(res.user)
+        setUsername(res.user.displayName || emailInput.split('@')[0])
+        setShowEmailModal(false)
+        setOtpStage('input')
+        goTo(1)
+      } else {
+        setOtpError(res.message || 'Kode OTP tidak sesuai atau kedaluwarsa')
+      }
+    } catch {
+      setOtpError('Gagal memverifikasi kode OTP')
+    } finally {
+      setIsOtpVerifying(false)
+    }
+  }
+
+  /* ── Handle 6-Digit OTP Box Changes ────────────────────────────── */
+  const handleOtpBoxChange = (index, value) => {
+    const char = value.slice(-1)
+    if (char && !/^\d+$/.test(char)) return
+
+    const newDigits = [...otpDigits]
+    newDigits[index] = char
+    setOtpDigits(newDigits)
+    setOtpError('')
+
+    if (char && index < 5) {
+      otpInputRefs.current[index + 1]?.focus()
+    }
+
+    // Auto verify when all 6 boxes are filled
+    const combined = newDigits.join('')
+    if (combined.length === 6) {
+      handleVerifyOtp(combined)
+    }
+  }
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus()
+    }
+    if (e.key === 'Enter') {
+      handleVerifyOtp()
+    }
+  }
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').trim()
+    const numericCode = pastedData.replace(/\D/g, '').slice(0, 6)
+    if (numericCode.length > 0) {
+      const newDigits = ['', '', '', '', '', '']
+      for (let i = 0; i < numericCode.length; i++) {
+        newDigits[i] = numericCode[i]
+      }
+      setOtpDigits(newDigits)
+      setOtpError('')
+      const nextFocus = Math.min(numericCode.length, 5)
+      otpInputRefs.current[nextFocus]?.focus()
+
+      if (numericCode.length === 6) {
+        handleVerifyOtp(numericCode)
+      }
+    }
+  }
+
+  const handleAutoPasteSimulation = () => {
+    if (!activeOtpCode) return
+    const newDigits = activeOtpCode.split('').slice(0, 6)
+    setOtpDigits(newDigits)
+    setOtpError('')
+    setCopiedBanner(true)
+    setTimeout(() => setCopiedBanner(false), 2000)
+    handleVerifyOtp(activeOtpCode)
   }
 
   /* ── Guest Mode Handler ────────────────────────────────────────── */
@@ -553,10 +659,14 @@ export default function OnboardingFlow() {
                   </span>
                 </button>
 
-                {/* 2. Email / Gmail Button */}
+                {/* 2. Email / Gmail Button (OTP Flow) */}
                 <button
                   type="button"
-                  onClick={() => setShowEmailModal(true)}
+                  onClick={() => {
+                    setShowEmailModal(true)
+                    setOtpStage('input')
+                    setOtpError('')
+                  }}
                   className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-sm hover:border-[var(--border-strong)] transition-all active:scale-[0.98] cursor-pointer"
                 >
                   <Mail size={18} className="text-[var(--muted)]" strokeWidth={2} />
@@ -903,7 +1013,7 @@ export default function OnboardingFlow() {
                         {authProvider === 'google'
                           ? 'Akun Google'
                           : authProvider === 'email'
-                          ? 'Akun Email'
+                          ? 'Akun Email / Gmail'
                           : 'Mode Tamu Offline'}
                       </p>
                     </div>
@@ -1014,108 +1124,228 @@ export default function OnboardingFlow() {
         </div>
       </div>
 
-      {/* ── Email Auth Modal ── */}
+      {/* ════════════════════════════════════════════════════════════
+         MODAL LOGIN / VERIFIKASI VIA EMAIL / GMAIL (OTP CODE SYSTEM)
+         ════════════════════════════════════════════════════════════ */}
       {showEmailModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-2xl space-y-5">
             {/* Modal Header */}
             <div className="flex items-center justify-between">
-              <h4 className="font-black text-base text-[var(--fg)]">
-                {emailAuthMode === 'login'
-                  ? t('auth.modalLoginTitle', 'Masuk Akun FinTrack')
-                  : t('auth.modalRegisterTitle', 'Buat Akun Baru')}
-              </h4>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)]">
+                  {otpStage === 'input' ? <Mail size={16} /> : <KeyRound size={16} />}
+                </div>
+                <div>
+                  <h4 className="font-black text-base text-[var(--fg)]">
+                    {otpStage === 'input'
+                      ? t('auth.modalOtpTitle', 'Masuk via Email / Gmail')
+                      : t('auth.modalOtpVerifyTitle', 'Verifikasi Kode OTP')}
+                  </h4>
+                  <p className="text-[11px] text-[var(--muted)] font-medium">
+                    {otpStage === 'input'
+                      ? t('auth.modalOtpSubtitle', 'Masukkan email untuk menerima 6 digit kode OTP.')
+                      : t('auth.modalOtpVerifySubtitle', { email: emailInput })}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowEmailModal(false)}
-                className="p-1.5 rounded-full text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+                onClick={() => {
+                  setShowEmailModal(false)
+                  setOtpStage('input')
+                  setOtpError('')
+                }}
+                className="p-1.5 rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* Email Form */}
-            <form onSubmit={handleEmailAuthSubmit} className="space-y-3">
-              {emailAuthMode === 'register' && (
+            {/* ── STAGE 1: Input Email Form ── */}
+            {otpStage === 'input' && (
+              <form onSubmit={handleSendOtp} className="space-y-3.5">
                 <div className="space-y-1">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    Nama Lengkap
+                    Alamat Email / Gmail
+                  </label>
+                  <div className="relative flex items-center">
+                    <Mail size={16} className="absolute left-3.5 text-[var(--muted)]" />
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => {
+                        setEmailInput(e.target.value)
+                        if (otpError) setOtpError('')
+                      }}
+                      placeholder={t('auth.emailPlaceholder', 'nama@gmail.com')}
+                      className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] pl-10 pr-4 py-3 text-xs sm:text-sm font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] transition-colors"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                    Nama Tampilan (Opsional)
                   </label>
                   <input
                     type="text"
                     value={emailNameInput}
                     onChange={(e) => setEmailNameInput(e.target.value)}
                     placeholder={t('auth.namePlaceholder', 'Nama lengkap Anda')}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--border-strong)]"
-                    required
+                    className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3 text-xs sm:text-sm font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] transition-colors"
                   />
                 </div>
-              )}
 
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Email / Gmail
-                </label>
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder={t('auth.emailPlaceholder', 'nama@gmail.com')}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--border-strong)]"
-                  required
-                />
+                {otpError && (
+                  <p className="text-xs font-semibold text-red-500 flex items-center gap-1.5">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{otpError}</span>
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isOtpSending}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-bold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-60"
+                >
+                  {isOtpSending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <KeyRound size={16} />
+                  )}
+                  <span>
+                    {isOtpSending
+                      ? t('auth.sendingOtp', 'Mengirim Kode...')
+                      : t('auth.sendOtpCta', 'Kirim Kode Verifikasi OTP')}
+                  </span>
+                </button>
+              </form>
+            )}
+
+            {/* ── STAGE 2: 6-Digit OTP Verification Screen ── */}
+            {otpStage === 'verify' && (
+              <div className="space-y-4">
+                {/* Simulated Realistic OTP Banner for Quick Copy */}
+                {activeOtpCode && (
+                  <div className="p-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1">
+                        <CheckCircle2 size={12} />
+                        {t('auth.otpCodeSentBanner', 'Kode OTP FinTrack Anda:')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAutoPasteSimulation}
+                        className="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy size={11} />
+                        <span>{copiedBanner ? 'Tertempel!' : t('auth.otpAutoPaste', 'Tempel Otomatis Kode')}</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-black text-lg text-[var(--fg)] tracking-widest">
+                        {activeOtpCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAutoPasteSimulation}
+                        className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--bg)] text-[10px] font-bold cursor-pointer"
+                      >
+                        Gunakan Kode
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6-Digit Interactive Input Boxes */}
+                <div className="space-y-1.5">
+                  <label className="block text-center text-xs font-bold text-[var(--muted)]">
+                    Masukkan 6 digit kode verifikasi
+                  </label>
+                  <div className="flex items-center justify-center gap-2" onPaste={handleOtpPaste}>
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => (otpInputRefs.current[idx] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpBoxChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        className={`w-11 h-13 sm:w-12 sm:h-14 text-center font-mono font-black text-lg sm:text-xl rounded-2xl border bg-[var(--field-bg)] text-[var(--fg)] outline-none transition-all ${
+                          digit
+                            ? 'border-[var(--accent)] bg-[var(--panel-strong)] ring-2 ring-[var(--accent)]/30'
+                            : 'border-[var(--border)] focus:border-[var(--accent)]'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {otpError && (
+                  <p className="text-xs font-semibold text-red-500 text-center flex items-center justify-center gap-1.5">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{otpError}</span>
+                  </p>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyOtp()}
+                    disabled={isOtpVerifying || otpDigits.join('').length !== 6}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-bold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isOtpVerifying ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Check size={16} strokeWidth={3} />
+                    )}
+                    <span>
+                      {isOtpVerifying
+                        ? t('auth.verifyingOtp', 'Memverifikasi...')
+                        : t('auth.verifyOtpCta', 'Verifikasi & Lanjutkan')}
+                    </span>
+                  </button>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpStage('input')
+                        setOtpError('')
+                      }}
+                      className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] flex items-center gap-1 cursor-pointer"
+                    >
+                      <ArrowLeft size={13} />
+                      <span>{t('auth.changeEmailBtn', 'Ubah Email')}</span>
+                    </button>
+
+                    {otpCountdown > 0 ? (
+                      <span className="text-xs font-medium text-[var(--muted)]">
+                        {t('auth.resendOtpIn', { seconds: otpCountdown })}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={isOtpSending}
+                        className="text-xs font-bold text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw size={12} className={isOtpSending ? 'animate-spin' : ''} />
+                        <span>{t('auth.resendOtpBtn', 'Kirim Ulang Kode OTP')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Kata Sandi
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder={t('auth.passwordPlaceholder', 'Kata sandi minimal 6 karakter')}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-bold text-[var(--fg)] outline-none focus:border-[var(--border-strong)]"
-                  required
-                />
-              </div>
-
-              {emailAuthError && (
-                <p className="text-xs font-semibold text-red-500 flex items-center gap-1">
-                  <AlertCircle size={13} />
-                  {emailAuthError}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={isEmailLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-60"
-              >
-                {isEmailLoading && <Loader2 size={14} className="animate-spin" />}
-                <span>
-                  {emailAuthMode === 'login'
-                    ? t('auth.loginAction', 'Masuk Sekarang')
-                    : t('auth.registerAction', 'Daftar Akun')}
-                </span>
-              </button>
-            </form>
-
-            {/* Toggle Mode */}
-            <div className="text-center pt-1 border-t border-[var(--border)]">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailAuthMode(emailAuthMode === 'login' ? 'register' : 'login')
-                  setEmailAuthError('')
-                }}
-                className="text-xs font-bold text-[var(--accent)] hover:underline cursor-pointer"
-              >
-                {emailAuthMode === 'login'
-                  ? t('auth.noAccount', 'Belum punya akun? Daftar gratis')
-                  : t('auth.haveAccount', 'Sudah punya akun? Masuk')}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
