@@ -12,6 +12,7 @@ import useTranslation from '../../hooks/useTranslation'
 import AiDigitalReceipt from './AiDigitalReceipt'
 import AiIntentSwitchDialog from './AiIntentSwitchDialog'
 import ReceiptScanModePicker from './ReceiptScanModePicker'
+import VoiceVisualizer from './VoiceVisualizer'
 
 const CURRENCY_SAMPLE_TEMPLATES = {
   IDR: {
@@ -408,22 +409,42 @@ export default function AiQuickLogModal() {
   }, [isOpen])
 
   // Voice recording toggle
+  const handleStopRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // ignore
+      }
+    }
+    setIsRecording(false)
+  }
+
+  const handleCancelRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // ignore
+      }
+    }
+    setIsRecording(false)
+    setInputValue(baseInputBeforeRecordingRef.current.trim())
+  }
+
   const toggleRecording = () => {
     if (isRecording) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch {
-          // ignore
-        }
-      }
-      setIsRecording(false)
+      handleStopRecording()
       return
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      setErrorMessage('Browser Anda tidak mendukung Voice Input.')
+      setErrorMessage(
+        locale === 'en'
+          ? 'Your browser does not support Voice Input.'
+          : 'Browser atau perangkat Anda tidak mendukung Voice Input.',
+      )
       return
     }
 
@@ -455,8 +476,15 @@ export default function AiQuickLogModal() {
         const fullText = (baseInputBeforeRecordingRef.current + finalTranscript + interimTranscript).trim()
         setInputValue(fullText)
       }
-      recognition.onerror = () => {
+      recognition.onerror = (event) => {
         setIsRecording(false)
+        if (event?.error === 'not-allowed') {
+          setErrorMessage(
+            locale === 'en'
+              ? 'Microphone access was denied. Please allow microphone permission.'
+              : 'Izin mikrofon ditolak. Mohon aktifkan izin mikrofon di pengaturan.',
+          )
+        }
       }
       recognition.onend = () => {
         setIsRecording(false)
@@ -707,19 +735,16 @@ function isObviousNonTransaction(text) {
 
               {/* Main Input Box */}
               <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 focus-within:border-[var(--accent)] transition-colors shadow-inner">
-                {/* Active Voice Recording Live Equalizer Visualizer */}
+                {/* Active Voice Recording Live Waveform Visualizer */}
                 {isRecording && (
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-500 mb-2 animate-in fade-in duration-200">
-                    <div className="flex items-center gap-1 h-4 px-0.5">
-                      <div className="ft-eq-bar" />
-                      <div className="ft-eq-bar" />
-                      <div className="ft-eq-bar" />
-                      <div className="ft-eq-bar" />
-                      <div className="ft-eq-bar" />
-                    </div>
-                    <span className="text-xs font-bold tracking-tight">
-                      {locale === 'en' ? 'Listening to your voice...' : 'Mendengarkan suara Anda...'}
-                    </span>
+                  <div className="mb-2.5">
+                    <VoiceVisualizer
+                      isRecording={isRecording}
+                      onStop={handleStopRecording}
+                      onCancel={handleCancelRecording}
+                      t={t}
+                      locale={locale}
+                    />
                   </div>
                 )}
 

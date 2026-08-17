@@ -95,6 +95,25 @@
   perspective: 1000px;
 }
 
+/* Voice Audio Waveform Animation */
+@keyframes ft-wave-bar {
+  0%, 100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.ft-wave-bar-1 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.1s; transform-origin: center; }
+.ft-wave-bar-2 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.3s; transform-origin: center; }
+.ft-wave-bar-3 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.5s; transform-origin: center; }
+.ft-wave-bar-4 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.2s; transform-origin: center; }
+.ft-wave-bar-5 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.4s; transform-origin: center; }
+.ft-wave-bar-6 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.25s; transform-origin: center; }
+
 @keyframes ft-spring-pop {
   0% {
     opacity: 0;

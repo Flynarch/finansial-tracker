@@ -10,12 +10,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import { format } from 'date-fns'
-import { Send, Trash2, Sparkles, Mic, Image as ImageIcon, Camera, X } from 'lucide-react'
+import { Send, Trash2, Sparkles, Mic, MicOff, Image as ImageIcon, Camera, X } from 'lucide-react'
 import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from './ChatBubble'
 import TransactionSuccess from './TransactionSuccess'
 import ActionSuccessCard from './ActionSuccessCard'
 import QuickChips from './QuickChips'
 import ReceiptScanModePicker from './ReceiptScanModePicker'
+import VoiceVisualizer from './VoiceVisualizer'
 import useChatStore from '../../store/useChatStore'
 
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
@@ -55,6 +56,8 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const setInitialInput = useChatStore((s) => s.setInitialInput)
 
   const handleSendRef = useRef(null)
+  const recognitionRef = useRef(null)
+  const baseInputBeforeRecordingRef = useRef('')
 
   useEffect(() => {
     return () => {
@@ -191,10 +194,33 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
     }
   }
 
+  const handleStopRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // ignore
+      }
+    }
+    setIsRecording(false)
+  }
+
+  const handleCancelRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // ignore
+      }
+    }
+    setIsRecording(false)
+    setInputValue(baseInputBeforeRecordingRef.current.trim())
+  }
+
   const toggleRecording = () => {
     if (isRecording) {
-       setIsRecording(false)
-       return
+      handleStopRecording()
+      return
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
@@ -208,16 +234,55 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       ])
       return
     }
-    const recognition = new SpeechRecognition()
-    recognition.lang = locale === 'id' ? 'id-ID' : 'en-US'
-    recognition.start()
-    setIsRecording(true)
-    recognition.onresult = (e) => {
-       setInputValue(prev => prev + (prev ? " " : "") + e.results[0][0].transcript)
-       setIsRecording(false)
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.lang = locale === 'id' ? 'id-ID' : 'en-US'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognitionRef.current = recognition
+      baseInputBeforeRecordingRef.current = inputValue ? `${inputValue.trim()} ` : ''
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+      }
+      recognition.onresult = (e) => {
+        let finalTranscript = ''
+        let interimTranscript = ''
+
+        for (let i = 0; i < e.results.length; i++) {
+          const transcript = e.results[i][0].transcript
+          if (e.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        const fullText = (baseInputBeforeRecordingRef.current + finalTranscript + interimTranscript).trim()
+        setInputValue(fullText)
+      }
+      recognition.onerror = (event) => {
+        setIsRecording(false)
+        if (event?.error === 'not-allowed') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              role: 'assistant',
+              content:
+                locale === 'en'
+                  ? 'Microphone permission was denied. Please allow microphone access in device settings.'
+                  : 'Izin mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan.',
+            },
+          ])
+        }
+      }
+      recognition.onend = () => setIsRecording(false)
+      recognition.start()
+    } catch {
+      setIsRecording(false)
     }
-    recognition.onerror = () => setIsRecording(false)
-    recognition.onend = () => setIsRecording(false)
   }
 
   const handleSend = async (text = inputValue, image = selectedImage, scanMode = 'all', targetWalletId = null) => {
@@ -922,15 +987,13 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           ) : null}
 
           {isRecording && (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold animate-fade-in">
-              <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-              <span>{locale === 'en' ? 'Listening...' : 'Mendengarkan ucapan Anda...'}</span>
-              <div className="ml-auto flex items-center gap-1 h-3.5">
-                <div className="ft-eq-bar bg-rose-500" />
-                <div className="ft-eq-bar bg-rose-500" />
-                <div className="ft-eq-bar bg-rose-500" />
-                <div className="ft-eq-bar bg-rose-500" />
-              </div>
+            <div className="mb-2">
+              <VoiceVisualizer
+                isRecording={isRecording}
+                onStop={handleStopRecording}
+                onCancel={handleCancelRecording}
+                locale={locale}
+              />
             </div>
           )}
 
@@ -967,10 +1030,14 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             <button
               type="button"
               onClick={toggleRecording}
-              className={`${isRecording ? 'text-rose-500 bg-rose-500/10' : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'} transition p-2 rounded-xl shrink-0 cursor-pointer`}
-              title={locale === 'en' ? 'Record voice' : 'Rekam suara'}
+              className={`p-2 rounded-xl shrink-0 transition active:scale-95 cursor-pointer ${
+                isRecording
+                  ? 'border border-rose-500 bg-rose-500/20 text-rose-500 shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'
+              }`}
+              title={isRecording ? (locale === 'en' ? 'Stop recording' : 'Berhenti merekam') : (locale === 'en' ? 'Record voice' : 'Rekam suara')}
             >
-              <Mic size={17} />
+              {isRecording ? <MicOff size={17} /> : <Mic size={17} />}
             </button>
 
             <textarea
