@@ -37,9 +37,14 @@ export async function signOutCurrentUser() {
 export async function signInWithGoogle() {
   try {
     const auth = getFirebaseAuth()
+    if (!auth) {
+      return {
+        success: false,
+        code: 'auth/no-auth-instance',
+        message: 'Konfigurasi Firebase belum terpasang di file .env aplikasi.',
+      }
+    }
     const provider = new GoogleAuthProvider()
-    provider.addScope('email')
-    provider.addScope('profile')
     provider.setCustomParameters({ prompt: 'select_account' })
     const result = await signInWithPopup(auth, provider)
     const u = result.user
@@ -60,15 +65,19 @@ export async function signInWithGoogle() {
       code === 'auth/cancelled-popup-request' ||
       code === 'auth/user-cancelled'
 
-    let message = 'Gagal masuk dengan Google'
+    let message = 'Gagal masuk dengan Google: ' + (error?.message || code)
     if (code === 'auth/popup-blocked') {
-      message = 'Jendela popup diblokir oleh browser. Izinkan popup untuk melanjutkan.'
+      message = 'Jendela popup diblokir oleh browser. Izinkan popup pada browser Anda untuk melanjutkan.'
     } else if (code === 'auth/unauthorized-domain') {
-      message = 'Domain aplikasi belum diizinkan di Firebase Auth Console.'
+      message = 'Domain (localhost / hosting) belum didaftarkan di Firebase Console > Authentication > Settings > Authorized Domains.'
     } else if (code === 'auth/network-request-failed') {
       message = 'Gagal terhubung ke Google. Periksa koneksi internet Anda.'
     } else if (code === 'auth/operation-not-allowed') {
-      message = 'Metode login Google belum diaktifkan di Firebase Console.'
+      message = 'Metode login Google belum diaktifkan di Firebase Console > Authentication > Sign-in method.'
+    } else if (code === 'auth/invalid-action-code') {
+      message = 'Tindakan tidak valid. Pastikan Project Support Email sudah diisi di Firebase Console > Sign-in method > Google.'
+    } else if (code === 'auth/configuration-not-found') {
+      message = 'Konfigurasi Authentication belum aktif di Firebase Console.'
     }
 
     return {
