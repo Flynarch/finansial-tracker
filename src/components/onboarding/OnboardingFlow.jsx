@@ -988,7 +988,7 @@ export default function OnboardingFlow() {
                     onClick={handleEditUsernameFromStep4}
                     className="text-xs font-bold text-[var(--accent)] hover:underline cursor-pointer"
                   >
-                    Sunting
+                    {t('auth.editName', 'Edit')}
                   </button>
                 </div>
 
@@ -1004,7 +1004,7 @@ export default function OnboardingFlow() {
                       className="text-xs font-bold text-[var(--accent)] flex items-center gap-1 hover:underline cursor-pointer"
                     >
                       <Plus size={13} />
-                      Tambah
+                      {t('auth.addWallet', 'Tambah')}
                     </button>
                   </div>
 

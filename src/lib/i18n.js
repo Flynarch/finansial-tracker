@@ -817,6 +817,8 @@ const dictionaries = {
     'auth.finishStepSubtitle': 'FinTrack siap menemani perjalanan finansial Anda. Mari mulai kelola transaksi pertama.',
     'auth.startAppCta': 'Mulai Gunakan FinTrack',
     'auth.switchAccount': 'Ganti Akun / Logout',
+    'auth.editName': 'Edit',
+    'auth.addWallet': 'Tambah',
 
     'tour.stepBadge': 'Langkah {{current}} dari {{total}}',
     'tour.skip': 'Lewati Tur',
@@ -1759,6 +1761,8 @@ const dictionaries = {
     'auth.finishStepSubtitle': 'FinTrack is ready to empower your financial journey. Let us record your first transaction.',
     'auth.startAppCta': 'Start Using FinTrack',
     'auth.switchAccount': 'Switch Account / Logout',
+    'auth.editName': 'Edit',
+    'auth.addWallet': 'Add',
 
     'tour.stepBadge': 'Step {{current}} of {{total}}',
     'tour.skip': 'Skip Tour',
