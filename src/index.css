@@ -83,6 +83,18 @@
   animation: ft-slide-fade-down 0.18s ease-out both;
 }
 
+/* High-performance off-screen list rendering & GPU layer */
+.ft-content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+
+.ft-gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
 @keyframes ft-spring-pop {
   0% {
     opacity: 0;

@@ -389,15 +389,23 @@ export async function getWalletCurrentBalance(walletId) {
   const wallet = await db.wallets.get(walletId)
   if (!wallet) return 0
 
-  const allTxs = await db.transactions
-    .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
-    .toArray()
+  const [sourceTxs, targetTxs] = await Promise.all([
+    db.transactions.where('walletId').equals(walletId).toArray(),
+    db.transactions.where('targetWalletId').equals(walletId).toArray(),
+  ])
+
+  const txMap = new Map()
+  sourceTxs.forEach((tx) => txMap.set(tx.id, tx))
+  targetTxs.forEach((tx) => txMap.set(tx.id, tx))
+  const allTxs = Array.from(txMap.values())
 
   return computeWalletBalance(wallet, allTxs)
 }
 
 export async function getAllWalletBalances() {
-  const wallets = await db.wallets.toArray()
-  const allTxs = await db.transactions.toArray()
+  const [wallets, allTxs] = await Promise.all([
+    db.wallets.toArray(),
+    db.transactions.toArray(),
+  ])
   return computeAllWalletBalances(wallets, allTxs)
 }

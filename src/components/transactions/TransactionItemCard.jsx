@@ -43,8 +43,8 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       if (setApiErrorTone) setApiErrorTone('error')
     }
   }
-  const storeWallets = useWalletStore((state) => state.wallets)
-  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : storeWallets
+
+  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : useWalletStore.getState().wallets
 
   const getWalletName = (id) => {
     if (!id) return 'Wallet'
