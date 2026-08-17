@@ -25,7 +25,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
   Trash2,
   Wallet,
   Star,
@@ -34,8 +33,6 @@ import {
   Sun,
   Moon,
   Sparkles,
-  Bot,
-  Layers,
   Globe,
   Loader2,
   AlertCircle,
@@ -594,11 +591,7 @@ export default function OnboardingFlow() {
               </div>
 
               {/* Hero Banner */}
-              <div className="space-y-2 pt-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[10.5px] font-bold text-[var(--muted)]">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 inline-block" />
-                  {t('auth.welcomeBadge', 'FinTrack v4.2.0 • Offline-First & Cloud Ready')}
-                </div>
+              <div className="space-y-2 pt-4 pb-2">
                 <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--fg)] leading-tight">
                   {t('auth.welcomeHeadline', 'Kelola Finansial Lebih Cerdas, Rapi, & Terarah')}
                 </h2>
@@ -610,36 +603,8 @@ export default function OnboardingFlow() {
                 </p>
               </div>
 
-              {/* 3 Value Proposition Cards */}
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                    <ShieldCheck size={18} strokeWidth={2.5} />
-                  </div>
-                  <span className="text-xs font-bold text-[var(--fg)]">
-                    {t('auth.benefit1', '100% Offline-First & Aman Terenkripsi')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-                    <Bot size={18} strokeWidth={2.5} />
-                  </div>
-                  <span className="text-xs font-bold text-[var(--fg)]">
-                    {t('auth.benefit2', 'Asisten AI & Ekstraksi Struk Digital Otomatis')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0">
-                    <Layers size={18} strokeWidth={2.5} />
-                  </div>
-                  <span className="text-xs font-bold text-[var(--fg)]">
-                    {t('auth.benefit3', 'Sinkronisasi Multi-Akun & Rekonsiliasi Saldo')}
-                  </span>
-                </div>
-              </div>
-
               {/* Auth Buttons Stack */}
-              <div className="space-y-2.5 pt-2">
+              <div className="space-y-3 pt-2">
                 {/* 1. Google Sign-In Primary Button */}
                 <button
                   type="button"
