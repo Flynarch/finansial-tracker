@@ -6,9 +6,10 @@
 ---
 
 ## 1. Project Overview & Baseline
-- **Purpose**: Financial tracking web & mobile application (FinTrack)
-- **Primary Tech Stack**: React 19, JavaScript/JSX, Vite, Tailwind CSS v4, Dexie.js (IndexedDB), Firebase
-- **Architecture Pattern**: Modular, Component-Driven Web Application
+- **Purpose**: Financial tracking Native Android Application (FinTrack APK) powered by Capacitor
+- **Target Platform**: Native Android APK (Mobile-First / Android Native Architecture). The web environment is solely used for local development and live-reloading.
+- **Primary Tech Stack**: React 19, JavaScript/JSX, Vite, Tailwind CSS v4, Dexie.js (IndexedDB), Capacitor 8, Android SDK / Gradle, Firebase Native
+- **Architecture Pattern**: Modular, Component-Driven Mobile Application with Offline-First Local Storage
 
 ---
 
@@ -22,6 +23,8 @@ Always execute deterministic package commands using the specified package manage
 - **Run Linter**: `npm run lint`
 - **Run i18n Check**: `npm run lint:i18n`
 - **Build Production**: `npm run build`
+- **Sync Capacitor Android**: `npx cap sync android`
+- **Assemble Android APK**: `cmd.exe /c "cd android && gradlew.bat assembleDebug"`
 
 ---
 
@@ -41,6 +44,7 @@ To maintain compatibility across diverse developer environments (Antigravity 2.0
 
 ### Allowed Editing Directories
 - `src/` - Application source code and core business logic.
+- `android/` - Android native project files and Gradle configurations.
 - `tests/` - Unit, integration, and E2E test suites.
 - `docs/` - Technical documentation and specifications.
 
@@ -155,4 +159,27 @@ When requested to **Debug**, **Audit**, or **Improve** a feature (or when trigge
 ### D. Verification & Regression Checks
 - Execute all verification gates: `npm run lint` and `npm run build`.
 - Confirm that the fix does not break related components, analytics cards, or database transactions.
+
+---
+
+## 13. Mobile & Native Android APK Directives
+
+### A. Native Platform Priority
+- **Primary Target is Android APK**: This repository is designed and built specifically as a Native Android Application (`.apk`) using Capacitor. Web browsers are strictly development and preview environments.
+- **No Web Assumptions**: Never make design, architectural, or authentication compromises based on web limitations. Always optimize for Android OS runtime, Google Play Services, and touchscreens.
+
+### B. Native Authentication & Plugins
+- **Native Google Play Services**: Use native Capacitor authentication plugins (`@capacitor-firebase/authentication`) to trigger the Android native bottom sheet for Google Sign-In with one-tap, avoiding web popups or redirect issues.
+- **Native Biometrics**: Use `@aparajita/capacitor-biometric-auth` for Android fingerprint/biometric app security.
+- **Native Notifications**: Use `@capacitor/local-notifications` for Android local alarms and reminder channels.
+
+### C. Mobile UX, Touch & Viewport Discipline
+- **Touch Responsiveness**: Ensure `-webkit-tap-highlight-color: transparent` and `touch-action: manipulation` are active across all UI elements.
+- **No Stuck Desktop Hovers**: Use active touch feedback (`active:scale-[0.98]`) rather than hover-dependent interactions.
+- **Android Hardware Back Button**: All modal sheets, bottom drawers, and dialogs must register with `useBackButton` / `backButtonManager` so pressing the Android physical back button closes the top-most modal before navigating or exiting.
+- **Safe Area Insets**: Protect content from notch cutouts and navigation gesture bars with `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`.
+- **Virtual Keyboard Resizing**: Forms and bottom sheets must support mobile virtual keyboards without occluding submit buttons (`interactive-widget=resizes-content`).
+
+### D. Android APK Assembly Workflow
+- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v4.2.0.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
 
