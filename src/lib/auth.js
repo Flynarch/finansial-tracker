@@ -119,7 +119,7 @@ export async function signInWithGoogle() {
     } else if (code === 'auth/invalid-action-code') {
       message = 'Tindakan tidak valid. Pastikan Project Support Email sudah diisi di Firebase Console > Sign-in method > Google.'
     } else if (code === 'auth/configuration-not-found') {
-      message = 'Konfigurasi Authentication belum aktif di Firebase Console.'
+      message = 'Fitur Authentication atau penyedia Google belum diaktifkan di Firebase Console. Silakan buka Firebase Console > Build > Authentication > Sign-in method dan aktifkan Google.'
     }
 
     return {
