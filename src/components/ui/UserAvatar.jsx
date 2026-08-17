@@ -11,16 +11,6 @@ const SIZE_MAP = {
   '2xl': 'h-28 w-28 text-3xl',
 }
 
-function getProfileInitials(name) {
-  const clean = String(name || '').trim()
-  if (!clean) return ''
-  const parts = clean.split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase()
-  }
-  return clean.slice(0, 2).toUpperCase()
-}
-
 const UserAvatar = memo(function UserAvatar({
   name,
   photo,
@@ -38,7 +28,6 @@ const UserAvatar = memo(function UserAvatar({
 
   const finalName = name !== undefined ? name : storeName
   const finalPhoto = photo !== undefined ? photo : storePhoto
-  const initials = getProfileInitials(finalName)
 
   const sizeClasses = typeof size === 'string' && SIZE_MAP[size] ? SIZE_MAP[size] : SIZE_MAP.md
   const isCircle = shape === 'circle'
@@ -84,10 +73,10 @@ const UserAvatar = memo(function UserAvatar({
         ) : null}
 
         <div
-          className="w-full h-full flex items-center justify-center font-black"
+          className="w-full h-full flex items-center justify-center"
           style={{ display: finalPhoto ? 'none' : 'flex' }}
         >
-          {initials || <User className="w-1/2 h-1/2 opacity-80" strokeWidth={2.2} />}
+          <User className="w-1/2 h-1/2 opacity-85" strokeWidth={2.2} />
         </div>
       </div>
 
