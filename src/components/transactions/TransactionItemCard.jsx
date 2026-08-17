@@ -2,6 +2,7 @@ import { memo, useState } from 'react'
 import CategoryIcon from '../ui/CategoryIcon'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import MoneyBagIcon from '../ui/MoneyBagIcon'
 import useWalletStore from '../../store/useWalletStore'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
@@ -157,13 +158,18 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               if (isContextWalletMatch) return null
               const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
               if (!walletObj) return null
+              const isCash = walletObj.customIcon === 'dollar' || walletObj.customIcon === 'cash' || String(walletObj.name || '').toLowerCase().includes('cash') || String(walletObj.name || '').toLowerCase().includes('uang tunai')
               const logo = getWalletLogoUrl(walletObj)
               return (
                 <div
-                  className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--panel-strong)] bg-[var(--field-bg)] shadow-2xs"
+                  className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
                   title={walletObj.name}
                 >
-                  {logo ? (
+                  {isCash ? (
+                    <div className="w-full h-full flex items-center justify-center text-amber-500">
+                      <MoneyBagIcon size={10} strokeWidth={2.5} />
+                    </div>
+                  ) : logo ? (
                     <img
                       src={logo}
                       alt={walletObj.name}
@@ -176,7 +182,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                   ) : null}
                   <span
                     className="text-[7px] font-black leading-none text-[var(--fg)] flex items-center justify-center"
-                    style={{ display: logo ? 'none' : 'flex' }}
+                    style={{ display: isCash || logo ? 'none' : 'flex' }}
                   >
                     {walletObj.name ? walletObj.name.substring(0, 2).toUpperCase() : 'W'}
                   </span>

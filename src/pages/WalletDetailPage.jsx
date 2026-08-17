@@ -386,29 +386,34 @@ export default function WalletDetailPage() {
           />
 
           {/* Centered Circular Logo */}
-          <div className="relative z-10 w-13 h-13 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] flex items-center justify-center overflow-hidden border border-[var(--wallet-logo-border,var(--border))] shadow-md mx-auto mt-2.5 mb-2">
-            {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
-              <div className="w-full h-full flex items-center justify-center text-amber-500">
-                <MoneyBagIcon size={26} strokeWidth={2.5} />
+          {(() => {
+            const isCash = wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai')
+            return (
+              <div className="relative z-10 w-13 h-13 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] flex items-center justify-center overflow-hidden border border-[var(--wallet-logo-border,var(--border))] shadow-md mx-auto mt-2.5 mb-2">
+                {isCash ? (
+                  <div className="w-full h-full flex items-center justify-center text-amber-500">
+                    <MoneyBagIcon size={26} strokeWidth={2.5} />
+                  </div>
+                ) : getWalletLogoUrl(wallet) ? (
+                  <img 
+                    src={getWalletLogoUrl(wallet)} 
+                    alt={wallet.name} 
+                    className="w-full h-full object-contain p-[2px] rounded-full" 
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                    }}
+                  />
+                ) : null}
+                <div 
+                  className="w-full h-full flex items-center justify-center font-black text-sm text-[var(--fg)]"
+                  style={{ display: isCash || getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
+                >
+                  {getInitials(wallet.name)}
+                </div>
               </div>
-            ) : getWalletLogoUrl(wallet) ? (
-              <img 
-                src={getWalletLogoUrl(wallet)} 
-                alt={wallet.name} 
-                className="w-full h-full object-contain p-[2px] rounded-full"
-                onError={(e) => {
-                  e.target.style.display = 'none'
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
-                }}
-              />
-            ) : null}
-            <div 
-              className="w-full h-full flex items-center justify-center font-black text-sm text-[var(--fg)]"
-              style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
-            >
-              {getInitials(wallet.name)}
-            </div>
-          </div>
+            )
+          })()}
 
           {/* Subtitles: Account Type Pill Badge & Primary Wallet Pill */}
           <div className="relative z-10 flex flex-wrap items-center justify-center gap-1.5 mb-1">
@@ -591,8 +596,8 @@ export default function WalletDetailPage() {
           {/* Header Info Inside Sheet */}
           <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] mb-3">
             <div className="w-10 h-10 rounded-full bg-[var(--wallet-logo-bg,var(--panel))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center font-black text-xs text-[var(--fg)] shrink-0 shadow-2xs">
-              {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' ? (
-                <MoneyBagIcon size={20} className="text-amber-500" />
+              {wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
+                <MoneyBagIcon size={20} className="text-amber-500" strokeWidth={2.5} />
               ) : getWalletLogoUrl(wallet) ? (
                 <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-contain p-1 rounded-full" />
               ) : (

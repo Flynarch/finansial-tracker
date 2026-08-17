@@ -423,7 +423,7 @@ export default function OnboardingFlow() {
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-9 h-9 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-                                {w.customIcon === 'dollar' ? (
+                                {w.customIcon === 'dollar' || w.customIcon === 'cash' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
                                   <MoneyBagIcon size={18} strokeWidth={2.5} className="text-amber-500" />
                                 ) : logoUrl ? (
                                   <img
@@ -438,7 +438,7 @@ export default function OnboardingFlow() {
                                 ) : null}
                                 <span
                                   className="font-black text-xs text-[var(--fg)]"
-                                  style={{ display: w.customIcon === 'dollar' || logoUrl ? 'none' : 'block' }}
+                                  style={{ display: w.customIcon === 'dollar' || w.customIcon === 'cash' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') || logoUrl ? 'none' : 'block' }}
                                 >
                                   {w.name?.substring(0, 2).toUpperCase()}
                                 </span>

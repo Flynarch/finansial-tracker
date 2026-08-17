@@ -242,7 +242,7 @@ export default function WalletCarousel({
           </div>
 
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
-          <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
+          <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 -mx-5 px-5 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
             {activeWallets.map((w) => {
               const isPrimary = defaultWalletId ? w.id === defaultWalletId : (activeWallets.length === 1 && w.id === activeWallets[0].id)
               return (
@@ -255,7 +255,7 @@ export default function WalletCarousel({
 
                   {/* Logo (prominent) */}
                   <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
-                    {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' ? (
+                    {w.customIcon === 'dollar' || w.customIcon === 'cash' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
                       <div className="w-full h-full flex items-center justify-center text-amber-500">
                         <MoneyBagIcon size={18} strokeWidth={2.5} />
                       </div>
@@ -272,7 +272,7 @@ export default function WalletCarousel({
                     ) : null}
                     <span 
                       className="text-[11px] font-bold text-[var(--fg)]"
-                      style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || getWalletLogoUrl(w) ? 'none' : 'flex' }}
+                      style={{ display: w.customIcon === 'dollar' || w.customIcon === 'cash' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') || getWalletLogoUrl(w) ? 'none' : 'flex' }}
                     >
                       {w.name?.substring(0, 2).toUpperCase()}
                     </span>

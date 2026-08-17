@@ -9,6 +9,7 @@ import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { convertCurrency, formatCurrency, toSafeNumber } from '../../lib/utils'
 import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../../lib/categoryIcon'
 import CategoryIcon from '../ui/CategoryIcon'
+import MoneyBagIcon from '../ui/MoneyBagIcon'
 
 export const DashboardRecentTx = memo(function DashboardRecentTx({
   groupedRecentEntries,
@@ -123,13 +124,18 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                       {(() => {
                         const originWallet = wallets.find((w) => String(w.id) === String(latestTx?.walletId))
                         if (!originWallet) return null
+                        const isCash = originWallet.customIcon === 'dollar' || originWallet.customIcon === 'cash' || String(originWallet.name || '').toLowerCase().includes('cash') || String(originWallet.name || '').toLowerCase().includes('uang tunai')
                         const logo = getWalletLogoUrl(originWallet)
                         return (
                           <div
-                            className="absolute -bottom-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--panel-strong)] bg-[var(--field-bg)] shadow-2xs"
+                            className="absolute -bottom-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
                             title={originWallet.name}
                           >
-                            {logo ? (
+                            {isCash ? (
+                              <div className="w-full h-full flex items-center justify-center text-amber-500">
+                                <MoneyBagIcon size={9} strokeWidth={2.5} />
+                              </div>
+                            ) : logo ? (
                               <img
                                 src={logo}
                                 alt={originWallet.name}
@@ -142,7 +148,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                             ) : null}
                             <span
                               className="text-[6.5px] font-black leading-none text-[var(--fg)] flex items-center justify-center"
-                              style={{ display: logo ? 'none' : 'flex' }}
+                              style={{ display: isCash || logo ? 'none' : 'flex' }}
                             >
                               {originWallet.name ? originWallet.name.substring(0, 2).toUpperCase() : 'W'}
                             </span>

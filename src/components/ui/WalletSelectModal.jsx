@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeAllWalletBalances } from '../../lib/db'
 import { Wallet, Check, Search, X, Plus, ChevronDown } from 'lucide-react'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import MoneyBagIcon from './MoneyBagIcon'
 import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -74,7 +75,11 @@ export function WalletSelectTrigger({
       {wallet ? (
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} relative grid shrink-0 place-items-center border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
-            {getWalletLogoUrl(wallet) ? (
+            {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
+              <div className="w-full h-full flex items-center justify-center text-amber-500">
+                <MoneyBagIcon size={compact ? 15 : 19} strokeWidth={2.5} />
+              </div>
+            ) : getWalletLogoUrl(wallet) ? (
               <img
                 src={getWalletLogoUrl(wallet)}
                 alt={wallet.name}
@@ -87,7 +92,7 @@ export function WalletSelectTrigger({
             ) : null}
             <div
               className="hidden h-full w-full items-center justify-center font-black text-xs text-[var(--accent)]"
-              style={{ display: getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
+              style={{ display: wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || String(wallet.name || '').toLowerCase().includes('uang tunai') || getWalletLogoUrl(wallet) ? 'none' : 'flex' }}
             >
               {wallet.name ? wallet.name.substring(0, 2).toUpperCase() : 'W'}
             </div>
@@ -277,8 +282,12 @@ export default function WalletSelectModal({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                    <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border)]/60 bg-[var(--panel)] overflow-hidden shadow-2xs">
-                      {logoUrl ? (
+                    <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs">
+                      {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
+                        <div className="w-full h-full flex items-center justify-center text-amber-500">
+                          <MoneyBagIcon size={20} strokeWidth={2.5} />
+                        </div>
+                      ) : logoUrl ? (
                         <img
                           src={logoUrl}
                           alt={w.name}
@@ -291,7 +300,7 @@ export default function WalletSelectModal({
                       ) : null}
                       <div
                         className="hidden h-full w-full items-center justify-center font-black text-xs text-[var(--accent)]"
-                        style={{ display: logoUrl ? 'none' : 'flex' }}
+                        style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') || logoUrl ? 'none' : 'flex' }}
                       >
                         {w.name ? w.name.substring(0, 2).toUpperCase() : 'W'}
                       </div>
