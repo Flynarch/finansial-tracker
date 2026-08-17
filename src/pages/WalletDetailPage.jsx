@@ -466,7 +466,7 @@ export default function WalletDetailPage() {
 
         {/* ── 3. Content Section: Unified Transaction Feed Card ─────── */}
         <div className="px-4 mt-3">
-          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 sm:p-3.5 shadow-sm space-y-3">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-sm space-y-3">
             {/* Card Header & Controls */}
             <div className="space-y-2.5 pb-2.5 border-b border-[var(--border)]/40">
               <div className="flex items-center justify-between px-0.5">
