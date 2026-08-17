@@ -389,7 +389,7 @@ export default function WalletDetailPage() {
           {(() => {
             const isCash = wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai')
             return (
-              <div className="relative z-10 w-13 h-13 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] flex items-center justify-center overflow-hidden border border-[var(--wallet-logo-border,var(--border))] shadow-md mx-auto mt-2.5 mb-2">
+              <div className="relative z-10 w-13 h-13 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] flex items-center justify-center overflow-hidden border-[0.5px] border-[var(--wallet-logo-border,var(--border))] shadow-xs mx-auto mt-2.5 mb-2">
                 {isCash ? (
                   <div className="w-full h-full flex items-center justify-center text-amber-500">
                     <MoneyBagIcon size={26} strokeWidth={2.5} />
@@ -595,7 +595,7 @@ export default function WalletDetailPage() {
         <div className="space-y-2 pb-2">
           {/* Header Info Inside Sheet */}
           <div className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] mb-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--wallet-logo-bg,var(--panel))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center font-black text-xs text-[var(--fg)] shrink-0 shadow-2xs">
+            <div className="w-10 h-10 rounded-full bg-[var(--wallet-logo-bg,var(--panel))] border-[0.5px] border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center font-black text-xs text-[var(--fg)] shrink-0 shadow-2xs">
               {wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
                 <MoneyBagIcon size={20} className="text-amber-500" strokeWidth={2.5} />
               ) : getWalletLogoUrl(wallet) ? (

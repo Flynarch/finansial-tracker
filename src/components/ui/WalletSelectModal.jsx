@@ -74,7 +74,7 @@ export function WalletSelectTrigger({
     >
       {wallet ? (
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} rounded-full flex items-center justify-center shrink-0 border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
+          <div className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} rounded-full flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
             {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
               <div className="w-full h-full flex items-center justify-center text-amber-500">
                 <MoneyBagIcon size={compact ? 15 : 19} strokeWidth={2.5} />
@@ -282,7 +282,7 @@ export default function WalletSelectModal({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs">
                       {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
                         <div className="w-full h-full flex items-center justify-center text-amber-500">
                           <MoneyBagIcon size={20} strokeWidth={2.5} />

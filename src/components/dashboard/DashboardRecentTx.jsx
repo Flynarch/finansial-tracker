@@ -128,7 +128,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                         const logo = getWalletLogoUrl(originWallet)
                         return (
                           <div
-                            className="absolute -bottom-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
+                            className="absolute -bottom-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
                             title={originWallet.name}
                           >
                             {isCash ? (

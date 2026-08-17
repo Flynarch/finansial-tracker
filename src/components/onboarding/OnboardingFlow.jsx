@@ -422,14 +422,14 @@ export default function OnboardingFlow() {
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                              <div className="w-9 h-9 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] border-[0.5px] border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                                 {w.customIcon === 'dollar' || w.customIcon === 'cash' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
                                   <MoneyBagIcon size={18} strokeWidth={2.5} className="text-amber-500" />
                                 ) : logoUrl ? (
                                   <img
                                     src={logoUrl}
                                     alt={w.name}
-                                    className="w-full h-full object-contain p-0.5 rounded-full"
+                                    className="w-full h-full object-contain p-1 rounded-full"
                                     onError={(e) => {
                                       e.target.style.display = 'none'
                                       if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

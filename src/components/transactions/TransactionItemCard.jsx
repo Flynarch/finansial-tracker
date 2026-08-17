@@ -162,7 +162,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               const logo = getWalletLogoUrl(walletObj)
               return (
                 <div
-                  className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
+                  className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel-strong))] shadow-2xs"
                   title={walletObj.name}
                 >
                   {isCash ? (
