@@ -18,9 +18,11 @@ import AiChatSheet from '../chat/AiChatSheet'
 import AiQuickLogModal from '../chat/AiQuickLogModal'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
+import useAuthDeepLink from '../../hooks/useAuthDeepLink'
 
 function AppShell() {
   useNotificationEngine()
+  useAuthDeepLink()
   const theme = useSettingsStore((state) => state.theme)
   const locale = useSettingsStore((state) => state.locale)
   const motionPreference = useSettingsStore((state) => state.motionPreference)

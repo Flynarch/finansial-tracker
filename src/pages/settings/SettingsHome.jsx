@@ -20,14 +20,12 @@ import {
   LogOut,
   AlertTriangle,
   ShieldAlert,
-  Loader2,
   CheckCircle2,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import {
   signOutCurrentUser,
-  signInWithGoogle,
 } from '../../lib/auth'
 import { db } from '../../lib/db'
 import { exportAllDataAsJson } from '../../lib/backup'
@@ -35,6 +33,7 @@ import { uploadLatestBackup } from '../../lib/cloudBackup'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
+import AuthModal from '../../components/auth/AuthModal'
 import { currencyOptions } from './settingsConstants'
 import {
   SettingsBentoTile,
@@ -78,8 +77,6 @@ export default function SettingsHome() {
   const [isGuestWarningOpen, setIsGuestWarningOpen] = useState(false)
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
-  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false)
-  const [connectSuccessMsg, setConnectSuccessMsg] = useState('')
 
   const executePerformLogout = async () => {
     try {
@@ -128,45 +125,6 @@ export default function SettingsHome() {
       setIsGuestWarningOpen(true)
     } else {
       setIsLogoutConfirmOpen(true)
-    }
-  }
-
-  /* ── Connect Google in Settings ────────────────────────────────── */
-  const handleConnectGoogle = async () => {
-    setIsConnectingGoogle(true)
-    try {
-      const res = await signInWithGoogle()
-      let userObj = res.success && res.user ? res.user : null
-      if (!userObj && res.code !== 'auth/popup-closed-by-user') {
-        userObj = {
-          uid: `google_${Date.now()}`,
-          displayName: profileName || 'Pengguna Google',
-          email: 'user@gmail.com',
-          photoURL: '',
-          provider: 'google',
-        }
-      }
-
-      if (userObj) {
-        const backup = await exportAllDataAsJson()
-        try {
-          localStorage.setItem(`ft_user_backup_${userObj.uid}`, JSON.stringify(backup))
-          await uploadLatestBackup(userObj.uid, backup)
-        } catch {
-          /* ignore */
-        }
-        await setAuthUser(userObj)
-        setConnectSuccessMsg(t('settings.connectSuccess', 'Akun berhasil terhubung & data diamankan!'))
-        setTimeout(() => {
-          setIsConnectModalOpen(false)
-          setIsGuestWarningOpen(false)
-          setConnectSuccessMsg('')
-        }, 1500)
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setIsConnectingGoogle(false)
     }
   }
 
@@ -583,58 +541,12 @@ export default function SettingsHome() {
         </div>
       </Modal>
 
-      {/* Modal Connect Account (Google Sign-In) */}
-      <Modal
+      {/* Modal Connect Account / Switch Account (Google / Email / Register) */}
+      <AuthModal
         isOpen={isConnectModalOpen}
-        title={t('settings.connectAccountModalTitle', 'Hubungkan Akun Google')}
-        onClose={() => {
-          setIsConnectModalOpen(false)
-          setConnectSuccessMsg('')
-        }}
-      >
-        <div className="space-y-4">
-          {connectSuccessMsg ? (
-            <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
-                <Check size={20} strokeWidth={3} />
-              </div>
-              <p className="text-xs font-bold text-emerald-500">{connectSuccessMsg}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-[var(--muted)] leading-relaxed">
-                {t(
-                  'settings.connectAccountModalSubtitle',
-                  'Hubungkan akun Google Anda untuk menyinkronkan data transaksi dan cadangan keuangan secara aman.'
-                )}
-              </p>
-
-              {/* Connect Google Button */}
-              <button
-                type="button"
-                onClick={handleConnectGoogle}
-                disabled={isConnectingGoogle}
-                className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-xs sm:text-sm hover:border-[var(--border-strong)] transition-all cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-70"
-              >
-                {isConnectingGoogle ? (
-                  <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
-                ) : (
-                  <Globe size={16} className="text-blue-500" />
-                )}
-                <span>{t('auth.loginWithGoogle', 'Lanjutkan dengan Google')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsConnectModalOpen(false)}
-                className="w-full py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer text-center"
-              >
-                {t('common.cancel', 'Batal')}
-              </button>
-            </div>
-          )}
-        </div>
-      </Modal>
+        onClose={() => setIsConnectModalOpen(false)}
+        onSuccess={() => setIsConnectModalOpen(false)}
+      />
     </div>
   )
 }

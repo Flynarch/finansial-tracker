@@ -32,6 +32,8 @@ const useSettingsStore = create((set, get) => ({
   lockSecret: '',
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
+  emailVerified: false,
+  emailVerificationDismissed: false,
   isUnlocked: true,
   isLoaded: false,
   persist: async (updates) => {
@@ -48,6 +50,7 @@ const useSettingsStore = create((set, get) => ({
       authProvider: next.authProvider || 'guest',
       authUserEmail: next.authUserEmail || '',
       authUserId: next.authUserId || '',
+      emailVerified: Boolean(next.emailVerified),
       initialBalance: next.initialBalance,
       hasCompletedOnboarding: next.hasCompletedOnboarding,
       hasCompletedSpotlightTour: next.hasCompletedSpotlightTour,
@@ -91,16 +94,25 @@ const useSettingsStore = create((set, get) => ({
     set({ profilePhoto: next })
     await get().persist({ profilePhoto: next })
   },
-  setAuthUser: async ({ uid = '', email = '', displayName = '', photoURL = '', provider = 'guest' }) => {
+  setAuthUser: async ({ uid = '', email = '', displayName = '', photoURL = '', provider = 'guest', emailVerified = false }) => {
     const updates = {
       authUserId: uid,
       authUserEmail: email,
       authProvider: provider,
+      emailVerified: Boolean(emailVerified),
       ...(displayName ? { profileName: displayName } : {}),
       ...(photoURL ? { profilePhoto: photoURL } : {}),
     }
     set(updates)
     await get().persist(updates)
+  },
+  setEmailVerified: async (emailVerified) => {
+    const next = Boolean(emailVerified)
+    set({ emailVerified: next })
+    await get().persist({ emailVerified: next })
+  },
+  dismissEmailVerificationBanner: () => {
+    set({ emailVerificationDismissed: true })
   },
   setInitialBalance: async (initialBalance) => {
     set({ initialBalance: Number(initialBalance) || 0 })
@@ -199,6 +211,7 @@ const useSettingsStore = create((set, get) => ({
       authProvider: record.authProvider || 'guest',
       authUserEmail: record.authUserEmail || '',
       authUserId: record.authUserId || '',
+      emailVerified: Boolean(record.emailVerified),
       initialBalance: Number(record.initialBalance) || 0,
       hasCompletedOnboarding: onboardingDone,
       hasCompletedSpotlightTour: tourDone,

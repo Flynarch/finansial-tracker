@@ -33,7 +33,10 @@ import {
   Loader2,
   AlertCircle,
   Camera,
+  Mail,
+  UserPlus,
 } from 'lucide-react'
+import AuthModal from '../auth/AuthModal'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
 
@@ -150,6 +153,8 @@ export default function OnboardingFlow() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [googleError, setGoogleError] = useState('')
   const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState('login')
 
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const hasWallets = wallets && wallets.length > 0
@@ -463,13 +468,40 @@ export default function OnboardingFlow() {
                   </span>
                 </button>
 
-                {/* 2. Guest Mode (Instant Pass-Through) */}
+                {/* 2. Email & Password / Bikin Akun Secondary Actions */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthModalMode('login')
+                      setAuthModalOpen(true)
+                    }}
+                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-extrabold text-xs hover:border-[var(--border-strong)] transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <Mail size={15} className="text-[var(--accent)]" />
+                    <span>{t('auth.signInEmailBtn', 'Masuk Email')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthModalMode('register')
+                      setAuthModalOpen(true)
+                    }}
+                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-extrabold text-xs shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <UserPlus size={15} />
+                    <span>{t('auth.signUpBtn', 'Bikin Akun')}</span>
+                  </button>
+                </div>
+
+                {/* 3. Guest Mode (Instant Pass-Through) */}
                 <button
                   type="button"
                   onClick={handleGuestSignIn}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-[var(--muted)] font-semibold text-xs hover:text-[var(--fg)] transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-[var(--muted)] font-semibold text-xs hover:text-[var(--fg)] transition-colors cursor-pointer"
                 >
-                  <UserCheck size={15} />
+                  <UserCheck size={14} />
                   <span>{t('auth.continueAsGuest', 'Lanjutkan sebagai Tamu')}</span>
                 </button>
 
@@ -928,6 +960,19 @@ export default function OnboardingFlow() {
         currentPhoto={profilePhoto}
         onSavePhoto={(photoDataUrl) => setProfilePhoto(photoDataUrl)}
         zIndex="z-[10000]"
+      />
+
+      {/* ── Authentication Modal (Login / Register / Magic Link) ── */}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialMode={authModalMode}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={(u) => {
+          setAuthModalOpen(false)
+          if (u?.displayName) setUsername(u.displayName)
+          if (u?.photoURL) setProfilePhoto(u.photoURL)
+          goTo(1)
+        }}
       />
     </div>,
     document.body

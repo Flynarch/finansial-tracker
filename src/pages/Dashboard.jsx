@@ -13,6 +13,7 @@ import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
+import EmailVerificationBanner from '../components/auth/EmailVerificationBanner'
 
 export default function Dashboard() {
   const [isEntering, setIsEntering] = useState(false)
@@ -151,6 +152,9 @@ export default function Dashboard() {
           isEntering ? 'opacity-100' : 'opacity-0'
         }`}
       >
+        {/* Email Verification Reminder Banner (Only if email unverified) */}
+        <EmailVerificationBanner />
+
         {/* 1. Wallet Carousel (Hero) */}
         <div data-tour="hero-carousel">
           <WalletCarousel
