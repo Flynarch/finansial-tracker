@@ -7,6 +7,7 @@ import UserAvatar from '../components/ui/UserAvatar'
 import ChangePhotoModal from '../components/profile/ChangePhotoModal'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
+import { signOutCurrentUser } from '../lib/auth'
 import { db } from '../lib/db'
 
 /* ─── stat mini-icons ─── */
@@ -92,6 +93,15 @@ function ShortcutIcon({ name }) {
       </svg>
     )
   }
+  if (name === 'logout') {
+    return (
+      <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
   return null
 }
 
@@ -130,6 +140,14 @@ function Profile() {
 
   const profileName = useSettingsStore((s) => s.profileName)
   const setProfileName = useSettingsStore((s) => s.setProfileName)
+  const authProvider = useSettingsStore((s) => s.authProvider)
+  const authUserEmail = useSettingsStore((s) => s.authUserEmail)
+  const resetOnboarding = useSettingsStore((s) => s.resetOnboarding)
+
+  const handleSwitchAccount = async () => {
+    await signOutCurrentUser()
+    await resetOnboarding()
+  }
 
   const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
   const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
@@ -234,7 +252,11 @@ function Profile() {
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--fg)]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinejoin="round" />
                 </svg>
-                {t('profile.badge.local')}
+                {authProvider === 'google'
+                  ? `Google • ${authUserEmail || 'Connected'}`
+                  : authProvider === 'email'
+                  ? `Email • ${authUserEmail || 'Registered'}`
+                  : t('profile.badge.local')}
               </span>
             </div>
           </div>
@@ -315,6 +337,12 @@ function Profile() {
               label={t('profile.menu.todos')}
               sublabel={t('profile.menu.todosSub')}
               onClick={() => navigate('/todos')}
+            />
+            <ShortcutRow
+              icon="logout"
+              label={t('auth.switchAccount', 'Ganti Akun / Logout')}
+              sublabel={authProvider === 'google' ? 'Keluar dari Google dan hubungkan akun lain' : 'Masuk dengan Google atau akun lain'}
+              onClick={handleSwitchAccount}
             />
           </div>
         </div>

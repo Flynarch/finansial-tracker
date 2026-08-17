@@ -17,9 +17,11 @@ import {
   ChevronRight,
   TrendingUp,
   Check,
+  LogOut,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
+import { signOutCurrentUser } from '../../lib/auth'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
@@ -51,6 +53,9 @@ export default function SettingsHome() {
   const motionPreference = useSettingsStore((state) => state.motionPreference)
   const securityEnabled = useSettingsStore((state) => state.securityEnabled)
   const profileName = useSettingsStore((state) => state.profileName)
+  const authProvider = useSettingsStore((state) => state.authProvider)
+  const authUserEmail = useSettingsStore((state) => state.authUserEmail)
+  const resetOnboarding = useSettingsStore((state) => state.resetOnboarding)
 
   const setDefaultCurrency = useSettingsStore((state) => state.setDefaultCurrency)
   const setLocale = useSettingsStore((state) => state.setLocale)
@@ -58,6 +63,11 @@ export default function SettingsHome() {
   const setMotionPreference = useSettingsStore((state) => state.setMotionPreference)
 
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false)
+
+  const handleSwitchAccount = async () => {
+    await signOutCurrentUser()
+    await resetOnboarding()
+  }
 
   const handleToggleTheme = () => {
     executeThemeTransition({
@@ -126,7 +136,11 @@ export default function SettingsHome() {
               </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 inline-block" />
-                Offline-First Storage
+                {authProvider === 'google'
+                  ? `Google • ${authUserEmail || 'Connected'}`
+                  : authProvider === 'email'
+                  ? `Email • ${authUserEmail || 'Registered'}`
+                  : 'Offline-First Storage'}
               </p>
             </div>
           </div>
@@ -259,6 +273,28 @@ export default function SettingsHome() {
           label={t('settings.helpTitle', 'Tur & Panduan Fitur')}
           icon={Compass}
         />
+        <button
+          type="button"
+          onClick={handleSwitchAccount}
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[var(--field-bg)] transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+              <LogOut size={16} strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-xs font-bold text-red-500">
+                {t('auth.switchAccount', 'Ganti Akun / Logout')}
+              </span>
+              <span className="block text-[10.5px] font-medium text-[var(--muted)] truncate mt-0.5">
+                {authProvider === 'google'
+                  ? 'Keluar dari Google dan hubungkan akun lain'
+                  : 'Masuk dengan Google atau akun lain'}
+              </span>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-[var(--muted-2)] shrink-0" />
+        </button>
       </SettingsSection>
 
       {/* Modal Quick Currency Selector */}

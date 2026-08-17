@@ -12,6 +12,9 @@ const useSettingsStore = create((set, get) => ({
   reduceMotion: false,
   profileName: '',
   profilePhoto: '',
+  authProvider: 'guest', // 'google' | 'email' | 'guest'
+  authUserEmail: '',
+  authUserId: '',
   initialBalance: 0,
   hasCompletedOnboarding: false,
   hasCompletedSpotlightTour: false,
@@ -34,6 +37,9 @@ const useSettingsStore = create((set, get) => ({
       motionPreference: next.motionPreference,
       profileName: next.profileName,
       profilePhoto: next.profilePhoto || '',
+      authProvider: next.authProvider || 'guest',
+      authUserEmail: next.authUserEmail || '',
+      authUserId: next.authUserId || '',
       initialBalance: next.initialBalance,
       hasCompletedOnboarding: next.hasCompletedOnboarding,
       hasCompletedSpotlightTour: next.hasCompletedSpotlightTour,
@@ -77,6 +83,17 @@ const useSettingsStore = create((set, get) => ({
     set({ profilePhoto: next })
     await get().persist({ profilePhoto: next })
   },
+  setAuthUser: async ({ uid = '', email = '', displayName = '', photoURL = '', provider = 'guest' }) => {
+    const updates = {
+      authUserId: uid,
+      authUserEmail: email,
+      authProvider: provider,
+      ...(displayName ? { profileName: displayName } : {}),
+      ...(photoURL ? { profilePhoto: photoURL } : {}),
+    }
+    set(updates)
+    await get().persist(updates)
+  },
   setInitialBalance: async (initialBalance) => {
     set({ initialBalance: Number(initialBalance) || 0 })
     await get().persist({ initialBalance: Number(initialBalance) || 0 })
@@ -103,6 +120,10 @@ const useSettingsStore = create((set, get) => ({
   completeOnboarding: async () => {
     set({ hasCompletedOnboarding: true })
     await get().persist({ hasCompletedOnboarding: true })
+  },
+  resetOnboarding: async () => {
+    set({ hasCompletedOnboarding: false, hasCompletedSpotlightTour: false })
+    await get().persist({ hasCompletedOnboarding: false, hasCompletedSpotlightTour: false })
   },
   startSpotlightTour: () => {
     set({ isSpotlightTourActive: true })
@@ -143,6 +164,9 @@ const useSettingsStore = create((set, get) => ({
         : 'system',
       profileName: record.profileName || '',
       profilePhoto: record.profilePhoto || '',
+      authProvider: record.authProvider || 'guest',
+      authUserEmail: record.authUserEmail || '',
+      authUserId: record.authUserId || '',
       initialBalance: Number(record.initialBalance) || 0,
       hasCompletedOnboarding: onboardingDone,
       hasCompletedSpotlightTour: tourDone,
