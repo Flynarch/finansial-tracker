@@ -84,6 +84,7 @@ export default function SettingsData() {
         motionPreference: 'system',
         reduceMotion: false,
         profileName: '',
+        profilePhoto: '',
         hasCompletedOnboarding: false,
         securityEnabled: false,
         securityMethod: 'pin',

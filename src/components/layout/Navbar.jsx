@@ -5,6 +5,7 @@ import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
+import UserAvatar from '../ui/UserAvatar'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import {
@@ -108,8 +109,6 @@ function Navbar() {
     await db.notifications.clear()
   }
 
-  const initials = profileName ? profileName.substring(0, 2).toUpperCase() : 'FT'
-
   return (
     <header className="pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-1 px-4 sm:px-6">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
@@ -123,19 +122,12 @@ function Navbar() {
           aria-label={t('profile.title', 'Lihat Profil')}
         >
           {/* Avatar (Compact) */}
-          <div className="relative shrink-0">
-            <div
-              className="flex h-9.5 w-9.5 items-center justify-center rounded-xl text-xs font-black tracking-wide transition-shadow duration-200 group-hover:shadow-xs"
-              style={{
-                background: 'linear-gradient(145deg, var(--fg), color-mix(in srgb, var(--fg) 75%, var(--accent)))',
-                color: 'var(--bg)',
-              }}
-            >
-              {initials}
-            </div>
-            {/* Online status indicator */}
-            <span className="absolute -bottom-[0.5px] -right-[0.5px] h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--bg)]" />
-          </div>
+          <UserAvatar
+            size="md"
+            shape="circle"
+            showOnlineIndicator={true}
+            className="group-hover:scale-105 transition-transform"
+          />
 
           {/* Identity text */}
           <div className="min-w-0 flex flex-col justify-center">

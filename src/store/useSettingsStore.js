@@ -11,6 +11,7 @@ const useSettingsStore = create((set, get) => ({
   motionPreference: 'system',
   reduceMotion: false,
   profileName: '',
+  profilePhoto: '',
   initialBalance: 0,
   hasCompletedOnboarding: false,
   hasCompletedSpotlightTour: false,
@@ -32,6 +33,7 @@ const useSettingsStore = create((set, get) => ({
       defaultWalletId: next.defaultWalletId,
       motionPreference: next.motionPreference,
       profileName: next.profileName,
+      profilePhoto: next.profilePhoto || '',
       initialBalance: next.initialBalance,
       hasCompletedOnboarding: next.hasCompletedOnboarding,
       hasCompletedSpotlightTour: next.hasCompletedSpotlightTour,
@@ -69,6 +71,11 @@ const useSettingsStore = create((set, get) => ({
     const next = String(profileName || '').trim()
     set({ profileName: next })
     await get().persist({ profileName: next })
+  },
+  setProfilePhoto: async (profilePhoto) => {
+    const next = String(profilePhoto || '').trim()
+    set({ profilePhoto: next })
+    await get().persist({ profilePhoto: next })
   },
   setInitialBalance: async (initialBalance) => {
     set({ initialBalance: Number(initialBalance) || 0 })
@@ -135,6 +142,7 @@ const useSettingsStore = create((set, get) => ({
         ? record.motionPreference
         : 'system',
       profileName: record.profileName || '',
+      profilePhoto: record.profilePhoto || '',
       initialBalance: Number(record.initialBalance) || 0,
       hasCompletedOnboarding: onboardingDone,
       hasCompletedSpotlightTour: tourDone,

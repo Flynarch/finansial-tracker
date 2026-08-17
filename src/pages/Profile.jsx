@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Camera, Pencil } from 'lucide-react'
 import Modal from '../components/ui/Modal'
+import UserAvatar from '../components/ui/UserAvatar'
+import ChangePhotoModal from '../components/profile/ChangePhotoModal'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { db } from '../lib/db'
@@ -121,6 +124,7 @@ function Profile() {
   const { t } = useTranslation()
   const [isEntering, setIsEntering] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [editName, setEditName] = useState('')
   const nameInputRef = useRef(null)
 
@@ -144,14 +148,6 @@ function Profile() {
   }, [])
 
   const displayName = profileName || t('profile.userName')
-
-  const initials =
-    String(displayName || 'FT')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase())
-      .join('') || 'FT'
 
   const openEditModal = () => {
     setEditName(profileName)
@@ -183,27 +179,56 @@ function Profile() {
           />
 
           <div className="relative flex flex-col items-center px-5 pb-8 pt-8">
-            <div className="relative mb-5">
-              <div className="h-[5.5rem] w-[5.5rem] rounded-full border-[3px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] p-1 shadow-lg shadow-[color-mix(in_srgb,var(--accent)_20%,transparent)]">
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--panel-strong)] text-[22px] font-bold tracking-tight text-[var(--accent)]">
-                  {initials}
-                </div>
-              </div>
+            <div className="relative mb-4">
+              {/* Profile Avatar Button */}
               <button
                 type="button"
-                onClick={openEditModal}
-                className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                aria-label={t('profile.edit')}
+                onClick={() => setPhotoModalOpen(true)}
+                className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-lg shadow-[color-mix(in_srgb,var(--accent)_20%,transparent)] transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                title={t('profile.changePhoto', 'Ubah foto profil')}
+                aria-label={t('profile.changePhoto', 'Ubah foto profil')}
               >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <UserAvatar
+                  size={88}
+                  shape="circle"
+                  className="w-[88px] h-[88px]"
+                  border={false}
+                />
+                <div className="absolute inset-1 rounded-full bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex flex-col items-center justify-center text-white backdrop-blur-[1px]">
+                  <Camera size={20} strokeWidth={2.2} />
+                  <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">
+                    {t('profile.edit', 'Ubah')}
+                  </span>
+                </div>
+              </button>
+
+              {/* Camera badge trigger */}
+              <button
+                type="button"
+                onClick={() => setPhotoModalOpen(true)}
+                className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                aria-label={t('profile.changePhoto', 'Ubah foto profil')}
+                title={t('profile.changePhoto', 'Ubah foto profil')}
+              >
+                <Camera size={14} strokeWidth={2.5} />
               </button>
             </div>
 
-            <h2 className="mb-2.5 max-w-full truncate text-center text-[22px] font-bold tracking-tight text-[var(--fg)]">
-              {displayName}
-            </h2>
+            <div className="flex items-center justify-center gap-2 mb-2 max-w-full">
+              <h2 className="max-w-full truncate text-center text-[22px] font-bold tracking-tight text-[var(--fg)]">
+                {displayName}
+              </h2>
+              <button
+                type="button"
+                onClick={openEditModal}
+                className="grid h-7 w-7 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
+                title={t('profile.editName', 'Ubah nama')}
+                aria-label={t('profile.editName', 'Ubah nama')}
+              >
+                <Pencil size={14} strokeWidth={2.2} />
+              </button>
+            </div>
+
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--field-bg)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--muted)] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-sm">
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--fg)]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -341,6 +366,9 @@ function Profile() {
           </div>
         </div>
       </Modal>
+
+      {/* ── Change Photo Modal ── */}
+      <ChangePhotoModal isOpen={photoModalOpen} onClose={() => setPhotoModalOpen(false)} />
     </div>
   )
 }

@@ -22,6 +22,7 @@ import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
+import UserAvatar from '../../components/ui/UserAvatar'
 import { currencyOptions } from './settingsConstants'
 import {
   SettingsBentoTile,
@@ -109,9 +110,11 @@ export default function SettingsHome() {
           className="group flex cursor-pointer items-center justify-between gap-4 pb-4 transition select-none"
         >
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
-              {profileName ? profileName.slice(0, 2).toUpperCase() : 'RI'}
-            </div>
+            <UserAvatar
+              size={48}
+              shape="circle"
+              className="group-hover:scale-105 transition-transform"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-extrabold text-base text-[var(--fg)] truncate tracking-tight">
