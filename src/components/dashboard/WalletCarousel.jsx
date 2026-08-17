@@ -279,12 +279,12 @@ export default function WalletCarousel({
                   </div>
                   {/* Name + Saldo Uang */}
                   <div className="min-w-0 flex flex-col text-left gap-0.5">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] truncate max-w-[85px] leading-tight">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10.5px] font-bold tracking-tight text-[var(--muted)] truncate max-w-[85px] leading-tight">
                         {w.name}
                       </span>
                       {isPrimary && (
-                        <Star size={9} className="fill-amber-500 text-amber-500 shrink-0" />
+                        <Star size={10} className="fill-amber-500 text-amber-500 shrink-0 inline-block self-center" />
                       )}
                     </div>
                     <span className="ft-wallet-mini-balance">
