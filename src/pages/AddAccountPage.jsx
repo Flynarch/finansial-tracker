@@ -115,8 +115,8 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   return (
     <div className={`ft-page-enter flex flex-col ${isOnboarding ? 'h-full w-full' : 'min-h-screen bg-[var(--bg)]'}`}>
       {/* ── Sticky Top Header & Filters ─────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-2.5 border-b border-[var(--border)] shadow-xs">
-        <div className="px-4 pt-4 pb-2">
+      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-2.5 border-b border-[var(--border)] shadow-xs w-full">
+        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-4 pb-2">
           <PageHeader
             title={'Pilih Institusi / Dompet'}
             onBack={() => (isOnboarding && onBack ? onBack() : navigate(-1))}
@@ -124,7 +124,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
         </div>
 
         {/* Search Field */}
-        <div className="px-4 pb-2.5">
+        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pb-2.5">
           <div className="relative flex items-center">
             <Search size={17} className="absolute left-3.5 text-[var(--muted)]" />
             <input
@@ -138,7 +138,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
         </div>
 
         {/* Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto ft-hide-scrollbar px-4 pb-0.5">
+        <div className="max-w-2xl mx-auto w-full flex items-center gap-2 overflow-x-auto ft-hide-scrollbar px-4 sm:px-6 pb-0.5">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -155,8 +155,8 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
         </div>
       </div>
 
-      {/* ── Sleek List Content (Gaya Baris Melengkung iOS Fintech) ─ */}
-      <div className="flex-1 overflow-y-auto pb-28 pt-4 px-4 space-y-6">
+      {/* ── Sleek List Content (Gaya Baris Melengkung iOS Fintech Wide Layout) ─ */}
+      <div className="flex-1 overflow-y-auto pb-28 pt-4 px-4 sm:px-6 space-y-6 max-w-2xl mx-auto w-full">
         {filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Search size={36} className="text-[var(--muted)] opacity-40 mb-3" />
@@ -195,7 +195,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                           if (!added) setSelectedInst(inst)
                         }}
                         disabled={added}
-                        className={`group w-full flex items-center gap-3.5 px-4 py-3 rounded-[1.25rem] border text-left transition-all active:scale-[0.98] cursor-pointer ${
+                        className={`group w-full flex items-center gap-3.5 sm:gap-4 px-4 py-3.5 sm:px-5 sm:py-4 rounded-[1.25rem] border text-left transition-all active:scale-[0.98] cursor-pointer ${
                           added
                             ? 'bg-[var(--field-bg)]/40 border-[var(--border)]/40 opacity-50 grayscale cursor-not-allowed'
                             : 'bg-[var(--panel-strong)] border-[color-mix(in_srgb,var(--border)_75%,transparent)] hover:bg-[var(--field-bg)] hover:border-[var(--border-strong)] shadow-2xs'
@@ -207,14 +207,14 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                         {/* Text Details */}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-black text-[var(--fg)] truncate">
+                            <span className="text-sm sm:text-base font-black text-[var(--fg)] truncate">
                               {inst.name}
                             </span>
                             {inst.isRecommended && (
-                              <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+                              <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />
                             )}
                           </div>
-                          <p className="text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">
+                          <p className="text-[11px] sm:text-xs font-medium text-[var(--muted)] truncate mt-0.5">
                             {inst.type === 'bank'
                               ? 'Bank Digital / Nasional'
                               : inst.type === 'ewallet'
@@ -248,16 +248,18 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
 
       {/* ── Sticky Bottom Action Bar ─────────────────────────────── */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
+        className="fixed bottom-0 left-0 right-0 z-40 px-4 sm:px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
         style={{ background: 'linear-gradient(to top, var(--bg) 80%, transparent)' }}
       >
-        <button
-          onClick={() => setSelectedInst('custom')}
-          className="w-full flex items-center justify-center gap-2 py-4 px-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-xs shadow-md transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
-        >
-          <Plus size={16} strokeWidth={3} />
-          <span>Buat Akun / Dompet Kustom</span>
-        </button>
+        <div className="max-w-2xl mx-auto w-full">
+          <button
+            onClick={() => setSelectedInst('custom')}
+            className="w-full flex items-center justify-center gap-2 py-4 px-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-xs sm:text-sm shadow-md transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
+          >
+            <Plus size={16} strokeWidth={3} />
+            <span>Buat Akun / Dompet Kustom</span>
+          </button>
+        </div>
       </div>
     </div>
   )

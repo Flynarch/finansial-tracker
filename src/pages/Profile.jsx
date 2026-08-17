@@ -7,7 +7,6 @@ import UserAvatar from '../components/ui/UserAvatar'
 import ChangePhotoModal from '../components/profile/ChangePhotoModal'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import { signOutCurrentUser } from '../lib/auth'
 import { db } from '../lib/db'
 
 /* ─── stat mini-icons ─── */
@@ -142,12 +141,6 @@ function Profile() {
   const setProfileName = useSettingsStore((s) => s.setProfileName)
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
-  const resetOnboarding = useSettingsStore((s) => s.resetOnboarding)
-
-  const handleSwitchAccount = async () => {
-    await signOutCurrentUser()
-    await resetOnboarding()
-  }
 
   const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
   const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
@@ -337,12 +330,6 @@ function Profile() {
               label={t('profile.menu.todos')}
               sublabel={t('profile.menu.todosSub')}
               onClick={() => navigate('/todos')}
-            />
-            <ShortcutRow
-              icon="logout"
-              label={t('auth.switchAccount', 'Ganti Akun / Logout')}
-              sublabel={authProvider === 'google' ? 'Keluar dari Google dan hubungkan akun lain' : 'Masuk dengan Google atau akun lain'}
-              onClick={handleSwitchAccount}
             />
           </div>
         </div>

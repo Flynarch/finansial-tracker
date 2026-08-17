@@ -22,6 +22,9 @@ import {
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { signOutCurrentUser } from '../../lib/auth'
+import { db } from '../../lib/db'
+import { exportAllDataAsJson } from '../../lib/backup'
+import { uploadLatestBackup } from '../../lib/cloudBackup'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
@@ -55,7 +58,9 @@ export default function SettingsHome() {
   const profileName = useSettingsStore((state) => state.profileName)
   const authProvider = useSettingsStore((state) => state.authProvider)
   const authUserEmail = useSettingsStore((state) => state.authUserEmail)
+  const authUserId = useSettingsStore((state) => state.authUserId)
   const resetOnboarding = useSettingsStore((state) => state.resetOnboarding)
+  const setAuthUser = useSettingsStore((state) => state.setAuthUser)
 
   const setDefaultCurrency = useSettingsStore((state) => state.setDefaultCurrency)
   const setLocale = useSettingsStore((state) => state.setLocale)
@@ -65,8 +70,41 @@ export default function SettingsHome() {
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false)
 
   const handleSwitchAccount = async () => {
-    await signOutCurrentUser()
-    await resetOnboarding()
+    try {
+      const currentUid = authUserId || (authProvider === 'google' ? 'google_last' : 'guest_last')
+      const backup = await exportAllDataAsJson()
+      try {
+        localStorage.setItem(`ft_user_backup_${currentUid}`, JSON.stringify(backup))
+      } catch {
+        /* ignore */
+      }
+      if (authProvider === 'google' && authUserId) {
+        try {
+          await uploadLatestBackup(authUserId, backup)
+        } catch {
+          /* ignore */
+        }
+      }
+
+      await db.transaction('rw', db.tables, async () => {
+        await Promise.all(db.tables.map((table) => table.clear()))
+      })
+
+      await signOutCurrentUser()
+      await resetOnboarding()
+      await setAuthUser({
+        uid: '',
+        email: '',
+        displayName: '',
+        photoURL: '',
+        provider: 'guest',
+      })
+      navigate('/', { replace: true })
+    } catch {
+      await signOutCurrentUser()
+      await resetOnboarding()
+      navigate('/', { replace: true })
+    }
   }
 
   const handleToggleTheme = () => {
@@ -194,10 +232,10 @@ export default function SettingsHome() {
           label={t('settings.visualTheme', 'Tema Visual')}
           value={
             theme === 'midnight'
-              ? t('settings.themeMidnight', 'Mode Biru (Midnight)')
+              ? t('settings.themeMidnight', 'Midnight Sapphire')
               : theme === 'dark'
-              ? t('settings.themeDark', 'Mode Arang (Matte)')
-              : t('settings.themeLight', 'Mode Terang (Putih)')
+              ? t('settings.themeDark', 'Matte Dark')
+              : t('settings.themeLight', 'Putih')
           }
           icon={theme === 'midnight' ? Sparkles : theme === 'dark' ? Moon : Sun}
           onClick={handleToggleTheme}
@@ -266,35 +304,26 @@ export default function SettingsHome() {
         />
       </SettingsSection>
 
-      {/* 5. Directory Group 3: Pusat Bantuan */}
+      {/* 5. Directory Group 3: Pusat Bantuan & Sesi Akun */}
       <SettingsSection label={t('settings.section.support', 'Bantuan & Dukungan')}>
         <SettingsLinkRow
           to="/settings/help"
           label={t('settings.helpTitle', 'Tur & Panduan Fitur')}
           icon={Compass}
         />
-        <button
-          type="button"
+        <SettingsLinkRow
+          label={t('auth.switchAccount', 'Ganti Akun / Logout')}
+          subtitle={
+            authProvider === 'google'
+              ? `Google • ${authUserEmail || 'Connected'}`
+              : authProvider === 'email'
+              ? `Email • ${authUserEmail || 'Registered'}`
+              : 'Mode Tamu Offline'
+          }
+          icon={LogOut}
+          iconColor="text-red-500 bg-red-500/10 border-red-500/20"
           onClick={handleSwitchAccount}
-          className="w-full flex items-center justify-between p-3.5 hover:bg-[var(--field-bg)] transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-              <LogOut size={16} strokeWidth={2.5} />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-xs font-bold text-red-500">
-                {t('auth.switchAccount', 'Ganti Akun / Logout')}
-              </span>
-              <span className="block text-[10.5px] font-medium text-[var(--muted)] truncate mt-0.5">
-                {authProvider === 'google'
-                  ? 'Keluar dari Google dan hubungkan akun lain'
-                  : 'Masuk dengan Google atau akun lain'}
-              </span>
-            </div>
-          </div>
-          <ChevronRight size={16} className="text-[var(--muted-2)] shrink-0" />
-        </button>
+        />
       </SettingsSection>
 
       {/* Modal Quick Currency Selector */}

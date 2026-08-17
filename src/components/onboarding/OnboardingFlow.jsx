@@ -16,6 +16,9 @@ import {
   signUpWithEmail,
   signInAsGuest,
 } from '../../lib/auth'
+import { executeThemeTransition } from '../../lib/themeTransition'
+import { importAllDataFromJsonPayload } from '../../lib/backup'
+import { downloadLatestBackupJson } from '../../lib/cloudBackup'
 import {
   Plus,
   Check,
@@ -35,6 +38,7 @@ import {
   Globe,
   Loader2,
   AlertCircle,
+  Camera,
 } from 'lucide-react'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
@@ -206,32 +210,58 @@ export default function OnboardingFlow() {
     [step]
   )
 
+  /* ── Restore User Snapshot Helper ──────────────────────────────── */
+  const restoreUserSnapshot = async (uid, isGoogle = false) => {
+    if (!uid) return
+    const userBackupKey = `ft_user_backup_${uid}`
+    const rawLocal = localStorage.getItem(userBackupKey)
+    if (rawLocal) {
+      try {
+        const data = JSON.parse(rawLocal)
+        await importAllDataFromJsonPayload(data)
+        return
+      } catch {
+        /* ignore */
+      }
+    }
+    if (isGoogle) {
+      try {
+        const cloudData = await downloadLatestBackupJson(uid)
+        if (cloudData) {
+          await importAllDataFromJsonPayload(cloudData)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   /* ── Google Sign In Handler ────────────────────────────────────── */
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
       const res = await signInWithGoogle()
-      if (res.success && res.user) {
-        await setAuthUser(res.user)
-        if (res.user.displayName) {
-          setUsername(res.user.displayName)
-        }
-        goTo(1)
-      } else if (res.code !== 'auth/popup-closed-by-user') {
+      let userObj = res.success && res.user ? res.user : null
+      if (!userObj && res.code !== 'auth/popup-closed-by-user') {
         // Fallback demo account for testing / offline environments
-        const fallbackUser = {
+        userObj = {
           uid: `google_${Date.now()}`,
           displayName: 'Pengguna Google',
           email: 'user@gmail.com',
           photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
           provider: 'google',
         }
-        await setAuthUser(fallbackUser)
-        setUsername(fallbackUser.displayName)
+      }
+
+      if (userObj) {
+        await restoreUserSnapshot(userObj.uid, true)
+        await setAuthUser(userObj)
+        if (userObj.displayName) {
+          setUsername(userObj.displayName)
+        }
         goTo(1)
       }
     } catch {
-      // Graceful fallback
       goTo(1)
     } finally {
       setIsGoogleLoading(false)
@@ -259,22 +289,22 @@ export default function OnboardingFlow() {
         res = await signInWithEmail(emailInput, passwordInput)
       }
 
-      if (res.success && res.user) {
-        await setAuthUser(res.user)
-        setUsername(res.user.displayName || emailInput.split('@')[0])
-        setShowEmailModal(false)
-        goTo(1)
-      } else {
-        // If demo/offline without live Firebase backend, create offline user
+      let userObj = res.success && res.user ? res.user : null
+      if (!userObj) {
         const offlineName = emailNameInput.trim() || emailInput.split('@')[0]
-        await setAuthUser({
+        userObj = {
           uid: `email_${Date.now()}`,
           displayName: offlineName,
           email: emailInput.trim(),
           photoURL: '',
           provider: 'email',
-        })
-        setUsername(offlineName)
+        }
+      }
+
+      if (userObj) {
+        await restoreUserSnapshot(userObj.uid, false)
+        await setAuthUser(userObj)
+        setUsername(userObj.displayName || emailInput.split('@')[0])
         setShowEmailModal(false)
         goTo(1)
       }
@@ -303,6 +333,21 @@ export default function OnboardingFlow() {
     }
     setUsername('')
     goTo(1)
+  }
+
+  /* ── Theme Selection with Smooth GPU sweep ─────────────────────── */
+  const handleThemeSelect = (targetTheme, e) => {
+    if (targetTheme === theme) return
+    const rect = e?.currentTarget?.getBoundingClientRect?.()
+    const originX = rect ? rect.left + rect.width / 2 : window.innerWidth / 2
+    const originY = rect ? rect.top + rect.height / 2 : window.innerHeight / 2
+    executeThemeTransition({
+      currentTheme: theme,
+      targetTheme,
+      setTheme,
+      originX,
+      originY,
+    })
   }
 
   /* ── Navigation Next / Back ────────────────────────────────────── */
@@ -399,7 +444,11 @@ export default function OnboardingFlow() {
         transition: 'opacity 0.4s ease-out',
       }}
     >
-      <div className="relative z-10 flex h-full w-full max-w-lg flex-col px-6 py-6 sm:justify-center sm:py-10">
+      <div
+        className={`relative z-10 flex h-full w-full ${
+          step === 3 ? 'max-w-2xl px-0 sm:px-4' : 'max-w-lg px-6'
+        } flex-col py-6 sm:justify-center sm:py-10`}
+      >
         <div
           className="flex flex-1 flex-col justify-center sm:flex-initial"
           style={{
@@ -528,7 +577,7 @@ export default function OnboardingFlow() {
           )}
 
           {/* ════════════════════════════════════════════════════════════
-             STEP 1: CONFIRM PROFILE & AVATAR
+             STEP 1: CONFIRM PROFILE & AVATAR (Clean Matching Profile.jsx)
              ════════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="space-y-6">
@@ -546,38 +595,49 @@ export default function OnboardingFlow() {
                 </p>
               </div>
 
-              {/* Avatar Centerpiece with Auto Google Sync or Persona Switch */}
-              <div className="flex flex-col items-center justify-center gap-3 py-2">
-                <div className="relative group cursor-pointer" onClick={() => setIsChangePhotoOpen(true)}>
-                  <UserAvatar
-                    name={username || 'Pengguna'}
-                    photo={profilePhoto}
-                    size="2xl"
-                    shape="circle"
-                    className="border-2 border-[var(--border-strong)] shadow-md"
-                  />
-                  <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--accent)] text-[var(--bg)] flex items-center justify-center border-2 border-[var(--panel-strong)] shadow-md">
-                    <Sparkles size={14} />
-                  </span>
-                </div>
+              {/* Avatar Centerpiece with Clean Camera Button (Matching Profile.jsx) */}
+              <div className="flex flex-col items-center justify-center gap-2.5 py-3">
+                <div className="relative">
+                  {/* Profile Avatar Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsChangePhotoOpen(true)}
+                    className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-lg shadow-[color-mix(in_srgb,var(--accent)_20%,transparent)] transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    title={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
+                    aria-label={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
+                  >
+                    <UserAvatar
+                      name={username || 'Pengguna'}
+                      photo={profilePhoto}
+                      size="2xl"
+                      shape="circle"
+                      className="w-[88px] h-[88px]"
+                      border={false}
+                    />
+                    <div className="absolute inset-1 rounded-full bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex flex-col items-center justify-center text-white backdrop-blur-[1px]">
+                      <Camera size={20} strokeWidth={2.2} />
+                      <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">
+                        {t('profile.edit', 'Ubah')}
+                      </span>
+                    </div>
+                  </button>
 
-                {/* Account Type Status Badge */}
-                {authProvider === 'google' ? (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold border border-blue-500/20">
-                    <GoogleIcon className="w-3.5 h-3.5" />
-                    <span>{t('auth.googleConnectedBadge', 'Terverifikasi Akun Google')}</span>
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--field-bg)] text-[var(--muted)] text-xs font-bold border border-[var(--border)]">
-                    <ShieldCheck size={13} className="text-emerald-500" />
-                    <span>{t('auth.guestConnectedBadge', 'Mode Tamu Offline-First')}</span>
-                  </div>
-                )}
+                  {/* Camera badge trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setIsChangePhotoOpen(true)}
+                    className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    aria-label={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
+                    title={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
+                  >
+                    <Camera size={14} strokeWidth={2.5} />
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => setIsChangePhotoOpen(true)}
-                  className="text-xs font-bold text-[var(--accent)] hover:underline cursor-pointer"
+                  className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer pt-1"
                 >
                   {t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                 </button>
@@ -637,7 +697,7 @@ export default function OnboardingFlow() {
           )}
 
           {/* ════════════════════════════════════════════════════════════
-             STEP 2: CHOOSE VISUAL THEME (Live Interactive Preview)
+             STEP 2: CHOOSE VISUAL THEME (Putih, Matte Dark, Midnight Sapphire)
              ════════════════════════════════════════════════════════════ */}
           {step === 2 && (
             <div className="space-y-6">
@@ -655,11 +715,11 @@ export default function OnboardingFlow() {
                 </p>
               </div>
 
-              {/* Theme Options Stack */}
+              {/* Theme Options Stack with Smooth GPU Transition */}
               <div className="space-y-3 pt-1">
-                {/* 1. Light Theme */}
+                {/* 1. Putih (Light Theme) */}
                 <div
-                  onClick={() => setTheme('light')}
+                  onClick={(e) => handleThemeSelect('light', e)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer relative ${
                     theme === 'light'
                       ? 'border-[var(--accent)] bg-[var(--panel-strong)] ring-2 ring-[var(--accent)]/30'
@@ -673,7 +733,7 @@ export default function OnboardingFlow() {
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-[var(--fg)]">
-                          {t('auth.themeLightTitle', 'Mode Terang (Putih)')}
+                          {t('auth.themeLightTitle', 'Putih')}
                         </h4>
                       </div>
                     </div>
@@ -688,9 +748,9 @@ export default function OnboardingFlow() {
                   </p>
                 </div>
 
-                {/* 2. Dark (Matte Charcoal) Theme */}
+                {/* 2. Matte Dark Theme */}
                 <div
-                  onClick={() => setTheme('dark')}
+                  onClick={(e) => handleThemeSelect('dark', e)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer relative ${
                     theme === 'dark'
                       ? 'border-[var(--accent)] bg-[var(--panel-strong)] ring-2 ring-[var(--accent)]/30'
@@ -704,7 +764,7 @@ export default function OnboardingFlow() {
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-[var(--fg)]">
-                          {t('auth.themeDarkTitle', 'Mode Arang (Matte Dark)')}
+                          {t('auth.themeDarkTitle', 'Matte Dark')}
                         </h4>
                       </div>
                     </div>
@@ -719,9 +779,9 @@ export default function OnboardingFlow() {
                   </p>
                 </div>
 
-                {/* 3. Midnight (Sapphire Blue) Theme */}
+                {/* 3. Midnight Sapphire Theme */}
                 <div
-                  onClick={() => setTheme('midnight')}
+                  onClick={(e) => handleThemeSelect('midnight', e)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer relative ${
                     theme === 'midnight'
                       ? 'border-[var(--accent)] bg-[var(--panel-strong)] ring-2 ring-[var(--accent)]/30'
@@ -735,7 +795,7 @@ export default function OnboardingFlow() {
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-[var(--fg)]">
-                          {t('auth.themeMidnightTitle', 'Mode Biru (Midnight Sapphire)')}
+                          {t('auth.themeMidnightTitle', 'Midnight Sapphire')}
                         </h4>
                       </div>
                     </div>
@@ -774,12 +834,14 @@ export default function OnboardingFlow() {
           )}
 
           {/* ════════════════════════════════════════════════════════════
-             STEP 3: INITIAL WALLET SETUP
+             STEP 3: INITIAL WALLET SETUP (Wide Edge-to-Edge Layout)
              ════════════════════════════════════════════════════════════ */}
           {step === 3 && (
-            <div className="flex flex-col h-full">
-              <ProgressHeader step={3} total={4} />
-              <div className="flex-1 min-h-0">
+            <div className="flex flex-col h-full w-full">
+              <div className="px-4 sm:px-6">
+                <ProgressHeader step={3} total={4} />
+              </div>
+              <div className="flex-1 min-h-0 w-full">
                 <Suspense
                   fallback={
                     <div className="flex h-64 items-center justify-center">

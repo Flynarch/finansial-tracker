@@ -19,20 +19,20 @@ export function getThemeDetails(theme) {
   switch (theme) {
     case 'midnight':
       return {
-        label: 'Mode Biru (Midnight)',
-        shortLabel: 'Biru',
+        label: 'Midnight Sapphire',
+        shortLabel: 'Midnight',
         bgColor: '#090d16',
       }
     case 'dark':
       return {
-        label: 'Mode Arang (Matte)',
-        shortLabel: 'Arang',
+        label: 'Matte Dark',
+        shortLabel: 'Matte Dark',
         bgColor: '#191b1f',
       }
     case 'light':
     default:
       return {
-        label: 'Mode Terang (Putih)',
+        label: 'Putih',
         shortLabel: 'Putih',
         bgColor: '#f4f6f9',
       }
