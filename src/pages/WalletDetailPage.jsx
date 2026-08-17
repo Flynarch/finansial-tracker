@@ -139,13 +139,9 @@ export default function WalletDetailPage() {
     }
   }
 
-  const handleToggleDefaultWallet = async () => {
+  const handleSetDefaultWallet = async () => {
     try {
-      if (isDefaultWallet) {
-        await setDefaultWalletId(null)
-      } else {
-        await setDefaultWalletId(walletId)
-      }
+      await setDefaultWalletId(walletId)
       setIsActionMenuOpen(false)
     } catch (err) {
       console.error('Failed to set default wallet', err)
@@ -260,6 +256,11 @@ export default function WalletDetailPage() {
         return
       }
 
+      if (isDefaultWallet) {
+        const nextWallet = allWallets.find((w) => w.id !== walletId)
+        await setDefaultWalletId(nextWallet ? nextWallet.id : null)
+      }
+
       await deleteWallet(walletId)
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -365,7 +366,7 @@ export default function WalletDetailPage() {
         {pageError ? <ToastBanner message={pageError} type="error" onDismiss={() => setPageError('')} /> : null}
 
         {/* ── 1. Clean Neutral Hero Section with Wallet Icon ────────────── */}
-        <div className="ft-wallet-detail-hero -mx-4 -mt-4 pb-8 pt-3 px-4 text-center bg-[var(--panel)] border-b border-[var(--border)] relative overflow-hidden">
+        <div className="ft-wallet-detail-hero w-full pb-8 pt-3 px-4 text-center bg-[var(--panel)] border-b border-[var(--border)] relative overflow-hidden">
           {/* Top Nav Bar with 3-Dots Action Button */}
           <PageHeader
             title={wallet.name}
@@ -609,31 +610,37 @@ export default function WalletDetailPage() {
             )}
           </div>
 
-          {/* Action 1: Set/Unset Default Wallet */}
-          <button
-            type="button"
-            onClick={handleToggleDefaultWallet}
-            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                isDefaultWallet ? 'bg-amber-500/15 text-amber-500' : 'bg-[var(--field-bg)] text-[var(--muted)]'
-              }`}>
-                <Star size={18} className={isDefaultWallet ? 'fill-amber-500' : ''} />
+          {/* Action 1: Set Default Wallet (or active indicator) */}
+          {isDefaultWallet ? (
+            <div className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-amber-500/25 bg-amber-500/10 select-none">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center">
+                  <Star size={18} className="fill-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--fg)]">Akun Utama (Aktif)</p>
+                  <p className="text-[10px] text-[var(--muted)]">Akun ini sedang menjadi akun default Anda</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-[var(--fg)]">
-                  {isDefaultWallet ? 'Lepas Status Akun Utama' : 'Jadikan Akun Utama'}
-                </p>
-                <p className="text-[10px] text-[var(--muted)]">
-                  {isDefaultWallet ? 'Akun ini sedang menjadi akun default' : 'Pilihan utama saat mencatat transaksi baru'}
-                </p>
-              </div>
-            </div>
-            {isDefaultWallet ? (
               <Check size={16} className="text-amber-500 shrink-0" strokeWidth={3} />
-            ) : null}
-          </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSetDefaultWallet}
+              className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
+                  <Star size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--fg)]">Jadikan Akun Utama</p>
+                  <p className="text-[10px] text-[var(--muted)]">Pilihan utama saat mencatat transaksi baru</p>
+                </div>
+              </div>
+            </button>
+          )}
 
           {/* Action 2: Delete Wallet */}
           <button

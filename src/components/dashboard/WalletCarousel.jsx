@@ -5,6 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 
 export default function WalletCarousel({ 
   monthIncome, 
@@ -15,6 +16,7 @@ export default function WalletCarousel({
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const [activeSlide, setActiveSlide] = useState(() => {
     const saved = sessionStorage.getItem('dashboard_carousel_slide')
     return saved ? parseInt(saved, 10) : 0
@@ -241,48 +243,58 @@ export default function WalletCarousel({
 
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
           <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
-            {activeWallets.map(w => (
-              <button 
-                key={w.id}
-                onClick={() => navigate(`/wallet/${w.id}`)}
-                className="ft-wallet-mini"
-                title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
-              >
-                {/* Logo (prominent) */}
-                <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
-                  {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' ? (
-                    <div className="w-full h-full flex items-center justify-center text-amber-500">
-                      <MoneyBagIcon size={18} strokeWidth={2.5} />
+            {activeWallets.map((w) => {
+              const isPrimary = defaultWalletId ? w.id === defaultWalletId : (activeWallets.length === 1 && w.id === activeWallets[0].id)
+              return (
+                <button 
+                  key={w.id}
+                  onClick={() => navigate(`/wallet/${w.id}`)}
+                  className={`ft-wallet-mini relative transition-all ${
+                    isPrimary ? 'border-amber-500/35 ring-1 ring-amber-500/20' : ''
+                  }`}
+                  title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
+                >
+                  {/* Logo (prominent) */}
+                  <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
+                    {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' ? (
+                      <div className="w-full h-full flex items-center justify-center text-amber-500">
+                        <MoneyBagIcon size={18} strokeWidth={2.5} />
+                      </div>
+                    ) : getWalletLogoUrl(w) ? (
+                      <img 
+                        src={getWalletLogoUrl(w)} 
+                        alt={w.name} 
+                        className="w-full h-full object-contain p-[1px] rounded-full" 
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <span 
+                      className="text-[11px] font-bold text-[var(--fg)]"
+                      style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || getWalletLogoUrl(w) ? 'none' : 'flex' }}
+                    >
+                      {w.name?.substring(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  {/* Name + Saldo Uang */}
+                  <div className="min-w-0 flex flex-col text-left gap-0.5">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] truncate max-w-[85px] leading-tight">
+                        {w.name}
+                      </span>
+                      {isPrimary && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={t('wallets.primaryBadge', 'Akun Utama')} />
+                      )}
                     </div>
-                  ) : getWalletLogoUrl(w) ? (
-                    <img 
-                      src={getWalletLogoUrl(w)} 
-                      alt={w.name} 
-                      className="w-full h-full object-contain p-[1px] rounded-full" 
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <span 
-                    className="text-[11px] font-bold text-[var(--fg)]"
-                    style={{ display: w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || getWalletLogoUrl(w) ? 'none' : 'flex' }}
-                  >
-                    {w.name?.substring(0,2).toUpperCase()}
-                  </span>
-                </div>
-                {/* Name + Saldo Uang */}
-                <div className="min-w-0 flex flex-col text-left gap-0.5">
-                  <span className="text-[10px] font-bold tracking-tight text-[var(--muted)] truncate max-w-[90px] leading-tight">
-                    {w.name}
-                  </span>
-                  <span className="ft-wallet-mini-balance">
-                    {formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
-                  </span>
-                </div>
-              </button>
-            ))}
+                    <span className="ft-wallet-mini-balance">
+                      {formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
             
             {/* Tambah Akun Card */}
             <button 

@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Trash2,
   Wallet,
+  Star,
 } from 'lucide-react'
 
 const AddAccountPage = lazy(() => import('../../pages/AddAccountPage'))
@@ -87,6 +88,8 @@ export default function OnboardingFlow() {
   const setProfileName = useSettingsStore((s) => s.setProfileName)
   const completeOnboarding = useSettingsStore((s) => s.completeOnboarding)
   const startSpotlightTour = useSettingsStore((s) => s.startSpotlightTour)
+  const defaultWalletId = useSettingsStore((s) => s.defaultWalletId)
+  const setDefaultWalletId = useSettingsStore((s) => s.setDefaultWalletId)
 
   const saved = useMemo(() => loadProgress(), [])
 
@@ -193,10 +196,19 @@ export default function OnboardingFlow() {
     goTo(2)
   }, [goTo])
 
-  const handleDeleteWallet = useCallback(async (e, walletId) => {
-    e.stopPropagation()
-    await db.wallets.delete(walletId)
-  }, [])
+  const handleDeleteWallet = useCallback(
+    async (e, walletId) => {
+      e.stopPropagation()
+      if (defaultWalletId === walletId && wallets && wallets.length > 1) {
+        const nextW = wallets.find((w) => w.id !== walletId)
+        if (nextW) {
+          await setDefaultWalletId(nextW.id)
+        }
+      }
+      await db.wallets.delete(walletId)
+    },
+    [defaultWalletId, wallets, setDefaultWalletId]
+  )
 
   const handleFinish = useCallback(async () => {
     if (!hasWallets) return
@@ -397,12 +409,17 @@ export default function OnboardingFlow() {
                   {/* List of Wallets (3 Top + Chip Kapsul Ekspansi "+ X Dompet Lainnya") */}
                   {hasWallets ? (
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1 ft-hide-scrollbar">
-                      {visibleWallets.map((w) => {
+                      {visibleWallets.map((w, idx) => {
                         const logoUrl = getWalletLogoUrl(w)
+                        const isDefault = defaultWalletId ? w.id === defaultWalletId : idx === 0
                         return (
                           <div
                             key={w.id}
-                            className="group flex items-center justify-between gap-3 p-3 rounded-xl border border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--field-bg)]"
+                            className={`group flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+                              isDefault
+                                ? 'border-amber-500/35 bg-[var(--field-bg)] ring-1 ring-amber-500/20'
+                                : 'border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--field-bg)]'
+                            }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-9 h-9 rounded-full bg-[var(--panel-strong)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
@@ -428,7 +445,15 @@ export default function OnboardingFlow() {
                               </div>
 
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-[var(--fg)] truncate">{w.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-black text-[var(--fg)] truncate">{w.name}</p>
+                                  {isDefault && (
+                                    <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[8.5px] font-black text-amber-500 shrink-0">
+                                      <Star size={8} className="fill-amber-500" />
+                                      <span>Utama</span>
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[10px] font-bold text-[var(--muted)]">
                                   {w.currency || 'IDR'}
                                 </p>
@@ -436,6 +461,15 @@ export default function OnboardingFlow() {
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
+                              {!isDefault && wallets.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDefaultWalletId(w.id)}
+                                  className="rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1 text-[9.5px] font-bold text-[var(--muted)] hover:text-amber-500 hover:border-amber-500/30 transition cursor-pointer"
+                                >
+                                  Jadikan Utama
+                                </button>
+                              )}
                               <span className="text-xs font-black text-[var(--fg)] tabular-nums">
                                 {formatCurrency(w.balance || 0, w.currency || 'IDR')}
                               </span>

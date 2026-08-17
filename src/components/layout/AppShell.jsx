@@ -41,6 +41,7 @@ function AppShell() {
   // Hide global navigation & AI trigger bar on dedicated sub-detail pages
   const isDetailPage =
     location.pathname.startsWith('/todos/') ||
+    location.pathname.startsWith('/wallet/') ||
     location.pathname.startsWith('/wallets/') ||
     location.pathname.startsWith('/savings/') ||
     location.pathname === '/add-account'
@@ -206,8 +207,12 @@ function AppShell() {
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
         <main
-          className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 px-4 pt-4 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
-            isDetailPage ? 'pb-8' : 'pb-[calc(10.5rem+env(safe-area-inset-bottom))]'
+          className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
+            location.pathname.startsWith('/wallet/')
+              ? 'px-0 pt-0 pb-8'
+              : isDetailPage
+              ? 'px-4 pt-4 pb-8'
+              : 'px-4 pt-4 pb-[calc(10.5rem+env(safe-area-inset-bottom))]'
           }`}
         >
           <div key={location.pathname} className="ft-page-transition">
