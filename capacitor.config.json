@@ -1,5 +1,8 @@
 {
   "appId": "com.hmias.fintrack",
   "appName": "FinTrack",
-  "webDir": "dist"
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#0b0f1a"
+  }
 }

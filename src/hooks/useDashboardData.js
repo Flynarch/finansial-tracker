@@ -175,6 +175,28 @@ export function useDashboardData() {
     }, 0)
   }, [walletsWithBalance, defaultCurrency, rates])
 
+  const normalizedTransactions = useMemo(() => {
+    if (!transactions) return []
+    return transactions.map((tx) => {
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      return {
+        ...tx,
+        convertedAmount: amount,
+      }
+    })
+  }, [transactions, defaultCurrency, rates])
+
+  const normalizedAllTransactionsForBalance = useMemo(() => {
+    if (!allTransactionsForBalance) return []
+    return allTransactionsForBalance.map((tx) => {
+      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      return {
+        ...tx,
+        convertedAmount: amount,
+      }
+    })
+  }, [allTransactionsForBalance, defaultCurrency, rates])
+
   const monthStats = useMemo(() => {
     if (transactions === null || investments === null) {
       return {
@@ -187,14 +209,14 @@ export function useDashboardData() {
         expenseDeltaPct: 0,
       }
     }
-    const safeTx = transactions ?? []
+    const safeTx = normalizedTransactions
     const lastMonthKey = format(subMonths(new Date(), 1), 'yyyy-MM')
 
     const lastMonth = safeTx.reduce(
       (acc, tx) => {
         if (!tx?.date?.startsWith(lastMonthKey)) return acc
         if (isExcludeAnalyticsTx(tx)) return acc
-        const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+        const amount = tx.convertedAmount || 0
         if (tx.type === 'income') acc.income += amount
         if (tx.type === 'expense') acc.expense += amount
         return acc
@@ -206,7 +228,7 @@ export function useDashboardData() {
       (acc, tx) => {
         if (!tx?.date?.startsWith(currentMonthKey)) return acc
         if (isExcludeAnalyticsTx(tx)) return acc
-        const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+        const amount = tx.convertedAmount || 0
         if (tx.type === 'income') acc.income += amount
         if (tx.type === 'expense') acc.expense += amount
         return acc
@@ -224,7 +246,7 @@ export function useDashboardData() {
       incomeDeltaPct: lastMonth.income > 0 ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 : 0,
       expenseDeltaPct: lastMonth.expense > 0 ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 : 0,
     }
-  }, [transactions, investments, currentMonthKey, defaultCurrency, rates])
+  }, [transactions, investments, currentMonthKey, normalizedTransactions])
 
   const portfolioStats = useMemo(() => {
     if (investments === null) return { portfolioValue: 0 }
@@ -254,10 +276,10 @@ export function useDashboardData() {
       return { todayNet: 0, todayIncome: 0 }
     }
     const todayKey = format(new Date(), 'yyyy-MM-dd')
-    const flow = (transactions ?? []).reduce(
+    const flow = normalizedTransactions.reduce(
       (acc, tx) => {
         if (tx?.date !== todayKey) return acc
-        const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+        const amount = tx.convertedAmount || 0
         if (tx.type === 'income') acc.income += amount
         if (tx.type === 'expense') acc.expense += amount
         return acc
@@ -265,7 +287,7 @@ export function useDashboardData() {
       { income: 0, expense: 0 },
     )
     return { todayIncome: flow.income, todayNet: flow.income - flow.expense }
-  }, [transactions, defaultCurrency, rates])
+  }, [transactions, normalizedTransactions])
 
   const chartData = useMemo(() => {
     if (transactions === null)
@@ -277,7 +299,7 @@ export function useDashboardData() {
         data1y: [],
         dataAll: [],
       }
-    const safeTx = transactions ?? []
+    const safeTx = normalizedTransactions ?? []
 
     const generateDaily = (daysCount) => {
       const arr = Array.from({ length: daysCount }, (_, idx) => {
@@ -321,7 +343,7 @@ export function useDashboardData() {
     const { arr: dataAll, map: mapAll } = generateMonthly(totalMonths)
 
     safeTx.forEach((tx) => {
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      const amount = tx.convertedAmount || 0
       const txDate = tx?.date
       if (!txDate) return
 
@@ -372,7 +394,7 @@ export function useDashboardData() {
       data1y,
       dataAll,
     }
-  }, [transactions, defaultCurrency, rates])
+  }, [transactions, normalizedTransactions])
 
   const { monthIncome, monthExpense, monthDelta, monthDeltaTone, monthDeltaPct, incomeDeltaPct, expenseDeltaPct } = monthStats
   const { portfolioValue } = portfolioStats
@@ -399,18 +421,11 @@ export function useDashboardData() {
     const monthBudgetCount = monthBudgets.length
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isArchived)
     const goalCount = activeGoals.length
-    const monthExpenseTxs = (transactions ?? []).filter(
+    const monthExpenseTxs = normalizedTransactions.filter(
       (tx) => tx?.type === 'expense' && tx?.date?.startsWith(currentMonthKey) && !isExcludeAnalyticsTx(tx),
     )
     const monthExpenseTotal = monthExpenseTxs.reduce(
-      (sum, tx) =>
-        sum +
-        convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        ),
+      (sum, tx) => sum + (tx.convertedAmount || 0),
       0,
     )
 
@@ -463,7 +478,7 @@ export function useDashboardData() {
       goalPercent,
       goalRows,
     }
-  }, [budgets, goals, transactions, currentMonthKey, defaultCurrency, rates])
+  }, [budgets, goals, normalizedTransactions, currentMonthKey, defaultCurrency, rates])
 
   const loanSummary = useMemo(() => {
     const safeLoans = loans ?? []
@@ -540,19 +555,14 @@ export function useDashboardData() {
 
   const computeCashBalanceBeforeDate = useCallback(
     (dateKey) => {
-      const safeTx = allTransactionsForBalance ?? transactions ?? []
+      const safeTx = normalizedAllTransactionsForBalance.length > 0 ? normalizedAllTransactionsForBalance : normalizedTransactions
       const target = String(dateKey || '')
       if (!target) return totalWalletBalance || 0
 
       const netFlowSinceTarget = safeTx.reduce((acc, tx) => {
         const d = String(tx?.date || '')
         if (!d || d < target) return acc
-        const amount = convertCurrency(
-          toSafeNumber(tx.amount),
-          tx.currency || defaultCurrency,
-          defaultCurrency,
-          rates,
-        )
+        const amount = tx.convertedAmount || 0
         if (tx.type === 'income') return acc + amount
         if (tx.type === 'expense') return acc - amount
         return acc
@@ -560,7 +570,7 @@ export function useDashboardData() {
 
       return (totalWalletBalance || 0) - netFlowSinceTarget
     },
-    [defaultCurrency, rates, transactions, allTransactionsForBalance, totalWalletBalance],
+    [normalizedAllTransactionsForBalance, normalizedTransactions, totalWalletBalance],
   )
 
   const buildRevenueSeries = useCallback(
@@ -569,14 +579,9 @@ export function useDashboardData() {
         const todayKey = format(new Date(), 'yyyy-MM-dd')
         const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue
         const hourNet = Array.from({ length: 24 }, () => 0)
-        ;(transactions ?? []).forEach((tx) => {
+        normalizedTransactions.forEach((tx) => {
           if (String(tx?.date || '') !== todayKey) return
-          const amount = convertCurrency(
-            toSafeNumber(tx.amount),
-            tx.currency || defaultCurrency,
-            defaultCurrency,
-            rates,
-          )
+          const amount = tx.convertedAmount || 0
           const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
           const fallbackMs = Number(new Date(`${todayKey}T12:00:00`).getTime())
           const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
@@ -623,7 +628,7 @@ export function useDashboardData() {
         return { time: timeMs, value: running }
       })
     },
-    [computeCashBalanceBeforeDate, defaultCurrency, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, rates, transactions],
+    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, normalizedTransactions],
   )
 
   const computeRevenueValue = useCallback(() => {
@@ -721,7 +726,7 @@ export function useDashboardData() {
   const buildPreviousPeriodRevenueSeries = useCallback(
     (rangeId, currentSeries) => {
       if (!currentSeries || currentSeries.length === 0) return []
-      const safeTx = allTransactionsForBalance ?? transactions ?? []
+      const safeTx = normalizedAllTransactionsForBalance.length > 0 ? normalizedAllTransactionsForBalance : normalizedTransactions
 
       if (rangeId === '1d') {
         const yesterday = subDays(new Date(), 1)
@@ -731,12 +736,7 @@ export function useDashboardData() {
         const hourNetYesterday = Array.from({ length: 24 }, () => 0)
         safeTx.forEach((tx) => {
           if (String(tx?.date || '') !== yesterdayKey) return
-          const amount = convertCurrency(
-            toSafeNumber(tx.amount),
-            tx.currency || defaultCurrency,
-            defaultCurrency,
-            rates,
-          )
+          const amount = tx.convertedAmount || 0
           const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
           const fallbackMs = Number(new Date(`${yesterdayKey}T12:00:00`).getTime())
           const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
@@ -780,7 +780,7 @@ export function useDashboardData() {
         safeTx.forEach((tx) => {
           const d = tx?.date
           if (prevDailyNetMap.has(d)) {
-            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const amount = tx.convertedAmount || 0
             const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
             prevDailyNetMap.set(d, prevDailyNetMap.get(d) + signed)
           }
@@ -816,7 +816,7 @@ export function useDashboardData() {
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
           if (prevMonthlyNetMap.has(m)) {
-            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const amount = tx.convertedAmount || 0
             const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
             prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
           }
@@ -851,7 +851,7 @@ export function useDashboardData() {
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
           if (prevMonthlyNetMap.has(m)) {
-            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const amount = tx.convertedAmount || 0
             const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
             prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
           }
@@ -875,7 +875,7 @@ export function useDashboardData() {
 
       return currentSeries
     },
-    [allTransactionsForBalance, transactions, computeCashBalanceBeforeDate, portfolioValue, defaultCurrency, rates],
+    [normalizedAllTransactionsForBalance, normalizedTransactions, computeCashBalanceBeforeDate, portfolioValue],
   )
 
   const zoomCombinedChartSeries = useMemo(() => {
