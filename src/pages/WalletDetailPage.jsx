@@ -307,26 +307,6 @@ export default function WalletDetailPage() {
     return { all: allTransactions.length, expense, income }
   }, [allTransactions, walletId])
 
-  const heroAmbientStyle = useMemo(() => {
-    if (!wallet) return {}
-    const wType = String(wallet.type || '').toLowerCase()
-    const wName = String(wallet.name || '').toLowerCase()
-
-    let tintRgb = '245, 158, 11' // Amber (Cash / Default)
-    if (wType.includes('bank') || wName.includes('bca') || wName.includes('mandiri') || wName.includes('bni') || wName.includes('bri') || wName.includes('jago')) {
-      tintRgb = '99, 102, 241' // Indigo Blue (Bank)
-    } else if (wType.includes('ewallet') || wType.includes('e-wallet') || wName.includes('dana') || wName.includes('gopay') || wName.includes('ovo') || wName.includes('shopee')) {
-      tintRgb = '20, 184, 166' // Emerald/Cyan (E-Wallet)
-    }
-
-    return {
-      background: `
-        radial-gradient(ellipse at 50% 0%, rgba(${tintRgb}, 0.15) 0%, transparent 70%),
-        linear-gradient(180deg, var(--panel-strong) 0%, var(--bg) 100%)
-      `,
-      borderBottom: '1px solid var(--border)',
-    }
-  }, [wallet])
 
   if (wallet === null || (dbWallets !== undefined && !wallet)) {
     return (
@@ -384,11 +364,8 @@ export default function WalletDetailPage() {
       <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)] pb-28 relative">
         {pageError ? <ToastBanner message={pageError} type="error" onDismiss={() => setPageError('')} /> : null}
 
-        {/* ── 1. Curved Hero Section with Wallet Icon & Ambient Glow ────────────── */}
-        <div 
-          className="ft-wallet-detail-hero -mx-4 -mt-4 pb-8 pt-3 px-4 text-center relative overflow-hidden"
-          style={heroAmbientStyle}
-        >
+        {/* ── 1. Clean Neutral Hero Section with Wallet Icon ────────────── */}
+        <div className="ft-wallet-detail-hero -mx-4 -mt-4 pb-8 pt-3 px-4 text-center bg-[var(--panel)] border-b border-[var(--border)] relative overflow-hidden">
           {/* Top Nav Bar with 3-Dots Action Button */}
           <PageHeader
             title={wallet.name}

@@ -1882,18 +1882,8 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 .ft-wallet-detail-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 0;
-  border-bottom: none;
-}
-
-html:not([data-theme="light"]) .ft-wallet-detail-hero {
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 50%, #020617 100%);
-  border-color: rgba(94, 234, 212, 0.12);
-}
-
-[data-theme="light"] .ft-wallet-detail-hero {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
-  border-color: rgba(15, 23, 42, 0.06);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
 }
 
 .ft-wallet-action-btn {
