@@ -73,7 +73,7 @@ export function WalletSelectTrigger({
     >
       {wallet ? (
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} relative grid shrink-0 place-items-center border border-[var(--border)]/60 bg-[var(--panel)] overflow-hidden shadow-2xs`}>
+          <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} relative grid shrink-0 place-items-center border border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
             {getWalletLogoUrl(wallet) ? (
               <img
                 src={getWalletLogoUrl(wallet)}

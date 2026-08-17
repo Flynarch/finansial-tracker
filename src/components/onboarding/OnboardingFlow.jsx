@@ -422,7 +422,7 @@ export default function OnboardingFlow() {
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-full bg-[var(--panel-strong)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-[var(--wallet-logo-bg,var(--panel-strong))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                                 {w.customIcon === 'dollar' ? (
                                   <MoneyBagIcon size={18} strokeWidth={2.5} className="text-amber-500" />
                                 ) : logoUrl ? (

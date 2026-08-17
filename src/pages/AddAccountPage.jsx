@@ -50,7 +50,7 @@ function CircularInstitutionLogo({ inst }) {
     String(inst.name || '').toLowerCase().includes('cash')
 
   return (
-    <div className="w-11 h-11 rounded-full bg-[var(--field-bg)] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+    <div className="w-11 h-11 rounded-full bg-[var(--wallet-logo-bg,var(--field-bg))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
       {isCash ? (
         <div className="w-full h-full flex items-center justify-center bg-white dark:bg-zinc-800 text-amber-500 p-1.5">
           <MoneyBagIcon size={22} />
