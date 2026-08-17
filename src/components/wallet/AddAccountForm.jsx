@@ -4,6 +4,7 @@ import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import { db } from '../../lib/db'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 
@@ -68,8 +69,9 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
       createdAt: Date.now(),
     })
 
+    const allWallets = await db.wallets.toArray()
     const currentDefaultId = useSettingsStore.getState().defaultWalletId
-    if (!currentDefaultId) {
+    if (!currentDefaultId || allWallets.length === 1) {
       await useSettingsStore.getState().setDefaultWalletId(newId)
     }
 

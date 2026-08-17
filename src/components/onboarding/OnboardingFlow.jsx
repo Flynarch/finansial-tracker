@@ -183,6 +183,16 @@ export default function OnboardingFlow() {
     }
   }, [step, username])
 
+  // Automatically ensure first wallet is set as primary/default
+  useEffect(() => {
+    if (wallets && wallets.length > 0) {
+      const isCurrentDefaultValid = defaultWalletId && wallets.some((w) => w.id === defaultWalletId)
+      if (!isCurrentDefaultValid) {
+        setDefaultWalletId(wallets[0].id)
+      }
+    }
+  }, [wallets, defaultWalletId, setDefaultWalletId])
+
   const goTo = useCallback(
     (nextStep) => {
       const dir = nextStep > step ? 1 : -1
@@ -342,6 +352,10 @@ export default function OnboardingFlow() {
     if (trimmedName) {
       await setProfileName(trimmedName)
     }
+    const currentDefault = useSettingsStore.getState().defaultWalletId
+    if (!currentDefault && wallets && wallets.length > 0) {
+      await setDefaultWalletId(wallets[0].id)
+    }
     await completeOnboarding()
     startSpotlightTour()
     clearProgress()
@@ -351,7 +365,7 @@ export default function OnboardingFlow() {
       /* ignore */
     }
     navigate('/dashboard', { replace: true })
-  }, [hasWallets, username, setProfileName, completeOnboarding, startSpotlightTour, navigate])
+  }, [hasWallets, username, wallets, setProfileName, setDefaultWalletId, completeOnboarding, startSpotlightTour, navigate])
 
   if (!isLoaded || hasCompleted) return null
 
