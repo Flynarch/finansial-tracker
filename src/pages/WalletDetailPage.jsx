@@ -427,7 +427,7 @@ export default function WalletDetailPage() {
 
         {/* ── 2. Overlapping Balance Card with Single Adjust Balance Action ─────── */}
         <div className="px-4 -mt-3 relative z-20">
-          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-2">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-2">
             {/* Top Row: Label Caption & Direct Adjust Balance Button */}
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">

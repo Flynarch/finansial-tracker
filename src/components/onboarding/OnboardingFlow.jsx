@@ -415,9 +415,9 @@ export default function OnboardingFlow() {
                         return (
                           <div
                             key={w.id}
-                            className={`group flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+                            className={`group relative flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
                               isDefault
-                                ? 'border-amber-500/35 bg-[var(--field-bg)] ring-1 ring-amber-500/20'
+                                ? 'border-amber-500/35 bg-[var(--field-bg)]'
                                 : 'border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--field-bg)]'
                             }`}
                           >

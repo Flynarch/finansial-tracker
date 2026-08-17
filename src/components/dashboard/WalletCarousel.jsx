@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
-import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Plus, Star } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
@@ -249,11 +249,10 @@ export default function WalletCarousel({
                 <button 
                   key={w.id}
                   onClick={() => navigate(`/wallet/${w.id}`)}
-                  className={`ft-wallet-mini relative transition-all ${
-                    isPrimary ? 'border-amber-500/35 ring-1 ring-amber-500/20' : ''
-                  }`}
+                  className="ft-wallet-mini"
                   title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
                 >
+
                   {/* Logo (prominent) */}
                   <div className="ft-wallet-mini-logo rounded-full overflow-hidden">
                     {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' ? (
@@ -285,7 +284,7 @@ export default function WalletCarousel({
                         {w.name}
                       </span>
                       {isPrimary && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={t('wallets.primaryBadge', 'Akun Utama')} />
+                        <Star size={9} className="fill-amber-500 text-amber-500 shrink-0" />
                       )}
                     </div>
                     <span className="ft-wallet-mini-balance">
