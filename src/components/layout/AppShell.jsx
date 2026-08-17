@@ -208,7 +208,7 @@ function AppShell() {
         <Sidebar />
         <main
           className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
-            location.pathname.startsWith('/wallet/')
+            location.pathname.startsWith('/wallet/') || location.pathname === '/add-account'
               ? 'px-0 pt-0 pb-8'
               : isDetailPage
               ? 'px-4 pt-4 pb-8'
