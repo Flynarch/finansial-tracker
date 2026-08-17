@@ -106,7 +106,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
         <div className="relative z-10 flex flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             {/* Logo Circle */}
-            <div className="w-14 h-14 rounded-2xl bg-[var(--wallet-logo-bg,var(--field-bg))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+            <div className="w-14 h-14 rounded-full bg-[var(--wallet-logo-bg,var(--field-bg))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
               {isCashInstitution ? (
                 <div className="w-full h-full flex items-center justify-center text-amber-500 p-2">
                   <MoneyBagIcon size={30} strokeWidth={2.5} />
@@ -115,7 +115,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 <img
                   src={institution.logoUrl}
                   alt={name}
-                  className="w-full h-full object-contain p-1 rounded-2xl"
+                  className="w-full h-full object-contain p-1.5 rounded-full"
                   onError={(e) => {
                     e.target.style.display = 'none'
                     if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
