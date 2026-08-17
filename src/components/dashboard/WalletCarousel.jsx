@@ -263,7 +263,7 @@ export default function WalletCarousel({
                       <img 
                         src={getWalletLogoUrl(w)} 
                         alt={w.name} 
-                        className="w-full h-full object-contain p-1 rounded-full" 
+                        className="w-full h-full object-cover" 
                         onError={(e) => {
                           e.target.style.display = 'none'
                           if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

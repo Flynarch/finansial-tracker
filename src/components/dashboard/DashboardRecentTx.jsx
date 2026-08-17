@@ -139,7 +139,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                               <img
                                 src={logo}
                                 alt={originWallet.name}
-                                className="h-full w-full object-contain p-[1px] rounded-full"
+                                className="h-full w-full object-cover"
                                 onError={(e) => {
                                   e.target.style.display = 'none'
                                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

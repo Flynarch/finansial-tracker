@@ -472,7 +472,7 @@ export default function AiDigitalReceipt({
                               <img
                                 src={walletLogo}
                                 alt={walletObj.name}
-                                className="h-full w-full object-contain p-[0.5px] rounded-full"
+                                className="h-full w-full object-cover"
                                 onError={(e) => {
                                   e.target.style.display = 'none'
                                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

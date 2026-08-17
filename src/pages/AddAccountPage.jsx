@@ -59,7 +59,7 @@ function CircularInstitutionLogo({ inst }) {
         <img
           src={getWalletLogoUrl(inst)}
           alt={inst.name}
-          className="w-full h-full object-contain p-1 rounded-full"
+          className="w-full h-full object-cover"
           onError={(e) => {
             e.target.style.display = 'none'
             if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
