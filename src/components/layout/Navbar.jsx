@@ -165,6 +165,7 @@ function Navbar() {
           {/* AI Chat */}
           <button
             type="button"
+            data-tour="ai-chat-btn"
             onClick={() => useChatStore.getState().setIsOpen(true)}
             aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
             title={t('aiChat.title', 'Konsultasi AI Chat')}

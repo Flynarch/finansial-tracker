@@ -64,6 +64,7 @@ export default function Dashboard() {
     zoomCombinedChartSeries,
     comparePrevious,
     setComparePrevious,
+    comparisonSummary,
     showDetailedAnalytics,
     setShowDetailedAnalytics,
     zoomTooltipDismissed,
@@ -250,6 +251,7 @@ export default function Dashboard() {
           netWorthGrowth={netWorthGrowth}
           comparePrevious={comparePrevious}
           setComparePrevious={setComparePrevious}
+          comparisonSummary={comparisonSummary}
           zoomCombinedChartSeries={zoomCombinedChartSeries}
           zoomRevenueChartDomain={zoomRevenueChartDomain}
           zoomRevenueAxisTicks={zoomRevenueAxisTicks}

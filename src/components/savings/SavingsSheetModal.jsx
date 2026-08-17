@@ -5,7 +5,6 @@ import BottomSheet from '../ui/BottomSheet'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
-import useBottomSheet from '../../hooks/useBottomSheet'
 import {
   formatMoneyInput,
   formatMoneyValueForInput,
@@ -16,7 +15,6 @@ import {
 export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null, onSaved }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
-  const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
   const targetAmountInputRef = useRef(null)
   const currentAmountInputRef = useRef(null)
@@ -54,8 +52,6 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
     }
   }
 
-
-
   const save = async () => {
     const payload = {
       name: String(form.name || '').trim(),
@@ -83,7 +79,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
         await db.goals.add(payload)
       }
       onSaved?.()
-      closeSheet()
+      onClose()
     } catch {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
       setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
@@ -94,24 +90,24 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
     <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
-      title={editingGoal ? t('savings.sheet.editTitle') : t('savings.sheet.addTitle')}
-      closeAriaLabel={t('savings.sheet.close')}
+      title={editingGoal ? t('savings.sheet.editTitle', 'Edit Target Tabungan') : t('savings.sheet.addTitle', 'Tambah Target Tabungan')}
     >
       {sheetError ? <ToastBanner message={sheetError} /> : null}
 
-      <div className="grid gap-3">
+      <div className="grid gap-3 pt-1">
         <label className="ft-label text-xs">
-          {t('savings.goalName')}
+          {t('savings.goalName', 'Nama Target')}
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            className="ft-field mt-1 w-full"
+            placeholder={t('savings.namePlaceholder', 'Beli Rumah, Dana Darurat, Liburan...')}
+            className="ft-field mt-1 w-full text-xs font-semibold py-2 px-3 rounded-xl"
           />
         </label>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           <label className="ft-label text-xs">
-            {t('savings.target')}
+            {t('savings.target', 'Target Nominal')}
             <input
               ref={targetAmountInputRef}
               type="text"
@@ -129,11 +125,12 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
                   el.setSelectionRange(caret, caret)
                 })
               }}
-              className="ft-field mt-1 w-full font-semibold tabular-nums"
+              placeholder="0"
+              className="ft-field mt-1 w-full font-bold tabular-nums text-xs py-2 px-3 rounded-xl"
             />
           </label>
           <label className="ft-label text-xs">
-            {t('savings.current')}
+            {t('savings.current', 'Saldo Awal')}
             <input
               ref={currentAmountInputRef}
               type="text"
@@ -151,13 +148,14 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
                   el.setSelectionRange(caret, caret)
                 })
               }}
-              className="ft-field mt-1 w-full font-semibold tabular-nums"
+              placeholder="0"
+              className="ft-field mt-1 w-full font-bold tabular-nums text-xs py-2 px-3 rounded-xl"
             />
           </label>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           <label className="ft-label text-xs">
-            {t('savings.currency')}
+            {t('savings.currency', 'Mata Uang')}
             <select
               value={form.currency}
               onChange={(e) =>
@@ -168,7 +166,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
                   currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
                 }))
               }
-              className="ft-field mt-1 w-full"
+              className="ft-field mt-1 w-full text-xs font-semibold py-2 px-3 rounded-xl"
             >
               {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
                 <option key={c} value={c}>
@@ -179,24 +177,25 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
           </label>
         </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">
+          <Button
+            type="button"
+            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)] !py-2 !px-4 text-xs active:scale-95 transition-all cursor-pointer"
+            onClick={onClose}
+          >
+            {t('savings.cancel', 'Batal')}
+          </Button>
           <Button
             type="button"
             onClick={save}
+            className="!py-2 !px-5 text-xs font-bold active:scale-95 transition-all cursor-pointer"
             disabled={
               !String(form.name || '').trim() ||
               parseMoneyInput(form.targetAmount, form.currency) <= 0 ||
               parseMoneyInput(form.currentAmount, form.currency) < 0
             }
           >
-            {t('savings.save')}
-          </Button>
-          <Button
-            type="button"
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-            onClick={onClose}
-          >
-            {t('savings.cancel')}
+            {t('savings.save', 'Simpan')}
           </Button>
         </div>
       </div>

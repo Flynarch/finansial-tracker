@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { format, startOfMonth, subMonths, differenceInDays } from 'date-fns'
+import { format, startOfMonth, subMonths, subDays, differenceInDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeAllWalletBalances } from '../lib/db'
@@ -718,20 +718,197 @@ export function useDashboardData() {
     }
   }, [rangedSummaryStats.net, zoomRevenueValue])
 
+  const buildPreviousPeriodRevenueSeries = useCallback(
+    (rangeId, currentSeries) => {
+      if (!currentSeries || currentSeries.length === 0) return []
+      const safeTx = allTransactionsForBalance ?? transactions ?? []
+
+      if (rangeId === '1d') {
+        const yesterday = subDays(new Date(), 1)
+        const yesterdayKey = format(yesterday, 'yyyy-MM-dd')
+        const startBalanceYesterday = computeCashBalanceBeforeDate(yesterdayKey) + portfolioValue
+
+        const hourNetYesterday = Array.from({ length: 24 }, () => 0)
+        safeTx.forEach((tx) => {
+          if (String(tx?.date || '') !== yesterdayKey) return
+          const amount = convertCurrency(
+            toSafeNumber(tx.amount),
+            tx.currency || defaultCurrency,
+            defaultCurrency,
+            rates,
+          )
+          const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+          const fallbackMs = Number(new Date(`${yesterdayKey}T12:00:00`).getTime())
+          const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
+          const hour = new Date(txMs).getHours()
+          if (hour >= 0 && hour <= 23) hourNetYesterday[hour] += signed
+        })
+
+        let running = startBalanceYesterday
+        const yesterdayHourly = Array.from({ length: 24 }, (_, hour) => {
+          running += toSafeNumber(hourNetYesterday[hour])
+          return running
+        })
+
+        return currentSeries.map((item) => {
+          const hour = new Date(item.time).getHours()
+          const prevVal = yesterdayHourly[Math.min(23, Math.max(0, hour))] ?? startBalanceYesterday
+          return {
+            ...item,
+            prevValue: prevVal,
+            prevLabel: `${format(yesterday, 'dd MMM')}, ${String(hour).padStart(2, '0')}:00`,
+          }
+        })
+      }
+
+      let daysBack = 7
+      if (rangeId === '1w') daysBack = 7
+      else if (rangeId === '1m') daysBack = 30
+      else if (rangeId === '3m') daysBack = 90
+
+      if (['1w', '1m', '3m'].includes(rangeId)) {
+        const today = new Date()
+        const prevDates = Array.from({ length: daysBack }, (_, idx) => {
+          const d = subDays(today, daysBack * 2 - 1 - idx)
+          return format(d, 'yyyy-MM-dd')
+        })
+
+        const startPrevDate = prevDates[0]
+        const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue
+
+        const prevDailyNetMap = new Map(prevDates.map((d) => [d, 0]))
+        safeTx.forEach((tx) => {
+          const d = tx?.date
+          if (prevDailyNetMap.has(d)) {
+            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+            prevDailyNetMap.set(d, prevDailyNetMap.get(d) + signed)
+          }
+        })
+
+        let running = startBalancePrev
+        const prevRunningArray = prevDates.map((d) => {
+          running += prevDailyNetMap.get(d) || 0
+          return { date: d, value: running }
+        })
+
+        return currentSeries.map((item, idx) => {
+          const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          return {
+            ...item,
+            prevValue: prevData?.value ?? startBalancePrev,
+            prevLabel: prevData?.date ? format(new Date(prevData.date), 'dd MMM yyyy') : '',
+          }
+        })
+      }
+
+      if (rangeId === 'ytd') {
+        const currentYear = new Date().getFullYear()
+        const prevYear = currentYear - 1
+        const monthsCount = Math.max(2, new Date().getMonth() + 1)
+        const prevMonths = Array.from({ length: monthsCount }, (_, idx) => {
+          const m = String(idx + 1).padStart(2, '0')
+          return `${prevYear}-${m}`
+        })
+
+        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue
+        const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
+        safeTx.forEach((tx) => {
+          const m = String(tx?.date || '').slice(0, 7)
+          if (prevMonthlyNetMap.has(m)) {
+            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+            prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
+          }
+        })
+
+        let running = startBalancePrev
+        const prevRunningArray = prevMonths.map((m) => {
+          running += prevMonthlyNetMap.get(m) || 0
+          return { month: m, value: running }
+        })
+
+        return currentSeries.map((item, idx) => {
+          const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          return {
+            ...item,
+            prevValue: prevData?.value ?? startBalancePrev,
+            prevLabel: prevData?.month ? format(new Date(`${prevData.month}-01`), 'MMM yyyy') : '',
+          }
+        })
+      }
+
+      if (rangeId === '1y' || rangeId === 'all') {
+        const totalMonths = currentSeries.length || 12
+        const today = new Date()
+        const prevMonths = Array.from({ length: totalMonths }, (_, idx) => {
+          const d = subMonths(today, totalMonths * 2 - 1 - idx)
+          return format(d, 'yyyy-MM')
+        })
+
+        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue
+        const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
+        safeTx.forEach((tx) => {
+          const m = String(tx?.date || '').slice(0, 7)
+          if (prevMonthlyNetMap.has(m)) {
+            const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+            prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
+          }
+        })
+
+        let running = startBalancePrev
+        const prevRunningArray = prevMonths.map((m) => {
+          running += prevMonthlyNetMap.get(m) || 0
+          return { month: m, value: running }
+        })
+
+        return currentSeries.map((item, idx) => {
+          const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          return {
+            ...item,
+            prevValue: prevData?.value ?? startBalancePrev,
+            prevLabel: prevData?.month ? format(new Date(`${prevData.month}-01`), 'MMM yyyy') : '',
+          }
+        })
+      }
+
+      return currentSeries
+    },
+    [allTransactionsForBalance, transactions, computeCashBalanceBeforeDate, portfolioValue, defaultCurrency, rates],
+  )
+
   const zoomCombinedChartSeries = useMemo(() => {
     if (!zoomRevenueSeries || zoomRevenueSeries.length === 0) return []
     if (!comparePrevious) return zoomRevenueSeries
+    return buildPreviousPeriodRevenueSeries(zoomRevenueRange, zoomRevenueSeries)
+  }, [zoomRevenueSeries, comparePrevious, buildPreviousPeriodRevenueSeries, zoomRevenueRange])
 
-    const count = zoomRevenueSeries.length
-    return zoomRevenueSeries.map((item, idx) => {
-      const prevRatio = 0.85 + Math.sin((idx / (count || 1)) * Math.PI) * 0.1
-      const prevVal = Math.round(item.value * prevRatio)
-      return {
-        ...item,
-        prevValue: prevVal,
-      }
-    })
-  }, [zoomRevenueSeries, comparePrevious])
+  const comparisonSummary = useMemo(() => {
+    if (!comparePrevious || !zoomCombinedChartSeries || zoomCombinedChartSeries.length === 0) return null
+
+    const first = zoomCombinedChartSeries[0]
+    const last = zoomCombinedChartSeries[zoomCombinedChartSeries.length - 1]
+    const currentEndVal = last?.value ?? 0
+    const currentStartVal = first?.value ?? 0
+    const currentNet = currentEndVal - currentStartVal
+
+    const prevEndVal = last?.prevValue ?? 0
+    const prevStartVal = first?.prevValue ?? 0
+    const prevNet = prevEndVal - prevStartVal
+
+    const diff = currentNet - prevNet
+    const isPositive = diff >= 0
+
+    return {
+      currentNet,
+      prevNet,
+      diff,
+      isPositive,
+      currentEndVal,
+      prevEndVal,
+    }
+  }, [comparePrevious, zoomCombinedChartSeries])
 
   const zoomPeakAndFloor = useMemo(() => {
     if (!zoomRevenueSeries || zoomRevenueSeries.length === 0) {
@@ -875,6 +1052,7 @@ export function useDashboardData() {
     zoomCombinedChartSeries,
     comparePrevious,
     setComparePrevious,
+    comparisonSummary,
     showDetailedAnalytics,
     setShowDetailedAnalytics,
     zoomTooltipDismissed,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Pure chart domain and tick helper functions extracted from Dashboard.jsx.
  * All functions are stateless and have no React dependencies.
  */
@@ -22,7 +22,9 @@ export function buildCenteredDomain(series, padRatio = 0.22, { includeZero = fal
 }
 
 export function buildPaddedDomain(series, padRatio = 0.18, { includeZero = false, respectDataSign = false } = {}) {
-  const values = (series || []).map((row) => Number(row?.value)).filter((v) => Number.isFinite(v))
+  const values = (series || [])
+    .flatMap((row) => [Number(row?.value), Number(row?.prevValue)])
+    .filter((v) => Number.isFinite(v))
   if (values.length === 0) return ['auto', 'auto']
   const min = Math.min(...values); const max = Math.max(...values)
   const span = Math.max(1, max - min); const pad = span * padRatio

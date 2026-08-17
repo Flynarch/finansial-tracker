@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
-import BottomSheet from '../ui/BottomSheet'
+import Modal from '../ui/Modal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
@@ -125,7 +125,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   }
 
   return (
-    <BottomSheet
+    <Modal
       isOpen={isOpen}
       onClose={closeSheet}
       title={isDebt ? t('loans.payment.titleDebt', 'Bayar Cicilan Hutang') : t('loans.payment.titleReceivable', 'Terima Pembayaran Piutang')}
@@ -395,6 +395,6 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
           </Button>
         </div>
       </div>
-    </BottomSheet>
+    </Modal>
   )
 }

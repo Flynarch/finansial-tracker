@@ -8,7 +8,6 @@ import ToastBanner from '../ui/ToastBanner'
 import { resolveExpenseParentIconKey } from '../../lib/categoryIcon'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
-import useBottomSheet from '../../hooks/useBottomSheet'
 import { formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../../lib/utils'
 import { getMergedExpenseTree, parseExpenseCategoryPath } from '../../lib/expenseCategories'
 
@@ -131,7 +130,6 @@ const BudgetParentCategoryItem = memo(function BudgetParentCategoryItem({
 
 export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null, initialMonth, onSaved }) {
   const { locale, t } = useTranslation()
-  const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
   const [expandedParentId, setExpandedParentId] = useState(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
@@ -243,7 +241,7 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
         await db.budgets.add(payload)
       }
       onSaved?.()
-      closeSheet()
+      onClose()
     } catch {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
       setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
@@ -254,8 +252,7 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
     <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
-      title={editingBudget ? t('budget.sheet.editTitle') : t('budget.sheet.addTitle')}
-      closeAriaLabel={t('budget.sheet.close')}
+      title={editingBudget ? t('budget.sheet.editTitle', 'Edit Anggaran') : t('budget.sheet.addTitle', 'Tambah Anggaran')}
     >
       {sheetError ? <ToastBanner message={sheetError} /> : null}
 
@@ -353,20 +350,21 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
           />
         </label>
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">
           <Button
             type="button"
-            onClick={save}
-            disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
+            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)] !py-1.5 !px-3.5 text-xs active:scale-95 transition-all cursor-pointer"
+            onClick={onClose}
           >
-            {t('budget.save')}
+            {t('budget.cancel', 'Batal')}
           </Button>
           <Button
             type="button"
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-            onClick={closeSheet}
+            onClick={save}
+            className="!py-1.5 !px-4 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
           >
-            {t('budget.cancel')}
+            {t('budget.save', 'Simpan')}
           </Button>
         </div>
       </div>

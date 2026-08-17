@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 
-function Modal({ isOpen, title, children, onClose }) {
+function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md' }) {
   const { isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const { t } = useTranslation()
 
@@ -21,7 +21,7 @@ function Modal({ isOpen, title, children, onClose }) {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-[10vh] bg-black/70 backdrop-blur-md transition-opacity duration-300 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       // Prevent background scroll without breaking inner scroll containers.
@@ -30,25 +30,25 @@ function Modal({ isOpen, title, children, onClose }) {
       onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
     >
       <div
-        className={`w-full max-w-md max-h-[90vh] overflow-y-auto hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-2xl transition-all duration-250 will-change-[transform,opacity] [transform:translate3d(0,0,0)] ${
-          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
+        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-300 transform-gpu will-change-[transform,opacity] ${
+          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-4 opacity-0'
         }`}
         style={{
           boxShadow: 'var(--shadow-card)',
-          transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+          transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
         }}
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="ft-display text-base font-semibold text-[var(--fg)]">{title}</h3>
+        <div className="mb-3 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
+          <h3 className="ft-display text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h3>
           <button
             type="button"
             onClick={closeSheet}
-            className="flex h-8 w-8 items-center justify-center rounded-full transition-colors text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)]"
-            aria-label={t('common.close')}
+            className="flex h-7 w-7 items-center justify-center rounded-full transition-colors text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] cursor-pointer"
+            aria-label={t('common.close', 'Tutup')}
           >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
               <path d="M18 6L6 18" />
               <path d="M6 6l12 12" />
             </svg>

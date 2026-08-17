@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -6,11 +6,12 @@ import {
   TrendingUp,
   PieChart,
   Sparkles,
-  PlusCircle,
+  Compass,
   X,
   ArrowRight,
   ArrowLeft,
   Check,
+  CornerDownLeft,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -18,14 +19,70 @@ import useTranslation from '../../hooks/useTranslation'
 function getVisibleElement(selector) {
   if (typeof document === 'undefined' || !selector) return null
   const elements = Array.from(document.querySelectorAll(selector))
+  if (elements.length === 0) return null
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+  // If looking for ai-chat-btn, prefer the mobile floating AiTriggerBar on mobile, and Navbar icon on desktop
+  const sorted = elements.slice().sort((a, b) => {
+    const aIsAiBar = a.classList.contains('ft-ai-bar')
+    const bIsAiBar = b.classList.contains('ft-ai-bar')
+    if (isMobile) {
+      if (aIsAiBar && !bIsAiBar) return -1
+      if (!aIsAiBar && bIsAiBar) return 1
+    } else {
+      if (aIsAiBar && !bIsAiBar) return 1
+      if (!aIsAiBar && bIsAiBar) return -1
+    }
+    return 0
+  })
+
   return (
-    elements.find((el) => {
+    sorted.find((el) => {
       const rect = el.getBoundingClientRect()
-      return rect.width > 0 && rect.height > 0
+      const style = window.getComputedStyle(el)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
     }) ||
-    elements[0] ||
+    sorted[0] ||
     null
   )
+}
+
+function smoothScrollTo(targetY, duration = 540) {
+  if (typeof window === 'undefined') return
+  const startY = window.scrollY || window.pageYOffset
+  const diff = targetY - startY
+  if (Math.abs(diff) < 2) return
+
+  const startTime = performance.now()
+  // Quintic deceleration for a silky, butter-smooth scroll without jerky snapping
+  const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5)
+
+  const step = (currentTime) => {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(1, elapsed / duration)
+    const eased = easeOutQuint(progress)
+    window.scrollTo(0, startY + diff * eased)
+    if (progress < 1) {
+      requestAnimationFrame(step)
+    }
+  }
+
+  requestAnimationFrame(step)
+}
+
+/** Generate Driver.js-style evenodd SVG path with rounded rectangle cutout */
+function buildCutoutSvgPath(rect, vw, vh) {
+  if (!rect) return `M0,0 H${vw} V${vh} H0 Z`
+  const { left: x, top: y, width: w, height: h, radius: rawR } = rect
+  const r = Math.max(0, Math.min(rawR || 20, w / 2, h / 2))
+
+  return `M0,0 H${vw} V${vh} H0 Z M${x + r},${y} h${w - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${h - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - 2 * r} a${r},${r} 0 0 1 -${r},-${r} v-${h - 2 * r} a${r},${r} 0 0 1 ${r},-${r} Z`
 }
 
 export default function SpotlightTour() {
@@ -37,7 +94,17 @@ export default function SpotlightTour() {
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [targetRect, setTargetRect] = useState(null)
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 340, placement: 'bottom' })
+  const [popoverPos, setPopoverPos] = useState({
+    top: 0,
+    left: 0,
+    width: 360,
+    placement: 'bottom',
+    arrowLeft: 180,
+    arrowTop: 80,
+  })
+
+  const rafTrackingId = useRef(null)
+  const targetElementRef = useRef(null)
 
   const tourSteps = useMemo(
     () => [
@@ -51,6 +118,9 @@ export default function SpotlightTour() {
         ),
         Icon: Wallet,
         color: 'text-indigo-500 bg-indigo-500/12 border-indigo-500/20',
+        radius: 24,
+        padding: 6,
+        preferredPlacement: 'bottom',
       },
       {
         id: 'networth-chart',
@@ -62,6 +132,9 @@ export default function SpotlightTour() {
         ),
         Icon: TrendingUp,
         color: 'text-emerald-500 bg-emerald-500/12 border-emerald-500/20',
+        radius: 24,
+        padding: 6,
+        preferredPlacement: 'bottom',
       },
       {
         id: 'pulse-bento',
@@ -73,6 +146,9 @@ export default function SpotlightTour() {
         ),
         Icon: PieChart,
         color: 'text-purple-500 bg-purple-500/12 border-purple-500/20',
+        radius: 24,
+        padding: 6,
+        preferredPlacement: 'bottom',
       },
       {
         id: 'ai-chat-btn',
@@ -84,17 +160,23 @@ export default function SpotlightTour() {
         ),
         Icon: Sparkles,
         color: 'text-amber-500 bg-amber-500/12 border-amber-500/20',
+        radius: 9999,
+        padding: 4,
+        preferredPlacement: 'top',
       },
       {
         id: 'bottom-nav',
         target: '[data-tour="bottom-nav"]',
-        title: t('tour.step.nav.title', 'Navigasi & Tombol Catat'),
+        title: t('tour.step.nav.title', 'Navigasi & Menu Lengkap'),
         desc: t(
           'tour.step.nav.desc',
-          'Gunakan tombol (+) melayang untuk mencatat manual kapan saja, serta jelajahi menu Transaksi, Aktivitas, dan Profil.',
+          'Jelajahi seluruh menu utama seperti Transaksi, Anggaran, Aktivitas, Kalender, dan Pengaturan dengan mudah.',
         ),
-        Icon: PlusCircle,
+        Icon: Compass,
         color: 'text-sky-500 bg-sky-500/12 border-sky-500/20',
+        radius: 20,
+        padding: 6,
+        preferredPlacement: 'top',
       },
     ],
     [t],
@@ -102,11 +184,13 @@ export default function SpotlightTour() {
 
   const currentStep = tourSteps[currentStepIndex] || tourSteps[0]
 
-  // Update bounding box coordinates for active step
-  const updateBoundingBox = useCallback(() => {
+  // Calculate & update target bounding box and popover position with guaranteed zero-overlap
+  const computePositions = useCallback(() => {
     if (!isSpotlightTourActive || !currentStep) return
 
     const el = getVisibleElement(currentStep.target)
+    targetElementRef.current = el
+
     if (!el) {
       setTargetRect(null)
       return
@@ -118,8 +202,10 @@ export default function SpotlightTour() {
     let width = rect.width
     let height = rect.height
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+
     // For bottom-nav step on mobile, include the central FAB button bounds if present
-    if (currentStep.id === 'bottom-nav') {
+    if (currentStep.id === 'bottom-nav' && !isDesktop) {
       const fabEl = getVisibleElement('[data-tour="quick-add-btn"]')
       if (fabEl) {
         const fabRect = fabEl.getBoundingClientRect()
@@ -135,73 +221,154 @@ export default function SpotlightTour() {
       }
     }
 
-    const padding = 6
+    const pad = currentStep.padding ?? 6
+    const roundedRadius = currentStep.radius ?? 20
+
     const roundedRect = {
-      top: Math.max(0, top - padding),
-      left: Math.max(0, left - padding),
-      width: width + padding * 2,
-      height: height + padding * 2,
-      right: left + width + padding,
-      bottom: top + height + padding,
+      top: Math.max(0, top - pad),
+      left: Math.max(0, left - pad),
+      width: width + pad * 2,
+      height: height + pad * 2,
+      right: left + width + pad,
+      bottom: top + height + pad,
+      radius: roundedRadius,
     }
 
     setTargetRect(roundedRect)
 
-    // Calculate Popover Position
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const cardWidth = Math.min(360, vw - 32)
-    const estimatedCardHeight = 220
+    // Viewport dimensions
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+    const cardWidth = Math.min(360, vw - 24)
+    const estimatedCardHeight = 185
 
     let popoverLeft = roundedRect.left + roundedRect.width / 2 - cardWidth / 2
-    popoverLeft = Math.max(16, Math.min(popoverLeft, vw - cardWidth - 16))
+    popoverLeft = Math.max(12, Math.min(popoverLeft, vw - cardWidth - 12))
 
     let popoverTop
     let placement
+    let arrowTop = 60
 
-    if (currentStep.id === 'bottom-nav') {
-      popoverTop = Math.max(16, roundedRect.top - estimatedCardHeight - 14)
-      placement = 'top'
-    } else if (roundedRect.bottom + estimatedCardHeight + 20 < vh) {
-      popoverTop = roundedRect.bottom + 12
-      placement = 'bottom'
-    } else if (roundedRect.top - estimatedCardHeight - 16 > 0) {
-      popoverTop = roundedRect.top - estimatedCardHeight - 12
-      placement = 'top'
+    // Desktop sidebar step positioning (placed to the right of the sidebar)
+    if (currentStep.id === 'bottom-nav' && isDesktop && roundedRect.left <= 40 && roundedRect.width < 320) {
+      placement = 'right'
+      popoverLeft = Math.min(vw - cardWidth - 20, roundedRect.right + 18)
+      popoverTop = Math.max(70, Math.min(vh - estimatedCardHeight - 30, vh / 2 - estimatedCardHeight / 2))
+      arrowTop = Math.max(24, Math.min(estimatedCardHeight / 2, estimatedCardHeight - 24))
     } else {
-      popoverTop = Math.max(16, vh / 2 - estimatedCardHeight / 2)
-      placement = 'center'
+      const spaceBelow = vh - roundedRect.bottom - 16
+      const spaceAbove = roundedRect.top - 16
+
+      if (currentStep.preferredPlacement === 'top' || (spaceAbove >= estimatedCardHeight && spaceBelow < estimatedCardHeight)) {
+        placement = 'top'
+        popoverTop = Math.max(12, roundedRect.top - estimatedCardHeight - 14)
+      } else {
+        placement = 'bottom'
+        popoverTop = Math.min(vh - estimatedCardHeight - 12, roundedRect.bottom + 14)
+      }
     }
 
-    setPopoverPos({ top: popoverTop, left: popoverLeft, width: cardWidth, placement })
+    const targetCenterX = roundedRect.left + roundedRect.width / 2
+    const arrowLeft = Math.max(24, Math.min(targetCenterX - popoverLeft, cardWidth - 24))
+
+    setPopoverPos({
+      top: popoverTop,
+      left: popoverLeft,
+      width: cardWidth,
+      placement,
+      arrowLeft,
+      arrowTop,
+    })
   }, [isSpotlightTourActive, currentStep])
 
-  // Scroll to element & update positioning on step change, resize, scroll
+  // Continuous tracking loop (RAF) for 650ms during step transitions and smooth scroll
+  const startTrackingLoop = useCallback(
+    (durationMs = 650) => {
+      if (rafTrackingId.current) {
+        cancelAnimationFrame(rafTrackingId.current)
+      }
+      const startTime = performance.now()
+
+      const tick = (now) => {
+        computePositions()
+        if (now - startTime < durationMs) {
+          rafTrackingId.current = requestAnimationFrame(tick)
+        } else {
+          computePositions()
+          rafTrackingId.current = null
+        }
+      }
+
+      rafTrackingId.current = requestAnimationFrame(tick)
+    },
+    [computePositions],
+  )
+
+  // Step changes: Eased smooth scroll to optimal position
   useEffect(() => {
     if (!isSpotlightTourActive) return
 
-    // Ensure user is on /dashboard during the feature tour
+    // Ensure user is on /dashboard during the tour
     if (location.pathname !== '/dashboard') {
       navigate('/dashboard')
     }
 
-    const timer = setTimeout(() => {
-      const el = getVisibleElement(currentStep?.target)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-      }
-      updateBoundingBox()
-    }, 120)
+    const el = getVisibleElement(currentStep?.target)
+    if (el) {
+      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+      const elRect = el.getBoundingClientRect()
+      const elDocTop = elRect.top + (window.scrollY || window.pageYOffset)
 
-    window.addEventListener('resize', updateBoundingBox)
-    window.addEventListener('scroll', updateBoundingBox, true)
+      let targetScrollY = 0
+
+      if (currentStep.id === 'hero-carousel') {
+        targetScrollY = 0
+      } else if (currentStep.id === 'networth-chart' || currentStep.id === 'pulse-bento') {
+        targetScrollY = Math.max(0, elDocTop - 68)
+      } else if (currentStep.id === 'ai-chat-btn' || currentStep.id === 'bottom-nav') {
+        if (!isDesktop) {
+          targetScrollY = Math.min(
+            Math.max(0, elDocTop - 280),
+            document.documentElement.scrollHeight - window.innerHeight,
+          )
+        }
+      }
+
+      smoothScrollTo(targetScrollY, 540)
+    }
+
+    startTrackingLoop(700)
 
     return () => {
-      clearTimeout(timer)
-      window.removeEventListener('resize', updateBoundingBox)
-      window.removeEventListener('scroll', updateBoundingBox, true)
+      if (rafTrackingId.current) {
+        cancelAnimationFrame(rafTrackingId.current)
+      }
     }
-  }, [isSpotlightTourActive, currentStepIndex, location.pathname, navigate, currentStep, updateBoundingBox])
+  }, [isSpotlightTourActive, currentStepIndex, location.pathname, navigate, currentStep, startTrackingLoop])
+
+  // Resize and passive scroll listeners
+  useEffect(() => {
+    if (!isSpotlightTourActive) return undefined
+
+    const handleScrollOrResize = () => {
+      computePositions()
+    }
+
+    window.addEventListener('resize', handleScrollOrResize, { passive: true })
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true })
+
+    let resizeObserver = null
+    if (typeof ResizeObserver !== 'undefined' && targetElementRef.current) {
+      resizeObserver = new ResizeObserver(() => computePositions())
+      resizeObserver.observe(targetElementRef.current)
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize)
+      window.removeEventListener('scroll', handleScrollOrResize)
+      if (resizeObserver) resizeObserver.disconnect()
+    }
+  }, [isSpotlightTourActive, computePositions])
 
   const handleNext = useCallback(() => {
     if (currentStepIndex < tourSteps.length - 1) {
@@ -246,108 +413,140 @@ export default function SpotlightTour() {
 
   if (!isSpotlightTourActive) return null
 
+  const StepIcon = currentStep?.Icon || Sparkles
+  const isLastStep = currentStepIndex === tourSteps.length - 1
+
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
   const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
-  const StepIcon = currentStep?.Icon || Sparkles
+  const svgPath = buildCutoutSvgPath(targetRect, vw, vh)
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] overflow-hidden select-none">
-      {/* SVG Backdrop with Hole Cutout */}
-      <svg className="absolute inset-0 h-full w-full pointer-events-auto" onClick={handleNext}>
-        <defs>
-          <mask id="spotlight-mask">
-            <rect x="0" y="0" width={vw} height={vh} fill="white" />
-            {targetRect && (
-              <rect
-                x={targetRect.left}
-                y={targetRect.top}
-                width={targetRect.width}
-                height={targetRect.height}
-                rx="18"
-                ry="18"
-                fill="black"
-              />
-            )}
-          </mask>
-        </defs>
-        <rect
-          x="0"
-          y="0"
-          width="100%"
-          height="100%"
-          fill="rgba(15, 23, 42, 0.72)"
-          mask="url(#spotlight-mask)"
-          className="transition-all duration-300 ease-out backdrop-blur-2xs"
+    <div className="fixed inset-0 z-[110] overflow-hidden select-none animate-fadeIn pointer-events-none">
+      {/* Driver.js style clean SVG backdrop with evenodd cutout */}
+      <svg
+        className="absolute inset-0 h-full w-full pointer-events-auto"
+        onClick={handleNext}
+      >
+        <path
+          d={svgPath}
+          fill="rgba(5, 8, 18, 0.72)"
+          fillRule="evenodd"
+          className="transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
 
-      {/* Target Highlight Border Ring */}
+      {/* Subtle, ultra-clean elevated spotlight rim */}
       {targetRect && (
         <div
-          className="pointer-events-none absolute rounded-2xl border-2 border-[var(--accent)] ring-4 ring-[var(--accent)]/20 shadow-2xl transition-all duration-300 ease-out"
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation()
+            handleNext()
+          }}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleNext()}
+          className="pointer-events-auto absolute border border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/20 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
           style={{
             top: targetRect.top,
             left: targetRect.left,
             width: targetRect.width,
             height: targetRect.height,
+            borderRadius: targetRect.radius || 20,
+            boxShadow:
+              '0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 8px 32px -4px rgba(0, 0, 0, 0.45)',
           }}
+          title={t('tour.targetHint', 'Klik target untuk lanjut')}
+          aria-label={t('tour.targetHint', 'Klik target untuk lanjut')}
         />
       )}
 
       {/* Floating Tooltip Card */}
       <div
-        className="absolute z-10 flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-300 ease-out pointer-events-auto backdrop-blur-md"
+        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)]/95 p-4 sm:p-5 shadow-2xl transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto backdrop-blur-xl"
         style={{
           top: popoverPos.top,
           left: popoverPos.left,
-          width: popoverPos.width || 340,
+          width: popoverPos.width || 360,
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${currentStep.color}`}>
-              <StepIcon className="h-4 w-4" />
+        {/* Dynamic Directional Pointer Arrow (Caret) */}
+        {popoverPos.placement === 'bottom' && (
+          <div
+            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            style={{ left: popoverPos.arrowLeft }}
+          />
+        )}
+        {popoverPos.placement === 'top' && (
+          <div
+            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            style={{ left: popoverPos.arrowLeft }}
+          />
+        )}
+        {popoverPos.placement === 'right' && (
+          <div
+            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            style={{ top: popoverPos.arrowTop }}
+          />
+        )}
+
+        {/* Card Header & Content keyed to step for smooth entry */}
+        <div key={currentStep.id} className="animate-fadeIn">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl border ${currentStep.color} shadow-2xs`}>
+                <StepIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="inline-block rounded-full bg-[var(--accent)]/12 px-2.5 py-0.5 text-[9.5px] font-black tracking-wider text-[var(--accent)] uppercase border border-[var(--accent)]/20">
+                  {t('tour.stepBadge', { current: currentStepIndex + 1, total: tourSteps.length })}
+                </span>
+                <h3 className="truncate text-sm sm:text-base font-black text-[var(--fg)] tracking-tight mt-0.5">
+                  {currentStep?.title}
+                </h3>
+              </div>
             </div>
-            <div className="min-w-0">
-              <span className="inline-block rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[var(--accent)] uppercase border border-[var(--accent)]/20">
-                {t('tour.stepBadge', { current: currentStepIndex + 1, total: tourSteps.length })}
-              </span>
-              <h3 className="truncate text-sm sm:text-base font-black text-[var(--fg)] tracking-tight mt-0.5">
-                {currentStep?.title}
-              </h3>
-            </div>
+
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition cursor-pointer active:scale-95 shadow-2xs"
+              title={t('tour.skip', 'Lewati Tur')}
+              aria-label={t('tour.skip', 'Lewati Tur')}
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition cursor-pointer"
-            title={t('tour.skip', 'Lewati Tur')}
-            aria-label={t('tour.skip', 'Lewati Tur')}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {/* Content Body */}
+          <div className="mt-3 min-h-[50px]">
+            <p className="text-xs leading-relaxed text-[var(--muted)] font-medium">
+              {currentStep?.desc}
+            </p>
+          </div>
         </div>
 
-        {/* Content Body */}
-        <p className="mt-2.5 text-xs leading-relaxed text-[var(--muted)] font-medium">
-          {currentStep?.desc}
-        </p>
+        {/* Keyboard Helper (Desktop only) */}
+        <div className="hidden sm:flex items-center gap-1 mt-1 text-[10px] font-bold text-[var(--muted-2)]">
+          <CornerDownLeft className="h-3 w-3" />
+          <span>{t('tour.keyboardHint', 'Gunakan ← → atau Enter untuk navigasi')}</span>
+        </div>
 
         {/* Footer controls */}
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--border)]/60 pt-3">
-          {/* Step dots */}
-          <div className="flex items-center gap-1">
-            {tourSteps.map((_, idx) => (
+        <div className="mt-3 flex items-center justify-between border-t border-[var(--border)]/70 pt-3">
+          {/* Interactive Step dots */}
+          <div className="flex items-center gap-1.5" role="tablist" aria-label={t('tour.stepDotsLabel', 'Langkah tur')}>
+            {tourSteps.map((step, idx) => (
               <button
-                key={idx}
+                key={step.id}
                 type="button"
+                role="tab"
+                aria-selected={idx === currentStepIndex}
                 onClick={() => setCurrentStepIndex(idx)}
-                aria-label={`Langkah ${idx + 1}`}
-                className="h-1.5 rounded-full transition-all duration-300 cursor-pointer"
+                aria-label={t('tour.stepDot', { step: idx + 1 })}
+                className="h-2 rounded-full transition-all duration-300 cursor-pointer"
                 style={{
-                  width: idx === currentStepIndex ? 18 : 6,
+                  width: idx === currentStepIndex ? 22 : 6,
                   backgroundColor:
                     idx === currentStepIndex ? 'var(--accent)' : 'var(--border)',
                 }}
@@ -355,12 +554,13 @@ export default function SpotlightTour() {
             ))}
           </div>
 
+          {/* Action Buttons */}
           <div className="flex items-center gap-2">
             {currentStepIndex > 0 ? (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="inline-flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>{t('tour.prev', 'Kembali')}</span>
@@ -370,17 +570,17 @@ export default function SpotlightTour() {
             <button
               type="button"
               onClick={handleNext}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3.5 py-1.5 text-xs font-extrabold text-[var(--bg)] shadow-md transition active:scale-95 hover:opacity-90 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-4 py-1.5 text-xs font-black text-[var(--bg)] shadow-md transition active:scale-95 hover:opacity-90 cursor-pointer"
             >
               <span>
-                {currentStepIndex < tourSteps.length - 1
-                  ? t('tour.next', 'Lanjut')
-                  : t('tour.finish', 'Selesai')}
+                {isLastStep
+                  ? t('tour.finish', 'Selesai')
+                  : t('tour.next', 'Lanjut')}
               </span>
-              {currentStepIndex < tourSteps.length - 1 ? (
-                <ArrowRight className="h-3.5 w-3.5" />
-              ) : (
+              {isLastStep ? (
                 <Check className="h-3.5 w-3.5" strokeWidth={3} />
+              ) : (
+                <ArrowRight className="h-3.5 w-3.5" />
               )}
             </button>
           </div>
