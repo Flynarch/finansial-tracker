@@ -277,7 +277,7 @@
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
     --wallet-logo-bg: #272c36;
-    --wallet-logo-border: rgba(255, 255, 255, 0.1);
+    --wallet-logo-border: rgba(255, 255, 255, 0.06);
   }
 
   /* ── Design tokens: midnight (Obsidian Navy Blue Studio) ─────────────── */
@@ -363,7 +363,7 @@
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
     --wallet-logo-bg: #172138;
-    --wallet-logo-border: rgba(255, 255, 255, 0.12);
+    --wallet-logo-border: rgba(255, 255, 255, 0.08);
   }
 
   /* ── Design tokens: light ────────────────────────────────────────────── */
@@ -449,7 +449,7 @@
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
     --wallet-logo-bg: #ffffff;
-    --wallet-logo-border: rgba(15, 23, 42, 0.1);
+    --wallet-logo-border: rgba(15, 23, 42, 0.07);
   }
 
   * {
@@ -1809,9 +1809,9 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid var(--wallet-logo-border, var(--border));
+  border: 0.5px solid var(--wallet-logo-border, var(--border));
   background: var(--wallet-logo-bg, var(--panel-strong));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .ft-wallet-mini-logo img {

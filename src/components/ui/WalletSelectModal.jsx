@@ -83,7 +83,7 @@ export function WalletSelectTrigger({
               <img
                 src={getWalletLogoUrl(wallet)}
                 alt={wallet.name}
-                className="w-full h-full object-contain p-0.5 rounded-full"
+                className="w-full h-full object-contain p-1 rounded-full"
                 onError={(e) => {
                   e.target.style.display = 'none'
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -291,7 +291,7 @@ export default function WalletSelectModal({
                         <img
                           src={logoUrl}
                           alt={w.name}
-                          className="w-full h-full object-contain p-1 rounded-full"
+                          className="w-full h-full object-contain p-1.5 rounded-full"
                           onError={(e) => {
                             e.target.style.display = 'none'
                             if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

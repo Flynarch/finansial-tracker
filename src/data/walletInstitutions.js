@@ -13,6 +13,9 @@ export const getLogoUrl = (domain) => {
 // Modern Official Bank BRI Logo Vector (Royal Blue & Orange emblem)
 export const BRI_CUSTOM_LOGO = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="30" fill="%2300529C"/><path d="M25 82V38h28c11 0 18 5 18 13 0 5-4 9-9 11 7 2 11 7 11 14 0 10-8 16-22 16H25zm16-28h11c5 0 8-2 8-5s-3-5-8-5H41v10zm0 20h12c6 0 10-3 10-7s-4-6-10-6H41v13z" fill="white"/><rect x="85" y="38" width="12" height="44" rx="2" fill="%23F37021"/></svg>`
 
+// Modern Official Bank BCA Logo Vector (Royal Blue with perfectly proportioned centered emblem)
+export const BCA_CUSTOM_LOGO = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="60" fill="%2300529C"/><g transform="translate(20, 40) scale(0.68)"><path d="M18 10 L34 32 L18 54 L2 32 Z" fill="white"/><path d="M18 20 L26 32 L18 44 L10 32 Z" fill="%2300529C"/><text x="44" y="44" fill="white" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="900" letter-spacing="1">BCA</text></g></svg>`
+
 // Modern High-Detail Gold Money Sack Cash Vector (White Badge)
 export const CASH_CUSTOM_LOGO = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="body" x1="12" y1="20" x2="52" y2="60" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23FCD34D"/><stop offset="45%25" stop-color="%23F59E0B"/><stop offset="100%25" stop-color="%23B45309"/></linearGradient><linearGradient id="top" x1="20" y1="8" x2="44" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23FDE68A"/><stop offset="100%25" stop-color="%23D97706"/></linearGradient><linearGradient id="rope" x1="20" y1="20" x2="44" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23EF4444"/><stop offset="100%25" stop-color="%23991B1B"/></linearGradient><linearGradient id="coin" x1="26" y1="32" x2="38" y2="44" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23FFFBEB"/><stop offset="50%25" stop-color="%23FBBF24"/><stop offset="100%25" stop-color="%23D97706"/></linearGradient></defs><rect width="64" height="64" rx="18" fill="white" stroke="%23E2E8F0" stroke-width="1.5"/><path d="M22 14C20 10 18 8 24 8C27 8 29 11 32 11C35 11 37 8 40 8C46 8 44 10 42 14C40 18 24 18 22 14Z" fill="url(%23top)" stroke="%2392400E" stroke-width="1.2"/><rect x="20" y="19" width="24" height="4.5" rx="2.2" fill="url(%23rope)" stroke="%237F1D1D" stroke-width="0.8"/><path d="M25 23.5L22 29M28 23.5L27 30" stroke="%23991B1B" stroke-width="1.8" stroke-linecap="round"/><path d="M21 23C15 26 10 33 10 42C10 52 18 58 32 58C46 58 54 52 54 42C54 33 49 26 43 23C38 25 26 25 21 23Z" fill="url(%23body)" stroke="%2378350F" stroke-width="1.5"/><circle cx="32" cy="40" r="9.5" fill="url(%23coin)" stroke="%23B45309" stroke-width="1.2"/><text x="32" y="44.5" text-anchor="middle" font-size="13" font-weight="900" fill="%2378350F" font-family="sans-serif">$</text><path d="M16 38C15 42 16 48 20 52" stroke="%23FEF3C7" stroke-width="2.2" stroke-linecap="round" opacity="0.6"/></svg>`
 
@@ -21,6 +24,10 @@ export function getWalletLogoUrl(wallet) {
   const name = String(wallet.name || '').toLowerCase()
   const inst = String(wallet.institutionType || wallet.id || '').toLowerCase()
   const url = String(wallet.logoUrl || '')
+
+  if (name.includes('bca') || inst.includes('bca') || url.includes('bca.co.id')) {
+    return BCA_CUSTOM_LOGO
+  }
 
   if (name.includes('bri') || inst.includes('bri') || url.includes('bri.co.id')) {
     return BRI_CUSTOM_LOGO
@@ -50,7 +57,7 @@ export function getWalletLogoUrl(wallet) {
 
 export const walletInstitutions = [
   // ── 1. Bank Utama & Digital Indonesia ──────────────────────────────────
-  { id: 'bca', name: 'BCA', type: 'bank', domain: 'bca.co.id', logoUrl: getLogoUrl('bca.co.id'), isRecommended: true },
+  { id: 'bca', name: 'BCA', type: 'bank', domain: 'bca.co.id', logoUrl: BCA_CUSTOM_LOGO, isRecommended: true },
   { id: 'mandiri', name: 'Mandiri', type: 'bank', domain: 'bankmandiri.co.id', logoUrl: getLogoUrl('bankmandiri.co.id'), isRecommended: true },
   { id: 'bni', name: 'BNI', type: 'bank', domain: 'bni.co.id', logoUrl: getLogoUrl('bni.co.id'), isRecommended: true },
   { id: 'bri', name: 'BRI', type: 'bank', domain: 'bri.co.id', logoUrl: BRI_CUSTOM_LOGO, isRecommended: true },

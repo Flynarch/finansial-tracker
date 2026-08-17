@@ -398,7 +398,7 @@ export default function WalletDetailPage() {
                   <img 
                     src={getWalletLogoUrl(wallet)} 
                     alt={wallet.name} 
-                    className="w-full h-full object-contain p-[2px] rounded-full" 
+                    className="w-full h-full object-contain p-1.5 rounded-full" 
                     onError={(e) => {
                       e.target.style.display = 'none'
                       if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -599,7 +599,7 @@ export default function WalletDetailPage() {
               {wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
                 <MoneyBagIcon size={20} className="text-amber-500" strokeWidth={2.5} />
               ) : getWalletLogoUrl(wallet) ? (
-                <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-contain p-1 rounded-full" />
+                <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-contain p-1.5 rounded-full" />
               ) : (
                 getInitials(wallet.name)
               )}
