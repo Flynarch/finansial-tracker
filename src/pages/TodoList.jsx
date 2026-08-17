@@ -809,7 +809,7 @@ function TodoList() {
                 <path d="M8 16h.01"></path>
               </svg>
             </div>
-            <h3 className="text-[15px] font-bold text-[var(--fg)] mb-1">Tidak ada tugas</h3>
+            <h3 className="text-[15px] font-bold text-[var(--fg)] mb-1">{t('todo.emptyState.title', 'Tidak ada tugas')}</h3>
             <p className="text-[13px] font-medium text-[var(--muted)] max-w-[220px] leading-relaxed">
               {filter === 'all'
                 ? t('todo.emptyState.all')
@@ -821,10 +821,10 @@ function TodoList() {
               <button
                 type="button"
                 onClick={() => { resetAddForm(); setAddOpen(true) }}
-                className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[var(--fg)] px-6 py-2.5 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95"
+                className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[var(--fg)] px-6 py-2.5 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95 cursor-pointer"
               >
                 <Plus size={15} strokeWidth={2.5} />
-                <span>Tambah Tugas</span>
+                <span>{t('todo.addBtn', 'Tambah Tugas')}</span>
               </button>
             )}
           </div>

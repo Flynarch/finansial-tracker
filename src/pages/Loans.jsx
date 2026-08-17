@@ -434,16 +434,10 @@ export default function Loans() {
                 const isEditingThisNote = editingNoteId === item.id
                 const isSwiped = swipedId === item.id
 
-                const glowClass = isPaid
-                  ? 'loan-card-glow-paid'
-                  : isDebt
-                    ? 'loan-card-glow-debt'
-                    : 'loan-card-glow-receivable'
-
                 return (
                   <div
                     key={item.id}
-                    className={`relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] ${glowClass} hover:border-[var(--border-strong)] transition-all`}
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:border-[var(--border-strong)] transition-all"
                   >
                     {/* Progressive Swipe Background (Habits Style) */}
                     <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />

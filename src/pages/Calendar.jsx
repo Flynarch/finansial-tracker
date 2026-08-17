@@ -1,4 +1,4 @@
-import { format, getDay, parse, startOfWeek } from 'date-fns'
+import { format, getDay, parse, startOfWeek, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns'
 import { enUS, id } from 'date-fns/locale'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -150,8 +150,19 @@ function Calendar() {
     color: '#f59e0b',
   })
 
-  const transactions = useLiveQuery(() => db.transactions.orderBy('date').toArray(), [], [])
-  const importantEvents = useLiveQuery(() => db.calendarEvents.orderBy('date').toArray(), [], [])
+  const calStart = useMemo(() => format(startOfMonth(subMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
+  const calEnd = useMemo(() => format(endOfMonth(addMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
+
+  const transactions = useLiveQuery(
+    () => db.transactions.where('date').between(calStart, calEnd, true, true).toArray(),
+    [calStart, calEnd],
+    []
+  )
+  const importantEvents = useLiveQuery(
+    () => db.calendarEvents.where('date').between(calStart, calEnd, true, true).toArray(),
+    [calStart, calEnd],
+    []
+  )
 
   const calendarEvents = useMemo(() => {
     const txEvents = transactions.map((tx) => ({

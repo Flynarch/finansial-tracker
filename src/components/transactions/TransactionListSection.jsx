@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import EmptyState from '../ui/EmptyState'
 import { TransactionItemCard } from './TransactionItemCard'
 
@@ -73,6 +73,25 @@ export const TransactionListSection = memo(function TransactionListSection({
   allWallets,
   newestTransactionId,
 }) {
+  const PAGE_CHUNK = 25
+  const [prevLength, setPrevLength] = useState(filteredTransactions.length)
+  const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_CHUNK)
+
+  if (prevLength !== filteredTransactions.length) {
+    setPrevLength(filteredTransactions.length)
+    setVisibleGroupCount(PAGE_CHUNK)
+  }
+
+  const handleScrollInternal = (event) => {
+    onScroll?.(event)
+    const el = event.currentTarget
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+      if (visibleGroupCount < groupedEntriesDetailed.length) {
+        setVisibleGroupCount((prev) => Math.min(prev + PAGE_CHUNK, groupedEntriesDetailed.length))
+      }
+    }
+  }
+
   if (isLoading) {
     return <TransactionListSkeleton />
   }
@@ -85,16 +104,18 @@ export const TransactionListSection = memo(function TransactionListSection({
     )
   }
 
+  const visibleGroups = groupedEntriesDetailed.slice(0, visibleGroupCount)
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
         ref={listScrollRef}
         className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar touch-pan-y overscroll-contain px-0.5"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        onScroll={onScroll}
+        onScroll={handleScrollInternal}
       >
         <div className="min-h-full space-y-3 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-          {groupedEntriesDetailed.map((group, idx) => (
+          {visibleGroups.map((group, idx) => (
             <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
               {/* Date Header Strip */}
               <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]/95 backdrop-blur-xs">
@@ -156,6 +177,19 @@ export const TransactionListSection = memo(function TransactionListSection({
               </div>
             </section>
           ))}
+
+          {/* Progressive Load Indicator / More Groups Button */}
+          {visibleGroupCount < groupedEntriesDetailed.length && (
+            <div className="flex justify-center pt-2 pb-1">
+              <button
+                type="button"
+                onClick={() => setVisibleGroupCount((prev) => Math.min(prev + PAGE_CHUNK, groupedEntriesDetailed.length))}
+                className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
+              >
+                {t('common.loadMore', 'Tampilkan Lebih Banyak')} ({groupedEntriesDetailed.length - visibleGroupCount} lagi)
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

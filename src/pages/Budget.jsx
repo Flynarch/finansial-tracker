@@ -50,7 +50,6 @@ function Budget() {
   }, [])
 
   const budgets = useLiveQuery(() => db.budgets.toArray(), [], [])
-  const transactions = useLiveQuery(() => db.transactions.toArray(), [], [])
   const currentMonth = format(new Date(), 'yyyy-MM')
 
   const [month, setMonth] = useState(currentMonth)
@@ -61,9 +60,12 @@ function Budget() {
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
-  const monthExpenseTxs = useMemo(
-    () => (transactions ?? []).filter((tx) => tx?.type === 'expense' && tx?.date?.startsWith(month)),
-    [transactions, month]
+  const monthStart = `${month}-01`
+  const monthEnd = `${month}-31`
+  const monthExpenseTxs = useLiveQuery(
+    () => db.transactions.where('date').between(monthStart, monthEnd, true, true).filter((tx) => tx.type === 'expense').toArray(),
+    [month],
+    []
   )
 
   const sortedMonthBudgets = useMemo(() => {

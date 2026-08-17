@@ -62,7 +62,15 @@ export default function Reports() {
     return () => window.removeEventListener('resize', sync)
   }, [])
 
-  const transactions = useLiveQuery(() => db.transactions.toArray(), [], [])
+  const cutoffDate = useMemo(() => {
+    return format(startOfMonth(subMonths(new Date(), Math.max(rangeMonths, 12))), 'yyyy-MM-dd')
+  }, [rangeMonths])
+
+  const transactions = useLiveQuery(
+    () => db.transactions.where('date').aboveOrEqual(cutoffDate).toArray(),
+    [cutoffDate],
+    []
+  )
   const investments = useLiveQuery(() => db.investments.toArray(), [], [])
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 

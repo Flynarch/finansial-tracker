@@ -64,10 +64,8 @@ export default function SavingsDetail() {
   const logs = useLiveQuery(async () => {
     if (!goalId || Number.isNaN(goalId)) return []
     try {
-      const data = await db.goalLogs.toArray()
-      return data
-        .filter((l) => String(l.goalId) === String(goalId))
-        .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      const data = await db.goalLogs.where('goalId').equals(goalId).toArray()
+      return (data || []).sort((a, b) => String(b.date).localeCompare(String(a.date)))
     } catch {
       return []
     }
