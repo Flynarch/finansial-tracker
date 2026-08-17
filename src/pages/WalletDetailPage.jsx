@@ -10,7 +10,6 @@ import {
   MoreVertical,
   Star,
   Sliders,
-  Plus,
   Check,
   X,
   Wallet as WalletIcon
@@ -25,7 +24,6 @@ import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
-import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
 import { formatCurrency, formatMoneyInput, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
@@ -95,7 +93,6 @@ export default function WalletDetailPage() {
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
   const [newBalanceRaw, setNewBalanceRaw] = useState('')
 
   const [editingTransaction, setEditingTransaction] = useState(null)
@@ -450,17 +447,26 @@ export default function WalletDetailPage() {
           </div>
         </div>
 
-        {/* ── 2. Overlapping Balance Card with Direct Actions ─────── */}
+        {/* ── 2. Overlapping Balance Card with Single Adjust Balance Action ─────── */}
         <div className="px-4 -mt-3 relative z-20">
-          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-3">
-            {/* Top Row: Label Caption & Currency Badge */}
+          <div className="-mx-3.5 sm:mx-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-2">
+            {/* Top Row: Label Caption & Direct Adjust Balance Button */}
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
                 Saldo Akun Saat Ini
               </span>
-              <span className="rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 font-black text-[10px] text-[var(--muted)] uppercase tracking-wider">
-                {wallet.currency || defaultCurrency}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
+                  setIsEditBalanceModalOpen(true)
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-[11px] font-bold hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+                title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
+              >
+                <Sliders size={12} strokeWidth={2} />
+                <span>{t('wallets.adjustBalance', 'Penyesuaian Saldo')}</span>
+              </button>
             </div>
 
             {/* Middle Row: Crisp Bold Balance Display */}
@@ -468,34 +474,14 @@ export default function WalletDetailPage() {
               <p className="ft-display text-2xl sm:text-3xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
                 {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
               </p>
-              <p className="mt-1.5 text-[10px] font-semibold text-[var(--muted)]">
-                Terakhir update: {updatedAt}
-              </p>
             </div>
 
-            {/* Bottom Row: Quick Ergonomic Action Buttons */}
-            <div className="pt-2 border-t border-[var(--border)]/40 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsQuickAddOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs hover:opacity-90 active:scale-95 transition cursor-pointer"
-              >
-                <Plus size={14} strokeWidth={3} />
-                <span>Catat Transaksi</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
-                  setIsEditBalanceModalOpen(true)
-                }}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-xs font-bold hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shrink-0"
-                title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
-              >
-                <Sliders size={13} strokeWidth={2} />
-                <span className="hidden xs:inline">Edit Saldo</span>
-              </button>
+            {/* Bottom Row: Timestamp & Currency Info */}
+            <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-[10px] text-[var(--muted)]">
+              <span>Terakhir update: {updatedAt}</span>
+              <span className="rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 font-black text-[10px] text-[var(--muted)] uppercase tracking-wider">
+                {wallet.currency || defaultCurrency}
+              </span>
             </div>
           </div>
         </div>
@@ -608,17 +594,9 @@ export default function WalletDetailPage() {
                   <Receipt size={26} strokeWidth={1.5} />
                 </div>
                 <h3 className="text-sm font-bold text-[var(--fg)] mb-1">Belum ada transaksi</h3>
-                <p className="text-xs text-[var(--muted)] max-w-xs mx-auto mb-4">
+                <p className="text-xs text-[var(--muted)] max-w-xs mx-auto">
                   Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} di akun ini.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsQuickAddOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs hover:opacity-90 active:scale-95 transition cursor-pointer"
-                >
-                  <Plus size={14} strokeWidth={3} />
-                  <span>Catat Transaksi Pertama</span>
-                </button>
               </div>
             )}
           </div>
@@ -680,26 +658,7 @@ export default function WalletDetailPage() {
             ) : null}
           </button>
 
-          {/* Action 2: Adjust Balance */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsActionMenuOpen(false)
-              setNewBalanceRaw(formatMoneyValueForInput(currentBalance, wallet.currency || defaultCurrency))
-              setIsEditBalanceModalOpen(true)
-            }}
-            className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
-          >
-            <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
-              <Sliders size={18} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-[var(--fg)]">Penyesuaian Saldo</p>
-              <p className="text-[10px] text-[var(--muted)]">Koreksi total saldo fisik riil akun</p>
-            </div>
-          </button>
-
-          {/* Action 3: Delete Wallet */}
+          {/* Action 2: Delete Wallet */}
           <button
             type="button"
             onClick={() => {
@@ -729,12 +688,6 @@ export default function WalletDetailPage() {
         t={t}
         locale={locale}
         wallets={allWallets}
-      />
-
-      <QuickAddTransactionModal 
-        isOpen={isQuickAddOpen}
-        onClose={() => setIsQuickAddOpen(false)}
-        initialWalletId={walletId}
       />
 
       <ConfirmDeleteModal
