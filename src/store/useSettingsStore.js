@@ -122,8 +122,25 @@ const useSettingsStore = create((set, get) => ({
     await get().persist({ hasCompletedOnboarding: true })
   },
   resetOnboarding: async () => {
-    set({ hasCompletedOnboarding: false, hasCompletedSpotlightTour: false })
-    await get().persist({ hasCompletedOnboarding: false, hasCompletedSpotlightTour: false })
+    set({
+      hasCompletedOnboarding: false,
+      hasCompletedSpotlightTour: false,
+      isSpotlightTourActive: false,
+      authProvider: 'guest',
+      authUserEmail: '',
+      authUserId: '',
+      profileName: '',
+      profilePhoto: '',
+    })
+    await get().persist({
+      hasCompletedOnboarding: false,
+      hasCompletedSpotlightTour: false,
+      authProvider: 'guest',
+      authUserEmail: '',
+      authUserId: '',
+      profileName: '',
+      profilePhoto: '',
+    })
   },
   startSpotlightTour: () => {
     set({ isSpotlightTourActive: true })

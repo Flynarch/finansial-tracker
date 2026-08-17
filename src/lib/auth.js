@@ -9,6 +9,7 @@ import {
   signInAnonymously,
 } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
+import { dispatchOtpEmail } from './emailService'
 
 export function subscribeAuth(listener) {
   try {
@@ -152,11 +153,20 @@ export async function sendEmailOtp(email, displayName = '') {
     /* ignore */
   }
 
+  // Dispatch actual email to user's real Gmail inbox
+  const dispatchRes = await dispatchOtpEmail({
+    email: cleanEmail,
+    code,
+    name: otpPayload.displayName,
+  })
+
   return {
     success: true,
     email: cleanEmail,
-    code, // Returned for instant simulated testing banner / notification
+    code, // Preserved for quick-test simulation / fallback
     expiresAt,
+    isRealEmailDelivered: dispatchRes.delivered,
+    provider: dispatchRes.provider,
   }
 }
 
