@@ -225,18 +225,18 @@ function Profile() {
               </button>
             </div>
 
-            <div className="flex items-center justify-center gap-2 mb-2 max-w-full">
-              <h2 className="max-w-full truncate text-center text-[22px] font-bold tracking-tight text-[var(--fg)]">
+            <div className="flex items-center justify-center gap-1.5 mb-2 max-w-full">
+              <h2 className="truncate text-center text-[22px] font-bold tracking-tight text-[var(--fg)]">
                 {displayName}
               </h2>
               <button
                 type="button"
                 onClick={openEditModal}
-                className="grid h-7 w-7 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
+                className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-90 cursor-pointer shrink-0"
                 title={t('profile.editName', 'Ubah nama')}
                 aria-label={t('profile.editName', 'Ubah nama')}
               >
-                <Pencil size={14} strokeWidth={2.2} />
+                <Pencil size={12.5} strokeWidth={2.2} />
               </button>
             </div>
 
