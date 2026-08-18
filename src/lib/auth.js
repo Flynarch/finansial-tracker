@@ -15,8 +15,13 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   reload,
+  deleteUser,
 } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
+import { deleteCloudBackup } from './cloudBackup'
+import { db } from './db'
+import useSettingsStore from '../store/useSettingsStore'
+import { clearAppLocalStorage } from '../pages/settings/settingsConstants'
 
 /**
  * Cleanly translate Firebase Auth error codes into human-friendly Indonesian messages.
@@ -58,6 +63,9 @@ export function formatAuthError(error, fallbackMsg = 'Gagal memproses autentikas
   }
   if (code === 'auth/user-disabled') {
     return 'Akun ini telah dinonaktifkan oleh administrator.'
+  }
+  if (code === 'auth/requires-recent-login') {
+    return 'Demi keamanan akun, silakan keluar dan masuk kembali sebelum menghapus akun.'
   }
   return error?.message || fallbackMsg
 }
@@ -541,5 +549,100 @@ export async function signInAnonymousUser() {
  */
 export async function signInAsGuest() {
   return await signInAnonymousUser()
+}
+
+/**
+ * Permanently Delete Currently Signed In Account
+ * 1. Purges Firestore & Cloud Storage backups.
+ * 2. Deletes user identity from Firebase Auth (Native & Web).
+ * 3. Wipes all local Dexie database tables.
+ * 4. Clears local storage and resets settings to factory defaults.
+ */
+export async function deleteCurrentAccount() {
+  const auth = getFirebaseAuth()
+  const currentUser = auth?.currentUser
+
+  if (currentUser) {
+    const uid = currentUser.uid
+    // 1. Purge cloud backup data
+    await deleteCloudBackup(uid).catch(() => {})
+
+    // 2. Delete user from Firebase Auth
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await FirebaseAuthentication.deleteUser().catch(() => {})
+      }
+      await deleteUser(currentUser)
+    } catch (error) {
+      if (error?.code === 'auth/requires-recent-login') {
+        return {
+          success: false,
+          requiresRecentLogin: true,
+          code: error.code,
+          message: formatAuthError(error, 'Demi keamanan akun, silakan keluar dan masuk kembali sebelum menghapus akun.'),
+        }
+      }
+      // If error is other than requires-recent-login (e.g. user already deleted), proceed with local cleanup
+      console.warn('Firebase deleteUser warning:', error)
+    }
+  }
+
+  // 3. Purge all local database tables
+  try {
+    const dataTables = [
+      db.transactions,
+      db.budgets,
+      db.goals,
+      db.savings,
+      db.loans,
+      db.investments,
+      db.investmentOrders,
+      db.calendarEvents,
+      db.recurringTransactions,
+      db.todos,
+      db.sub_tasks,
+      db.habits,
+      db.habitLogs,
+      db.ideas,
+      db.board_links,
+      db.notifications,
+      db.goalLogs,
+      db.wallets,
+    ]
+    await Promise.all(dataTables.map((t) => t?.clear?.().catch(() => {})))
+  } catch {
+    /* ignore */
+  }
+
+  // 4. Reset local store and storage
+  try {
+    clearAppLocalStorage()
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const resetOnboarding = useSettingsStore.getState().resetOnboarding
+    if (resetOnboarding) await resetOnboarding().catch(() => {})
+
+    const setAuthUser = useSettingsStore.getState().setAuthUser
+    if (setAuthUser) {
+      await setAuthUser({
+        uid: '',
+        email: '',
+        displayName: '',
+        photoURL: '',
+        provider: 'guest',
+        emailVerified: false,
+      }).catch(() => {})
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    success: true,
+    message: 'Akun dan seluruh data Anda telah berhasil dihapus.',
+  }
 }
 

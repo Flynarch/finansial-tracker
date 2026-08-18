@@ -6,11 +6,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   HardDrive,
+  UserX,
 } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import { db } from '../../lib/db'
 import { downloadTextFile } from '../../lib/utils'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
+import { deleteCurrentAccount } from '../../lib/auth'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { clearFinancialLocalStorage } from './settingsConstants'
@@ -20,12 +22,17 @@ import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
 
 export default function SettingsData() {
   const { t } = useTranslation()
+  const authProvider = useSettingsStore((s) => s.authProvider)
+  const authUserEmail = useSettingsStore((s) => s.authUserEmail)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resetConfirmText, setResetConfirmText] = useState('')
+  const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
   const [busyAction, setBusyAction] = useState(null)
   const fileInputRef = useRef(null)
   const canConfirmReset = resetConfirmText === 'RESET'
+  const canConfirmDeleteAccount = deleteAccountConfirmText === 'HAPUS'
   const isBusy = busyAction !== null
 
   const handleExportJson = async () => {
@@ -123,6 +130,29 @@ export default function SettingsData() {
     }
   }
 
+  const handleDeleteAccount = async () => {
+    if (isBusy) return
+    if (deleteAccountConfirmText !== 'HAPUS') {
+      setStatusMessage(t('settings.deleteAccount.needConfirm', 'Ketik HAPUS untuk mengonfirmasi.'))
+      return
+    }
+    try {
+      setBusyAction('deleteAccount')
+      const res = await deleteCurrentAccount()
+      if (res.success) {
+        setIsDeleteAccountModalOpen(false)
+        setDeleteAccountConfirmText('')
+        window.location.href = '/'
+      } else {
+        setStatusMessage(res.message || t('common.error.saveFailed', 'Gagal menghapus akun.'))
+      }
+    } catch {
+      setStatusMessage(t('common.error.saveFailed', 'Gagal menghapus akun.'))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   return (
     <>
       {statusMessage ? (
@@ -167,26 +197,25 @@ export default function SettingsData() {
         </div>
       </div>
 
-      {/* Backup & Restore Action Cards */}
+      {/* Cadangan & Ekspor */}
       <SettingsSection
-        label={t('settings.backup.title', 'Cadangan & Pemulihan')}
+        label={t('settings.backup.sectionTitle', 'Cadangan & Pemulihan')}
         footnote={t(
-          'settings.backup.footnote',
-          'File cadangan JSON berisi seluruh riwayat transaksi, dompet, anggaran, dan tabungan Anda.',
+          'settings.backup.description',
+          'Ekspor seluruh transaksi dan pengaturan ke berkas JSON lokal untuk cadangan mandiri.',
         )}
       >
-        {/* Ekspor JSON Card */}
         <div className="ft-settings-cell space-y-3.5">
           <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-2xs">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-2xs">
               <Download className="h-5.5 w-5.5" />
             </div>
             <div className="min-w-0">
               <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
-                {t('settings.backup.jsonTitle', 'Ekspor Salinan Data (JSON)')}
+                {t('settings.backup.export', 'Ekspor Data Cadangan')}
               </h3>
               <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                Unduh file cadangan lengkap ke memori perangkat atau cloud drive Anda.
+                Unduh seluruh data keuangan dalam format file JSON aman.
               </p>
             </div>
           </div>
@@ -195,26 +224,25 @@ export default function SettingsData() {
             type="button"
             disabled={isBusy}
             onClick={handleExportJson}
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl bg-[var(--fg)] px-4 text-sm font-black text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer"
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
           >
-            <Download className="h-4.5 w-4.5" />
+            <HardDrive className="h-4.5 w-4.5 text-[var(--muted)]" />
             <span>
               {isBusy && busyAction === 'export'
                 ? t('common.loading', 'Mengekspor Data...')
-                : t('settings.backup.export', 'Unduh Cadangan JSON')}
+                : t('settings.backup.exportJson', 'Unduh Cadangan JSON')}
             </span>
           </button>
         </div>
 
-        {/* Impor JSON Card */}
         <div className="ft-settings-cell space-y-3.5">
           <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-500/10 text-sky-500 border border-sky-500/20 shadow-2xs">
               <UploadCloud className="h-5.5 w-5.5" />
             </div>
             <div className="min-w-0">
               <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
-                {t('settings.backup.importTitle', 'Pulihkan Data (Impor JSON)')}
+                {t('settings.backup.importTitle', 'Pulihkan Data Cadangan')}
               </h3>
               <p className="text-xs font-medium text-[var(--muted)] mt-1">
                 Pilih file backup .json sebelumnya untuk mengembalikan riwayat data.
@@ -246,41 +274,69 @@ export default function SettingsData() {
         </div>
       </SettingsSection>
 
-
-
       {/* Zona Berbahaya */}
       <SettingsSection
         label={t('settings.dangerZone', 'Zona Berbahaya')}
         footnote={t(
           'settings.reset.description',
-          'Tindakan ini akan menghapus seluruh data lokal secara permanen dan tidak dapat dibatalkan.',
+          'Tindakan di zona ini permanen dan tidak dapat dibatalkan.',
         )}
       >
+        {/* 1. Reset Riwayat Finansial */}
         <div className="ft-settings-cell space-y-3.5">
           <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-2xs">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-2xs">
               <AlertTriangle className="h-5.5 w-5.5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-extrabold text-rose-500 leading-tight">
-                {t('settings.reset.title', 'Reset Seluruh Database')}
+              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
+                {t('settings.reset.title', 'Reset Riwayat Finansial')}
               </h3>
               <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                Hapus semua akun, riwayat transaksi, anggaran, dan preferensi aplikasi.
+                Hapus semua akun, riwayat transaksi, dan anggaran. Akun login Anda tetap aktif.
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-black text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 text-sm font-black text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
             disabled={isBusy}
             onClick={() => setIsClearModalOpen(true)}
           >
-            <AlertTriangle className="h-4.5 w-4.5 text-rose-500" />
+            <AlertTriangle className="h-4.5 w-4.5 text-amber-500" />
             <span>{t('settings.reset.button', 'Hapus Semua Riwayat Finansial')}</span>
           </button>
         </div>
+
+        {/* 2. Hapus Akun & Data Permanen (Hanya jika login dengan akun terdaftar) */}
+        {authProvider && authProvider !== 'guest' && authUserEmail && (
+          <div className="ft-settings-cell space-y-3.5">
+            <div className="flex items-center gap-3.5">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-2xs">
+                <UserX className="h-5.5 w-5.5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-extrabold text-rose-500 leading-tight">
+                  {t('settings.deleteAccount.title', 'Hapus Akun Permanen')}
+                </h3>
+                <p className="text-xs font-medium text-[var(--muted)] mt-1">
+                  Hapus kredensial login, seluruh cadangan cloud di Google Firestore, dan data lokal secara permanen.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-black text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
+              disabled={isBusy}
+              onClick={() => setIsDeleteAccountModalOpen(true)}
+            >
+              <UserX className="h-4.5 w-4.5 text-rose-500" />
+              <span>{t('settings.deleteAccount.button', 'Hapus Akun & Semua Data')}</span>
+            </button>
+          </div>
+        )}
       </SettingsSection>
 
       {/* Clear Confirmation Modal */}
@@ -295,7 +351,7 @@ export default function SettingsData() {
         <div className="space-y-4">
           <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
             {t('settings.reset.modalDesc', 'Seluruh data transaksi dan akun akan dihapus. Ketik')}
-            <span className="mx-1 font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+            <span className="mx-1 font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
               RESET
             </span>
             {t('settings.reset.modalDescSuffix', 'di bawah untuk melanjutkan.')}
@@ -314,12 +370,12 @@ export default function SettingsData() {
               disabled={!canConfirmReset || isBusy}
               className={`flex-1 h-12 rounded-2xl py-2.5 px-4 text-sm font-bold transition active:scale-95 cursor-pointer ${
                 canConfirmReset
-                  ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-500'
+                  ? 'bg-amber-600 text-white shadow-sm hover:bg-amber-500'
                   : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
               }`}
               onClick={handleClearAllData}
             >
-              {t('settings.reset.confirm', 'Hapus Permanen')}
+              {t('settings.reset.confirm', 'Hapus Data Finansial')}
             </button>
             <button
               type="button"
@@ -328,6 +384,72 @@ export default function SettingsData() {
               onClick={() => {
                 if (isBusy) return
                 setIsClearModalOpen(false)
+              }}
+            >
+              {t('settings.cancel', 'Batal')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteAccountModalOpen}
+        title={t('settings.deleteAccount.modalTitle', 'Konfirmasi Hapus Akun Permanen')}
+        onClose={() => {
+          if (isBusy) return
+          setIsDeleteAccountModalOpen(false)
+        }}
+      >
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-600 dark:text-rose-300 leading-relaxed space-y-1.5">
+            <p className="font-extrabold text-rose-500">
+              {t('settings.deleteAccount.warningHeader', 'Peringatan: Tindakan ini tidak dapat dibatalkan!')}
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-[11px] opacity-90">
+              <li>Akun login ({authUserEmail}) akan dihapus permanen.</li>
+              <li>Seluruh cadangan cloud di Google Firestore & Storage akan dihapus.</li>
+              <li>Seluruh data finansial di perangkat ini akan dibersihkan.</li>
+            </ul>
+          </div>
+
+          <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
+            {t('settings.deleteAccount.modalDesc', 'Untuk mengonfirmasi penghapusan akun, silakan ketik')}
+            <span className="mx-1 font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+              HAPUS
+            </span>
+            {t('settings.deleteAccount.modalDescSuffix', 'di bawah ini.')}
+          </p>
+          <input
+            type="text"
+            value={deleteAccountConfirmText}
+            onChange={(event) => setDeleteAccountConfirmText(event.target.value)}
+            onInput={() => setStatusMessage('')}
+            className="ft-settings-field-compact font-mono text-center tracking-widest text-sm h-12"
+            placeholder={t('settings.deleteAccount.modalType', 'Ketik HAPUS')}
+          />
+          <div className="flex gap-2.5 pt-1">
+            <button
+              type="button"
+              disabled={!canConfirmDeleteAccount || isBusy}
+              className={`flex-1 h-12 rounded-2xl py-2.5 px-4 text-sm font-black transition active:scale-95 cursor-pointer ${
+                canConfirmDeleteAccount
+                  ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-500'
+                  : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+              }`}
+              onClick={handleDeleteAccount}
+            >
+              {isBusy && busyAction === 'deleteAccount'
+                ? t('common.processing', 'Menghapus Akun...')
+                : t('settings.deleteAccount.confirmBtn', 'Hapus Akun Permanen')}
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-4 text-sm font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
+              onClick={() => {
+                if (isBusy) return
+                setIsDeleteAccountModalOpen(false)
               }}
             >
               {t('settings.cancel', 'Batal')}

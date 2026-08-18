@@ -1,9 +1,32 @@
-import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { getDownloadURL, ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage'
+import { doc, getDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore'
 import { getFirebaseDb, getFirebaseStorage } from './firebase'
 
 function latestBackupPath(uid) {
   return `fintrack-backups/${uid}/latest.json`
+}
+
+export async function deleteCloudBackup(uid) {
+  if (!uid) return
+  const storage = getFirebaseStorage()
+  const db = getFirebaseDb()
+
+  try {
+    if (storage) {
+      const fileRef = storageRef(storage, latestBackupPath(uid))
+      await deleteObject(fileRef).catch(() => {})
+    }
+  } catch {
+    /* ignore storage delete error */
+  }
+
+  try {
+    if (db) {
+      await deleteDoc(doc(db, 'users', uid)).catch(() => {})
+    }
+  } catch {
+    /* ignore firestore delete error */
+  }
 }
 
 export async function uploadLatestBackup(uid, payload) {
