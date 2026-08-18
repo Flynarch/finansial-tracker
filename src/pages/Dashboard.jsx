@@ -152,9 +152,6 @@ export default function Dashboard() {
           isEntering ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Email Verification Reminder Banner (Only if email unverified) */}
-        <EmailVerificationBanner />
-
         {/* 1. Wallet Carousel (Hero) */}
         <div data-tour="hero-carousel">
           <WalletCarousel
@@ -176,6 +173,9 @@ export default function Dashboard() {
           wallets={walletsWithBalance}
           t={t}
         />
+
+        {/* Email Verification Reminder Banner (Placed directly below Transaksi Terakhir) */}
+        <EmailVerificationBanner />
 
         {/* 3. Net Worth Mini Chart */}
         <div data-tour="networth-chart">

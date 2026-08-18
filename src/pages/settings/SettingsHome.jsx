@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sun,
@@ -21,11 +21,16 @@ import {
   AlertTriangle,
   ShieldAlert,
   CheckCircle2,
+  Mail,
+  Send,
+  AlertCircle,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import {
   signOutCurrentUser,
+  sendVerificationEmail,
+  reloadAuthUser,
 } from '../../lib/auth'
 import { db } from '../../lib/db'
 import { exportAllDataAsJson } from '../../lib/backup'
@@ -68,6 +73,7 @@ export default function SettingsHome() {
   const emailVerified = useSettingsStore((state) => state.emailVerified)
   const resetOnboarding = useSettingsStore((state) => state.resetOnboarding)
   const setAuthUser = useSettingsStore((state) => state.setAuthUser)
+  const setEmailVerified = useSettingsStore((state) => state.setEmailVerified)
 
   const setDefaultCurrency = useSettingsStore((state) => state.setDefaultCurrency)
   const setLocale = useSettingsStore((state) => state.setLocale)
@@ -79,44 +85,109 @@ export default function SettingsHome() {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
 
+  const [isVerifLoading, setIsVerifLoading] = useState(false)
+  const [isVerifChecking, setIsVerifChecking] = useState(false)
+  const [verifCooldown, setVerifCooldown] = useState(0)
+  const [verifFeedback, setVerifFeedback] = useState('')
+
+  useEffect(() => {
+    if (verifCooldown <= 0) return
+    const timer = setInterval(() => {
+      setVerifCooldown((prev) => prev - 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [verifCooldown])
+
+  const handleSendVerification = async () => {
+    if (verifCooldown > 0 || isVerifLoading) return
+    setIsVerifLoading(true)
+    setVerifFeedback('')
+    try {
+      const res = await sendVerificationEmail()
+      if (res.success) {
+        if (res.alreadyVerified) {
+          await setEmailVerified(true)
+        } else {
+          setVerifCooldown(60)
+          setVerifFeedback(t('auth.verifSentFeedback', 'Tautan verifikasi telah dikirim ke email Anda.'))
+        }
+      } else {
+        setVerifFeedback(res.message || t('auth.verifFailedFeedback', 'Gagal mengirim email verifikasi.'))
+      }
+    } catch {
+      setVerifFeedback(t('auth.generalError', 'Terjadi kesalahan sistem.'))
+    } finally {
+      setIsVerifLoading(false)
+    }
+  }
+
+  const handleCheckVerifStatus = async () => {
+    setIsVerifChecking(true)
+    setVerifFeedback('')
+    try {
+      const refreshed = await reloadAuthUser()
+      if (refreshed?.emailVerified) {
+        await setEmailVerified(true)
+        setVerifFeedback(t('auth.verifSuccessConfirmed', 'Email berhasil diverifikasi!'))
+      } else {
+        setVerifFeedback(t('auth.verifNotYetConfirmed', 'Email belum diverifikasi. Cek inbox email Anda.'))
+      }
+    } catch {
+      setVerifFeedback(t('auth.generalError', 'Terjadi kesalahan saat memeriksa status.'))
+    } finally {
+      setIsVerifChecking(false)
+    }
+  }
+
   const executePerformLogout = async () => {
     try {
       const currentUid = authUserId || (authProvider === 'google' ? 'google_last' : authProvider === 'email' ? 'email_last' : 'guest_last')
-      const backup = await exportAllDataAsJson()
-      try {
-        localStorage.setItem(`ft_user_backup_${currentUid}`, JSON.stringify(backup))
-      } catch {
-        /* ignore */
-      }
-      if (authUserId) {
+      const backup = await exportAllDataAsJson().catch(() => null)
+      if (backup) {
         try {
-          await uploadLatestBackup(authUserId, backup)
+          localStorage.setItem(`ft_user_backup_${currentUid}`, JSON.stringify(backup))
         } catch {
           /* ignore */
         }
+        if (authUserId) {
+          Promise.race([
+            uploadLatestBackup(authUserId, backup),
+            new Promise((resolve) => setTimeout(resolve, 2500)),
+          ]).catch(() => {})
+        }
       }
 
-      await db.transaction('rw', db.tables, async () => {
-        await Promise.all(db.tables.map((table) => table.clear()))
-      })
+      // Safely clear financial data tables without deleting settings configuration
+      const dataTables = [
+        db.transactions,
+        db.wallets,
+        db.categories,
+        db.budgets,
+        db.savings,
+        db.loans,
+        db.investments,
+        db.todos,
+      ]
+      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch(() => {})))
     } catch {
       /* ignore */
     } finally {
-      await signOutCurrentUser()
+      await signOutCurrentUser().catch(() => {})
       try {
         localStorage.removeItem('ft_onboarding_seen_v1')
         localStorage.removeItem('ft_onboarding_progress')
       } catch {
         /* ignore */
       }
-      await resetOnboarding()
+      await resetOnboarding().catch(() => {})
       await setAuthUser({
         uid: '',
         email: '',
         displayName: '',
         photoURL: '',
         provider: 'guest',
-      })
+        emailVerified: false,
+      }).catch(() => {})
       navigate('/dashboard', { replace: true })
     }
   }
@@ -278,6 +349,59 @@ export default function SettingsHome() {
             <CheckCircle2 size={14} />
             <span>{t('settings.connectAccountNow', 'Hubungkan / Tautkan Akun')}</span>
           </button>
+        </div>
+      )}
+
+      {/* 1.6 Unverified Email Banner (Persis di posisi kartu status profil / tamu) */}
+      {authProvider === 'email' && !emailVerified && authUserEmail && (
+        <div className="mb-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+              <Mail size={22} strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="font-extrabold text-sm text-[var(--fg)]">
+                  {t('auth.emailUnverifiedTitle', 'Verifikasi Alamat Email')}
+                </h4>
+              </div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed truncate">
+                {authUserEmail} • {t('auth.emailUnverifiedSubtitle', 'Amankan akun dan cadangan data Anda.')}
+              </p>
+            </div>
+          </div>
+
+          {verifFeedback && (
+            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 px-1">
+              <AlertCircle size={14} className="shrink-0" />
+              <span>{verifFeedback}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={handleSendVerification}
+              disabled={isVerifLoading || verifCooldown > 0}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-amber-500 text-white dark:text-slate-900 font-extrabold text-xs hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <Send size={14} />
+              <span>
+                {verifCooldown > 0
+                  ? `${t('auth.resendIn', 'Kirim Ulang')} (${verifCooldown}s)`
+                  : t('auth.resendVerifBtn', 'Kirim Tautan Verifikasi')}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCheckVerifStatus}
+              disabled={isVerifChecking}
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl border border-amber-500/40 bg-[var(--card-bg)] text-[var(--fg)] font-bold text-xs hover:bg-[var(--field-bg)] active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={isVerifChecking ? 'animate-spin' : ''} />
+              <span>{t('auth.checkStatusBtn', 'Cek Status')}</span>
+            </button>
+          </div>
         </div>
       )}
 
