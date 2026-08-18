@@ -233,18 +233,26 @@ export async function signUpWithEmail(email, password, displayName, sendVerifica
     const result = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword)
     const u = result.user
 
+    const postTasks = []
     if (cleanName) {
-      await updateProfile(u, { displayName: cleanName }).catch(() => {})
+      postTasks.push(updateProfile(u, { displayName: cleanName }).catch(() => {}))
     }
 
     let verificationSent = false
     if (sendVerification && u) {
-      try {
-        await sendEmailVerification(u)
-        verificationSent = true
-      } catch (verifErr) {
-        console.warn('Auto sendEmailVerification failed:', verifErr)
-      }
+      postTasks.push(
+        sendEmailVerification(u)
+          .then(() => {
+            verificationSent = true
+          })
+          .catch((verifErr) => {
+            console.warn('Auto sendEmailVerification failed:', verifErr)
+          })
+      )
+    }
+
+    if (postTasks.length > 0) {
+      await Promise.allSettled(postTasks)
     }
 
     return {

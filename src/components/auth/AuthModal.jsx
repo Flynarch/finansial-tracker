@@ -170,24 +170,38 @@ export default function AuthModal({
     return score
   }, [password])
 
-  const restoreUserBackup = async (userObj) => {
+  const restoreUserBackup = async (userObj, isNewUser = false) => {
     if (!userObj?.uid) return
     try {
       const userBackupKey = `ft_user_backup_${userObj.uid}`
+      
+      // Brand new user: immediately export guest data and upload in background
+      if (isNewUser) {
+        const backup = await exportAllDataAsJson()
+        localStorage.setItem(userBackupKey, JSON.stringify(backup))
+        uploadLatestBackup(userObj.uid, backup).catch(() => {})
+        return
+      }
+
       const rawLocal = localStorage.getItem(userBackupKey)
       if (rawLocal) {
         const data = JSON.parse(rawLocal)
         await importAllDataFromJsonPayload(data)
         return
       }
-      const cloudData = await downloadLatestBackupJson(userObj.uid)
+
+      // Existing user sign-in: attempt cloud download with fast timeout
+      const cloudData = await Promise.race([
+        downloadLatestBackupJson(userObj.uid),
+        new Promise((resolve) => setTimeout(() => resolve(null), 3500)),
+      ]).catch(() => null)
+
       if (cloudData) {
         await importAllDataFromJsonPayload(cloudData)
       } else {
-        // First time cloud sync for new user
         const backup = await exportAllDataAsJson()
         localStorage.setItem(userBackupKey, JSON.stringify(backup))
-        await uploadLatestBackup(userObj.uid, backup).catch(() => {})
+        uploadLatestBackup(userObj.uid, backup).catch(() => {})
       }
     } catch {
       // Backup restore error non-blocking
@@ -203,7 +217,7 @@ export default function AuthModal({
       const res = await signInWithGoogle()
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user)
+        await restoreUserBackup(res.user, Boolean(res.isNewUser))
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
         setTimeout(() => {
@@ -242,7 +256,7 @@ export default function AuthModal({
       const res = await signInWithEmail(email, password)
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user)
+        await restoreUserBackup(res.user, false)
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk ke akun FinTrack.'))
         setTimeout(() => {
@@ -295,7 +309,7 @@ export default function AuthModal({
       const res = await signUpWithEmail(email, password, fallbackName, sendVerification)
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user)
+        await restoreUserBackup(res.user, true)
         triggerHaptic('success')
         if (res.verificationSent) {
           setSuccessMessage(t('auth.registerSuccessWithVerif', 'Akun berhasil dibuat! Tautan verifikasi telah dikirim ke email Anda.'))

@@ -44,12 +44,16 @@ export async function getLatestBackupMeta(uid) {
 }
 
 export async function downloadLatestBackupJson(uid) {
-  const storage = getFirebaseStorage()
-  const fileRef = storageRef(storage, latestBackupPath(uid))
-  const url = await getDownloadURL(fileRef)
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Failed downloading backup')
-  return await res.json()
+  try {
+    const storage = getFirebaseStorage()
+    const fileRef = storageRef(storage, latestBackupPath(uid))
+    const url = await getDownloadURL(fileRef)
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 export async function uploadToDropbox(accessToken, jsonString) {
