@@ -146,17 +146,19 @@ export default function Dashboard() {
     const n = Number(amount || 0)
     const sign = n < 0 ? '-' : ''
     const abs = Math.abs(n)
+    const activeLocale = locale === 'en' ? 'en-US' : 'id-ID'
+    const isEn = locale === 'en'
     const fmt = (value, digits = 1) =>
-      value.toLocaleString('id-ID', {
+      value.toLocaleString(activeLocale, {
         minimumFractionDigits: 0,
         maximumFractionDigits: digits,
       })
     if (abs >= 1_000_000_000_000) return `${sign}${fmt(abs / 1_000_000_000_000, 1)}\u00A0T`
-    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000, 1)}\u00A0M`
-    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)}\u00A0jt`
-    if (abs >= 1_000) return `${sign}${fmt(abs / 1_000, 0)}\u00A0rb`
+    if (abs >= 1_000_000_000) return `${sign}${fmt(abs / 1_000_000_000, 1)}\u00A0${isEn ? 'B' : 'M'}`
+    if (abs >= 1_000_000) return `${sign}${fmt(abs / 1_000_000, abs % 1_000_000 === 0 ? 0 : 1)}\u00A0${isEn ? 'M' : 'jt'}`
+    if (abs >= 1_000) return `${sign}${fmt(abs / 1_000, 0)}\u00A0${isEn ? 'k' : 'rb'}`
     return `${sign}${fmt(abs, 0)}`
-  }, [])
+  }, [locale])
 
   return (
     <div className="bg-[var(--bg)]">

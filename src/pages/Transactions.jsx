@@ -57,7 +57,7 @@ function computeFilteredTransactions(transactions, filters, userWalletsCount, us
   return transactions
     .filter((item) => {
       if (searchLower) {
-        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''}`.toLowerCase()
+        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${item.rawText ?? ''}`.toLowerCase()
         if (!searchTarget.includes(searchLower)) return false
       }
 

@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { clampPercent } from './DashboardChartHelpers'
@@ -63,6 +63,8 @@ export const MiniChartCard = memo(function MiniChartCard({
   animationDuration = 900, animationEasing = 'ease',
 }) {
   const [scrubbedPoint, setScrubbedPoint] = useState(null)
+  const reactId = useId()
+  const gradientId = useMemo(() => `miniGradFade_${reactId.replace(/:/g, '')}`, [reactId])
 
   const lowHighText = useMemo(() => {
     if (!lowHigh || !Array.isArray(data) || data.length < 2) return null
@@ -134,7 +136,7 @@ export const MiniChartCard = memo(function MiniChartCard({
             onTouchEnd={handleChartLeave}
           >
             <defs>
-              <linearGradient id="miniGradFade" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={stroke || 'var(--accent)'} stopOpacity={0.30} />
                 <stop offset="100%" stopColor={stroke || 'var(--accent)'} stopOpacity={0} />
               </linearGradient>
@@ -174,7 +176,7 @@ export const MiniChartCard = memo(function MiniChartCard({
               <YAxis hide domain={yDomain} />
             )}
             <Area
-              type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill="url(#miniGradFade)"
+              type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill={`url(#${gradientId})`}
               strokeWidth={2} dot={false}
               isAnimationActive={animate} animationBegin={24}
               animationDuration={animationDuration} animationEasing={animationEasing}

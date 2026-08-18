@@ -150,7 +150,7 @@ export default function SettingsHome() {
           /* ignore */
         }
         if (authUserId) {
-          Promise.race([
+          await Promise.race([
             uploadLatestBackup(authUserId, backup),
             new Promise((resolve) => setTimeout(resolve, 2500)),
           ]).catch(() => {})

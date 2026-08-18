@@ -46,6 +46,7 @@ export default function WalletCarousel({
 
   // Restore scroll position when wallets are loaded
   useEffect(() => {
+    let timerId = null
     if (wallets !== undefined && !hasRestored.current) {
       hasRestored.current = true
       if (scrollRef.current && activeSlide > 0) {
@@ -59,13 +60,16 @@ export default function WalletCarousel({
               })
             }
           }
-          setTimeout(() => {
+          timerId = window.setTimeout(() => {
             isRestoring.current = false
           }, 150)
         })
       } else {
         isRestoring.current = false
       }
+    }
+    return () => {
+      if (timerId) window.clearTimeout(timerId)
     }
   }, [wallets, activeSlide])
 

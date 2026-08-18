@@ -19,17 +19,18 @@ export function useAnimatedCounter(targetValue, { duration = 650, enabled = true
 
   useEffect(() => {
     if (!enabled) {
-      setCurrentValue(numericTarget)
       prevValueRef.current = numericTarget
-      return
+      const frameId = requestAnimationFrame(() => {
+        setCurrentValue(numericTarget)
+      })
+      return () => cancelAnimationFrame(frameId)
     }
 
     const startValue = prevValueRef.current
     const endValue = numericTarget
 
     if (startValue === endValue) {
-      setCurrentValue(endValue)
-      return
+      return undefined
     }
 
     let startTime = null
