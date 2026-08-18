@@ -4,7 +4,11 @@ import { App } from '@capacitor/app'
 import { backButtonManager } from '../../lib/backButtonManager'
 import { getParentRoute } from '../../lib/navigationHierarchy'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
-import { initNotificationChannels, syncDailyReminderSchedule } from '../../lib/smartNotifications'
+import {
+  initNotificationChannels,
+  syncDailyReminderSchedule,
+  registerNotificationTapListener,
+} from '../../lib/smartNotifications'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -158,6 +162,15 @@ function AppShell() {
     }
     runAutomation()
   }, [])
+
+  useEffect(() => {
+    const unregister = registerNotificationTapListener((route) => {
+      if (route) navigate(route)
+    })
+    return () => {
+      if (typeof unregister === 'function') unregister()
+    }
+  }, [navigate])
 
   useEffect(() => {
     // Clear any residual overflow or touchAction locks from unmounted modals/sheets on route change

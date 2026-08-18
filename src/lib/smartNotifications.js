@@ -17,23 +17,30 @@ const NOTIFICATION_IDS = {
 }
 
 /**
- * Initializes Android notification channels.
+ * Initializes Android notification channels with active language support.
  */
 export async function initNotificationChannels() {
   if (!Capacitor.isNativePlatform()) return
   try {
+    const locale = useSettingsStore.getState().locale || 'id'
+    const isEn = locale === 'en'
+
     await LocalNotifications.createChannel({
       id: NOTIFICATION_CHANNELS.DAILY_REMINDER,
-      name: 'Pengingat Harian',
-      description: 'Pengingat rutin untuk mencatat pengeluaran harian Anda.',
+      name: isEn ? 'Daily Logging Reminder' : 'Pengingat Harian',
+      description: isEn
+        ? 'Daily friendly reminder to log your daily expenses.'
+        : 'Pengingat rutin untuk mencatat pengeluaran harian Anda.',
       importance: 4, // High
       visibility: 1, // Public
     }).catch(() => {})
 
     await LocalNotifications.createChannel({
       id: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
-      name: 'Peringatan Batas Anggaran',
-      description: 'Pemberitahuan saat pengeluaran mendekati atau melebihi limit anggaran.',
+      name: isEn ? 'Budget Limit Alerts' : 'Peringatan Batas Anggaran',
+      description: isEn
+        ? 'Real-time notifications when spending nears or exceeds budget limit.'
+        : 'Pemberitahuan saat pengeluaran mendekati atau melebihi limit anggaran.',
       importance: 5, // Max
       visibility: 1,
     }).catch(() => {})
@@ -99,14 +106,25 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
       triggerDate.setDate(triggerDate.getDate() + 1)
     }
 
+    const locale = useSettingsStore.getState().locale || 'id'
+    const isEn = locale === 'en'
+
+    const title = isEn
+      ? 'FinTrack • Daily Expense Reminder'
+      : 'FinTrack • Pengingat Catat Keuangan'
+    const body = isEn
+      ? 'Have you logged your expenses today? Take 1 minute to keep your finances organized.'
+      : 'Sudahkah Anda mencatat pengeluaran hari ini? Luangkan 1 menit untuk keuangan yang lebih teratur.'
+
     if (Capacitor.isNativePlatform()) {
       await LocalNotifications.schedule({
         notifications: [
           {
             id: NOTIFICATION_IDS.DAILY_REMINDER,
-            title: 'FinTrack • Pengingat Catat Keuangan',
-            body: 'Sudahkah Anda mencatat pengeluaran hari ini? Luangkan 1 menit untuk keuangan yang lebih teratur.',
+            title,
+            body,
             channelId: NOTIFICATION_CHANNELS.DAILY_REMINDER,
+            extra: { route: '/transactions' },
             schedule: {
               at: triggerDate,
               every: 'day',
@@ -169,16 +187,28 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
 
     const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
     const locale = useSettingsStore.getState().locale || 'id'
+    const isEn = locale === 'en'
+
+    const catDisplayName = matchingBudget.category === 'all'
+      ? (isEn ? 'Total Budget' : 'Total Anggaran')
+      : matchingBudget.category
+
+    const formattedSpent = formatCurrency(totalSpent, defaultCurrency, locale)
+    const formattedLimit = formatCurrency(budgetLimit, defaultCurrency, locale)
 
     let alertTitle = ''
     let alertBody = ''
 
     if (spentRatio >= 1.0) {
-      alertTitle = 'Batas Anggaran Terlampaui!'
-      alertBody = `Pengeluaran ${matchingBudget.category === 'all' ? 'Total' : matchingBudget.category} telah mencapai ${formatCurrency(totalSpent, defaultCurrency, locale)} (melebihi limit ${formatCurrency(budgetLimit, defaultCurrency, locale)}).`
+      alertTitle = isEn ? 'Budget Limit Exceeded!' : 'Batas Anggaran Terlampaui!'
+      alertBody = isEn
+        ? `Spending for ${catDisplayName} reached ${formattedSpent} (exceeded monthly limit of ${formattedLimit}).`
+        : `Pengeluaran ${catDisplayName} telah mencapai ${formattedSpent} (melebihi limit ${formattedLimit}).`
     } else if (spentRatio >= 0.8) {
-      alertTitle = 'Peringatan Anggaran (80%)'
-      alertBody = `Pengeluaran ${matchingBudget.category === 'all' ? 'Total' : matchingBudget.category} telah mencapai ${Math.round(spentRatio * 100)}% dari batas bulanan (${formatCurrency(totalSpent, defaultCurrency, locale)} / ${formatCurrency(budgetLimit, defaultCurrency, locale)}).`
+      alertTitle = isEn ? 'Budget Warning (80%)' : 'Peringatan Anggaran (80%)'
+      alertBody = isEn
+        ? `Spending for ${catDisplayName} reached ${Math.round(spentRatio * 100)}% of your monthly budget (${formattedSpent} / ${formattedLimit}).`
+        : `Pengeluaran ${catDisplayName} telah mencapai ${Math.round(spentRatio * 100)}% dari batas bulanan (${formattedSpent} / ${formattedLimit}).`
     }
 
     if (alertTitle && alertBody) {
@@ -186,6 +216,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
         id: NOTIFICATION_IDS.BUDGET_ALERT_BASE + Math.floor(Math.random() * 100),
         title: alertTitle,
         body: alertBody,
+        route: '/budget',
       })
     }
   } catch (err) {
@@ -196,7 +227,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
 /**
  * Fires an instant local notification or browser notification.
  */
-async function sendInstantBudgetNotification({ id, title, body }) {
+async function sendInstantBudgetNotification({ id, title, body, route = '/budget' }) {
   try {
     if (Capacitor.isNativePlatform()) {
       await LocalNotifications.schedule({
@@ -206,6 +237,7 @@ async function sendInstantBudgetNotification({ id, title, body }) {
             title,
             body,
             channelId: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
+            extra: { route },
             schedule: { at: new Date(Date.now() + 500) },
             smallIcon: 'ic_stat_icon_config_sample',
           },
@@ -216,5 +248,26 @@ async function sendInstantBudgetNotification({ id, title, body }) {
     }
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Sets up tap listeners on native notifications to navigate inside the app.
+ * @param {Function} navigateFn - React router navigate function
+ */
+export function registerNotificationTapListener(navigateFn) {
+  if (!Capacitor.isNativePlatform() || typeof navigateFn !== 'function') return () => {}
+  try {
+    const listenerPromise = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      const targetRoute = action?.notification?.extra?.route
+      if (targetRoute) {
+        navigateFn(targetRoute)
+      }
+    })
+    return () => {
+      listenerPromise.then((handle) => handle.remove()).catch(() => {})
+    }
+  } catch {
+    return () => {}
   }
 }

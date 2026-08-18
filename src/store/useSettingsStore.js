@@ -84,6 +84,16 @@ const useSettingsStore = create((set, get) => ({
     const next = locale === 'en' ? 'en' : 'id'
     set({ locale: next })
     await get().persist({ locale: next })
+    try {
+      const { initNotificationChannels, syncDailyReminderSchedule } = await import('../lib/smartNotifications')
+      await initNotificationChannels()
+      const { dailyReminderEnabled, dailyReminderTime } = get()
+      if (dailyReminderEnabled) {
+        await syncDailyReminderSchedule(true, dailyReminderTime)
+      }
+    } catch {
+      /* ignore */
+    }
   },
   setMotionPreference: async (motionPreference) => {
     const next = ['system', 'reduce', 'full'].includes(motionPreference) ? motionPreference : 'system'
