@@ -65,6 +65,7 @@ export default function SettingsHome() {
   const authProvider = useSettingsStore((state) => state.authProvider)
   const authUserEmail = useSettingsStore((state) => state.authUserEmail)
   const authUserId = useSettingsStore((state) => state.authUserId)
+  const emailVerified = useSettingsStore((state) => state.emailVerified)
   const resetOnboarding = useSettingsStore((state) => state.resetOnboarding)
   const setAuthUser = useSettingsStore((state) => state.setAuthUser)
 
@@ -80,14 +81,14 @@ export default function SettingsHome() {
 
   const executePerformLogout = async () => {
     try {
-      const currentUid = authUserId || (authProvider === 'google' ? 'google_last' : 'guest_last')
+      const currentUid = authUserId || (authProvider === 'google' ? 'google_last' : authProvider === 'email' ? 'email_last' : 'guest_last')
       const backup = await exportAllDataAsJson()
       try {
         localStorage.setItem(`ft_user_backup_${currentUid}`, JSON.stringify(backup))
       } catch {
         /* ignore */
       }
-      if (authProvider === 'google' && authUserId) {
+      if (authUserId) {
         try {
           await uploadLatestBackup(authUserId, backup)
         } catch {
@@ -190,7 +191,7 @@ export default function SettingsHome() {
                   {profileName || 'Rico'}
                 </h3>
                 <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)]">
-                  v4.2.0
+                  v4.5.0
                 </span>
               </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
@@ -202,7 +203,7 @@ export default function SettingsHome() {
                 {authProvider === 'google'
                   ? `Google • ${authUserEmail || 'Connected'}`
                   : authProvider === 'email'
-                  ? `Email • ${authUserEmail || 'Registered'}`
+                  ? `Email • ${authUserEmail || 'Registered'}${emailVerified ? ' (Terverifikasi)' : ''}`
                   : authProvider === 'anonymous'
                   ? 'Akun Anonim (Tamu)'
                   : 'Mode Tamu'}
@@ -378,7 +379,7 @@ export default function SettingsHome() {
             authProvider === 'google'
               ? `Google • ${authUserEmail || 'Connected'}`
               : authProvider === 'email'
-              ? `Email • ${authUserEmail || 'Registered'}`
+              ? `Email • ${authUserEmail || 'Registered'}${emailVerified ? ' (Terverifikasi)' : ''}`
               : authProvider === 'anonymous'
               ? 'Akun Anonim (Tamu)'
               : 'Mode Tamu'

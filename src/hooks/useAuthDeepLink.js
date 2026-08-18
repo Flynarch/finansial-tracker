@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { signInWithMagicLink } from '../lib/auth'
+import { signInWithMagicLink, reloadAuthUser } from '../lib/auth'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../lib/backup'
 import { uploadLatestBackup, downloadLatestBackupJson } from '../lib/cloudBackup'
 import useSettingsStore from '../store/useSettingsStore'
 
 export function useAuthDeepLink() {
   const setAuthUser = useSettingsStore((s) => s.setAuthUser)
+  const setEmailVerified = useSettingsStore((s) => s.setEmailVerified)
 
   useEffect(() => {
     const handleAuthUrl = async (url) => {
@@ -24,6 +25,19 @@ export function useAuthDeepLink() {
       if (!isAuthLink) return
 
       try {
+        // If it's an email verification link
+        if (url.includes('mode=verifyEmail')) {
+          await setEmailVerified(true)
+          const reloaded = await reloadAuthUser()
+          if (reloaded) {
+            await setAuthUser({
+              ...reloaded,
+              provider: 'email',
+              emailVerified: true,
+            })
+          }
+        }
+
         const storedEmail = typeof window !== 'undefined' ? window.localStorage.getItem('emailForSignIn') : ''
         const res = await signInWithMagicLink(storedEmail, url)
         if (res.success && res.user) {
@@ -72,7 +86,7 @@ export function useAuthDeepLink() {
     return () => {
       nativeListener?.then?.((handler) => handler?.remove?.()).catch(() => {})
     }
-  }, [setAuthUser])
+  }, [setAuthUser, setEmailVerified])
 }
 
 export default useAuthDeepLink

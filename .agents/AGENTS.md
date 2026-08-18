@@ -181,5 +181,5 @@ When requested to **Debug**, **Audit**, or **Improve** a feature (or when trigge
 - **Virtual Keyboard Resizing**: Forms and bottom sheets must support mobile virtual keyboards without occluding submit buttons (`interactive-widget=resizes-content`).
 
 ### D. Android APK Assembly Workflow
-- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v4.2.0.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
+- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v4.5.0.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
 

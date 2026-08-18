@@ -70,6 +70,13 @@ export default function AuthModal({
   // Gmail domain suggestion list (Mandatory Gmail app policy)
   const suggestedDomains = useMemo(() => ['@gmail.com', '@googlemail.com'], [])
 
+  const switchMode = (nextMode) => {
+    triggerHaptic('light')
+    setMode(nextMode)
+    setErrorMessage('')
+    setSuccessMessage('')
+  }
+
   const handleApplyDomain = (domain) => {
     triggerHaptic('light')
     const trimmed = email.trim()
@@ -87,6 +94,15 @@ export default function AuthModal({
   const isGmailAddress = (rawEmail) => {
     const trimmed = String(rawEmail || '').trim().toLowerCase()
     return trimmed.endsWith('@gmail.com') || trimmed.endsWith('@googlemail.com')
+  }
+
+  const validateGmailOrSetError = (rawEmail) => {
+    if (!isGmailAddress(rawEmail)) {
+      setErrorMessage(t('auth.gmailOnlyWarning', 'Hanya mendukung alamat email @gmail.com atau @googlemail.com'))
+      triggerHaptic('warning')
+      return false
+    }
+    return true
   }
 
   // Dynamic field-level error evaluations for subtle, elegant red styling
@@ -138,9 +154,9 @@ export default function AuthModal({
 
   const getPasswordInputClasses = (hasError) => {
     if (hasError) {
-      return 'w-full rounded-xl border pl-9 pr-9 py-2 text-xs font-semibold placeholder:text-[var(--muted)]/60 focus:outline-none transition-all duration-200 border-rose-500/50 bg-rose-500/[0.025] text-[var(--fg)] ring-2 ring-rose-500/15 focus:border-rose-500/80 focus:ring-2 focus:ring-rose-500/25'
+      return `w-full rounded-xl border pl-9 pr-9 py-2 text-xs font-semibold placeholder:text-[var(--muted)]/60 focus:outline-none transition-all duration-200 border-rose-500/50 bg-rose-500/[0.025] text-[var(--fg)] ring-2 ring-rose-500/15 focus:border-rose-500/80 focus:ring-2 focus:ring-rose-500/25`
     }
-    return 'w-full rounded-xl border pl-9 pr-9 py-2 text-xs font-semibold placeholder:text-[var(--muted)]/60 focus:outline-none transition-all duration-200 border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15'
+    return `w-full rounded-xl border pl-9 pr-9 py-2 text-xs font-semibold placeholder:text-[var(--muted)]/60 focus:outline-none transition-all duration-200 border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15`
   }
 
   // Password strength calculation for register mode
@@ -188,15 +204,18 @@ export default function AuthModal({
       if (res.success && res.user) {
         await setAuthUser(res.user)
         await restoreUserBackup(res.user)
+        triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
         setTimeout(() => {
           onSuccess?.(res.user)
           onClose?.()
         }, 800)
       } else if (!res.cancelled) {
+        triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google.'))
       }
     } catch {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan saat masuk.'))
     } finally {
       setIsLoading(false)
@@ -209,11 +228,12 @@ export default function AuthModal({
     setErrorMessage('')
     setSuccessMessage('')
     if (!email.trim() || !password) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.fillAllFields', 'Silakan masukkan email dan kata sandi.'))
       return
     }
 
-    if (!isGmailAddress(email)) {
+    if (!validateGmailOrSetError(email)) {
       return
     }
 
@@ -223,15 +243,18 @@ export default function AuthModal({
       if (res.success && res.user) {
         await setAuthUser(res.user)
         await restoreUserBackup(res.user)
+        triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk ke akun FinTrack.'))
         setTimeout(() => {
           onSuccess?.(res.user)
           onClose?.()
         }, 800)
       } else {
+        triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.loginFailed', 'Email atau kata sandi salah.'))
       }
     } catch {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan pada sistem.'))
     } finally {
       setIsLoading(false)
@@ -245,30 +268,35 @@ export default function AuthModal({
     setSuccessMessage('')
 
     if (!email.trim() || !password) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.fillAllFields', 'Silakan isi seluruh formulir pendaftaran.'))
       return
     }
 
-    if (!isGmailAddress(email)) {
+    if (!validateGmailOrSetError(email)) {
       return
     }
 
     if (password.length < 6) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.passwordTooShort', 'Kata sandi minimal 6 karakter.'))
       return
     }
 
     if (password !== confirmPassword) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.passwordMismatch', 'Konfirmasi kata sandi tidak cocok.'))
       return
     }
 
     setIsLoading(true)
     try {
-      const res = await signUpWithEmail(email, password, name || profileName, sendVerification)
+      const fallbackName = name.trim() || profileName || (email.split('@')[0] ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : '')
+      const res = await signUpWithEmail(email, password, fallbackName, sendVerification)
       if (res.success && res.user) {
         await setAuthUser(res.user)
         await restoreUserBackup(res.user)
+        triggerHaptic('success')
         if (res.verificationSent) {
           setSuccessMessage(t('auth.registerSuccessWithVerif', 'Akun berhasil dibuat! Tautan verifikasi telah dikirim ke email Anda.'))
         } else {
@@ -279,9 +307,11 @@ export default function AuthModal({
           onClose?.()
         }, 1200)
       } else {
+        triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.registerFailed', 'Gagal mendaftarkan akun baru.'))
       }
     } catch {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan saat pendaftaran.'))
     } finally {
       setIsLoading(false)
@@ -294,11 +324,12 @@ export default function AuthModal({
     setErrorMessage('')
     setSuccessMessage('')
     if (!email.trim()) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.fillEmail', 'Masukkan alamat email Anda.'))
       return
     }
 
-    if (!isGmailAddress(email)) {
+    if (!validateGmailOrSetError(email)) {
       return
     }
 
@@ -306,11 +337,14 @@ export default function AuthModal({
     try {
       const res = await sendPasswordReset(email)
       if (res.success) {
+        triggerHaptic('success')
         setSuccessMessage(res.message || t('auth.resetSent', 'Email pemulihan kata sandi telah dikirim.'))
       } else {
+        triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.resetFailed', 'Gagal mengirim email reset kata sandi.'))
       }
     } catch {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
       setIsLoading(false)
@@ -323,11 +357,12 @@ export default function AuthModal({
     setErrorMessage('')
     setSuccessMessage('')
     if (!email.trim()) {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.fillEmail', 'Masukkan alamat email Anda.'))
       return
     }
 
-    if (!isGmailAddress(email)) {
+    if (!validateGmailOrSetError(email)) {
       return
     }
 
@@ -335,11 +370,14 @@ export default function AuthModal({
     try {
       const res = await sendEmailMagicLink(email)
       if (res.success) {
+        triggerHaptic('success')
         setSuccessMessage(res.message || t('auth.magicLinkSent', 'Tautan masuk ajaib telah dikirim ke email Anda.'))
       } else {
+        triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.magicLinkFailed', 'Gagal mengirim tautan masuk.'))
       }
     } catch {
+      triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
       setIsLoading(false)
@@ -355,11 +393,7 @@ export default function AuthModal({
             {mode !== 'login' && mode !== 'register' ? (
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login')
-                  setErrorMessage('')
-                  setSuccessMessage('')
-                }}
+                onClick={() => switchMode('login')}
                 className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] hover:bg-[var(--panel-strong)] active:scale-95 transition-all cursor-pointer"
                 aria-label={t('common.back', 'Kembali')}
               >
@@ -400,11 +434,7 @@ export default function AuthModal({
           <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] gap-1">
             <button
               type="button"
-              onClick={() => {
-                setMode('login')
-                setErrorMessage('')
-                setSuccessMessage('')
-              }}
+              onClick={() => switchMode('login')}
               className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 mode === 'login'
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs border border-[var(--border)]'
@@ -416,11 +446,7 @@ export default function AuthModal({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setMode('register')
-                setErrorMessage('')
-                setSuccessMessage('')
-              }}
+              onClick={() => switchMode('register')}
               className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 mode === 'register'
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs border border-[var(--border)]'
@@ -506,11 +532,7 @@ export default function AuthModal({
                   </label>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode('forgot')
-                      setErrorMessage('')
-                      setSuccessMessage('')
-                    }}
+                    onClick={() => switchMode('forgot')}
                     className="text-[10.5px] font-bold text-[var(--accent)] hover:underline cursor-pointer"
                   >
                     {t('auth.forgotPassword', 'Lupa Sandi?')}
@@ -555,11 +577,7 @@ export default function AuthModal({
               <span>{t('auth.noAccountYetPrompt', 'Belum punya akun?')} </span>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('register')
-                  setErrorMessage('')
-                  setSuccessMessage('')
-                }}
+                onClick={() => switchMode('register')}
                 className="font-black text-[var(--accent)] hover:underline active:scale-95 transition-transform cursor-pointer"
               >
                 {t('auth.createAccountNow', 'Buat Akun Baru')}
@@ -604,11 +622,7 @@ export default function AuthModal({
             {/* Passwordless Magic Link Button */}
             <button
               type="button"
-              onClick={() => {
-                setMode('magic_link')
-                setErrorMessage('')
-                setSuccessMessage('')
-              }}
+              onClick={() => switchMode('magic_link')}
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-3 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)] active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
             >
               <Sparkles className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
@@ -807,11 +821,7 @@ export default function AuthModal({
               <span>{t('auth.haveAccountPrompt', 'Sudah punya akun?')} </span>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login')
-                  setErrorMessage('')
-                  setSuccessMessage('')
-                }}
+                onClick={() => switchMode('login')}
                 className="font-black text-[var(--accent)] hover:underline active:scale-95 transition-transform cursor-pointer"
               >
                 {t('auth.signInPrompt', 'Masuk di Sini')}
@@ -917,11 +927,7 @@ export default function AuthModal({
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login')
-                  setErrorMessage('')
-                  setSuccessMessage('')
-                }}
+                onClick={() => switchMode('login')}
                 className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
               >
                 {t('auth.backToSignIn', 'Kembali ke Halaman Masuk')}
@@ -1005,11 +1011,7 @@ export default function AuthModal({
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login')
-                  setErrorMessage('')
-                  setSuccessMessage('')
-                }}
+                onClick={() => switchMode('login')}
                 className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
               >
                 {t('auth.usePasswordInstead', 'Masuk dengan Kata Sandi Biasa')}

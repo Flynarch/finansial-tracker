@@ -28,7 +28,7 @@ const useSettingsStore = create((set, get) => ({
   hasCompletedSpotlightTour: false,
   isSpotlightTourActive: false,
   securityEnabled: false,
-  securityMethod: 'pin',
+  securityMethod: 'biometric',
   lockSecret: '',
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
@@ -217,7 +217,7 @@ const useSettingsStore = create((set, get) => ({
       hasCompletedOnboarding: onboardingDone,
       hasCompletedSpotlightTour: tourDone,
       securityEnabled,
-      securityMethod: record.securityMethod || 'pin',
+      securityMethod: record.securityMethod || 'biometric',
       lockSecret: record.lockSecret || '',
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
       geminiApiKey: record.geminiApiKey || '',

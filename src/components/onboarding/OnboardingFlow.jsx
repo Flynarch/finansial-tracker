@@ -96,10 +96,11 @@ function GoogleIcon({ className = 'w-5 h-5' }) {
 
 /* ── Progress Indicator (Minimalist Flat) ────────────────────────── */
 function ProgressHeader({ step, total = 4 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-between border-b border-[var(--border)] pb-4 mb-6">
       <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-        Langkah {step} dari {total}
+        {t('tour.stepBadge', 'Langkah {{current}} dari {{total}}', { current: step, total })}
       </span>
       <div className="flex items-center gap-1.5">
         {Array.from({ length: total }, (_, i) => i + 1).map((i) => (
@@ -416,7 +417,7 @@ export default function OnboardingFlow() {
                   <div>
                     <h1 className="font-black text-lg tracking-tight text-[var(--fg)]">FinTrack</h1>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                      v4.2.0 • Personal Finance
+                      v4.5.0 • Personal Finance
                     </p>
                   </div>
                 </div>
@@ -630,14 +631,14 @@ export default function OnboardingFlow() {
                   className="flex items-center justify-center gap-1.5 py-3.5 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer"
                 >
                   <ChevronLeft size={16} />
-                  <span>Kembali</span>
+                  <span>{t('common.back', 'Kembali')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
                   className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-bold text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                 >
-                  <span>Lanjut</span>
+                  <span>{t('auth.continue', 'Lanjut')}</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -767,14 +768,14 @@ export default function OnboardingFlow() {
                   className="flex items-center justify-center gap-1.5 py-3.5 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition-all cursor-pointer"
                 >
                   <ChevronLeft size={16} />
-                  <span>Kembali</span>
+                  <span>{t('common.back', 'Kembali')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
                   className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-bold text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                 >
-                  <span>Lanjut ke Dompet</span>
+                  <span>{t('auth.continueToWallet', 'Lanjut ke Dompet')}</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -845,16 +846,16 @@ export default function OnboardingFlow() {
                     />
                     <div>
                       <h4 className="font-extrabold text-sm text-[var(--fg)] truncate">
-                        {username || 'Pengguna FinTrack'}
+                        {username || t('auth.defaultUserName', 'Pengguna FinTrack')}
                       </h4>
                       <p className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">
                         {authProvider === 'google'
-                          ? 'Akun Google'
+                          ? t('auth.accountGoogle', 'Akun Google')
                           : authProvider === 'email'
-                          ? 'Akun Email'
+                          ? t('auth.accountEmail', 'Akun Email')
                           : authProvider === 'anonymous'
-                          ? 'Akun Anonim / Tamu'
-                          : 'Mode Tamu'}
+                          ? t('auth.accountAnonymous', 'Akun Anonim / Tamu')
+                          : t('auth.modeGuest', 'Mode Tamu')}
                       </p>
                     </div>
                   </div>
@@ -871,7 +872,7 @@ export default function OnboardingFlow() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                      Dompet Terdaftar ({wallets?.length || 0})
+                      {t('auth.registeredWallets', 'Dompet Terdaftar ({{count}})', { count: wallets?.length || 0 })}
                     </span>
                     <button
                       type="button"
@@ -980,7 +981,12 @@ export default function OnboardingFlow() {
         onClose={() => setAuthModalOpen(false)}
         onSuccess={(u) => {
           setAuthModalOpen(false)
-          if (u?.displayName) setUsername(u.displayName)
+          if (u?.displayName) {
+            setUsername(u.displayName)
+          } else if (u?.email) {
+            const prefix = u.email.split('@')[0]
+            setUsername(prefix ? prefix.charAt(0).toUpperCase() + prefix.slice(1) : '')
+          }
           if (u?.photoURL) setProfilePhoto(u.photoURL)
           goTo(1)
         }}

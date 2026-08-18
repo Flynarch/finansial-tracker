@@ -24,7 +24,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
       ? 'USD'
       : 'IDR')
 
-  const [name, setName] = useState(institution ? institution.name : 'Akun Baru')
+  const [name, setName] = useState(institution ? institution.name : t('wallets.newAccount', 'Akun Baru'))
   const [isEditingName, setIsEditingName] = useState(!institution)
   const [currency, setCurrency] = useState(initialCurrency)
 
@@ -98,7 +98,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           </button>
 
           <span className="rounded-full bg-[var(--field-bg)] border border-[var(--border)] px-4 py-1 text-xs font-black text-[var(--fg)]">
-            {institution ? institution.name : 'Akun Kustom'}
+            {institution ? institution.name : t('wallets.customAccount', 'Akun Kustom')}
           </span>
 
           <div className="w-9" />
@@ -177,7 +177,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           {/* Currency Select */}
           <div className="space-y-2">
             <label className="text-[11px] font-black text-[var(--muted)] uppercase tracking-wider pl-0.5">
-              Mata Uang
+              {t('settings.currency', 'Mata Uang')}
             </label>
             <div className="relative">
               <select
@@ -205,7 +205,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           {/* Balance Input Box */}
           <div className="space-y-2">
             <label className="text-[11px] font-black text-[var(--muted)] uppercase tracking-wider pl-0.5">
-              Saldo Awal
+              {t('wallets.initialBalance', 'Saldo Awal')}
             </label>
             <div className="relative flex items-center bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] rounded-2xl p-4 shadow-sm focus-within:border-[var(--fg)] transition">
               <span className="pr-2 text-[var(--fg)] font-black text-2xl sm:text-3xl shrink-0 select-none">
@@ -242,7 +242,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
           disabled={!isFormValid}
           className="w-full py-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-sm shadow-md transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
-          Simpan Akun Baru
+          {t('wallets.saveNewAccount', 'Simpan Akun Baru')}
         </button>
       </div>
     </div>

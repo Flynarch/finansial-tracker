@@ -340,7 +340,7 @@ function Profile() {
         <div className="flex items-center justify-center gap-2 pb-1">
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
           <div className="mt-8 text-center text-[11px] font-medium text-[var(--muted-2)] uppercase tracking-widest">
-            {t('profile.version', { value: '4.2.0' })}
+            {t('profile.version', { value: '4.5.0' })}
           </div>
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
         </div>

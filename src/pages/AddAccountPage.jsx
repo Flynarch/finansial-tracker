@@ -7,22 +7,7 @@ import { walletInstitutions, getWalletLogoUrl } from '../data/walletInstitutions
 import AddAccountForm from '../components/wallet/AddAccountForm'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import PageHeader from '../components/ui/PageHeader'
-
-const TABS = [
-  { id: 'all', label: 'Semua' },
-  { id: 'bank', label: 'Bank' },
-  { id: 'ewallet', label: 'E-Wallet' },
-  { id: 'investasi', label: 'Investasi' },
-  { id: 'lainnya', label: 'Kas & Lainnya' },
-]
-
-const CATEGORY_SECTIONS = [
-  { id: 'recommended', title: 'Rekomendasi Utama' },
-  { id: 'bank', title: 'Bank Digital & Nasional' },
-  { id: 'ewallet', title: 'E-Wallet & PayLater' },
-  { id: 'investasi', title: 'Investasi & Crypto' },
-  { id: 'lainnya', title: 'Kas & Lainnya' },
-]
+import useTranslation from '../hooks/useTranslation'
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -78,8 +63,31 @@ function CircularInstitutionLogo({ inst }) {
 }
 
 export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const wallets = useLiveQuery(() => db.wallets.toArray()) || []
+
+  const tabs = useMemo(
+    () => [
+      { id: 'all', label: t('wallets.tabAll', 'Semua') },
+      { id: 'bank', label: t('wallets.tabBank', 'Bank') },
+      { id: 'ewallet', label: t('wallets.tabEwallet', 'E-Wallet') },
+      { id: 'investasi', label: t('wallets.tabInvestasi', 'Investasi') },
+      { id: 'lainnya', label: t('wallets.tabLainnya', 'Kas & Lainnya') },
+    ],
+    [t]
+  )
+
+  const categorySections = useMemo(
+    () => [
+      { id: 'recommended', title: t('wallets.sectionRecommended', 'Rekomendasi Utama') },
+      { id: 'bank', title: t('wallets.sectionBank', 'Bank Digital & Nasional') },
+      { id: 'ewallet', title: t('wallets.sectionEwallet', 'E-Wallet & PayLater') },
+      { id: 'investasi', title: t('wallets.sectionInvestasi', 'Investasi & Crypto') },
+      { id: 'lainnya', title: t('wallets.sectionLainnya', 'Kas & Lainnya') },
+    ],
+    [t]
+  )
 
   const isInstitutionAdded = (inst) => {
     return wallets.some((w) => {
@@ -118,7 +126,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
       <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-2.5 border-b border-[var(--border)] shadow-xs w-full">
         <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-4 pb-2">
           <PageHeader
-            title={'Pilih Institusi / Dompet'}
+            title={t('wallets.chooseInstitution', 'Pilih Institusi / Dompet')}
             onBack={() => (isOnboarding && onBack ? onBack() : navigate(-1))}
           />
         </div>
@@ -129,7 +137,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
             <Search size={17} className="absolute left-3.5 text-[var(--muted)]" />
             <input
               type="text"
-              placeholder={'Cari Bank, e-Wallet, atau Kas...'}
+              placeholder={t('wallets.searchPlaceholder', 'Cari Bank, e-Wallet, atau Kas...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-2xl bg-[var(--field-bg)] py-3 pl-10 pr-4 text-sm font-semibold text-[var(--fg)] placeholder:text-[var(--muted-2)] border border-[var(--border)] focus:border-[var(--fg)] transition outline-none"
@@ -139,7 +147,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
 
         {/* Category Pills */}
         <div className="max-w-2xl mx-auto w-full flex items-center gap-2 overflow-x-auto ft-hide-scrollbar px-4 sm:px-6 pb-0.5">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -153,6 +161,35 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
             </button>
           ))}
         </div>
+
+        {/* Returning User Existing Wallets Banner */}
+        {isOnboarding && wallets.length > 0 && (
+          <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-2 pb-0.5">
+            <button
+              type="button"
+              onClick={onSuccess}
+              className="w-full flex items-center justify-between p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/15 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-emerald-500/20 text-emerald-500 shrink-0">
+                  <Check size={14} strokeWidth={2.8} />
+                </div>
+                <div className="text-left">
+                  <span className="block text-xs font-black text-[var(--fg)]">
+                    {t('wallets.syncedWalletsBanner', '{{count}} Dompet Tersinkronisasi', { count: wallets.length })}
+                  </span>
+                  <span className="block text-[10.5px] text-[var(--muted)] font-medium">
+                    {t('wallets.syncedWalletsDesc', 'Gunakan dompet yang sudah ada tanpa perlu menambah baru')}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-black text-[var(--fg)] shrink-0">
+                <span>{t('auth.continue', 'Lanjut')}</span>
+                <ChevronRight size={14} strokeWidth={2.5} />
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Sleek List Content (Gaya Baris Melengkung iOS Fintech Wide Layout) ─ */}
@@ -160,13 +197,15 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
         {filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Search size={36} className="text-[var(--muted)] opacity-40 mb-3" />
-            <h3 className="text-sm font-black text-[var(--fg)]">Tidak ditemukan</h3>
+            <h3 className="text-sm font-black text-[var(--fg)]">
+              {t('wallets.notFoundTitle', 'Tidak ditemukan')}
+            </h3>
             <p className="text-xs font-medium text-[var(--muted)] mt-1 max-w-[240px]">
-              Institusi &lsquo;{search}&rsquo; tidak ada dalam preset. Gunakan tombol kustom di bawah.
+              {t('wallets.notFoundDesc', 'Institusi "{{query}}" tidak ada dalam preset. Gunakan tombol kustom di bawah.', { query: search })}
             </p>
           </div>
         ) : (
-          CATEGORY_SECTIONS.map((sec) => {
+          categorySections.map((sec) => {
             let secItems
             if (search || activeTab !== 'all') {
               if (sec.id === 'recommended') return null
@@ -216,12 +255,12 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                           </div>
                           <p className="text-[11px] sm:text-xs font-medium text-[var(--muted)] truncate mt-0.5">
                             {inst.type === 'bank'
-                              ? 'Bank Digital / Nasional'
+                              ? t('wallets.typeBank', 'Bank Digital / Nasional')
                               : inst.type === 'ewallet'
-                              ? 'E-Wallet / Dompet Digital'
+                              ? t('wallets.typeEwallet', 'E-Wallet / Dompet Digital')
                               : inst.type === 'investasi'
-                              ? 'Platform Investasi'
-                              : 'Kas Utama & Lainnya'}
+                              ? t('wallets.typeInvestasi', 'Platform Investasi')
+                              : t('wallets.typeLainnya', 'Kas Utama & Lainnya')}
                           </p>
                         </div>
 
@@ -229,7 +268,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                         {added ? (
                           <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 shrink-0">
                             <Check size={11} strokeWidth={3} />
-                            Terdaftar
+                            {t('wallets.alreadyRegistered', 'Terdaftar')}
                           </span>
                         ) : (
                           <div className="p-1 rounded-full text-[var(--muted-2)] group-hover:text-[var(--fg)] group-hover:translate-x-0.5 transition-all shrink-0">
@@ -257,7 +296,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
             className="w-full flex items-center justify-center gap-2 py-4 px-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-xs sm:text-sm shadow-md transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
           >
             <Plus size={16} strokeWidth={3} />
-            <span>Buat Akun / Dompet Kustom</span>
+            <span>{t('wallets.createCustomWallet', 'Buat Akun / Dompet Kustom')}</span>
           </button>
         </div>
       </div>
