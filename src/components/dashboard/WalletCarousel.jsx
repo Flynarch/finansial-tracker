@@ -6,6 +6,7 @@ import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
+import AnimatedCounter from '../ui/AnimatedCounter'
 
 export default function WalletCarousel({ 
   monthIncome, 
@@ -78,12 +79,12 @@ export default function WalletCarousel({
             <div className="h-4 w-4 rounded-full bg-[var(--border)]/50" />
           </div>
           <div className="space-y-2">
-            <div className="h-8 w-44 rounded-xl bg-[var(--border)]/80" />
-            <div className="h-3 w-20 rounded-md bg-[var(--border)]/40" />
+            <div className="h-8 w-48 rounded-lg bg-[var(--border)]/80" />
+            <div className="h-3 w-20 rounded bg-[var(--border)]/50" />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <div className="h-9 flex-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
-            <div className="h-9 flex-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="h-10 rounded-xl bg-[var(--field-bg)]/60" />
+            <div className="h-10 rounded-xl bg-[var(--field-bg)]/60" />
           </div>
         </div>
       </section>
@@ -116,7 +117,7 @@ export default function WalletCarousel({
   const handleScroll = () => {
     if (!scrollRef.current || isRestoring.current) return
     const scrollLeft = scrollRef.current.scrollLeft
-    const width = scrollRef.current.clientWidth
+    const width = scrollRef.current.offsetWidth
     
     // Prevent divide by zero if width isn't ready
     if (width === 0) return 
@@ -138,7 +139,7 @@ export default function WalletCarousel({
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {/* SLIDE 1: Sisa Keuangan */}
-        <div className="w-full shrink-0 snap-center ft-hero-card">
+        <div className="w-full shrink-0 snap-center ft-hero-card ft-card-sheen">
           {/* Header row */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -168,13 +169,13 @@ export default function WalletCarousel({
 
           {/* Main amount */}
           <p className="relative z-10 ft-hero-number mt-2 break-words">
-            <span className="whitespace-nowrap">{formatCurrency(sisaKeuangan, defaultCurrency)}</span>
+            <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
           </p>
 
           {/* Income / Expense stat pills */}
           <div className="relative z-10 mt-5 flex gap-2">
             {/* Income pill */}
-            <div className="ft-stat-pill ft-stat-pill--income">
+            <div className="ft-stat-pill ft-stat-pill--income ft-spring-press">
               <div className="ft-stat-pill-icon">
                 <ArrowDownLeft size={16} strokeWidth={2.5} />
               </div>
@@ -183,13 +184,13 @@ export default function WalletCarousel({
                   {t('dashboard.income', 'Pemasukan')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-green)' }}>
-                  {formatCurrency(monthIncome, defaultCurrency)}
+                  <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />
                 </p>
               </div>
             </div>
             
             {/* Expense pill */}
-            <div className="ft-stat-pill ft-stat-pill--expense">
+            <div className="ft-stat-pill ft-stat-pill--expense ft-spring-press">
               <div className="ft-stat-pill-icon">
                 <ArrowUpRight size={16} strokeWidth={2.5} />
               </div>
@@ -198,7 +199,7 @@ export default function WalletCarousel({
                   {t('dashboard.expense', 'Pengeluaran')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-terra)' }}>
-                  {formatCurrency(monthExpense, defaultCurrency)}
+                  <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />
                 </p>
               </div>
             </div>
@@ -206,7 +207,7 @@ export default function WalletCarousel({
         </div>
 
         {/* SLIDE 2: Total Saldo & Horizontal Mini Wallet Cards */}
-        <div className="w-full shrink-0 snap-center ft-hero-card ml-4 flex flex-col justify-between">
+        <div className="w-full shrink-0 snap-center ft-hero-card ft-card-sheen ml-4 flex flex-col justify-between">
           <div>
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between">
@@ -237,7 +238,7 @@ export default function WalletCarousel({
 
             {/* Main amount */}
             <p className="relative z-10 ft-hero-number mt-2 break-all">
-              {formatCurrency(totalSaldo, defaultCurrency)}
+              <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
             </p>
           </div>
 
@@ -249,7 +250,7 @@ export default function WalletCarousel({
                 <button 
                   key={w.id}
                   onClick={() => navigate(`/wallet/${w.id}`)}
-                  className="ft-wallet-mini"
+                  className="ft-wallet-mini ft-spring-press"
                   title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
                 >
 
@@ -298,7 +299,7 @@ export default function WalletCarousel({
             {/* Tambah Akun Card */}
             <button 
               onClick={() => navigate('/add-account')}
-              className="ft-wallet-mini"
+              className="ft-wallet-mini ft-spring-press"
               style={{ borderStyle: 'dashed' }}
             >
               <div className="ft-wallet-mini-logo" style={{ background: 'var(--fg)', color: 'var(--bg)', border: 'none' }}>

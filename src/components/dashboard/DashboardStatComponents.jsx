@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { clampPercent } from './DashboardChartHelpers'
@@ -54,7 +54,7 @@ export function MetricCard({ title, value, rightLabel, progress = 0, showProgres
   )
 }
 
-/** Mini chart card with area chart */
+/** Mini chart card with area chart and interactive touch scrubber */
 export const MiniChartCard = memo(function MiniChartCard({
   title, value, data, stroke, onOpen, formatValue, rangeLabel, rangeId,
   xKey = 'day', yDomain, lowHigh, t: tMini, trendBadge, showXAxisDate = false,
@@ -62,6 +62,8 @@ export const MiniChartCard = memo(function MiniChartCard({
   rightAxisTicks, animate = false,
   animationDuration = 900, animationEasing = 'ease',
 }) {
+  const [scrubbedPoint, setScrubbedPoint] = useState(null)
+
   const lowHighText = useMemo(() => {
     if (!lowHigh || !Array.isArray(data) || data.length < 2) return null
     const values = data.map((r) => Number(r?.value)).filter((v) => Number.isFinite(v))
@@ -71,18 +73,45 @@ export const MiniChartCard = memo(function MiniChartCard({
     return { min: fmt(min), max: fmt(max) }
   }, [data, formatValue, lowHigh])
 
+  const handleChartMove = (e) => {
+    if (e?.activePayload?.[0]?.value !== undefined) {
+      const payload = e.activePayload[0]
+      const rawVal = payload.value
+      const rawTime = payload.payload?.[xKey]
+      let timeLabel = ''
+      if (rawTime && Number.isFinite(rawTime)) {
+        timeLabel = format(new Date(rawTime), 'dd MMM yyyy, HH:mm')
+      } else if (rawTime) {
+        timeLabel = String(rawTime)
+      }
+      setScrubbedPoint({
+        value: formatValue ? formatValue(rawVal) : String(rawVal),
+        time: timeLabel,
+      })
+    }
+  }
+
+  const handleChartLeave = () => {
+    setScrubbedPoint(null)
+  }
+
   return (
-    <button
-      type="button"
+    <div
       onClick={onOpen}
-      className="ft-interactive-card w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-left shadow-sm sm:p-4"
+      className="ft-interactive-card ft-spring-press w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-left shadow-sm sm:p-4 cursor-pointer"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold tracking-wide text-[var(--muted)]">{title}</p>
-          <div className="mt-0.5 flex items-center gap-2">
-            <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">{value}</p>
-            {trendBadge ? (
+          <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+            <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">
+              {scrubbedPoint ? scrubbedPoint.value : value}
+            </p>
+            {scrubbedPoint?.time ? (
+              <span className="text-[10.5px] font-semibold text-[var(--accent)] bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 rounded-md truncate">
+                {scrubbedPoint.time}
+              </span>
+            ) : trendBadge ? (
               <div className="shrink-0">{trendBadge}</div>
             ) : null}
           </div>
@@ -94,11 +123,15 @@ export const MiniChartCard = memo(function MiniChartCard({
         ) : null}
       </div>
 
-      <div className={`mt-3 ${showXAxisDate ? 'h-32' : 'h-28'} w-full pointer-events-none`}>
+      <div className={`mt-3 ${showXAxisDate ? 'h-32' : 'h-28'} w-full`}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}
             margin={{ top: 6, right: showRightAxis ? 4 : 8, bottom: showXAxisDate ? 4 : 0, left: 8 }}
+            onMouseMove={handleChartMove}
+            onTouchMove={handleChartMove}
+            onMouseLeave={handleChartLeave}
+            onTouchEnd={handleChartLeave}
           >
             <defs>
               <linearGradient id="miniGradFade" x1="0" y1="0" x2="0" y2="1">
@@ -156,7 +189,7 @@ export const MiniChartCard = memo(function MiniChartCard({
           <span className="text-[var(--muted)]">{tMini('dashboard.chart.high')} {lowHighText.max}</span>
         </div>
       ) : null}
-    </button>
+    </div>
   )
 })
 

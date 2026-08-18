@@ -14,6 +14,7 @@ import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
 import EmailVerificationBanner from '../components/auth/EmailVerificationBanner'
+import syncNativeWidgetData from '../lib/nativeWidgetSync'
 
 export default function Dashboard() {
   const [isEntering, setIsEntering] = useState(false)
@@ -86,6 +87,18 @@ export default function Dashboard() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    if (!walletsWithBalance) return
+    const active = walletsWithBalance.filter((w) => !w.isArchived)
+    const total = active.reduce((acc, w) => acc + (Number(w.currentBalance) || 0), 0)
+    syncNativeWidgetData({
+      totalBalance: total,
+      monthIncome: Number(monthIncome) || 0,
+      monthExpense: Number(monthExpense) || 0,
+      defaultCurrency: defaultCurrency || 'IDR',
+    })
+  }, [walletsWithBalance, monthIncome, monthExpense, defaultCurrency])
 
   const closeZoom = useCallback(() => {
     if (zoomedChart === 'revenue') {
