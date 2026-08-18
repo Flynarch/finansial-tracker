@@ -248,12 +248,17 @@ export default function Reports() {
               amount: toSafeNumber(cat.value),
               percent: donutTotal > 0 ? Math.round((toSafeNumber(cat.value) / donutTotal) * 100) : 0,
             }))
+            const profileName = useSettingsStore.getState().profileName || ''
             printFinancialReport({
-              title: `Laporan Keuangan (${rangeMonths} Bulan)`,
+              title: t('reports.statementTitle', 'Laporan Keuangan Resmi'),
+              periodName: `${rangeMonths} Bulan (${format(new Date(), 'MMMM yyyy')})`,
+              profileName,
               totalIncome: thisMonth.income,
               totalExpense: thisMonth.expense,
               netSavings: thisMonth.income - thisMonth.expense,
               categories,
+              transactions: filteredTransactions,
+              wallets,
               defaultCurrency,
               locale,
             })

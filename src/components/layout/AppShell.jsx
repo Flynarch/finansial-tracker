@@ -4,6 +4,7 @@ import { App } from '@capacitor/app'
 import { backButtonManager } from '../../lib/backButtonManager'
 import { getParentRoute } from '../../lib/navigationHierarchy'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
+import { initNotificationChannels, syncDailyReminderSchedule } from '../../lib/smartNotifications'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -146,6 +147,11 @@ function AppShell() {
       try {
         await processRecurringTransactions()
         await notifyTodayEvents()
+        await initNotificationChannels()
+        const { dailyReminderEnabled, dailyReminderTime } = useSettingsStore.getState()
+        if (dailyReminderEnabled) {
+          await syncDailyReminderSchedule(true, dailyReminderTime)
+        }
       } catch {
         // automation failure should not block app rendering
       }

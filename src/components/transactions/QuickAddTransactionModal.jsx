@@ -1,12 +1,14 @@
 import { format } from 'date-fns'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Camera, Sparkles } from 'lucide-react'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import Modal from '../ui/Modal'
 import ToastBanner from '../ui/ToastBanner'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
+import ReceiptScannerModal from './ReceiptScannerModal'
 import useTranslation from '../../hooks/useTranslation'
 import {
   getCategoryToneClass,
@@ -104,6 +106,22 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }, [rawWallets, allTransactions, rates])
 
   const [walletModalMode, setWalletModalMode] = useState(null) // null | 'walletId' | 'targetWalletId'
+  const [isOcrOpen, setIsOcrOpen] = useState(false)
+
+  const handleApplyReceipt = (receiptData) => {
+    if (!receiptData) return
+    setTxType('expense')
+    const curr = receiptData.currency || form.currency || defaultCurrency
+    setForm((p) => ({
+      ...p,
+      amount: formatMoneyInput(String(receiptData.amount || 0), curr),
+      date: receiptData.date || p.date,
+      category: receiptData.category || p.category,
+      notes: receiptData.notes || p.notes,
+      currency: curr,
+    }))
+  }
+
   const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
   const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
   const isCashWallet = useMemo(
@@ -516,6 +534,33 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       </div>
 
       {submitError ? <ToastBanner message={submitError} /> : null}
+
+      {/* OCR Receipt Scanner Quick Action */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setIsOcrOpen(true)}
+          className="w-full flex items-center justify-between gap-2.5 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 p-3 text-left transition active:scale-[0.98] hover:border-indigo-500/50 cursor-pointer shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/20 text-indigo-500 border border-indigo-500/30 shadow-2xs group-hover:scale-105 transition-transform">
+              <Camera className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-xs font-extrabold text-[var(--fg)] leading-tight flex items-center gap-1.5">
+                {t('transactions.ocr.bannerTitle', 'Pindai Struk Belanja')}
+                <span className="rounded-full bg-indigo-500/20 px-1.5 py-0.2 text-[9px] font-black text-indigo-500 uppercase tracking-wider">
+                  OCR AI
+                </span>
+              </span>
+              <span className="block text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">
+                {t('transactions.ocr.bannerSubtitle', 'Foto struk untuk isi nominal & rincian otomatis')}
+              </span>
+            </div>
+          </div>
+          <Sparkles className="h-4 w-4 shrink-0 text-indigo-400 opacity-70 group-hover:opacity-100 transition-opacity" />
+        </button>
+      </div>
 
       {/* Mode Toggle - Sliding Segmented Track */}
       {(() => {
@@ -1439,6 +1484,13 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             ? 'Pilih Dompet Asal'
             : 'Pilih Dompet / Akun'
         }
+      />
+
+      {/* OCR Smart Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={isOcrOpen}
+        onClose={() => setIsOcrOpen(false)}
+        onApplyReceipt={handleApplyReceipt}
       />
     </Modal>
   )

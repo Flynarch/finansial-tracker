@@ -32,6 +32,9 @@ const useSettingsStore = create((set, get) => ({
   lockSecret: '',
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
+  dailyReminderEnabled: true,
+  dailyReminderTime: '20:00',
+  budgetAlertsEnabled: true,
   emailVerified: false,
   emailVerificationDismissed: false,
   isUnlocked: true,
@@ -59,6 +62,9 @@ const useSettingsStore = create((set, get) => ({
       lockSecret: next.lockSecret,
       autoLockTimeout: next.autoLockTimeout,
       geminiApiKey: next.geminiApiKey,
+      dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
+      dailyReminderTime: next.dailyReminderTime || '20:00',
+      budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
     })
   },
   setTheme: async (theme) => {
@@ -123,6 +129,21 @@ const useSettingsStore = create((set, get) => ({
     const next = String(geminiApiKey || '').trim()
     set({ geminiApiKey: next })
     await get().persist({ geminiApiKey: next })
+  },
+  setDailyReminderEnabled: async (dailyReminderEnabled) => {
+    const next = Boolean(dailyReminderEnabled)
+    set({ dailyReminderEnabled: next })
+    await get().persist({ dailyReminderEnabled: next })
+  },
+  setDailyReminderTime: async (dailyReminderTime) => {
+    const next = String(dailyReminderTime || '20:00').trim()
+    set({ dailyReminderTime: next })
+    await get().persist({ dailyReminderTime: next })
+  },
+  setBudgetAlertsEnabled: async (budgetAlertsEnabled) => {
+    const next = Boolean(budgetAlertsEnabled)
+    set({ budgetAlertsEnabled: next })
+    await get().persist({ budgetAlertsEnabled: next })
   },
   setReduceMotion: (reduceMotion) => {
     set({ reduceMotion: Boolean(reduceMotion) })
@@ -221,6 +242,9 @@ const useSettingsStore = create((set, get) => ({
       lockSecret: record.lockSecret || '',
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
       geminiApiKey: record.geminiApiKey || '',
+      dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
+      dailyReminderTime: record.dailyReminderTime || '20:00',
+      budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
       isUnlocked: !securityEnabled,
       isLoaded: true,
     })

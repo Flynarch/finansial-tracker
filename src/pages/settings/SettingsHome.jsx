@@ -24,6 +24,7 @@ import {
   Mail,
   Send,
   AlertCircle,
+  Bell,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -508,8 +509,13 @@ export default function SettingsHome() {
         />
       </SettingsSection>
 
-      {/* 4. Directory Group 2: Keamanan & AI */}
-      <SettingsSection label={t('settings.section.security', 'Keamanan & Asisten AI')}>
+      {/* 4. Directory Group 2: Keamanan, Notifikasi & AI */}
+      <SettingsSection label={t('settings.section.security', 'Keamanan, Notifikasi & AI')}>
+        <SettingsLinkRow
+          to="/settings/notifications"
+          label={t('settings.notifications.title', 'Notifikasi & Pengingat Cerdas')}
+          icon={Bell}
+        />
         <SettingsLinkRow
           to="/settings/security"
           label={t('settings.appLock', 'Keamanan & Kunci Aplikasi')}

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { db } from '../lib/db'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { isExcludeAnalyticsTx } from '../lib/utils'
+import { checkBudgetAlertsAfterExpense } from '../lib/smartNotifications'
 
 export const defaultCategories = [
   'Food',
@@ -108,6 +109,13 @@ const useTransactionStore = create((set) => ({
             }
           }
         }
+
+        // Fire Native / Browser Push Notification
+        await checkBudgetAlertsAfterExpense({
+          category: payload.category,
+          amount: payload.amount,
+          date: payload.date,
+        }).catch(() => {})
       } catch (e) {
         console.error('Failed to check budget:', e)
       }

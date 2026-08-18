@@ -1,0 +1,220 @@
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
+import { format, parseISO } from 'date-fns'
+import { db } from './db'
+import { formatCurrency, toSafeNumber } from './utils'
+import useSettingsStore from '../store/useSettingsStore'
+
+export const NOTIFICATION_CHANNELS = {
+  DAILY_REMINDER: 'fintrack_daily_reminder',
+  BUDGET_ALERTS: 'fintrack_budget_alerts',
+  BILL_REMINDERS: 'fintrack_bill_reminders',
+}
+
+const NOTIFICATION_IDS = {
+  DAILY_REMINDER: 99901,
+  BUDGET_ALERT_BASE: 99800,
+}
+
+/**
+ * Initializes Android notification channels.
+ */
+export async function initNotificationChannels() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await LocalNotifications.createChannel({
+      id: NOTIFICATION_CHANNELS.DAILY_REMINDER,
+      name: 'Pengingat Harian',
+      description: 'Pengingat rutin untuk mencatat pengeluaran harian Anda.',
+      importance: 4, // High
+      visibility: 1, // Public
+    }).catch(() => {})
+
+    await LocalNotifications.createChannel({
+      id: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
+      name: 'Peringatan Batas Anggaran',
+      description: 'Pemberitahuan saat pengeluaran mendekati atau melebihi limit anggaran.',
+      importance: 5, // Max
+      visibility: 1,
+    }).catch(() => {})
+  } catch (err) {
+    console.warn('initNotificationChannels error:', err)
+  }
+}
+
+/**
+ * Request notification permissions if not already granted.
+ */
+export async function requestNotificationPermission() {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const status = await LocalNotifications.checkPermissions()
+      if (status.display !== 'granted') {
+        const req = await LocalNotifications.requestPermissions()
+        return req.display === 'granted'
+      }
+      return true
+    } else if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted') {
+        const res = await Notification.requestPermission()
+        return res === 'granted'
+      }
+      return true
+    }
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
+/**
+ * Schedules or cancels the daily recurring financial logging reminder.
+ * @param {boolean} enabled - Whether daily reminder is active
+ * @param {string} timeStr - Time string in HH:mm format (default: '20:00')
+ */
+export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00') {
+  try {
+    // 1. Cancel existing daily notification
+    if (Capacitor.isNativePlatform()) {
+      await LocalNotifications.cancel({
+        notifications: [{ id: NOTIFICATION_IDS.DAILY_REMINDER }],
+      }).catch(() => {})
+    }
+
+    if (!enabled) return
+
+    // 2. Request permission
+    const hasPerm = await requestNotificationPermission()
+    if (!hasPerm) return
+
+    // 3. Calculate target trigger time
+    const [hourStr, minStr] = String(timeStr || '20:00').split(':')
+    const targetHour = parseInt(hourStr, 10) || 20
+    const targetMin = parseInt(minStr, 10) || 0
+
+    const now = new Date()
+    const triggerDate = new Date()
+    triggerDate.setHours(targetHour, targetMin, 0, 0)
+    if (triggerDate <= now) {
+      triggerDate.setDate(triggerDate.getDate() + 1)
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: NOTIFICATION_IDS.DAILY_REMINDER,
+            title: 'FinTrack • Pengingat Catat Keuangan',
+            body: 'Sudahkah Anda mencatat pengeluaran hari ini? Luangkan 1 menit untuk keuangan yang lebih teratur.',
+            channelId: NOTIFICATION_CHANNELS.DAILY_REMINDER,
+            schedule: {
+              at: triggerDate,
+              every: 'day',
+              allowWhileIdle: true,
+            },
+            smallIcon: 'ic_stat_icon_config_sample',
+          },
+        ],
+      })
+    }
+  } catch (err) {
+    console.warn('syncDailyReminderSchedule error:', err)
+  }
+}
+
+/**
+ * Checks budget limits after a new expense transaction is recorded.
+ * Sends proactive alert if category expense reaches 80% or exceeds 100%.
+ */
+export async function checkBudgetAlertsAfterExpense({ category, amount, date }) {
+  try {
+    const budgetAlertsEnabled = useSettingsStore.getState().budgetAlertsEnabled
+    if (!budgetAlertsEnabled) return
+
+    if (!category || !amount || Number(amount) <= 0) return
+
+    const targetMonthStr = date ? format(parseISO(String(date)), 'yyyy-MM') : format(new Date(), 'yyyy-MM')
+    const currentMonthStr = format(new Date(), 'yyyy-MM')
+    if (targetMonthStr !== currentMonthStr) return
+
+    // Find active budgets for this category or parent category
+    const budgets = await db.budgets.toArray()
+    const parentCategory = category.includes('/') ? category.split('/')[0] : category
+
+    const matchingBudget = budgets.find(
+      (b) =>
+        b.month === currentMonthStr &&
+        (b.category === category || b.category === parentCategory || b.category === 'all')
+    )
+
+    if (!matchingBudget || !matchingBudget.amount || matchingBudget.amount <= 0) return
+
+    // Calculate total spent in this budget category for the current month
+    const allTxs = await db.transactions
+      .where('date')
+      .between(`${currentMonthStr}-01`, `${currentMonthStr}-31`, true, true)
+      .toArray()
+
+    const categoryTxs = allTxs.filter(
+      (t) =>
+        t.type === 'expense' &&
+        (t.category === matchingBudget.category ||
+          (matchingBudget.category !== 'all' && t.category?.startsWith?.(matchingBudget.category)) ||
+          matchingBudget.category === 'all')
+    )
+
+    const totalSpent = categoryTxs.reduce((acc, t) => acc + toSafeNumber(t.amount), 0)
+    const budgetLimit = toSafeNumber(matchingBudget.amount)
+    const spentRatio = totalSpent / budgetLimit
+
+    const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
+    const locale = useSettingsStore.getState().locale || 'id'
+
+    let alertTitle = ''
+    let alertBody = ''
+
+    if (spentRatio >= 1.0) {
+      alertTitle = 'Batas Anggaran Terlampaui!'
+      alertBody = `Pengeluaran ${matchingBudget.category === 'all' ? 'Total' : matchingBudget.category} telah mencapai ${formatCurrency(totalSpent, defaultCurrency, locale)} (melebihi limit ${formatCurrency(budgetLimit, defaultCurrency, locale)}).`
+    } else if (spentRatio >= 0.8) {
+      alertTitle = 'Peringatan Anggaran (80%)'
+      alertBody = `Pengeluaran ${matchingBudget.category === 'all' ? 'Total' : matchingBudget.category} telah mencapai ${Math.round(spentRatio * 100)}% dari batas bulanan (${formatCurrency(totalSpent, defaultCurrency, locale)} / ${formatCurrency(budgetLimit, defaultCurrency, locale)}).`
+    }
+
+    if (alertTitle && alertBody) {
+      await sendInstantBudgetNotification({
+        id: NOTIFICATION_IDS.BUDGET_ALERT_BASE + Math.floor(Math.random() * 100),
+        title: alertTitle,
+        body: alertBody,
+      })
+    }
+  } catch (err) {
+    console.warn('checkBudgetAlertsAfterExpense error:', err)
+  }
+}
+
+/**
+ * Fires an instant local notification or browser notification.
+ */
+async function sendInstantBudgetNotification({ id, title, body }) {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: id || Date.now() % 100000,
+            title,
+            body,
+            channelId: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
+            schedule: { at: new Date(Date.now() + 500) },
+            smallIcon: 'ic_stat_icon_config_sample',
+          },
+        ],
+      })
+    } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(`FinTrack • ${title}`, { body })
+    }
+  } catch {
+    /* ignore */
+  }
+}

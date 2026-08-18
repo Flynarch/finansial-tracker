@@ -938,3 +938,136 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
   }
 }
 
+/**
+ * Scans a receipt image using Gemini Vision and extracts structured financial data.
+ * @param {string} base64Data - Base64 encoded image string (with or without data URI prefix)
+ * @param {string} mimeType - Image mime type e.g. 'image/jpeg' or 'image/png'
+ * @param {object} options - Options including defaultCurrency and locale
+ * @returns {Promise<object>} Extracted transaction data
+ */
+export async function scanReceiptImage(base64Data, mimeType = 'image/jpeg', { defaultCurrency = 'IDR', locale = 'id' } = {}) {
+  const apiKey = getEffectiveApiKey()
+  if (!apiKey) {
+    throw new Error('API Key Gemini belum diset. Silakan atur di menu Pengaturan > Integrasi Asisten AI.')
+  }
+
+  // Clean raw base64 if it has data url prefix
+  let cleanBase64 = String(base64Data || '')
+  if (cleanBase64.includes('base64,')) {
+    const parts = cleanBase64.split('base64,')
+    cleanBase64 = parts[1]
+    const header = parts[0]
+    if (header.includes(':') && header.includes(';')) {
+      mimeType = header.split(':')[1].split(';')[0]
+    }
+  }
+
+  const categoryContext = buildCategoryContext(locale)
+
+  const prompt = `
+Anda adalah sistem OCR cerdas pemindai struk belanja dan nota pembayaran untuk aplikasi keuangan FinTrack.
+Tugas Anda: Analisis foto struk berikut secara teliti dan ekstrak seluruh informasinya dalam format JSON murni TANPA blok markdown.
+
+DAFTAR KATEGORI YANG TERSEDIA DI FINTRACK:
+${categoryContext}
+
+PETUNJUK EKSTRAKSI:
+1. "merchantName": Nama toko, resto, merchant, atau tempat pembayaran (misal: "Indomaret", "Alfamart", "Starbucks", "SPBU Pertamina", "Apotek Kimia Farma"). Jika tidak terbaca jelas, gunakan "Struk Belanja".
+2. "date": Tanggal transaksi dalam format "YYYY-MM-DD" (contoh: "${format(new Date(), 'yyyy-MM-dd')}"). Jika tanggal di struk tidak jelas atau tidak ditemukan, gunakan "${format(new Date(), 'yyyy-MM-dd')}".
+3. "totalAmount": Total nominal pembayaran akhir (angka positif tanpa titik/koma/simbol). Jangan ambil nominal diskon atau subtotal, tapi TOTAL AKHIR YANG DIBAYAR.
+4. "currency": Mata uang struk (misal: "${defaultCurrency}", "IDR", "USD").
+5. "suggestedCategory": Pilih salah satu ID kategori yang paling cocok dari daftar kategori di atas (format: "parentId/childId", contoh: "makanMinum/kopi", "makanMinum/restoran", "belanja/supermarket", "transportasi/bensin", "kesehatan/obat").
+6. "items": Daftar barang yang dibeli jika ada rincian item, dengan properti: "name" (nama barang), "price" (harga total item), "qty" (jumlah). Jika struk hanya mencantumkan total, buat 1 item dengan nama struk tersebut.
+7. "notes": Ringkasan catatan transaksi (contoh: "Alfamart: Kopi Susu, Roti Tawar").
+
+FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
+{
+  "merchantName": "Nama Merchant",
+  "date": "YYYY-MM-DD",
+  "totalAmount": 50000,
+  "currency": "IDR",
+  "suggestedCategory": "belanja/supermarket",
+  "items": [
+    { "name": "Item 1", "price": 30000, "qty": 1 },
+    { "name": "Item 2", "price": 20000, "qty": 1 }
+  ],
+  "notes": "Nama Toko: Item 1, Item 2"
+}
+`
+
+  const callApiWithFallback = async (reqContents) => {
+    let lastError = null
+    const key = getEffectiveApiKey()
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+        const res = await fetch(`${url}?key=${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: reqContents,
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        })
+
+        if (!res.ok) {
+          const errText = await res.text()
+          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+        }
+
+        const data = await res.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        return { text }
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError
+  }
+
+  try {
+    const contents = [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: mimeType || 'image/jpeg',
+              data: cleanBase64,
+            },
+          },
+        ],
+      },
+    ]
+    const response = await callApiWithFallback(contents)
+    const rawText = response.text || '{}'
+    const parsed = JSON.parse(rawText)
+
+    // Sanitize category
+    let finalCategory = parsed.suggestedCategory || 'belanja/lainnya'
+    try {
+      finalCategory = sanitizeCategoryPath(finalCategory, 'expense')
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      success: true,
+      merchantName: parsed.merchantName || 'Struk Belanja',
+      date: parsed.date || format(new Date(), 'yyyy-MM-dd'),
+      totalAmount: Number(parsed.totalAmount) || 0,
+      currency: parsed.currency || defaultCurrency,
+      suggestedCategory: finalCategory,
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      notes: parsed.notes || parsed.merchantName || 'Struk Belanja',
+    }
+  } catch (err) {
+    console.error('scanReceiptImage error:', err)
+    throw err
+  }
+}
+
