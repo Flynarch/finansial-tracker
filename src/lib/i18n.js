@@ -263,6 +263,14 @@ const dictionaries = {
     'settings.notifications.budgetActive': 'Aktif (80% & 100% Limit)',
     'settings.notifications.testBtn': 'Kirim Notifikasi Uji Coba',
     'settings.notifications.testSent': 'Notifikasi Uji Terkirim!',
+    'settings.nav.dataSubtitle': 'Ekspor JSON, Reset Data & Hapus Akun',
+    'settings.dangerZoneTitle': 'Reset Finansial & Hapus Akun',
+    'settings.dangerZoneSub': 'Reset data transaksi atau hapus akun permanen',
+    'settings.reset.cardSubtitle': 'Hapus semua dompet, transaksi, dan anggaran. Akun login Anda tetap aktif.',
+    'settings.deleteAccount.cardSubtitleCloud':
+      'Hapus profil login, cadangan cloud Firestore, dan seluruh data lokal secara permanen.',
+    'settings.deleteAccount.cardSubtitleGuest':
+      'Hapus seluruh data lokal dan kembalikan aplikasi ke setelan awal pabrik.',
     'reports.statementTitle': 'Laporan Keuangan Resmi',
     'budget.title': 'Anggaran',
     'budget.subtitle': 'Atur anggaran bulanan per kategori.',
@@ -1408,6 +1416,14 @@ const dictionaries = {
     'settings.notifications.budgetActive': 'Active (80% & 100% Limit)',
     'settings.notifications.testBtn': 'Send Test Notification',
     'settings.notifications.testSent': 'Test Notification Sent!',
+    'settings.nav.dataSubtitle': 'JSON Export, Reset Data & Delete Account',
+    'settings.dangerZoneTitle': 'Financial Reset & Account Deletion',
+    'settings.dangerZoneSub': 'Reset transaction records or permanently purge account',
+    'settings.reset.cardSubtitle': 'Delete all wallets, transactions, and budgets. Your login account remains active.',
+    'settings.deleteAccount.cardSubtitleCloud':
+      'Permanently delete login identity, Firestore cloud backups, and all local records.',
+    'settings.deleteAccount.cardSubtitleGuest':
+      'Wipe all local records and restore app to original factory settings.',
     'reports.statementTitle': 'Official Financial Statement',
     'budget.title': 'Budget',
     'budget.subtitle': 'Manage monthly budget by category.',

@@ -274,7 +274,7 @@ export default function SettingsData() {
         </div>
       </SettingsSection>
 
-      {/* Zona Berbahaya */}
+      {/* Zona Berbahaya: Reset Finansial & Hapus Akun Bersebelahan */}
       <SettingsSection
         label={t('settings.dangerZone', 'Zona Berbahaya')}
         footnote={t(
@@ -282,61 +282,82 @@ export default function SettingsData() {
           'Tindakan di zona ini permanen dan tidak dapat dibatalkan.',
         )}
       >
-        {/* 1. Reset Riwayat Finansial */}
-        <div className="ft-settings-cell space-y-3.5">
-          <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-2xs">
-              <AlertTriangle className="h-5.5 w-5.5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-[15px] font-extrabold text-[var(--fg)] leading-tight">
-                {t('settings.reset.title', 'Reset Riwayat Finansial')}
-              </h3>
-              <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                Hapus semua akun, riwayat transaksi, dan anggaran. Akun login Anda tetap aktif.
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Card 1: Reset Riwayat Finansial */}
+          <div className="ft-settings-cell flex flex-col justify-between space-y-4 border border-amber-500/20 bg-amber-500/5">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-[var(--fg)] leading-tight">
+                    {t('settings.reset.title', 'Reset Riwayat Finansial')}
+                  </h3>
+                  <span className="inline-block mt-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
+                    Sesi Akun Tetap Aktif
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
+                {t(
+                  'settings.reset.cardSubtitle',
+                  'Hapus semua dompet, transaksi, dan anggaran. Akun login Anda tetap aktif.',
+                )}
               </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 text-sm font-black text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
-            disabled={isBusy}
-            onClick={() => setIsClearModalOpen(true)}
-          >
-            <AlertTriangle className="h-4.5 w-4.5 text-amber-500" />
-            <span>{t('settings.reset.button', 'Hapus Semua Riwayat Finansial')}</span>
-          </button>
-        </div>
-
-        {/* 2. Hapus Akun & Data Permanen (Hanya jika login dengan akun terdaftar) */}
-        {authProvider && authProvider !== 'guest' && authUserEmail && (
-          <div className="ft-settings-cell space-y-3.5">
-            <div className="flex items-center gap-3.5">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-2xs">
-                <UserX className="h-5.5 w-5.5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-[15px] font-extrabold text-rose-500 leading-tight">
-                  {t('settings.deleteAccount.title', 'Hapus Akun Permanen')}
-                </h3>
-                <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                  Hapus kredensial login, seluruh cadangan cloud di Google Firestore, dan data lokal secara permanen.
-                </p>
-              </div>
             </div>
 
             <button
               type="button"
-              className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-black text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer shadow-2xs"
+              className="w-full h-11 flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 text-xs font-black text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 cursor-pointer shadow-2xs mt-auto"
+              disabled={isBusy}
+              onClick={() => setIsClearModalOpen(true)}
+            >
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span>{t('settings.reset.button', 'Reset Data Finansial')}</span>
+            </button>
+          </div>
+
+          {/* Card 2: Hapus Akun Permanen */}
+          <div className="ft-settings-cell flex flex-col justify-between space-y-4 border border-rose-500/20 bg-rose-500/5">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                  <UserX className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-rose-500 leading-tight">
+                    {t('settings.deleteAccount.title', 'Hapus Akun Permanen')}
+                  </h3>
+                  <span className="inline-block mt-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded">
+                    Hapus Total
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
+                {authProvider && authProvider !== 'guest' && authUserEmail
+                  ? t(
+                      'settings.deleteAccount.cardSubtitleCloud',
+                      'Hapus profil login, cadangan cloud Firestore, dan seluruh data lokal secara permanen.',
+                    )
+                  : t(
+                      'settings.deleteAccount.cardSubtitleGuest',
+                      'Hapus seluruh data lokal dan kembalikan aplikasi ke setelan awal pabrik.',
+                    )}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="w-full h-11 flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 text-xs font-black text-rose-500 hover:bg-rose-500/20 transition active:scale-95 cursor-pointer shadow-2xs mt-auto"
               disabled={isBusy}
               onClick={() => setIsDeleteAccountModalOpen(true)}
             >
-              <UserX className="h-4.5 w-4.5 text-rose-500" />
-              <span>{t('settings.deleteAccount.button', 'Hapus Akun & Semua Data')}</span>
+              <UserX className="h-4 w-4 text-rose-500" />
+              <span>{t('settings.deleteAccount.button', 'Hapus Akun Permanen')}</span>
             </button>
           </div>
-        )}
+        </div>
       </SettingsSection>
 
       {/* Clear Confirmation Modal */}
