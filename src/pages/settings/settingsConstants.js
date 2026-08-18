@@ -12,6 +12,33 @@ export const APP_LOCAL_STORAGE_KEYS = [
   'usd-idr-fallback-v1',
 ]
 
+/**
+ * Clear only financial caches without wiping user authentication, onboarding, or profile state
+ */
+export function clearFinancialLocalStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    const keysToRemove = [
+      'gold_price_history',
+      'gold_history_migrated',
+      'gold-spot-samples-v2',
+      'gold-spot-1g-idr',
+      'usd-idr-fallback-v1',
+      'ft_expense_category_custom_v1',
+      'ft_income_category_custom_v1',
+    ]
+    keysToRemove.forEach((k) => {
+      try {
+        window.localStorage.removeItem(k)
+      } catch {
+        /* ignore */
+      }
+    })
+  } catch {
+    // Ignore localStorage errors during reset.
+  }
+}
+
 export function clearAppLocalStorage() {
   if (typeof window === 'undefined') return
   try {

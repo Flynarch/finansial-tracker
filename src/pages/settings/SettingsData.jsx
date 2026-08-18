@@ -13,7 +13,7 @@ import { downloadTextFile } from '../../lib/utils'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
-import { clearAppLocalStorage } from './settingsConstants'
+import { clearFinancialLocalStorage } from './settingsConstants'
 import { SettingsSection } from './settingsComponents'
 import { resetExpenseCategoryCustomizations } from '../../lib/expenseCategories'
 import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
@@ -73,30 +73,49 @@ export default function SettingsData() {
     }
     try {
       setBusyAction('reset')
-      await Promise.all(db.tables.map((table) => table.clear()))
-      clearAppLocalStorage()
+
+      // 1. Clear all financial data tables in Dexie
+      const dataTables = [
+        db.transactions,
+        db.budgets,
+        db.goals,
+        db.savings,
+        db.loans,
+        db.investments,
+        db.investmentOrders,
+        db.calendarEvents,
+        db.recurringTransactions,
+        db.todos,
+        db.sub_tasks,
+        db.habits,
+        db.habitLogs,
+        db.ideas,
+        db.board_links,
+        db.notifications,
+        db.goalLogs,
+        db.wallets,
+      ]
+      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch(() => {})))
+
+      // 2. Re-create a clean initial wallet with default currency so UI has a primary wallet ready
+      const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
+      await db.wallets.add({
+        name: 'Kas Utama',
+        institutionType: 'cash',
+        logoUrl: '/logos/wallets/cash.svg',
+        currency: defaultCurrency,
+        balance: 0,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {})
+
+      // 3. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
+      clearFinancialLocalStorage()
       resetExpenseCategoryCustomizations()
       resetIncomeCategoryCustomizations()
-      useSettingsStore.setState({
-        theme: 'light',
-        locale: 'id',
-        defaultCurrency: 'IDR',
-        motionPreference: 'system',
-        reduceMotion: false,
-        profileName: '',
-        profilePhoto: '',
-        hasCompletedOnboarding: false,
-        securityEnabled: false,
-        securityMethod: 'pin',
-        lockSecret: '',
-        isUnlocked: true,
-      })
+
       setIsClearModalOpen(false)
       setResetConfirmText('')
-      setStatusMessage(t('settings.status.resetDone', 'Seluruh data berhasil dibersihkan.'))
-      window.setTimeout(() => {
-        if (typeof window !== 'undefined') window.location.reload()
-      }, 150)
+      setStatusMessage(t('settings.status.resetDone', 'Seluruh data finansial berhasil dibersihkan. Akun Anda tetap aktif.'))
     } catch {
       setStatusMessage(t('common.error.saveFailed', 'Gagal membersihkan data.'))
     } finally {
