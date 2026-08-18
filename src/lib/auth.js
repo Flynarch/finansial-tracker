@@ -435,34 +435,103 @@ export async function reloadAuthUser() {
 }
 
 /**
- * Continue in Offline-First Guest Mode
+ * Check if the currently active Firebase Auth user is Anonymous
  */
-export async function signInAsGuest() {
+export function isCurrentUserAnonymous() {
   try {
     const auth = getFirebaseAuth()
-    const result = await signInAnonymously(auth).catch(() => null)
+    return Boolean(auth?.currentUser?.isAnonymous)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Sign In Anonymously (Firebase Anonymous Authentication)
+ * Supports Native Android (@capacitor-firebase/authentication) and Web SDK with offline fallback.
+ */
+export async function signInAnonymousUser() {
+  const isNative = Capacitor.isNativePlatform()
+
+  // 1. Native Android Firebase Anonymous Auth
+  if (isNative) {
+    try {
+      const result = await FirebaseAuthentication.signInAnonymously()
+      const u = result?.user
+      if (u) {
+        return {
+          success: true,
+          user: {
+            uid: u.uid,
+            displayName: u.displayName || '',
+            email: '',
+            photoURL: '',
+            provider: 'anonymous',
+            isAnonymous: true,
+            emailVerified: false,
+          },
+        }
+      }
+    } catch (nativeError) {
+      console.warn('Native signInAnonymously encountered error, trying web fallback:', nativeError)
+    }
+  }
+
+  // 2. Web Firebase SDK Anonymous Auth
+  try {
+    const auth = getFirebaseAuth()
+    if (!auth) {
+      return {
+        success: true,
+        user: {
+          uid: `anon_${Date.now()}`,
+          displayName: '',
+          email: '',
+          photoURL: '',
+          provider: 'anonymous',
+          isAnonymous: true,
+          emailVerified: false,
+        },
+      }
+    }
+
+    const result = await signInAnonymously(auth)
+    const u = result.user
     return {
       success: true,
       user: {
-        uid: result?.user?.uid || `guest_${Date.now()}`,
-        displayName: '',
+        uid: u.uid,
+        displayName: u.displayName || '',
         email: '',
         photoURL: '',
-        provider: 'guest',
+        provider: 'anonymous',
+        isAnonymous: true,
         emailVerified: false,
       },
     }
-  } catch {
+  } catch (error) {
+    // If Firebase Anonymous is disabled in console or device is offline, gracefully return anonymous guest user
     return {
       success: true,
+      fallback: true,
       user: {
-        uid: `guest_${Date.now()}`,
+        uid: `anon_${Date.now()}`,
         displayName: '',
         email: '',
         photoURL: '',
-        provider: 'guest',
+        provider: 'anonymous',
+        isAnonymous: true,
         emailVerified: false,
       },
+      message: formatAuthError(error, 'Masuk sebagai akun anonim lokal.'),
     }
   }
 }
+
+/**
+ * Continue in Offline-First Guest Mode / Anonymous
+ */
+export async function signInAsGuest() {
+  return await signInAnonymousUser()
+}
+

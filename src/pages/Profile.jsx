@@ -249,6 +249,8 @@ function Profile() {
                   ? `Google • ${authUserEmail || 'Connected'}`
                   : authProvider === 'email'
                   ? `Email • ${authUserEmail || 'Registered'}`
+                  : authProvider === 'anonymous'
+                  ? 'Akun Anonim (Tamu)'
                   : t('profile.badge.local')}
               </span>
             </div>

@@ -3,7 +3,16 @@ import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 
-function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md', zIndex = 'z-50' }) {
+function Modal({
+  isOpen,
+  title,
+  children,
+  onClose,
+  maxWidth = 'max-w-md',
+  zIndex = 'z-50',
+  showHeader = true,
+  showCloseButton = true,
+}) {
   const { isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const { t } = useTranslation()
 
@@ -40,20 +49,24 @@ function Modal({ isOpen, title, children, onClose, maxWidth = 'max-w-md', zIndex
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
       >
-        <div className="mb-3 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
-          <h3 className="ft-display text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h3>
-          <button
-            type="button"
-            onClick={closeSheet}
-            className="flex h-7 w-7 items-center justify-center rounded-full transition-colors text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] cursor-pointer"
-            aria-label={t('common.close', 'Tutup')}
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-              <path d="M18 6L6 18" />
-              <path d="M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        {showHeader && (Boolean(title) || showCloseButton) && (
+          <div className="mb-3 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
+            <h3 className="ft-display text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h3>
+            {showCloseButton && (
+              <button
+                type="button"
+                onClick={closeSheet}
+                className="flex h-7 w-7 items-center justify-center rounded-full transition-colors text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] cursor-pointer"
+                aria-label={t('common.close', 'Tutup')}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+                  <path d="M18 6L6 18" />
+                  <path d="M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
         {children}
       </div>
     </div>,

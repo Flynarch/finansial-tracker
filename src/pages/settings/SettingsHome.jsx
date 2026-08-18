@@ -121,7 +121,7 @@ export default function SettingsHome() {
   }
 
   const handleSwitchAccount = () => {
-    if (authProvider === 'guest' || (!authUserEmail && !authUserId)) {
+    if (authProvider === 'guest' || authProvider === 'anonymous' || (!authUserEmail && !authUserId)) {
       setIsGuestWarningOpen(true)
     } else {
       setIsLogoutConfirmOpen(true)
@@ -196,13 +196,15 @@ export default function SettingsHome() {
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
                 <span
                   className={`h-2 w-2 rounded-full shrink-0 inline-block ${
-                    authProvider === 'guest' || !authUserEmail ? 'bg-amber-500' : 'bg-emerald-500'
+                    authProvider === 'guest' || authProvider === 'anonymous' || !authUserEmail ? 'bg-amber-500' : 'bg-emerald-500'
                   }`}
                 />
                 {authProvider === 'google'
                   ? `Google • ${authUserEmail || 'Connected'}`
                   : authProvider === 'email'
                   ? `Email • ${authUserEmail || 'Registered'}`
+                  : authProvider === 'anonymous'
+                  ? 'Akun Anonim (Tamu)'
                   : 'Mode Tamu'}
               </p>
             </div>
@@ -244,8 +246,8 @@ export default function SettingsHome() {
         </div>
       </div>
 
-      {/* 1.5 Guest Mode Warning & Link Account Banner */}
-      {(authProvider === 'guest' || !authUserEmail) && (
+      {/* 1.5 Guest / Anonymous Mode Warning & Link Account Banner */}
+      {(authProvider === 'guest' || authProvider === 'anonymous' || !authUserEmail) && (
         <div className="mb-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-start gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
@@ -254,13 +256,13 @@ export default function SettingsHome() {
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2">
                 <h4 className="font-extrabold text-sm text-[var(--fg)]">
-                  {t('settings.guestBannerTitle', 'Mode Tamu Aktif')}
+                  {t('settings.guestBannerTitle', 'Mode Tamu / Anonim Aktif')}
                 </h4>
               </div>
               <p className="text-xs text-[var(--muted)] leading-relaxed">
                 {t(
                   'settings.guestBannerSubtitle',
-                  'Hubungkan akun Google Anda agar catatan transaksi aman & tersinkronisasi.'
+                  'Hubungkan akun Google atau Email Anda agar catatan transaksi aman & tersinkronisasi multi-perangkat.'
                 )}
               </p>
             </div>
@@ -273,7 +275,7 @@ export default function SettingsHome() {
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
           >
             <CheckCircle2 size={14} />
-            <span>{t('settings.connectAccountNow', 'Hubungkan Akun Sekarang')}</span>
+            <span>{t('settings.connectAccountNow', 'Hubungkan / Tautkan Akun')}</span>
           </button>
         </div>
       )}
@@ -377,6 +379,8 @@ export default function SettingsHome() {
               ? `Google • ${authUserEmail || 'Connected'}`
               : authProvider === 'email'
               ? `Email • ${authUserEmail || 'Registered'}`
+              : authProvider === 'anonymous'
+              ? 'Akun Anonim (Tamu)'
               : 'Mode Tamu'
           }
           icon={LogOut}

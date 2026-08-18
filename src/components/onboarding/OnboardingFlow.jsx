@@ -448,7 +448,7 @@ export default function OnboardingFlow() {
               </div>
 
               {/* Auth Buttons Stack */}
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2.5 pt-2">
                 {/* 1. Google Sign-In Primary Button */}
                 <button
                   type="button"
@@ -459,7 +459,7 @@ export default function OnboardingFlow() {
                   {isGoogleLoading ? (
                     <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
                   ) : (
-                    <GoogleIcon className="w-5 h-5" />
+                    <GoogleIcon className="w-5 h-5 shrink-0" />
                   )}
                   <span>
                     {isGoogleLoading
@@ -468,42 +468,51 @@ export default function OnboardingFlow() {
                   </span>
                 </button>
 
-                {/* 2. Email & Password / Bikin Akun Secondary Actions */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthModalMode('login')
-                      setAuthModalOpen(true)
-                    }}
-                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-extrabold text-xs hover:border-[var(--border-strong)] transition-all active:scale-[0.98] cursor-pointer"
-                  >
-                    <Mail size={15} className="text-[var(--accent)]" />
-                    <span>{t('auth.signInEmailBtn', 'Masuk Email')}</span>
-                  </button>
+                {/* 2. Continue with Email (Full Width right below Google) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthModalMode('login')
+                    setAuthModalOpen(true)
+                  }}
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-sm hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] transition-all active:scale-[0.98] shadow-2xs cursor-pointer"
+                >
+                  <Mail size={17} className="text-[var(--accent)] shrink-0" />
+                  <span>{t('auth.continueWithEmail', 'Lanjutkan dengan Email')}</span>
+                </button>
 
+                {/* Subtle Divider (Seamless flex lines) */}
+                <div className="flex items-center gap-3 py-1 my-0.5 text-[9.5px] font-bold uppercase tracking-widest text-[var(--muted)]/50">
+                  <div className="flex-1 border-t border-[var(--border)]/40" />
+                  <span>{t('auth.orOtherOptions', 'atau opsi lainnya')}</span>
+                  <div className="flex-1 border-t border-[var(--border)]/40" />
+                </div>
+
+                {/* 3. Guest Mode */}
+                <button
+                  type="button"
+                  onClick={handleGuestSignIn}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl border border-dashed border-[var(--border)] bg-transparent text-[var(--muted)] font-bold text-xs hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <UserCheck size={14} className="shrink-0" />
+                  <span>{t('auth.guestModeFull', 'Lanjut Mode Tamu')}</span>
+                </button>
+
+                {/* 4. Direct 'No Account? Create Account' prompt */}
+                <div className="flex items-center justify-center gap-1.5 pt-1 text-xs text-[var(--muted)] font-medium">
+                  <span>{t('auth.noAccountYetPrompt', 'Belum punya akun?')}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setAuthModalMode('register')
                       setAuthModalOpen(true)
                     }}
-                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-extrabold text-xs shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                    className="inline-flex items-center gap-1 font-extrabold text-[var(--accent)] hover:underline active:scale-95 transition-transform cursor-pointer"
                   >
-                    <UserPlus size={15} />
-                    <span>{t('auth.signUpBtn', 'Bikin Akun')}</span>
+                    <UserPlus size={13} strokeWidth={2.5} />
+                    <span>{t('auth.createAccountNow', 'Buat Akun Baru')}</span>
                   </button>
                 </div>
-
-                {/* 3. Guest Mode (Instant Pass-Through) */}
-                <button
-                  type="button"
-                  onClick={handleGuestSignIn}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-[var(--muted)] font-semibold text-xs hover:text-[var(--fg)] transition-colors cursor-pointer"
-                >
-                  <UserCheck size={14} />
-                  <span>{t('auth.continueAsGuest', 'Lanjutkan sebagai Tamu')}</span>
-                </button>
 
                 {googleError && (
                   <div className="p-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs font-semibold flex items-center gap-2">
@@ -843,6 +852,8 @@ export default function OnboardingFlow() {
                           ? 'Akun Google'
                           : authProvider === 'email'
                           ? 'Akun Email'
+                          : authProvider === 'anonymous'
+                          ? 'Akun Anonim / Tamu'
                           : 'Mode Tamu'}
                       </p>
                     </div>

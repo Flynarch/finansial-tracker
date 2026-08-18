@@ -94,11 +94,12 @@ const useSettingsStore = create((set, get) => ({
     set({ profilePhoto: next })
     await get().persist({ profilePhoto: next })
   },
-  setAuthUser: async ({ uid = '', email = '', displayName = '', photoURL = '', provider = 'guest', emailVerified = false }) => {
+  setAuthUser: async ({ uid = '', email = '', displayName = '', photoURL = '', provider = 'guest', emailVerified = false, isAnonymous = false }) => {
+    const calculatedProvider = isAnonymous ? 'anonymous' : (provider || 'guest')
     const updates = {
       authUserId: uid,
       authUserEmail: email,
-      authProvider: provider,
+      authProvider: calculatedProvider,
       emailVerified: Boolean(emailVerified),
       ...(displayName ? { profileName: displayName } : {}),
       ...(photoURL ? { profilePhoto: photoURL } : {}),
