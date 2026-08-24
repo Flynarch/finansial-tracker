@@ -17,7 +17,9 @@ import { calculateBudgetSpent } from '../lib/budgetUtils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { ChevronLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
+import { isTxMatchingBudget } from '../lib/budgetUtils'
+import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
 
 function Budget() {
   const { locale, t } = useTranslation()
@@ -100,6 +102,51 @@ function Budget() {
     const overAmount = isOver ? totalSpent - totalLimit : 0
     return { totalSpent, totalLimit, pct, remaining, isOver, overAmount }
   }, [sortedMonthBudgets])
+
+  const prevMonthKey = useMemo(() => {
+    try {
+      const [y, m] = month.split('-').map(Number)
+      const d = new Date(y, m - 2, 1)
+      return format(d, 'yyyy-MM')
+    } catch {
+      return ''
+    }
+  }, [month])
+
+  const prevMonthBudgets = useMemo(() => {
+    if (!prevMonthKey || !budgets) return []
+    return budgets.filter((b) => b.month === prevMonthKey)
+  }, [budgets, prevMonthKey])
+
+  const handleCopyPrevMonthBudgets = async () => {
+    if (!prevMonthBudgets.length) return
+    const newBudgets = prevMonthBudgets.map((b) => ({
+      category: b.category,
+      limit: b.limit,
+      month: month,
+    }))
+    await db.budgets.bulkAdd(newBudgets)
+  }
+
+  const unbudgetedExpenses = useMemo(() => {
+    if (!monthExpenseTxs || !monthExpenseTxs.length) return []
+    const unbudgetedMap = new Map()
+
+    monthExpenseTxs.forEach((tx) => {
+      if (isExcludeAnalyticsTx(tx)) return
+      const isBudgeted = sortedMonthBudgets.some((b) => isTxMatchingBudget(b.category, tx.category))
+      if (!isBudgeted) {
+        const catKey = tx.category || 'lainnya'
+        const current = unbudgetedMap.get(catKey) || { category: catKey, totalSpent: 0, count: 0 }
+        const amt = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+        current.totalSpent += amt
+        current.count += 1
+        unbudgetedMap.set(catKey, current)
+      }
+    })
+
+    return [...unbudgetedMap.values()].sort((a, b) => b.totalSpent - a.totalSpent)
+  }, [monthExpenseTxs, sortedMonthBudgets, defaultCurrency, rates])
 
   const openAdd = useCallback(() => {
     setEditingId(null)
@@ -257,7 +304,23 @@ function Budget() {
           </div>
 
           {monthBudgets.length === 0 ? (
-            <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
+            <div className="space-y-4">
+              <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
+              {prevMonthBudgets.length > 0 && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={handleCopyPrevMonthBudgets}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] px-5 py-3 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
+                  >
+                    <Copy className="h-4 w-4 text-[var(--accent)]" />
+                    <span>
+                      Salin Anggaran dari Bulan Lalu ({prevMonthBudgets.length} Kategori)
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ft-stagger-in">
               {sortedMonthBudgets.map((b) => {
@@ -353,26 +416,83 @@ function Budget() {
             </div>
           )}
         </div>
-      </div>
 
-      <BudgetSheetModal
-        isOpen={sheetOpen}
-        onClose={closeSheet}
-        editingBudget={budgets?.find((b) => b.id === editingId)}
-        month={month}
-      />
-      <ConfirmDeleteModal
-        isOpen={!!deletingBudget}
-        onClose={() => setDeletingBudget(null)}
-        onConfirm={async () => {
-          if (deletingBudget) {
-            await db.budgets.delete(deletingBudget.id)
-            setDeletingBudget(null)
-          }
-        }}
-        title={t('budget.delete') || 'Hapus Anggaran'}
-        message={t('budget.deleteConfirm') || 'Apakah Anda yakin ingin menghapus anggaran ini?'}
-      />
+        {/* Unbudgeted Expenses Section */}
+        {unbudgetedExpenses.length > 0 && (
+          <div className="space-y-3 pt-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5">
+                <AlertOctagon className="h-4 w-4 text-amber-500" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--fg)]">
+                  Pengeluaran Tanpa Anggaran ({unbudgetedExpenses.length})
+                </h3>
+              </div>
+              <span className="text-[11px] font-bold text-[var(--muted)]">
+                Total: {formatCurrency(unbudgetedExpenses.reduce((s, u) => s + u.totalSpent, 0), defaultCurrency)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {unbudgetedExpenses.map((item) => {
+                const iconKey = resolveTransactionIconKey(item.category, 'expense')
+                const displayLabel = formatExpenseCategory(item.category, locale)
+                const colorClass = getCategoryColorClass(iconKey, 'expense', item.category)
+
+                return (
+                  <div
+                    key={item.category}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorClass} shadow-xs`}>
+                        <CategoryIcon iconKey={iconKey} className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-[var(--fg)]">{displayLabel}</p>
+                        <p className="text-[10px] text-[var(--muted)] font-medium">
+                          {item.count} Transaksi
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-black font-mono text-[var(--status-expense)]">
+                        {formatCurrency(item.totalSpent, defaultCurrency)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openAdd(item.category)}
+                        className="rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1 text-[10px] font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
+                      >
+                        + Budget
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <BudgetSheetModal
+          isOpen={sheetOpen}
+          onClose={closeSheet}
+          editingBudget={budgets?.find((b) => b.id === editingId)}
+          month={month}
+        />
+        <ConfirmDeleteModal
+          isOpen={!!deletingBudget}
+          onClose={() => setDeletingBudget(null)}
+          onConfirm={async () => {
+            if (deletingBudget) {
+              await db.budgets.delete(deletingBudget.id)
+              setDeletingBudget(null)
+            }
+          }}
+          title={t('budget.delete') || 'Hapus Anggaran'}
+          message={t('budget.deleteConfirm') || 'Apakah Anda yakin ingin menghapus anggaran ini?'}
+        />
+      </div>
     </div>
   )
 }

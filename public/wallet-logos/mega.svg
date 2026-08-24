@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#FF9E00"/>
+  <path d="M20 48L32 20L40 36L48 20L60 48" stroke="#18181B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <text x="40" y="66" text-anchor="middle" font-size="9" font-weight="900" fill="#18181B" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">MEGA</text>
+</svg>

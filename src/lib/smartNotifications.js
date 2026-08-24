@@ -165,7 +165,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
         (b.category === category || b.category === parentCategory || b.category === 'all')
     )
 
-    if (!matchingBudget || !matchingBudget.amount || matchingBudget.amount <= 0) return
+    if (!matchingBudget || !(matchingBudget.amount ?? matchingBudget.limit) || (matchingBudget.amount ?? matchingBudget.limit) <= 0) return
 
     // Calculate total spent in this budget category for the current month
     const allTxs = await db.transactions
@@ -182,7 +182,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
     )
 
     const totalSpent = categoryTxs.reduce((acc, t) => acc + toSafeNumber(t.amount), 0)
-    const budgetLimit = toSafeNumber(matchingBudget.amount)
+    const budgetLimit = toSafeNumber(matchingBudget.amount ?? matchingBudget.limit)
     const spentRatio = totalSpent / budgetLimit
 
     const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#00B14F"/>
+  <g transform="translate(14, 12)" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M26 42V18C26 10 38 10 38 18C38 26 26 26 26 26"/>
+    <path d="M26 22C26 14 14 14 14 22C14 30 26 30 26 30"/>
+  </g>
+  <text x="40" y="66" text-anchor="middle" font-size="12" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">bibit</text>
+</svg>

@@ -510,6 +510,11 @@ export default function Loans() {
                               {item.walletId && walletMap.has(Number(item.walletId)) && (
                                 <span> · {walletMap.get(Number(item.walletId))}</span>
                               )}
+                              {item.interestRate ? <span> · {item.interestRate}%/thn</span> : null}
+                              {item.tenorMonths ? <span> · {item.tenorMonths} bln</span> : null}
+                              {item.monthlyPayment && !isPaid ? (
+                                <span className="text-[var(--accent)] font-semibold"> (Cicilan: {formatCurrency(item.monthlyPayment, item.currency || defaultCurrency)}/bln)</span>
+                              ) : null}
                             </p>
                           </div>
                         </div>

@@ -4,6 +4,7 @@ import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import Modal from '../ui/Modal'
 import CustomDatePicker from '../ui/CustomDatePicker'
+import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -22,6 +23,7 @@ import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Spark
 export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const { recordPayment } = useLoanStore()
   const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
@@ -30,15 +32,12 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
+  const [paymentWalletId, setPaymentWalletId] = useState('')
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
 
-  const connectedWallet = useLiveQuery(
-    async () => {
-      if (!loan?.walletId) return null
-      return await db.wallets.get(Number(loan.walletId))
-    },
-    [loan?.walletId],
-    null,
-  )
+  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+
+  const selectedPaymentWallet = (allWallets || []).find((w) => String(w.id) === String(paymentWalletId || loan?.walletId || defaultWalletId))
 
   const paymentLogs = useLiveQuery(
     async () => {
@@ -116,7 +115,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
     }
 
     try {
-      await recordPayment(loan.id, payAmt, date, notes.trim())
+      await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId)
       onSaved?.()
       closeSheet()
     } catch (err) {
@@ -163,20 +162,6 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
                 {formatCurrency(remaining, currency)}
               </p>
             </div>
-          </div>
-
-          {/* Wallet Badge Link */}
-          <div className="flex items-center gap-1.5 pt-0.5 border-t border-[var(--border)]/60 text-[10px] font-bold">
-            <Wallet className="h-3 w-3 text-[var(--accent)] shrink-0" />
-            {connectedWallet ? (
-              <span className="text-[var(--fg)]">
-                {t('loans.payment.connectedWallet', { name: connectedWallet.name }, `Terhubung ke Wallet: ${connectedWallet.name} (Transaksi ledger otomatis)`)}
-              </span>
-            ) : (
-              <span className="text-[var(--muted)]">
-                {t('loans.payment.unconnectedWallet', 'Pinjaman ini hanya catatan memo (tidak terhubung ke wallet)')}
-              </span>
-            )}
           </div>
 
           {/* Progress Bar Dynamic Preview */}
@@ -329,6 +314,29 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
 
         {/* Input Details Card */}
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 space-y-2">
+          {/* Wallet Selector */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-[var(--fg)] flex items-center gap-1">
+              <Wallet className="h-3 w-3 text-[var(--muted)]" />
+              {isDebt ? 'Dompet Sumber Dana (Pengeluaran)' : 'Dompet Penerima Dana (Pemasukan)'}
+            </label>
+            <WalletSelectTrigger
+              wallet={selectedPaymentWallet}
+              placeholder={t('loans.payment.selectWallet', 'Pilih Dompet Transaksi')}
+              onClick={() => setIsWalletModalOpen(true)}
+            />
+            <WalletSelectModal
+              isOpen={isWalletModalOpen}
+              onClose={() => setIsWalletModalOpen(false)}
+              wallets={allWallets || []}
+              selectedWalletId={paymentWalletId || loan?.walletId || defaultWalletId}
+              onSelectWallet={(wId) => {
+                setPaymentWalletId(wId)
+                setIsWalletModalOpen(false)
+              }}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-[var(--fg)] flex items-center gap-1">

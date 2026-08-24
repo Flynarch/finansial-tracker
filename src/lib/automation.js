@@ -26,12 +26,14 @@ async function notifyIfAllowed(title, body) {
 export async function processRecurringTransactions() {
   const today = new Date()
   const todayKey = dateKey(today)
-  const recurringItems = await db.recurringTransactions.where('enabled').equals(1).toArray()
+  // Support both boolean true and integer 1 for the enabled field
+  const allRecurring = await db.recurringTransactions.toArray()
+  const recurringItems = allRecurring.filter(item => item.enabled === true || item.enabled === 1)
 
   for (const item of recurringItems) {
     let pointer = new Date(`${item.nextDate}T12:00:00`)
     while (dateKey(pointer) <= todayKey) {
-      await db.transactions.add({
+      const txData = {
         date: dateKey(pointer),
         amount: item.amount,
         type: item.type,
@@ -39,7 +41,10 @@ export async function processRecurringTransactions() {
         notes: `${item.notes || ''} (Auto: ${item.title})`.trim(),
         currency: item.currency || 'IDR',
         createdAt: pointer.getTime(),
-      })
+      }
+      if (item.walletId) txData.walletId = item.walletId
+      if (item.targetWalletId) txData.targetWalletId = item.targetWalletId
+      await db.transactions.add(txData)
       pointer = nextDateByFrequency(pointer, item.frequency)
     }
     await db.recurringTransactions.update(item.id, { nextDate: dateKey(pointer) })

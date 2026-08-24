@@ -107,7 +107,7 @@ const useLoanStore = create((set) => ({
     })
   },
 
-  recordPayment: async (loanId, amount, date, notes = '') => {
+  recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null) => {
     const loan = await db.loans.get(loanId)
     if (!loan) throw new Error('Catatan pinjaman tidak ditemukan.')
 
@@ -122,9 +122,10 @@ const useLoanStore = create((set) => ({
     const payDate = date || new Date().toISOString().split('T')[0]
 
     let generatedTxId = null
+    const effectiveWalletId = paymentWalletId || loan.walletId
 
     // Generate transaction in ledger if loan has connected walletId
-    if (loan.walletId) {
+    if (effectiveWalletId) {
       const isDebt = loan.type === 'debt'
       const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
       const txType = isDebt ? 'expense' : 'income' // Debt payment reduces wallet cash; Receivable receipt increases wallet cash
@@ -137,7 +138,7 @@ const useLoanStore = create((set) => ({
         amount: payAmt,
         currency: loan.currency || 'IDR',
         notes: txNotes,
-        walletId: Number(loan.walletId),
+        walletId: Number(effectiveWalletId),
         loanId,
         isExcludeFromAnalytics: true,
         excludeFromAnalytics: true,

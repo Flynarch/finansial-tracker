@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#4A0E4E"/>
+  <path d="M26 30C26 22 32 18 40 18C48 18 54 22 54 30V52C54 56 48 58 40 58C32 58 26 56 26 52V30Z" fill="#D946EF"/>
+  <circle cx="40" cy="38" r="5" fill="#FDE047"/>
+  <text x="40" y="70" text-anchor="middle" font-size="8" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">Bank Saqu</text>
+</svg>

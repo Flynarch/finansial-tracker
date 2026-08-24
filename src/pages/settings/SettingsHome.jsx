@@ -460,7 +460,7 @@ export default function SettingsHome() {
               ? t('settings.themeMidnight', 'Midnight Sapphire')
               : theme === 'dark'
               ? t('settings.themeDark', 'Matte Dark')
-              : t('settings.themeLight', 'Putih')
+              : t('settings.themeLight', 'Pure Light')
           }
           icon={theme === 'midnight' ? Sparkles : theme === 'dark' ? Moon : Sun}
           onClick={handleToggleTheme}

@@ -9,6 +9,7 @@ import { formatExpenseCategory } from '../../lib/expenseCategories'
 import HabitHeatmapWidget from '../habits/HabitHeatmapWidget'
 import { ProgressBar } from './DashboardStatComponents'
 import { getCompactItems } from '../../hooks/useDashboardData'
+import useBackButton from '../../hooks/useBackButton'
 
 export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   zoomedChart,
@@ -45,6 +46,8 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 }) {
   const navigate = useNavigate()
   const zoomChartRef = useRef(null)
+
+  useBackButton(onCloseZoom, Boolean(zoomedChart))
 
   useEffect(() => {
     const handleTapOutside = (event) => {
@@ -92,12 +95,12 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl sm:px-3 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
-          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transition-all duration-380 ft-hide-scrollbar ${
+          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transition-all duration-300 ft-hide-scrollbar ${
             zoomVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'
           }`}
           style={{
             boxShadow: 'var(--shadow)',
-            transitionTimingFunction: zoomVisible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+            transitionTimingFunction: zoomVisible ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />

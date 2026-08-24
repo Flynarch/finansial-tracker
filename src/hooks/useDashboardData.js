@@ -5,7 +5,6 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeAllWalletBalances } from '../lib/db'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
-import { calculateBudgetSpent } from '../lib/budgetUtils'
 import useTranslation from './useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
@@ -289,6 +288,8 @@ export function useDashboardData() {
     return { todayIncome: flow.income, todayNet: flow.income - flow.expense }
   }, [transactions, normalizedTransactions])
 
+  const { todayIncome } = todayStats
+
   const chartData = useMemo(() => {
     if (transactions === null)
       return {
@@ -396,89 +397,7 @@ export function useDashboardData() {
     }
   }, [transactions, normalizedTransactions])
 
-  const { monthIncome, monthExpense, monthDelta, monthDeltaTone, monthDeltaPct, incomeDeltaPct, expenseDeltaPct } = monthStats
-  const { portfolioValue } = portfolioStats
-  const { todayIncome } = todayStats
   const { data1w, data1m, data3m, dataYtd, data1y, dataAll } = chartData
-  const cashBalance = totalWalletBalance
-  const netWorth = cashBalance + portfolioValue
-
-  const groupedRecentEntries = useMemo(() => {
-    if (!recentTransactions) return []
-    const grouped = recentTransactions.reduce((acc, tx) => {
-      const key = tx?.date || 'unknown'
-      if (!acc[key]) acc[key] = []
-      acc[key].push(tx)
-      return acc
-    }, {})
-    return Object.entries(grouped)
-      .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
-      .map(([dateKey, items]) => [dateKey, items])
-  }, [recentTransactions])
-
-  const budgetGoalSummary = useMemo(() => {
-    const monthBudgets = (budgets ?? []).filter((b) => b.month === currentMonthKey)
-    const monthBudgetCount = monthBudgets.length
-    const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isArchived)
-    const goalCount = activeGoals.length
-    const monthExpenseTxs = normalizedTransactions.filter(
-      (tx) => tx?.type === 'expense' && tx?.date?.startsWith(currentMonthKey) && !isExcludeAnalyticsTx(tx),
-    )
-    const monthExpenseTotal = monthExpenseTxs.reduce(
-      (sum, tx) => sum + (tx.convertedAmount || 0),
-      0,
-    )
-
-    const budgetRows = monthBudgets
-      .map((b) => {
-        const limit = toSafeNumber(b.limit)
-        const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
-        const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
-        return { id: b.id, category: b.category, limit, spent, pct }
-      })
-      .sort((a, b) => b.pct - a.pct)
-
-    const totalLimit = monthBudgets.reduce((sum, b) => sum + toSafeNumber(b.limit), 0)
-    const totalSpent = monthExpenseTotal
-    const budgetPercent = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0
-
-    const goalTarget = activeGoals.reduce(
-      (sum, g) => sum + convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, rates),
-      0,
-    )
-    const goalCurrent = activeGoals.reduce(
-      (sum, g) => sum + convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, rates),
-      0,
-    )
-    const goalPercent = goalTarget > 0 ? Math.min(100, Math.round((goalCurrent / goalTarget) * 100)) : 0
-
-    const goalRows = activeGoals.map((g) => {
-      const target = convertCurrency(toSafeNumber(g.targetAmount), g.currency || defaultCurrency, defaultCurrency, rates)
-      const current = convertCurrency(toSafeNumber(g.currentAmount), g.currency || defaultCurrency, defaultCurrency, rates)
-      const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
-      return {
-        id: g.id,
-        name: g.name,
-        target,
-        current,
-        pct,
-        deadline: g.deadline,
-      }
-    })
-
-    return {
-      monthBudgetCount,
-      goalCount,
-      totalLimit,
-      totalSpent,
-      budgetPercent,
-      budgetRows,
-      goalTarget,
-      goalCurrent,
-      goalPercent,
-      goalRows,
-    }
-  }, [budgets, goals, normalizedTransactions, currentMonthKey, defaultCurrency, rates])
 
   const loanSummary = useMemo(() => {
     const safeLoans = loans ?? []
@@ -539,6 +458,9 @@ export function useDashboardData() {
     const debtPct = hasActiveLoans ? 100 - receivablePct : 0
 
     return {
+      activeLoans,
+      debtLoans,
+      receivableLoans,
       totalDebt,
       totalReceivable,
       debtCount: debtLoans.length,
@@ -552,6 +474,77 @@ export function useDashboardData() {
       urgentList: sortedUrgent.slice(0, 2),
     }
   }, [loans, defaultCurrency, rates])
+
+  const netLoanPosition = loanSummary.netPosition || 0
+  const portfolioValue = portfolioStats.portfolioValue || 0
+  const cashBalance = totalWalletBalance || 0
+  const netWorth = cashBalance + portfolioValue + netLoanPosition
+
+  const {
+    monthIncome,
+    monthExpense,
+    monthDelta,
+    monthDeltaTone,
+    monthDeltaPct,
+    incomeDeltaPct,
+    expenseDeltaPct,
+  } = monthStats
+
+  const groupedRecentEntries = useMemo(() => {
+    if (!recentTransactions) return []
+    const groups = {}
+    recentTransactions.slice(0, 10).forEach((tx) => {
+      const dateKey = tx.date || 'Unknown'
+      if (!groups[dateKey]) groups[dateKey] = []
+      groups[dateKey].push(tx)
+    })
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+  }, [recentTransactions])
+
+  const budgetGoalSummary = useMemo(() => {
+    const safeBudgets = budgets ?? []
+    const safeGoals = goals ?? []
+    const currentMonthTxs = normalizedTransactions.filter(
+      (tx) => tx.date?.startsWith(currentMonthKey) && tx.type === 'expense' && !isExcludeAnalyticsTx(tx),
+    )
+
+    const budgetRows = safeBudgets
+      .filter((b) => b.month === currentMonthKey)
+      .map((b) => {
+        const spent = currentMonthTxs
+          .filter((tx) => {
+            if (!tx.category) return false
+            if (b.category.includes('/')) return tx.category === b.category
+            return tx.category.startsWith(b.category + '/') || tx.category === b.category
+          })
+          .reduce((sum, tx) => sum + (tx.convertedAmount || 0), 0)
+        const limit = toSafeNumber(b.limit)
+        const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0
+        return {
+          ...b,
+          spent,
+          limit,
+          pct,
+        }
+      })
+
+    const goalRows = safeGoals.map((g) => {
+      const current = toSafeNumber(g.currentAmount)
+      const target = toSafeNumber(g.targetAmount)
+      const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
+      return {
+        ...g,
+        current,
+        target,
+        pct,
+      }
+    })
+
+    return {
+      budgetRows,
+      goalRows,
+    }
+  }, [budgets, goals, currentMonthKey, normalizedTransactions])
 
   const computeCashBalanceBeforeDate = useCallback(
     (dateKey) => {
@@ -577,7 +570,7 @@ export function useDashboardData() {
     (rangeId) => {
       if (rangeId === '1d') {
         const todayKey = format(new Date(), 'yyyy-MM-dd')
-        const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue
+        const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue + netLoanPosition
         const hourNet = Array.from({ length: 24 }, () => 0)
         normalizedTransactions.forEach((tx) => {
           if (String(tx?.date || '') !== todayKey) return
@@ -619,7 +612,7 @@ export function useDashboardData() {
 
       const firstItem = sourceData[0]
       const startDate = isMonthly ? `${firstItem.key}-01` : firstItem.date
-      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue
+      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue + netLoanPosition
 
       let running = startBalance
       return sourceData.map((row) => {
@@ -628,12 +621,12 @@ export function useDashboardData() {
         return { time: timeMs, value: running }
       })
     },
-    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, normalizedTransactions],
+    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, netLoanPosition, normalizedTransactions],
   )
 
   const computeRevenueValue = useCallback(() => {
-    return cashBalance + portfolioValue
-  }, [cashBalance, portfolioValue])
+    return cashBalance + portfolioValue + netLoanPosition
+  }, [cashBalance, portfolioValue, netLoanPosition])
 
   const zoomRevenueSeries = useMemo(() => {
     try {
@@ -731,7 +724,7 @@ export function useDashboardData() {
       if (rangeId === '1d') {
         const yesterday = subDays(new Date(), 1)
         const yesterdayKey = format(yesterday, 'yyyy-MM-dd')
-        const startBalanceYesterday = computeCashBalanceBeforeDate(yesterdayKey) + portfolioValue
+        const startBalanceYesterday = computeCashBalanceBeforeDate(yesterdayKey) + portfolioValue + netLoanPosition
 
         const hourNetYesterday = Array.from({ length: 24 }, () => 0)
         safeTx.forEach((tx) => {
@@ -774,7 +767,7 @@ export function useDashboardData() {
         })
 
         const startPrevDate = prevDates[0]
-        const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue
+        const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue + netLoanPosition
 
         const prevDailyNetMap = new Map(prevDates.map((d) => [d, 0]))
         safeTx.forEach((tx) => {
@@ -811,7 +804,7 @@ export function useDashboardData() {
           return `${prevYear}-${m}`
         })
 
-        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue
+        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition
         const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
@@ -843,10 +836,10 @@ export function useDashboardData() {
         const today = new Date()
         const prevMonths = Array.from({ length: totalMonths }, (_, idx) => {
           const d = subMonths(today, totalMonths * 2 - 1 - idx)
-          return format(d, 'yyyy-MM')
+          return format(d, 'yyyy-MM-dd')
         })
 
-        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue
+        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition
         const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
@@ -875,7 +868,7 @@ export function useDashboardData() {
 
       return currentSeries
     },
-    [normalizedAllTransactionsForBalance, normalizedTransactions, computeCashBalanceBeforeDate, portfolioValue],
+    [normalizedAllTransactionsForBalance, normalizedTransactions, computeCashBalanceBeforeDate, portfolioValue, netLoanPosition],
   )
 
   const zoomCombinedChartSeries = useMemo(() => {

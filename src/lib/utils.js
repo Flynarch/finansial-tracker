@@ -131,7 +131,7 @@ function escapeCsvValue(value) {
 }
 
 export function toTransactionsCsv(rows) {
-  const header = ['id', 'date', 'type', 'category', 'amount', 'currency', 'notes']
+  const header = ['id', 'date', 'type', 'category', 'amount', 'currency', 'notes', 'walletId', 'walletName', 'targetWalletId', 'loanId', 'isExcludeFromAnalytics', 'tags']
   const body = rows.map((row) =>
     [
       row.id,
@@ -141,6 +141,12 @@ export function toTransactionsCsv(rows) {
       row.amount,
       row.currency,
       row.notes,
+      row.walletId ?? '',
+      row.walletName ?? '',
+      row.targetWalletId ?? '',
+      row.loanId ?? '',
+      row.isExcludeFromAnalytics ? '1' : '0',
+      Array.isArray(row.tags) ? row.tags.join(';') : '',
     ]
       .map(escapeCsvValue)
       .join(','),
@@ -168,6 +174,7 @@ export const LOAN_CATEGORIES = Object.freeze([
 export function isExcludeAnalyticsTx(tx) {
   if (!tx) return false
   if (tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
+  if (tx.type === 'balance_adjustment') return true
   if (LOAN_CATEGORIES.includes(tx.category)) return true
   return false
 }

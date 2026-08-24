@@ -340,8 +340,8 @@ function Savings() {
                             </div>
                             <p className="mt-0.5 text-[10px] font-semibold text-[var(--muted)] truncate">
                               {isComplete
-                                ? 'Selesai & Dicairkan 🏆'
-                                : `Kurang: ${formatCurrency(g.remaining, g.currency || defaultCurrency)}`}
+                                ? t('savings.completedAndCashed', 'Selesai & Dicairkan')
+                                : `${t('savings.remainingShort', 'Kurang')}: ${formatCurrency(g.remaining, g.currency || defaultCurrency)}`}
                             </p>
                           </div>
                         </div>

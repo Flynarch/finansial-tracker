@@ -43,10 +43,25 @@ export async function exportAllDataAsJson() {
     db.loanPayments.toArray(),
   ])
 
+  let expenseCustom = null
+  let incomeCustom = null
+  try {
+    const rawExp = localStorage.getItem('ft_expense_category_custom_v1')
+    if (rawExp) expenseCustom = JSON.parse(rawExp)
+    const rawInc = localStorage.getItem('ft_income_category_custom_v1')
+    if (rawInc) incomeCustom = JSON.parse(rawInc)
+  } catch {
+    /* ignore */
+  }
+
   return {
     exportedAt: new Date().toISOString(),
     app: 'FinTrack',
     version: 3,
+    categoryCustomizations: {
+      expense: expenseCustom,
+      income: incomeCustom,
+    },
     data: {
       transactions,
       investments,
@@ -74,6 +89,23 @@ export async function exportAllDataAsJson() {
 export async function importAllDataFromJsonPayload(payload) {
   const parsed = payload && typeof payload === 'object' ? payload : {}
   const data = parsed.data || {}
+
+  if (parsed.categoryCustomizations?.expense) {
+    try {
+      localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(parsed.categoryCustomizations.expense))
+      window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
+    } catch {
+      /* ignore */
+    }
+  }
+  if (parsed.categoryCustomizations?.income) {
+    try {
+      localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(parsed.categoryCustomizations.income))
+      window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
+    } catch {
+      /* ignore */
+    }
+  }
 
   await db.transaction('rw', db.tables, async () => {
     await Promise.all(db.tables.map((table) => table.clear()))

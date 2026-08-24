@@ -175,48 +175,76 @@ function ChangePhotoContent({
   }
 
   return (
-    <div className="space-y-6 pt-1 pb-2">
-      {/* ── 1. Live Interactive Avatar Preview ── */}
-      <div className="flex flex-col items-center justify-center pt-2 pb-1">
-        <div className="relative group">
-          <div className="p-1 rounded-full border-2 border-[var(--accent)]/40 shadow-md">
+    <div className="space-y-3.5 pt-0.5">
+      {/* ── 1. Compact Header Profile Card & Actions ── */}
+      <div className="flex items-center gap-3 p-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
+        <div className="relative shrink-0">
+          <div className="p-0.5 rounded-full border border-[var(--accent)]/50 shadow-xs">
             <UserAvatar
               photo={previewPhoto}
               name={profileName}
-              size={96}
+              size={56}
               shape="circle"
-              className="w-24 h-24"
+              className="w-14 h-14"
             />
           </div>
 
-          {/* Quick Upload Action Button overlay */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isProcessing}
-            className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full bg-[var(--fg)] text-[var(--bg)] border-2 border-[var(--panel-strong)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer"
+            className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-[var(--fg)] text-[var(--bg)] border border-[var(--panel-strong)] shadow-xs transition hover:scale-110 active:scale-95 cursor-pointer"
             title={t('profile.changePhotoDesc', 'Unggah foto dari perangkat')}
             aria-label={t('profile.changePhotoDesc', 'Unggah foto dari perangkat')}
           >
-            <Camera size={14} strokeWidth={2.5} />
+            <Camera size={11} strokeWidth={2.5} />
           </button>
         </div>
 
-        <p className="mt-3 text-sm font-black text-[var(--fg)]">
-          {profileName || 'FinTrack User'}
-        </p>
-        <p className="text-xs font-medium text-[var(--muted)]">
-          {previewPhoto
-            ? t('profile.photoCustomActive', 'Foto kustom aktif')
-            : t('profile.photoDefaultInitials', 'Inisial nama (default)')}
-        </p>
-
-        {errorMsg ? (
-          <div className="mt-3 w-full rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2 text-center text-xs font-semibold text-rose-500">
-            {errorMsg}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div>
+            <p className="text-xs font-black text-[var(--fg)] truncate">
+              {profileName || 'FinTrack User'}
+            </p>
+            <p className="text-[10.5px] font-medium text-[var(--muted)] leading-tight">
+              {previewPhoto
+                ? t('profile.photoCustomActive', 'Foto kustom aktif')
+                : t('profile.photoDefaultInitials', 'Inisial nama (default)')}
+            </p>
           </div>
-        ) : null}
+
+          {/* Inline Action Buttons */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              className="flex items-center gap-1 py-1 px-2 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-[10.5px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition cursor-pointer shadow-2xs active:scale-95"
+            >
+              <Upload size={11} />
+              <span>{t('profile.uploadPhoto', 'Unggah Foto')}</span>
+            </button>
+
+            {previewPhoto ? (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                disabled={isProcessing}
+                className="flex items-center gap-1 py-1 px-2 rounded-lg border border-red-500/20 bg-red-500/10 text-[10.5px] font-bold text-red-500 hover:bg-red-500/20 transition cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Trash2 size={11} />
+                <span>{t('profile.removePhoto', 'Hapus')}</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
+
+      {errorMsg ? (
+        <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 text-center text-[11px] font-semibold text-rose-500">
+          {errorMsg}
+        </div>
+      ) : null}
 
       {/* Hidden Native File Input */}
       <input
@@ -227,36 +255,13 @@ function ChangePhotoContent({
         onChange={handleFileChange}
       />
 
-      {/* ── 2. Primary Actions (Upload & Remove) ── */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
-          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] transition cursor-pointer shadow-2xs"
-        >
-          <Upload size={14} />
-          <span>{t('profile.uploadPhoto', 'Unggah Foto')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleRemovePhoto}
-          disabled={!previewPhoto || isProcessing}
-          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border border-red-500/20 bg-red-500/10 text-xs font-bold text-red-500 hover:bg-red-500/20 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={14} />
-          <span>{t('profile.removePhoto', 'Hapus Foto')}</span>
-        </button>
-      </div>
-
-      {/* ── 3. Preset Persona Avatars ── */}
-      <div className="space-y-2">
-        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+      {/* ── 2. Preset Persona Avatars (4x2 Clean Fixed Grid) ── */}
+      <div className="space-y-1.5">
+        <label className="block text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
           {t('profile.presetAvatars', 'Atau Pilih Avatar Persona')}
         </label>
 
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {PRESET_AVATARS.map((preset) => {
             const isSelected = previewPhoto === preset.dataUrl
             return (
@@ -264,13 +269,13 @@ function ChangePhotoContent({
                 key={preset.id}
                 type="button"
                 onClick={() => handleSelectPreset(preset)}
-                className={`group relative flex flex-col items-center gap-1.5 p-2 rounded-2xl border transition-all cursor-pointer ${
+                className={`group relative flex flex-col items-center gap-1 p-1.5 rounded-xl border transition-all cursor-pointer ${
                   isSelected
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-xs ring-1 ring-[var(--accent)]'
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-2xs ring-1 ring-[var(--accent)]'
                     : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)]'
                 }`}
               >
-                <div className="relative w-11 h-11 rounded-full overflow-hidden border-[0.5px] border-[var(--wallet-logo-border,var(--border))] shadow-2xs">
+                <div className="relative w-9 h-9 rounded-full overflow-hidden border-[0.5px] border-[var(--border)] shadow-2xs">
                   <img
                     src={preset.dataUrl}
                     alt={preset.label}
@@ -278,12 +283,12 @@ function ChangePhotoContent({
                   />
                   {isSelected && (
                     <div className="absolute inset-0 bg-[var(--accent)]/30 backdrop-blur-[1px] flex items-center justify-center text-white">
-                      <Check size={16} strokeWidth={3} />
+                      <Check size={14} strokeWidth={3} />
                     </div>
                   )}
                 </div>
 
-                <span className="text-[10px] font-bold text-[var(--muted)] group-hover:text-[var(--fg)] truncate max-w-full">
+                <span className="text-[9.5px] font-bold text-[var(--muted)] group-hover:text-[var(--fg)] truncate max-w-full">
                   {preset.label.replace('Persona ', '')}
                 </span>
               </button>
@@ -292,12 +297,12 @@ function ChangePhotoContent({
         </div>
       </div>
 
-      {/* ── 4. Footer Actions ── */}
+      {/* ── 3. Footer Actions ── */}
       <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 py-3 px-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition cursor-pointer"
+          className="flex-1 py-2 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition cursor-pointer active:scale-95"
         >
           {t('profile.editModal.cancel', 'Batal')}
         </button>
@@ -306,9 +311,9 @@ function ChangePhotoContent({
           type="button"
           onClick={handleSave}
           disabled={isProcessing}
-          className="flex-[1.5] flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-md transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
+          className="flex-[1.5] flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
         >
-          <Check size={15} strokeWidth={2.5} />
+          <Check size={14} strokeWidth={2.5} />
           <span>{t('profile.saveChanges', 'Simpan Perubahan')}</span>
         </button>
       </div>
@@ -332,7 +337,7 @@ export default function ChangePhotoModal({
       isOpen={isOpen}
       onClose={onClose}
       title={t('profile.changePhotoModalTitle', 'Foto Profil')}
-      maxWidth="max-w-md"
+      maxWidth="max-w-sm"
       zIndex={zIndex}
     >
       {isOpen ? (

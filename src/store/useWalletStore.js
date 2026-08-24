@@ -59,6 +59,25 @@ const useWalletStore = create((set, get) => ({
       throw error
     }
   },
+  archiveWallet: async (id) => {
+    try {
+      await db.wallets.update(Number(id), { isArchived: 1 })
+      await get().loadWallets()
+    } catch (error) {
+      console.error('Failed to archive wallet:', error)
+      throw error
+    }
+  },
+
+  unarchiveWallet: async (id) => {
+    try {
+      await db.wallets.update(Number(id), { isArchived: 0 })
+      await get().loadWallets()
+    } catch (error) {
+      console.error('Failed to unarchive wallet:', error)
+      throw error
+    }
+  },
 }))
 
 export default useWalletStore

@@ -53,20 +53,19 @@ function getVisibleElement(selector) {
   )
 }
 
-function smoothScrollTo(targetY, duration = 540) {
+function smoothScrollTo(targetY, duration = 300) {
   if (typeof window === 'undefined') return
   const startY = window.scrollY || window.pageYOffset
   const diff = targetY - startY
   if (Math.abs(diff) < 2) return
 
   const startTime = performance.now()
-  // Quintic deceleration for a silky, butter-smooth scroll without jerky snapping
-  const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5)
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
 
   const step = (currentTime) => {
     const elapsed = currentTime - startTime
     const progress = Math.min(1, elapsed / duration)
-    const eased = easeOutQuint(progress)
+    const eased = easeOutCubic(progress)
     window.scrollTo(0, startY + diff * eased)
     if (progress < 1) {
       requestAnimationFrame(step)
@@ -281,9 +280,9 @@ export default function SpotlightTour() {
     })
   }, [isSpotlightTourActive, currentStep])
 
-  // Continuous tracking loop (RAF) for 650ms during step transitions and smooth scroll
+  // Continuous tracking loop (RAF) for 320ms during step transitions and smooth scroll
   const startTrackingLoop = useCallback(
-    (durationMs = 650) => {
+    (durationMs = 320) => {
       if (rafTrackingId.current) {
         cancelAnimationFrame(rafTrackingId.current)
       }
@@ -334,10 +333,10 @@ export default function SpotlightTour() {
         }
       }
 
-      smoothScrollTo(targetScrollY, 540)
+      smoothScrollTo(targetScrollY, 300)
     }
 
-    startTrackingLoop(700)
+    startTrackingLoop(350)
 
     return () => {
       if (rafTrackingId.current) {
@@ -431,7 +430,7 @@ export default function SpotlightTour() {
           d={svgPath}
           fill="rgba(5, 8, 18, 0.72)"
           fillRule="evenodd"
-          className="transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="transition-[d] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
 
@@ -445,7 +444,7 @@ export default function SpotlightTour() {
             handleNext()
           }}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleNext()}
-          className="pointer-events-auto absolute border border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/20 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
+          className="pointer-events-auto absolute border border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/20 transition-[top,left,width,height,border-radius] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
           style={{
             top: targetRect.top,
             left: targetRect.left,
@@ -462,7 +461,7 @@ export default function SpotlightTour() {
 
       {/* Floating Tooltip Card */}
       <div
-        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)]/95 p-4 sm:p-5 shadow-2xl transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto backdrop-blur-xl"
+        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border-strong)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-[top,left,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
         style={{
           top: popoverPos.top,
           left: popoverPos.left,
@@ -473,19 +472,19 @@ export default function SpotlightTour() {
         {/* Dynamic Directional Pointer Arrow (Caret) */}
         {popoverPos.placement === 'bottom' && (
           <div
-            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'top' && (
           <div
-            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'right' && (
           <div
-            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ top: popoverPos.arrowTop }}
           />
         )}
@@ -544,7 +543,7 @@ export default function SpotlightTour() {
                 aria-selected={idx === currentStepIndex}
                 onClick={() => setCurrentStepIndex(idx)}
                 aria-label={t('tour.stepDot', { step: idx + 1 })}
-                className="h-2 rounded-full transition-all duration-300 cursor-pointer"
+                className="h-2 rounded-full transition-[width,background-color] duration-300 cursor-pointer"
                 style={{
                   width: idx === currentStepIndex ? 22 : 6,
                   backgroundColor:

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Tag,
   TrendingDown,
@@ -6,14 +6,23 @@ import {
   RotateCcw,
   CheckCircle2,
   FolderOpen,
+  Plus,
+  X,
 } from 'lucide-react'
+import { db } from '../../lib/db'
 import ConfirmDeleteModal from '../../components/ui/ConfirmDeleteModal'
+import Modal from '../../components/ui/Modal'
 import {
-  EXPENSE_TREE,
+  getMergedExpenseTree,
+  addExpenseSubcategory,
+  removeExpenseSubcategory,
   resetExpenseCategoryCustomizations,
 } from '../../lib/expenseCategories'
 import {
-  INCOME_TREE,
+  getMergedIncomeTree,
+  addIncomeSubcategory,
+  removeIncomeSubcategory,
+  addIncomeParentCategory,
   resetIncomeCategoryCustomizations,
 } from '../../lib/incomeCategories'
 import { resolveTransactionIconKey } from '../../lib/categoryIcon'
@@ -31,24 +40,56 @@ export default function SettingsCategories() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [confirmResetType, setConfirmResetType] = useState(null) // 'expense' | 'income' | null
+  const [customVersion, setCustomVersion] = useState(0)
+
+  // Modals state
+  const [addSubModal, setAddSubModal] = useState({ isOpen: false, parentId: null, parentName: '' })
+  const [subNameId, setSubNameId] = useState('')
+  const [subNameEn, setSubNameEn] = useState('')
+
+  const [addParentModal, setAddParentModal] = useState(false)
+  const [parentNameId, setParentNameId] = useState('')
+  const [parentNameEn, setParentNameEn] = useState('')
+
+  const [deleteSubTarget, setDeleteSubTarget] = useState(null) // { parentId, childId, childName }
+
+  const bumpVersion = useCallback(() => setCustomVersion((v) => v + 1), [])
+
+  useEffect(() => {
+    const handleCustomChange = () => bumpVersion()
+    window.addEventListener('ft_expense_category_custom_changed', handleCustomChange)
+    window.addEventListener('ft_income_category_custom_changed', handleCustomChange)
+    return () => {
+      window.removeEventListener('ft_expense_category_custom_changed', handleCustomChange)
+      window.removeEventListener('ft_income_category_custom_changed', handleCustomChange)
+    }
+  }, [bumpVersion])
+
+  const expenseTree = useMemo(() => {
+    void customVersion
+    return getMergedExpenseTree()
+  }, [customVersion])
+  const incomeTree = useMemo(() => {
+    void customVersion
+    return getMergedIncomeTree()
+  }, [customVersion])
+  const currentTree = activeTab === 'expense' ? expenseTree : incomeTree
 
   const tabOptions = useMemo(
     () => [
       {
         value: 'expense',
-        label: `${t('common.expense', 'Pengeluaran')} (${EXPENSE_TREE.length})`,
+        label: `${t('common.expense', 'Pengeluaran')} (${expenseTree.length})`,
         icon: TrendingDown,
       },
       {
         value: 'income',
-        label: `${t('common.income', 'Pemasukan')} (${INCOME_TREE.length})`,
+        label: `${t('common.income', 'Pemasukan')} (${incomeTree.length})`,
         icon: TrendingUp,
       },
     ],
-    [t],
+    [t, expenseTree.length, incomeTree.length],
   )
-
-  const currentTree = activeTab === 'expense' ? EXPENSE_TREE : INCOME_TREE
 
   // Filter categories by search query
   const filteredTree = useMemo(() => {
@@ -69,16 +110,77 @@ export default function SettingsCategories() {
   const handleConfirmReset = () => {
     if (confirmResetType === 'expense') {
       resetExpenseCategoryCustomizations()
+      bumpVersion()
       setStatusMessage(
         t('settings.expenseCategoriesResetDone', 'Kategori pengeluaran berhasil di-reset ke bawaan.'),
       )
     } else if (confirmResetType === 'income') {
       resetIncomeCategoryCustomizations()
+      bumpVersion()
       setStatusMessage(
         t('settings.incomeCategoriesResetDone', 'Kategori pemasukan berhasil di-reset ke bawaan.'),
       )
     }
     setConfirmResetType(null)
+    setTimeout(() => setStatusMessage(''), 4000)
+  }
+
+  const handleAddSubcategory = (e) => {
+    e.preventDefault()
+    if (!subNameId.trim() || !addSubModal.parentId) return
+
+    if (activeTab === 'expense') {
+      addExpenseSubcategory(addSubModal.parentId, subNameId.trim(), subNameEn.trim() || subNameId.trim())
+    } else {
+      addIncomeSubcategory(addSubModal.parentId, subNameId.trim(), subNameEn.trim() || subNameId.trim())
+    }
+
+    bumpVersion()
+    setAddSubModal({ isOpen: false, parentId: null, parentName: '' })
+    setSubNameId('')
+    setSubNameEn('')
+    setStatusMessage(t('settings.subAddedSuccess', 'Subkategori berhasil ditambahkan.'))
+    setTimeout(() => setStatusMessage(''), 4000)
+  }
+
+  const handleAddParentCategory = (e) => {
+    e.preventDefault()
+    if (!parentNameId.trim()) return
+
+    if (activeTab === 'income') {
+      addIncomeParentCategory(parentNameId.trim(), parentNameEn.trim() || parentNameId.trim())
+      bumpVersion()
+      setAddParentModal(false)
+      setParentNameId('')
+      setParentNameEn('')
+      setStatusMessage(t('settings.catAddedSuccess', 'Kategori utama berhasil ditambahkan.'))
+      setTimeout(() => setStatusMessage(''), 4000)
+    }
+  }
+
+  const handleConfirmDeleteSub = async () => {
+    if (!deleteSubTarget) return
+    const { parentId, childId } = deleteSubTarget
+    const targetPath = `${parentId}/${childId}`
+    const fallbackPath = `${parentId}/lainnya`
+
+    if (activeTab === 'expense') {
+      removeExpenseSubcategory(parentId, childId)
+    } else {
+      removeIncomeSubcategory(parentId, childId)
+    }
+
+    try {
+      // Cascade update transactions with this category to fallback
+      await db.transactions.where('category').equals(targetPath).modify({ category: fallbackPath })
+    } catch {
+      // ignore
+    }
+
+    bumpVersion()
+    setDeleteSubTarget(null)
+    setStatusMessage(t('settings.subRemovedSuccess', 'Subkategori berhasil dihapus dan riwayat transaksi dialihkan ke Lainnya.'))
+    setTimeout(() => setStatusMessage(''), 4000)
   }
 
   return (
@@ -105,22 +207,35 @@ export default function SettingsCategories() {
             </h3>
             <p className="text-xs font-medium text-[var(--muted)] truncate mt-1">
               {t('settings.categoriesSummary', {
-                expense: EXPENSE_TREE.length,
-                income: INCOME_TREE.length,
+                expense: expenseTree.length,
+                income: incomeTree.length,
               })}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setConfirmResetType(activeTab)}
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2 text-xs font-extrabold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
-          title={t('settings.resetDefault', 'Reset ke Bawaan')}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span>{t('settings.resetDefault', 'Reset')}</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {activeTab === 'income' && (
+            <button
+              type="button"
+              onClick={() => setAddParentModal(true)}
+              className="flex items-center gap-1 rounded-xl bg-[var(--fg)] px-3 py-2 text-xs font-extrabold text-[var(--bg)] shadow-2xs transition active:scale-95 cursor-pointer"
+              title={t('settings.addCategory', 'Tambah Kategori')}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{t('settings.category', 'Kategori')}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setConfirmResetType(activeTab)}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-extrabold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+            title={t('settings.resetDefault', 'Reset ke Bawaan')}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>{t('settings.resetDefault', 'Reset')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Segment Tab Switcher */}
@@ -144,34 +259,28 @@ export default function SettingsCategories() {
         />
       </div>
 
-      {/* Category List */}
+      {/* Main Categories Section */}
       <SettingsSection
-        label={
-          activeTab === 'expense'
-            ? t('settings.expenseCategoriesList', 'Daftar Kategori Pengeluaran')
-            : t('settings.incomeCategoriesList', 'Daftar Kategori Pemasukan')
-        }
-        footnote={t('settings.categoriesFootnote', 'Kategori digunakan saat mencatat transaksi manual dan pengelompokan anggaran keuangan.')}
+        title={activeTab === 'expense' ? t('settings.expenseCategories', 'Kategori Pengeluaran') : t('settings.incomeCategories', 'Kategori Pemasukan')}
+        description={t('settings.categoriesDesc', 'Kelola daftar kategori dan subkategori sesuai kebiasaan finansial Anda')}
       >
         {filteredTree.length === 0 ? (
-          <div className="ft-settings-cell py-10 text-center">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] mb-2.5 shadow-2xs">
-              <FolderOpen className="h-6 w-6" />
-            </div>
-            <p className="text-sm font-bold text-[var(--fg)]">
-              {t('settings.categoriesNotFound', 'Kategori Tidak Ditemukan')}
-            </p>
-            <p className="text-xs font-medium text-[var(--muted)] mt-1 max-w-xs mx-auto">
-              {t('settings.categoriesNotFoundDesc', { query: searchQuery })}
+          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-8 text-center">
+            <FolderOpen className="mx-auto h-8 w-8 text-[var(--muted)]/50 mb-2" />
+            <p className="text-xs font-bold text-[var(--muted)]">
+              {t('settings.noCategoriesFound', 'Tidak ada kategori yang cocok dengan pencarian')}
             </p>
           </div>
         ) : (
           filteredTree.map((cat) => {
             const catName = cat.names?.[locale] || cat.names?.id || cat.id
-            const iconKey = resolveTransactionIconKey(cat.id, activeTab)
+            const iconKey = resolveTransactionIconKey(activeTab, cat.id, cat.icon)
 
             return (
-              <div key={cat.id} className="ft-settings-cell space-y-3">
+              <div
+                key={cat.id}
+                className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-card hover:border-[var(--border-strong)] transition-all"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)] shadow-2xs">
@@ -181,9 +290,19 @@ export default function SettingsCategories() {
                       {catName}
                     </span>
                   </div>
-                  <span className="inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-xs font-bold text-[var(--muted)] shrink-0">
-                    {cat.children?.length || 0} {t('settings.subcategoriesCount', 'subkategori')}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-xs font-bold text-[var(--muted)]">
+                      {cat.children?.length || 0} {t('settings.subcategoriesCount', 'subkategori')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAddSubModal({ isOpen: true, parentId: cat.id, parentName: catName })}
+                      className="grid h-8 w-8 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+                      title={t('settings.addSubcategory', 'Tambah Subkategori')}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Subcategories tags */}
@@ -194,9 +313,23 @@ export default function SettingsCategories() {
                       return (
                         <span
                           key={sub.id}
-                          className="inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition-all"
+                          className="group inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] pl-3 pr-1.5 py-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] transition-all"
                         >
-                          {subName}
+                          <span>{subName}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDeleteSubTarget({
+                                parentId: cat.id,
+                                childId: sub.id,
+                                childName: subName,
+                              })
+                            }
+                            className="h-4 w-4 rounded-full hover:bg-rose-500/20 hover:text-rose-500 text-[var(--muted)] grid place-items-center transition cursor-pointer"
+                            title={t('settings.deleteSubcategory', 'Hapus Subkategori')}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </span>
                       )
                     })}
@@ -208,8 +341,123 @@ export default function SettingsCategories() {
         )}
       </SettingsSection>
 
+      {/* Add Subcategory Modal */}
+      <Modal
+        isOpen={addSubModal.isOpen}
+        onClose={() => setAddSubModal({ isOpen: false, parentId: null, parentName: '' })}
+        title={t('settings.addSubcategoryTitle', { name: addSubModal.parentName }, `Tambah Subkategori (${addSubModal.parentName})`)}
+      >
+        <form onSubmit={handleAddSubcategory} className="space-y-4 pt-1">
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.subNameId', 'Nama Subkategori (Bahasa Indonesia) *')}
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={subNameId}
+              onChange={(e) => setSubNameId(e.target.value)}
+              placeholder={t('settings.subPlaceholderId', 'Contoh: Kopi Kekinian, Donat, Susu')}
+              className="ft-settings-field-compact font-semibold h-12"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.subNameEn', 'Nama Subkategori (English - Opsional)')}
+            </label>
+            <input
+              type="text"
+              value={subNameEn}
+              onChange={(e) => setSubNameEn(e.target.value)}
+              placeholder={t('settings.subPlaceholderEn', 'Example: Specialty Coffee, Donuts')}
+              className="ft-settings-field-compact font-semibold h-12"
+            />
+          </div>
+          <div className="flex gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => setAddSubModal({ isOpen: false, parentId: null, parentName: '' })}
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
+            >
+              {t('common.cancel', 'Batal')}
+            </button>
+            <button
+              type="submit"
+              disabled={!subNameId.trim()}
+              className="flex-1 py-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            >
+              {t('common.save', 'Simpan')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Parent Category Modal */}
+      <Modal
+        isOpen={addParentModal}
+        onClose={() => setAddParentModal(false)}
+        title={t('settings.addIncomeCategoryTitle', 'Tambah Kategori Utama Pemasukan')}
+      >
+        <form onSubmit={handleAddParentCategory} className="space-y-4 pt-1">
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.catNameId', 'Nama Kategori (Bahasa Indonesia) *')}
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={parentNameId}
+              onChange={(e) => setParentNameId(e.target.value)}
+              placeholder={t('settings.catPlaceholderId', 'Contoh: Freelance, Dividen, Royalti')}
+              className="ft-settings-field-compact font-semibold h-12"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.catNameEn', 'Nama Kategori (English - Opsional)')}
+            </label>
+            <input
+              type="text"
+              value={parentNameEn}
+              onChange={(e) => setParentNameEn(e.target.value)}
+              placeholder={t('settings.catPlaceholderEn', 'Example: Freelance, Dividends, Royalties')}
+              className="ft-settings-field-compact font-semibold h-12"
+            />
+          </div>
+          <div className="flex gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => setAddParentModal(false)}
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
+            >
+              {t('common.cancel', 'Batal')}
+            </button>
+            <button
+              type="submit"
+              disabled={!parentNameId.trim()}
+              className="flex-1 py-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            >
+              {t('common.save', 'Simpan')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Confirm Delete Subcategory Modal */}
       <ConfirmDeleteModal
-        isOpen={!!confirmResetType}
+        isOpen={Boolean(deleteSubTarget)}
+        onClose={() => setDeleteSubTarget(null)}
+        onConfirm={handleConfirmDeleteSub}
+        title={t('settings.deleteSubcategory', 'Hapus Subkategori')}
+        message={t('settings.deleteSubConfirm', { name: deleteSubTarget?.childName }, `Apakah Anda yakin ingin menghapus atau menyembunyikan subkategori "${deleteSubTarget?.childName}"?`)}
+        confirmText={t('common.delete', 'Hapus')}
+      />
+
+      {/* Confirm Reset All Categories Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(confirmResetType)}
         onClose={() => setConfirmResetType(null)}
         onConfirm={handleConfirmReset}
         title={t('settings.resetCategoriesTitle', 'Reset Kategori ke Bawaan')}

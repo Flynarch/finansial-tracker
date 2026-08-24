@@ -13,7 +13,6 @@ export function isTxMatchingBudget(budgetCategory, txCategory) {
 
   // Parent / Child path matching (e.g. "makanan_minuman" matches "makanan_minuman/restoran")
   if (raw.startsWith(`${b}/`)) return true
-  if (b.startsWith(`${raw}/`)) return true
 
   const parsedTx = parseExpenseCategoryPath(txCategory)
   const parsedB = parseExpenseCategoryPath(budgetCategory)
@@ -34,6 +33,22 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
 
   return monthExpenseTxs.reduce((sum, tx) => {
     if (isExcludeAnalyticsTx(tx)) return sum
+
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      let splitSum = 0
+      tx.splitItems.forEach((item) => {
+        if (isTxMatchingBudget(budgetCategory, item.category)) {
+          splitSum += convertCurrency(
+            toSafeNumber(item.amount),
+            tx.currency || defaultCurrency,
+            defaultCurrency,
+            rates,
+          )
+        }
+      })
+      return sum + splitSum
+    }
+
     if (!isTxMatchingBudget(budgetCategory, tx.category)) return sum
 
     return (

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <defs>
+    <linearGradient id="body" x1="12" y1="20" x2="68" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="45%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="top" x1="24" y1="10" x2="56" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="rope" x1="24" y1="24" x2="56" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#EF4444"/>
+      <stop offset="100%" stop-color="#991B1B"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="32" y1="40" x2="48" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFBEB"/>
+      <stop offset="50%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="22" fill="#0F172A"/>
+  <path d="M28 17C25 12 22 10 30 10C34 10 36 14 40 14C44 14 46 10 50 10C58 10 55 12 52 17C50 22 30 22 28 17Z" fill="url(#top)" stroke="#92400E" stroke-width="1.5"/>
+  <rect x="25" y="23" width="30" height="5.5" rx="2.75" fill="url(#rope)" stroke="#7F1D1D" stroke-width="1"/>
+  <path d="M31 29L28 36M35 29L34 37" stroke="#991B1B" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M26 28C19 32 13 41 13 52C13 65 23 72 40 72C57 72 67 65 67 52C67 41 61 32 54 28C48 30 32 30 26 28Z" fill="url(#body)" stroke="#78350F" stroke-width="1.8"/>
+  <circle cx="40" cy="50" r="12" fill="url(#coin)" stroke="#B45309" stroke-width="1.5"/>
+  <text x="40" y="55.5" text-anchor="middle" font-size="16" font-weight="900" fill="#78350F" font-family="sans-serif">$</text>
+  <path d="M20 48C19 53 20 60 25 65" stroke="#FEF3C7" stroke-width="2.8" stroke-linecap="round" opacity="0.6"/>
+</svg>

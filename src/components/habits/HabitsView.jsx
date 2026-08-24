@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
-import { Clock, Plus } from 'lucide-react'
+import { Clock, Plus, Pause } from 'lucide-react'
 import Modal from '../ui/Modal'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import HabitStatsModal from './HabitStatsModal'
@@ -100,17 +100,17 @@ const HabitItemCard = memo(function HabitItemCard({
         <div className="flex items-center gap-4 min-w-0">
           <button
             type="button"
-            disabled={!isTodayList}
+            disabled={!isTodayList || habit.isPaused}
             onClick={(e) => {
               e.stopPropagation()
-              if (!isTodayList) return
+              if (!isTodayList || habit.isPaused) return
               if (ignoreNextClickRef.current) {
                 ignoreNextClickRef.current = false
                 return
               }
               toggleHabitToday(habit.id)
             }}
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-[2.5px] transition-transform duration-200 ${isTodayList ? 'active:scale-95' : 'opacity-40'} ${isDone ? 'shadow-md' : 'shadow-sm bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)]'}`}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-[2.5px] transition-transform duration-200 ${isTodayList && !habit.isPaused ? 'active:scale-95' : 'opacity-40'} ${isDone ? 'shadow-md' : 'shadow-sm bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)]'}`}
             style={{
               backgroundColor: isDone ? habit.color : 'transparent',
               borderColor: isDone ? habit.color : 'color-mix(in_srgb,var(--border)_80%,transparent)',
@@ -121,16 +121,24 @@ const HabitItemCard = memo(function HabitItemCard({
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
+            ) : habit.isPaused ? (
+              <Pause size={14} className="text-amber-500" />
             ) : null}
           </button>
           <div className="flex flex-col min-w-0">
-            <p className={`truncate text-[15px] font-bold leading-snug ${isDone ? 'text-[var(--muted)] line-through' : 'text-[var(--fg)]'}`}>
+            <p className={`truncate text-[15px] font-bold leading-snug ${isDone ? 'text-[var(--muted)] line-through' : habit.isPaused ? 'text-[var(--muted)]' : 'text-[var(--fg)]'}`}>
               {habit.title}
             </p>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${isDone ? 'text-[var(--muted-2)] border-[var(--border)]' : 'text-[var(--fg)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border-transparent'}`}>
                 {habit.category || 'Lainnya'}
               </span>
+              {habit.isPaused && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/25 shrink-0">
+                  <Pause size={10} />
+                  <span>Dibekukan</span>
+                </span>
+              )}
               {habit.frequencyType === 'weekly' && (
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
                   {habit.frequencyValue}x / MINGGU
@@ -295,7 +303,8 @@ export default function HabitsView() {
       frequencyType: habit.frequencyType || 'daily',
       frequencyValue: habit.frequencyValue || [],
       reminderEnabled: habit.reminderEnabled || false,
-      reminderTime: habit.reminderTime || '08:00'
+      reminderTime: habit.reminderTime || '08:00',
+      isPaused: habit.isPaused || false,
     })
     setEditOpen(true)
   }, [])
@@ -314,6 +323,7 @@ export default function HabitsView() {
       frequencyValue: editForm.frequencyType === 'weekly' && !editForm.frequencyValue ? 3 : editForm.frequencyValue,
       reminderEnabled: editForm.reminderEnabled,
       reminderTime: editForm.reminderEnabled ? editForm.reminderTime : null,
+      isPaused: editForm.isPaused || false,
     })
     
     await cancelHabitNotification(editHabitId)
@@ -718,6 +728,29 @@ export default function HabitsView() {
                 />
               </div>
             )}
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Pause className="h-4 w-4 text-amber-500" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
+                    Bekukan Habit (Pause Streak)
+                  </p>
+                  <p className="text-[10px] text-[var(--muted)]">
+                    Jeda habit sementara saat liburan/sakit tanpa memutus streak
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${editForm.isPaused ? 'bg-amber-500' : 'bg-[var(--border)]'}`}
+                onClick={() => setEditForm({ ...editForm, isPaused: !editForm.isPaused })}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.isPaused ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
           </div>
 
           <HabitColorPicker

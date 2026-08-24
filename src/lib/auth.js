@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   signOut,
   signInWithPopup,
+  signInWithCredential,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -95,8 +96,129 @@ export async function signOutCurrentUser() {
   }
 }
 
+let gsiScriptPromise = null
+
 /**
- * Sign in with Google (Native Play Services on Android, Popup on Web)
+ * Load Google Identity Services SDK asynchronously if on Web.
+ */
+export function loadGoogleGsiScript() {
+  if (typeof window === 'undefined') return Promise.resolve(false)
+  if (window.google?.accounts?.id) return Promise.resolve(true)
+  if (gsiScriptPromise) return gsiScriptPromise
+
+  gsiScriptPromise = new Promise((resolve) => {
+    // Check if script element already exists in DOM
+    const existing = document.getElementById('google-gsi-client')
+    if (existing) {
+      if (window.google?.accounts?.id) {
+        resolve(true)
+        return
+      }
+      existing.addEventListener('load', () => resolve(true), { once: true })
+      existing.addEventListener('error', () => resolve(false), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'google-gsi-client'
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve(true)
+    script.onerror = () => {
+      console.warn('Google Identity Services script failed to load.')
+      resolve(false)
+    }
+    document.head.appendChild(script)
+  })
+
+  return gsiScriptPromise
+}
+
+/**
+ * Sign in with Google Credential (JWT token from Google Identity Services / One Tap)
+ */
+export async function signInWithGoogleCredential(idToken) {
+  try {
+    const auth = getFirebaseAuth()
+    if (!auth) {
+      return {
+        success: false,
+        code: 'auth/no-auth-instance',
+        message: 'Konfigurasi Firebase belum terpasang di file .env aplikasi.',
+      }
+    }
+    const credential = GoogleAuthProvider.credential(idToken)
+    const result = await signInWithCredential(auth, credential)
+    const u = result.user
+    return {
+      success: true,
+      user: {
+        uid: u.uid,
+        displayName: u.displayName || '',
+        email: u.email || '',
+        photoURL: u.photoURL || '',
+        provider: 'google',
+        emailVerified: Boolean(u.emailVerified ?? true),
+      },
+    }
+  } catch (error) {
+    return {
+      success: false,
+      code: error?.code || 'UNKNOWN_ERROR',
+      message: formatAuthError(error, 'Gagal masuk dengan kredensial Google.'),
+    }
+  }
+}
+
+/**
+ * Initialise & prompt Google One Tap on web viewport (In-App floating overlay).
+ * If Google One Tap is available and user signs in, calls onSuccess(user).
+ */
+export async function promptGoogleOneTap({ onSuccess, onError } = {}) {
+  if (Capacitor.isNativePlatform() || typeof window === 'undefined') return
+
+  const clientId =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    import.meta.env.VITE_FIREBASE_CLIENT_ID ||
+    ''
+
+  if (!clientId) {
+    return
+  }
+
+  const loaded = await loadGoogleGsiScript()
+  if (!loaded || !window.google?.accounts?.id) return
+
+  try {
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: async (response) => {
+        if (response?.credential) {
+          const authRes = await signInWithGoogleCredential(response.credential)
+          if (authRes.success && authRes.user) {
+            onSuccess?.(authRes.user)
+          } else if (authRes.message) {
+            onError?.(authRes.message)
+          }
+        }
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    })
+
+    window.google.accounts.id.prompt((notification) => {
+      if (notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.()) {
+        // Notification dismissed or not eligible — standard silent fallback
+      }
+    })
+  } catch (err) {
+    console.warn('Google One Tap prompt warning:', err)
+  }
+}
+
+/**
+ * Sign in with Google (Native Play Services on Android, In-Window Popup on Web)
  * Returns clean user details: { displayName, email, photoURL, uid, provider: 'google', emailVerified }
  */
 export async function signInWithGoogle() {

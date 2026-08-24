@@ -45,7 +45,7 @@ export default function SavingsDetail() {
   const { id } = useParams()
   const goalId = Number(id)
   const navigate = useNavigate()
-  const { locale } = useTranslation()
+  const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const profileName = useSettingsStore((state) => state.profileName)
 
@@ -384,7 +384,7 @@ export default function SavingsDetail() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black uppercase tracking-wider">
-                  {goal.isCompleted ? 'Tabungan Selesai & Dicairkan 🏆' : 'Target 100% Tercapai! 🎉'}
+                  {goal.isCompleted ? t('savings.completedAndCashed', 'Tabungan Selesai & Dicairkan') : t('savings.goalReached', 'Target 100% Tercapai!')}
                 </h3>
                 <p className="mt-0.5 text-xs font-medium opacity-90 leading-relaxed">
                   {goal.isCompleted
@@ -767,7 +767,7 @@ export default function SavingsDetail() {
 
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--earthy-green)]">
-                Selamat! Target 100% Tercapai 🏆
+                {t('savings.congratsGoalReached', 'Selamat! Target 100% Tercapai')}
               </span>
               <h3 className="text-xl font-black text-[var(--fg)] mt-1">{goal.name}</h3>
               <p className="mt-1 text-2xl font-black text-[var(--earthy-green)] tabular-nums">

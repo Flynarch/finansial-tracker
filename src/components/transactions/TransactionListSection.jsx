@@ -56,6 +56,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   highlightedTransactionId,
   openEditTransaction,
   deleteTransaction,
+  onDuplicate,
   setSwipedTransactionId,
   getSwipeHandlers,
   getCategoryColorClass,
@@ -154,6 +155,7 @@ export const TransactionListSection = memo(function TransactionListSection({
                         highlightedTransactionId={highlightedTransactionId}
                         openEditTransaction={openEditTransaction}
                         deleteTransaction={deleteTransaction}
+                        onDuplicate={onDuplicate}
                         setSwipedTransactionId={setSwipedTransactionId}
                         getSwipeHandlers={getSwipeHandlers}
                         getCategoryColorClass={getCategoryColorClass}

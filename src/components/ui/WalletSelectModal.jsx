@@ -10,6 +10,7 @@ import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
   const num = Number(val ?? 0)
@@ -74,7 +75,7 @@ export function WalletSelectTrigger({
     >
       {wallet ? (
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} rounded-full flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
+          <div className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} rounded-full aspect-square flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs`}>
             {wallet.customIcon === 'dollar' || wallet.name?.toLowerCase() === 'cash' || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
               <div className="w-full h-full flex items-center justify-center text-amber-500">
                 <MoneyBagIcon size={compact ? 15 : 19} strokeWidth={2.5} />
@@ -83,7 +84,7 @@ export function WalletSelectTrigger({
               <img
                 src={getWalletLogoUrl(wallet)}
                 alt={wallet.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-full aspect-square"
                 onError={(e) => {
                   e.target.style.display = 'none'
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -109,7 +110,7 @@ export function WalletSelectTrigger({
         </div>
       ) : (
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-9 w-9 rounded-xl'} grid shrink-0 place-items-center border border-dashed border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]`}>
+          <div className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} rounded-full aspect-square grid shrink-0 place-items-center border border-dashed border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]`}>
             <Wallet className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           </div>
           <span className="text-xs font-bold text-[var(--muted)] truncate">
@@ -163,6 +164,8 @@ export default function WalletSelectModal({
     )
   }, [activeWallets, search])
 
+  useBackButton(onClose, Boolean(isOpen))
+
   if (!isOpen) return null
 
   const handleSelect = (id) => {
@@ -181,7 +184,7 @@ export default function WalletSelectModal({
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all max-h-[85vh] flex flex-col z-10 animate-[ft-spring-up_0.36s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all max-h-[85vh] flex flex-col z-10 animate-[ft-spring-up_0.28s_cubic-bezier(0.16,1,0.3,1)_both]">
         {/* Drag handle for mobile */}
         <div className="flex justify-center pt-2.5 pb-1 sm:hidden">
           <div className="h-1.5 w-12 rounded-full bg-[var(--border)]/60" />
@@ -282,7 +285,7 @@ export default function WalletSelectModal({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs">
+                    <div className="w-10 h-10 rounded-full aspect-square flex items-center justify-center shrink-0 border-[0.5px] border-[var(--wallet-logo-border,var(--border))] bg-[var(--wallet-logo-bg,var(--panel))] overflow-hidden shadow-2xs">
                       {w.customIcon === 'dollar' || w.name?.toLowerCase() === 'cash' || String(w.name || '').toLowerCase().includes('uang tunai') ? (
                         <div className="w-full h-full flex items-center justify-center text-amber-500">
                           <MoneyBagIcon size={20} strokeWidth={2.5} />
@@ -291,7 +294,7 @@ export default function WalletSelectModal({
                         <img
                           src={logoUrl}
                           alt={w.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover rounded-full aspect-square"
                           onError={(e) => {
                             e.target.style.display = 'none'
                             if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

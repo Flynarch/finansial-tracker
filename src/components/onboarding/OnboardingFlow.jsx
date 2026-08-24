@@ -13,6 +13,7 @@ import ChangePhotoModal from '../profile/ChangePhotoModal'
 import {
   signInWithGoogle,
   signInAsGuest,
+  promptGoogleOneTap,
 } from '../../lib/auth'
 import { executeThemeTransition } from '../../lib/themeTransition'
 import { importAllDataFromJsonPayload } from '../../lib/backup'
@@ -239,6 +240,27 @@ export default function OnboardingFlow() {
       }
     }
   }
+
+  /* ── Google One Tap on Onboarding Screen ───────────────────────── */
+  useEffect(() => {
+    if (step !== 0 || hasCompleted) return
+    promptGoogleOneTap({
+      onSuccess: async (user) => {
+        await restoreUserSnapshot(user.uid, true)
+        await setAuthUser(user)
+        if (user.displayName) {
+          setUsername(user.displayName)
+        }
+        if (user.photoURL) {
+          setProfilePhoto(user.photoURL)
+        }
+        goTo(1)
+      },
+      onError: (msg) => {
+        if (msg) setGoogleError(msg)
+      },
+    })
+  }, [step, hasCompleted, setAuthUser, setProfilePhoto, goTo])
 
   /* ── Google Sign In Handler ────────────────────────────────────── */
   const handleGoogleSignIn = async () => {
@@ -682,7 +704,7 @@ export default function OnboardingFlow() {
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-[var(--fg)]">
-                          {t('auth.themeLightTitle', 'Putih')}
+                          {t('auth.themeLightTitle', 'Pure Light')}
                         </h4>
                       </div>
                     </div>
@@ -904,7 +926,7 @@ export default function OnboardingFlow() {
                               {isCash ? (
                                 <MoneyBagIcon size={16} strokeWidth={2.5} className="text-amber-500" />
                               ) : logoUrl ? (
-                                <img src={logoUrl} alt={w.name} className="w-full h-full object-cover" />
+                                <img src={logoUrl} alt={w.name} className="w-full h-full object-cover rounded-full" />
                               ) : (
                                 <span className="font-black text-xs text-[var(--fg)]">
                                   {w.name ? w.name.substring(0, 2).toUpperCase() : 'W'}

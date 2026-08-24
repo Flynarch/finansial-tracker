@@ -38,6 +38,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     notes: '',
     walletId: '',
     currency: defaultCurrency,
+    interestRate: '',
+    tenorMonths: '',
   })
 
   const selectedWallet = (wallets || []).find((w) => String(w.id) === String(form.walletId))
@@ -65,6 +67,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           notes: editingLoan.notes || '',
           walletId: editingLoan.walletId ? String(editingLoan.walletId) : '',
           currency: editingLoan.currency || defaultCurrency,
+          interestRate: editingLoan.interestRate ? String(editingLoan.interestRate) : '',
+          tenorMonths: editingLoan.tenorMonths ? String(editingLoan.tenorMonths) : '',
         })
       } else {
         setForm({
@@ -77,6 +81,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           notes: '',
           walletId: wallets && wallets.length > 0 ? String(wallets[0].id) : '',
           currency: defaultCurrency,
+          interestRate: '',
+          tenorMonths: '',
         })
       }
     }
@@ -110,6 +116,22 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       return
     }
 
+    const annualRate = parseFloat(form.interestRate) || 0
+    const tenor = parseInt(form.tenorMonths, 10) || 0
+    const monthlyRate = annualRate / 100 / 12
+
+    let calculatedMonthlyPayment = 0
+    if (total > 0 && tenor > 0) {
+      if (annualRate > 0) {
+        calculatedMonthlyPayment = Math.round(
+          (total * (monthlyRate * Math.pow(1 + monthlyRate, tenor))) /
+            (Math.pow(1 + monthlyRate, tenor) - 1),
+        )
+      } else {
+        calculatedMonthlyPayment = Math.round(total / tenor)
+      }
+    }
+
     const payload = {
       type: form.type,
       personName: form.personName.trim(),
@@ -120,6 +142,9 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       notes: form.notes.trim(),
       walletId: Number(form.walletId),
       currency: form.currency,
+      interestRate: annualRate > 0 ? annualRate : null,
+      tenorMonths: tenor > 0 ? tenor : null,
+      monthlyPayment: calculatedMonthlyPayment > 0 ? calculatedMonthlyPayment : null,
     }
 
     try {
@@ -138,6 +163,27 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   const isDebt = form.type === 'debt'
   const numericAmount = parseMoneyInput(form.totalAmount, form.currency) || 0
   const hasFilledAmount = numericAmount > 0
+
+  const annualRate = parseFloat(form.interestRate) || 0
+  const tenor = parseInt(form.tenorMonths, 10) || 0
+  const monthlyRate = annualRate / 100 / 12
+
+  let previewMonthlyPayment = 0
+  let previewTotalInterest = 0
+  let previewTotalRepayment = numericAmount
+
+  if (numericAmount > 0 && tenor > 0) {
+    if (annualRate > 0) {
+      previewMonthlyPayment = Math.round(
+        (numericAmount * (monthlyRate * Math.pow(1 + monthlyRate, tenor))) /
+          (Math.pow(1 + monthlyRate, tenor) - 1),
+      )
+      previewTotalRepayment = previewMonthlyPayment * tenor
+      previewTotalInterest = previewTotalRepayment - numericAmount
+    } else {
+      previewMonthlyPayment = Math.round(numericAmount / tenor)
+    }
+  }
 
   return (
     <Modal
@@ -319,7 +365,70 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           </div>
         </div>
 
-        {/* 6. Catatan (Opsional) */}
+        {/* 6. Suku Bunga & Tenor Cicilan (Opsional) */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 space-y-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] block">
+            Kalkulator Bunga & Tenor (Opsional)
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[9.5px] font-semibold text-[var(--muted)] block">
+                Bunga (% / Tahun)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="ft-input w-full text-xs font-bold py-1.5 px-2.5 rounded-xl font-mono"
+                placeholder="12"
+                value={form.interestRate}
+                onChange={(e) => setForm((prev) => ({ ...prev, interestRate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9.5px] font-semibold text-[var(--muted)] block">
+                Tenor (Bulan)
+              </label>
+              <input
+                type="number"
+                min="1"
+                className="ft-input w-full text-xs font-bold py-1.5 px-2.5 rounded-xl font-mono"
+                placeholder="12"
+                value={form.tenorMonths}
+                onChange={(e) => setForm((prev) => ({ ...prev, tenorMonths: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {previewMonthlyPayment > 0 && tenor > 0 && (
+            <div className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)] space-y-1 text-xs animate-fadeIn">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-semibold text-[var(--muted)]">Estimasi Cicilan / Bulan:</span>
+                <span className="font-extrabold text-[var(--fg)] tabular-nums">
+                  Rp {previewMonthlyPayment.toLocaleString('id-ID')}
+                </span>
+              </div>
+              {annualRate > 0 && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-semibold text-[var(--muted)]">Total Estimasi Bunga:</span>
+                    <span className="font-bold text-amber-500 tabular-nums">
+                      +Rp {previewTotalInterest.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-0.5 border-t border-[var(--border)]/60">
+                    <span className="text-[10px] font-bold text-[var(--fg)]">Total Pengembalian:</span>
+                    <span className="font-black text-[var(--fg)] tabular-nums">
+                      Rp {previewTotalRepayment.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 7. Catatan (Opsional) */}
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-[var(--muted)] block">
             {t('loans.modal.notes', 'Catatan (Opsional)')}

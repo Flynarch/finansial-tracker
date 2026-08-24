@@ -193,8 +193,20 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
           {/* 2 or 3 Clean Text Lines */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <p className="truncate text-sm font-extrabold text-[var(--fg)] leading-tight">{labels.main}</p>
+              {transaction.isSplit ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 border border-purple-500/30 px-1.5 py-0.2 text-[9px] font-extrabold text-purple-500 shrink-0">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 9 15"/><path d="M3 21l6-6"/></svg>
+                  <span>Split ({transaction.splitItems?.length || 0})</span>
+                </span>
+              ) : null}
+              {String(transaction.notes || '').includes('(Auto:') ? (
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.2 text-[8.5px] font-extrabold text-sky-500 shrink-0" title={t('tx.autoRecurringTooltip', 'Otomatis dari jadwal berulang')}>
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Auto</span>
+                </span>
+              ) : null}
               {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
                 <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
                   BARU
@@ -226,6 +238,20 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               <p className="mt-0.5 text-[11px] font-normal italic text-[var(--muted-2)] line-clamp-2 leading-snug break-words">
                 "{noteStr}"
               </p>
+            ) : null}
+
+            {/* Line 4: Tags Pills */}
+            {Array.isArray(transaction.tags) && transaction.tags.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {transaction.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-semibold text-[var(--muted)]"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
             ) : null}
           </div>
         </div>

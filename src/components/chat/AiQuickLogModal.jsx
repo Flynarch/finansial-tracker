@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { format } from 'date-fns'
 import { Sparkles, X, Mic, MicOff, Image as ImageIcon, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -9,6 +10,7 @@ import useSettingsStore from '../../store/useSettingsStore'
 import useTransactionStore from '../../store/useTransactionStore'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import AiDigitalReceipt from './AiDigitalReceipt'
 import AiIntentSwitchDialog from './AiIntentSwitchDialog'
 import ReceiptScanModePicker from './ReceiptScanModePicker'
@@ -275,6 +277,8 @@ export default function AiQuickLogModal() {
   const isOpen = useChatStore((s) => s.isQuickLogOpen)
   const closeQuickLog = useChatStore((s) => s.closeQuickLog)
   const switchToFullChat = useChatStore((s) => s.switchToFullChat)
+  const autoScan = useChatStore((s) => s.autoScan)
+  const clearAutoScan = useChatStore((s) => s.clearAutoScan)
 
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
@@ -397,6 +401,26 @@ export default function AiQuickLogModal() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, closeQuickLog])
+
+  useBackButton(() => {
+    if (modalMode === 'scan_mode') {
+      setModalMode('input')
+      setSelectedImage(null)
+      return
+    }
+    closeQuickLog()
+  }, Boolean(isOpen))
+
+  // Auto-scan trigger on open if requested
+  useEffect(() => {
+    if (isOpen && autoScan) {
+      clearAutoScan?.()
+      const timer = setTimeout(() => {
+        fileInputRef.current?.click()
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen, autoScan, clearAutoScan])
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -567,23 +591,58 @@ function isObviousNonTransaction(text) {
 
       // Check Intent: Is this a Transaction Creation?
       if (result.type === 'transactions' && result.action === 'create' && result.transactions?.length > 0) {
+        let transactionsToProcess = result.transactions
+
+        // If user chose per_item mode but AI returned 1 summary transaction containing items array, unroll into individual transactions!
+        if (
+          modeToUse === 'per_item' &&
+          transactionsToProcess.length === 1 &&
+          Array.isArray(transactionsToProcess[0].items) &&
+          transactionsToProcess[0].items.length > 1
+        ) {
+          const parent = transactionsToProcess[0]
+          transactionsToProcess = parent.items.map((it) => ({
+            type: 'expense',
+            category: sanitizeCategoryPath(it.name, 'expense') || parent.category || 'kebutuhan_harian/belanja_bulanan',
+            amount: Number(it.price) || 0,
+            notes: it.qty && it.qty > 1 ? `${it.name} (x${it.qty})` : it.name,
+            date: parent.date,
+            currency: parent.currency,
+            merchant: parent.merchant || result.merchant,
+            walletId: parent.walletId,
+            paymentMethod: parent.paymentMethod,
+          }))
+        }
+
         const savedTxs = []
-        for (const tx of result.transactions) {
+        for (const tx of transactionsToProcess) {
           let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null))
           if (finalWalletId !== null && !wallets.find((w) => w.id === finalWalletId)) {
             finalWalletId = wallets.length > 0 ? wallets[0].id : null
           }
 
           const matchedWallet = wallets.find((w) => w.id === finalWalletId)
-          const txCurrency = matchedWallet?.currency || tx.currency || defaultCurrency
+          const txCurrency = tx.currency || matchedWallet?.currency || defaultCurrency
+
+          // Resolve individual item category if per_item
+          const itemCategory = modeToUse === 'per_item'
+            ? sanitizeCategoryPath(tx.category || tx.notes, tx.type || 'expense')
+            : sanitizeCategoryPath(tx.category, tx.type)
 
           const txToSave = {
             ...tx,
-            category: sanitizeCategoryPath(tx.category, tx.type),
+            amount: Math.abs(Number(tx.amount || 0)),
+            date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+            category: itemCategory,
             walletId: finalWalletId,
             currency: txCurrency,
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-            createdAt: new Date().toISOString(),
+            merchant: tx.merchant || result.merchant || undefined,
+            items: Array.isArray(tx.items) && tx.items.length > 0 ? tx.items : undefined,
+            subtotal: typeof tx.subtotal === 'number' ? tx.subtotal : undefined,
+            tax: typeof tx.tax === 'number' ? tx.tax : undefined,
+            discount: typeof tx.discount === 'number' ? tx.discount : undefined,
+            paymentMethod: tx.paymentMethod || undefined,
+            createdAt: Date.now(),
           }
 
           if (tx.type === 'transfer' && tx.targetWalletId) {
@@ -591,12 +650,13 @@ function isObviousNonTransaction(text) {
             if (wallets.find((w) => w.id === twId)) txToSave.targetWalletId = twId
           }
 
-          await addTransaction(txToSave)
+          const createdId = await addTransaction(txToSave)
+          txToSave.id = createdId
           savedTxs.push(txToSave)
         }
 
         setRecordedTransactions(savedTxs)
-        setRecordedMerchant(result.merchant || '')
+        setRecordedMerchant(result.merchant || (savedTxs[0]?.merchant) || '')
         setModalMode('receipt')
         setInputValue('')
         setSelectedImage(null)
@@ -668,14 +728,14 @@ function isObviousNonTransaction(text) {
         }`}
       >
         {/* Top Drag Handle & Header (Fixed stable dimensions to prevent mobile jumping) */}
-        <div className="shrink-0 p-4 pb-3 border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl">
-          <div className="mx-auto mb-2.5 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
+        <div className={`shrink-0 ${modalMode === 'receipt' ? 'px-4 py-2.5' : 'p-4 pb-3'} border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl`}>
+          <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-[var(--border-strong)]/40" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
-                <Sparkles className="h-4 w-4" />
+              <div className="flex h-6.5 w-6.5 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
+                <Sparkles className="h-3.5 w-3.5" />
               </div>
-              <span className="text-sm font-black text-[var(--fg)] tracking-tight">
+              <span className="text-xs sm:text-sm font-black text-[var(--fg)] tracking-tight">
                 {modalMode === 'receipt'
                   ? (locale === 'en' ? 'Digital Receipt' : 'Struk Transaksi Digital')
                   : modalMode === 'scan_mode'
@@ -694,7 +754,7 @@ function isObviousNonTransaction(text) {
                 className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer flex items-center gap-1"
                 aria-label={t('aiChat.title', 'Buka AI Finance Chat')}
               >
-                <MessageSquare className="h-4 w-4" />
+                <MessageSquare className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
@@ -702,14 +762,14 @@ function isObviousNonTransaction(text) {
                 className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         </div>
 
         {/* Modal Body Container */}
-        <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${modalMode === 'receipt' ? 'p-3 sm:p-4' : 'p-4'} pb-[calc(1rem+env(safe-area-inset-bottom))] ft-hide-scrollbar`}>
+        <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${modalMode === 'receipt' ? 'p-2.5 sm:p-3.5' : 'p-4'} pb-[calc(1rem+env(safe-area-inset-bottom))] ft-hide-scrollbar`}>
           {/* Error Banner */}
           {errorMessage && (
             <div className="mb-3.5 flex items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-in fade-in duration-200">

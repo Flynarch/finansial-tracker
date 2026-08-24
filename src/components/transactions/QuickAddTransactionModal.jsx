@@ -1,15 +1,16 @@
 import { format } from 'date-fns'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Camera, Sparkles } from 'lucide-react'
+import { Camera, Sparkles, Tag, Split, Plus, Trash2, X } from 'lucide-react'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import Modal from '../ui/Modal'
 import ToastBanner from '../ui/ToastBanner'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
-import ReceiptScannerModal from './ReceiptScannerModal'
+import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import {
   getCategoryToneClass,
   getEffectiveCategoryTone,
@@ -106,21 +107,51 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }, [rawWallets, allTransactions, rates])
 
   const [walletModalMode, setWalletModalMode] = useState(null) // null | 'walletId' | 'targetWalletId'
-  const [isOcrOpen, setIsOcrOpen] = useState(false)
+  const [tags, setTags] = useState([])
+  const [tagInput, setTagInput] = useState('')
+  const [isSplit, setIsSplit] = useState(false)
+  const [splitItems, setSplitItems] = useState([
+    { id: '1', category: 'makanan/restoran', amount: '', notes: '' },
+    { id: '2', category: 'belanja/kebutuhan_harian', amount: '', notes: '' },
+  ])
 
-  const handleApplyReceipt = (receiptData) => {
-    if (!receiptData) return
-    setTxType('expense')
-    const curr = receiptData.currency || form.currency || defaultCurrency
-    setForm((p) => ({
-      ...p,
-      amount: formatMoneyInput(String(receiptData.amount || 0), curr),
-      date: receiptData.date || p.date,
-      category: receiptData.category || p.category,
-      notes: receiptData.notes || p.notes,
-      currency: curr,
-    }))
+  const handleAddTag = (e) => {
+    e?.preventDefault?.()
+    const clean = tagInput.trim().replace(/^#/, '').toLowerCase()
+    if (clean && !tags.includes(clean)) {
+      setTags((prev) => [...prev, clean])
+      setTagInput('')
+    }
   }
+
+  const handleRemoveTag = (tagToRemove) => {
+    setTags((prev) => prev.filter((t) => t !== tagToRemove))
+  }
+
+  const handleAddSplitItem = () => {
+    setSplitItems((prev) => [
+      ...prev,
+      { id: String(Date.now()), category: getDefaultExpenseCategoryPath(), amount: '', notes: '' },
+    ])
+  }
+
+  const handleRemoveSplitItem = (idToRemove) => {
+    if (splitItems.length <= 2) return
+    setSplitItems((prev) => prev.filter((it) => it.id !== idToRemove))
+  }
+
+  const handleUpdateSplitItem = (id, field, val) => {
+    setSplitItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, [field]: val } : it)),
+    )
+  }
+
+  const openQuickLog = useChatStore((s) => s.openQuickLog)
+
+  const handleOpenAiScan = useCallback(() => {
+    onClose?.()
+    openQuickLog({ autoScan: true })
+  }, [onClose, openQuickLog])
 
   const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
   const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
@@ -153,6 +184,18 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
+
+  useBackButton(() => {
+    if (walletModalMode) {
+      setWalletModalMode(null)
+      return
+    }
+    if (categorySheetOpen) {
+      setCategorySheetOpen(false)
+      return
+    }
+    onClose?.()
+  }, Boolean(isOpen))
   const [expenseParentId, setExpenseParentId] = useState(() => null)
   const [incomeParentId, setIncomeParentId] = useState(() => null)
   const [categoryEditMode, setCategoryEditMode] = useState(false)
@@ -499,15 +542,42 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           }
         }
         
+        let totalAmount = parseMoneyInput(form.amount, form.currency)
+        let resolvedCategory = txType === 'transfer' ? 'transfer' : form.category
+        let formattedSplitItems = []
+
+        if (txType === 'expense' && isSplit) {
+          formattedSplitItems = splitItems
+            .map((it) => ({
+              category: it.category,
+              amount: parseMoneyInput(it.amount, form.currency),
+              notes: (it.notes || '').trim(),
+            }))
+            .filter((it) => it.amount > 0)
+
+          if (formattedSplitItems.length < 2) {
+            setSubmitError('Split transaksi membutuhkan minimal 2 pembagian kategori dengan nominal > 0.')
+            return
+          }
+
+          const splitSum = formattedSplitItems.reduce((acc, it) => acc + it.amount, 0)
+          totalAmount = splitSum
+          resolvedCategory = formattedSplitItems[0].category
+        }
+
         await addTransaction({
           date: form.date,
-          amount: parseMoneyInput(form.amount, form.currency),
+          amount: totalAmount,
           type: txType,
-          category: txType === 'transfer' ? 'transfer' : form.category,
+          category: resolvedCategory,
           notes: form.notes.trim() || '',
           currency: form.currency,
           walletId: form.walletId,
-          ...(txType === 'transfer' ? { targetWalletId: form.targetWalletId } : {})
+          ...(txType === 'transfer' ? { targetWalletId: form.targetWalletId } : {}),
+          ...(tags.length > 0 ? { tags } : {}),
+          ...(txType === 'expense' && isSplit && formattedSplitItems.length >= 2
+            ? { isSplit: true, splitItems: formattedSplitItems }
+            : {}),
         })
       }
       onClose()
@@ -535,32 +605,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
       {submitError ? <ToastBanner message={submitError} /> : null}
 
-      {/* OCR Receipt Scanner Quick Action */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => setIsOcrOpen(true)}
-          className="w-full flex items-center justify-between gap-2.5 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 p-3 text-left transition active:scale-[0.98] hover:border-indigo-500/50 cursor-pointer shadow-2xs group"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/20 text-indigo-500 border border-indigo-500/30 shadow-2xs group-hover:scale-105 transition-transform">
-              <Camera className="h-4.5 w-4.5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-xs font-extrabold text-[var(--fg)] leading-tight flex items-center gap-1.5">
-                {t('transactions.ocr.bannerTitle', 'Pindai Struk Belanja')}
-                <span className="rounded-full bg-indigo-500/20 px-1.5 py-0.2 text-[9px] font-black text-indigo-500 uppercase tracking-wider">
-                  OCR AI
-                </span>
-              </span>
-              <span className="block text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">
-                {t('transactions.ocr.bannerSubtitle', 'Foto struk untuk isi nominal & rincian otomatis')}
-              </span>
-            </div>
-          </div>
-          <Sparkles className="h-4 w-4 shrink-0 text-indigo-400 opacity-70 group-hover:opacity-100 transition-opacity" />
-        </button>
-      </div>
 
       {/* Mode Toggle - Sliding Segmented Track */}
       {(() => {
@@ -896,8 +940,21 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           <>
             {/* Hero Amount Section */}
             <div className="py-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-2">
-                {t('addTx.amount')}
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                  {txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}
+                </div>
+                {txType !== 'transfer' && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAiScan}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/15 transition-all active:scale-[0.96] text-[11px] font-bold cursor-pointer shadow-2xs group"
+                  >
+                    <Camera className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                    <span>{t('transactions.ocr.pillBtn', 'Scan Struk AI')}</span>
+                    <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />
+                  </button>
+                )}
               </div>
               <div className="flex items-baseline gap-2.5">
                 {/* Inline Currency Prefix */}
@@ -1127,6 +1184,145 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   className="w-full bg-[var(--field-bg)] rounded-xl border-none py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:ring-1 focus:ring-[var(--border-strong)] transition-all resize-none"
                 />
               </div>
+
+              {/* Row 4: Tag System */}
+              {txType !== 'transfer' && (
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-[var(--muted)]" />
+                      Label / Tag (Opsional)
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] animate-fadeIn"
+                      >
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="text-[var(--muted)] hover:text-rose-500 transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddTag()
+                        }
+                      }}
+                      placeholder={t('tx.tagsPlaceholder', 'Tambah label (contoh: liburan, kantor)...')}
+                      className="flex-1 bg-[var(--field-bg)] rounded-xl py-2 px-3 text-xs font-semibold text-[var(--fg)] outline-none border border-[var(--border)] focus:border-[var(--accent)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTag}
+                      disabled={!tagInput.trim()}
+                      className="px-3 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] disabled:opacity-40 cursor-pointer"
+                    >
+                      + Tag
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Row 5: Split Transaction Section (Expenses only) */}
+              {form.type === 'expense' && (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-[var(--fg)] flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 9 15"/><path d="M3 21l6-6"/></svg>
+                        {t('addTx.splitCategory', 'Split Kategori Transaksi')}
+                      </p>
+                      <p className="text-[10px] text-[var(--muted)]">
+                        {t('addTx.splitDesc', 'Bagi transaksi ke beberapa sub-kategori berbeda')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleSplit}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isSplitMode ? 'bg-purple-500' : 'bg-[var(--border)]'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSplitMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  {isSplitMode && (
+                    <div className="space-y-2 pt-1 border-t border-[var(--border)]/60 animate-dropdown">
+                      {splitItems.map((item, idx) => (
+                        <div key={item.id} className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)] space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-black uppercase text-[var(--muted)]">
+                              {t('addTx.splitItem', 'Item')} #{idx + 1}
+                            </span>
+                            {splitItems.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSplitItem(item.id)}
+                                className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                              >
+                                {t('common.delete', 'Hapus')}
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              value={item.category}
+                              onChange={(e) => handleUpdateSplitItem(item.id, 'category', e.target.value)}
+                              className="w-full rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--fg)] outline-none"
+                            >
+                              {(mergedExpenseTree || []).map((parent) => (
+                                <optgroup key={parent.id} label={parent.names?.[lang] || parent.id}>
+                                  {(parent.subcategories || []).map((sub) => (
+                                    <option key={sub.id} value={`${parent.id}/${sub.id}`}>
+                                      {sub.names?.[lang] || sub.id}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder={t('common.amount', 'Nominal')}
+                              value={item.amount}
+                              onChange={(e) =>
+                                handleUpdateSplitItem(
+                                  item.id,
+                                  'amount',
+                                  formatMoneyInput(e.target.value, form.currency),
+                                )
+                              }
+                              className="w-full rounded-lg border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-black text-[var(--fg)] outline-none text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={handleAddSplitItem}
+                        className="w-full py-2 rounded-xl border border-dashed border-[var(--border)] bg-transparent text-xs font-bold text-indigo-500 hover:bg-indigo-500/10 transition cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Tambah Pembagian Kategori
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -1484,13 +1680,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             ? 'Pilih Dompet Asal'
             : 'Pilih Dompet / Akun'
         }
-      />
-
-      {/* OCR Smart Receipt Scanner Modal */}
-      <ReceiptScannerModal
-        isOpen={isOcrOpen}
-        onClose={() => setIsOcrOpen(false)}
-        onApplyReceipt={handleApplyReceipt}
       />
     </Modal>
   )

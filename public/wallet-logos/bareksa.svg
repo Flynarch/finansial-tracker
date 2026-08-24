@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#16A34A"/>
+  <path d="M40 18C34 18 30 22 30 28C30 34 36 38 40 38C44 38 50 34 50 28C50 22 46 18 40 18Z" fill="#FACC15"/>
+  <path d="M24 38C24 32 28 28 34 28C40 28 44 34 44 38C44 42 40 48 34 48C28 48 24 44 24 38Z" fill="#22C55E"/>
+  <path d="M56 38C56 32 52 28 46 28C40 28 36 34 36 38C36 42 40 48 46 48C52 48 56 44 56 38Z" fill="#4ADE80"/>
+  <text x="40" y="66" text-anchor="middle" font-size="10" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">bareksa</text>
+</svg>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Mail,
   Lock,
@@ -24,6 +24,7 @@ import {
   signUpWithEmail,
   sendPasswordReset,
   sendEmailMagicLink,
+  promptGoogleOneTap,
 } from '../../lib/auth'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
 import { uploadLatestBackup, downloadLatestBackupJson } from '../../lib/cloudBackup'
@@ -207,6 +208,26 @@ export default function AuthModal({
       // Backup restore error non-blocking
     }
   }
+
+  /* ── Auto Prompt Google One Tap on Web ───────────────────────────── */
+  useEffect(() => {
+    if (!isOpen || (mode !== 'login' && mode !== 'register')) return
+    promptGoogleOneTap({
+      onSuccess: async (user) => {
+        await setAuthUser(user)
+        await restoreUserBackup(user, false)
+        triggerHaptic('success')
+        setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
+        setTimeout(() => {
+          onSuccess?.(user)
+          onClose?.()
+        }, 800)
+      },
+      onError: (msg) => {
+        if (msg) setErrorMessage(msg)
+      },
+    })
+  }, [isOpen, mode, setAuthUser, onSuccess, onClose, t])
 
   /* ── Google Sign In ─────────────────────────────────────────────── */
   const handleGoogleAuth = async () => {

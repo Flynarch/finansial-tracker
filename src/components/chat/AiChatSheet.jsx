@@ -18,6 +18,7 @@ import QuickChips from './QuickChips'
 import ReceiptScanModePicker from './ReceiptScanModePicker'
 import VoiceVisualizer from './VoiceVisualizer'
 import useChatStore from '../../store/useChatStore'
+import useBackButton from '../../hooks/useBackButton'
 
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -44,6 +45,15 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
   const [isRecording, setIsRecording] = useState(false)
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
+
+  useBackButton(() => {
+    if (showScanModePicker) {
+      setShowScanModePicker(false)
+      setSelectedImage(null)
+      return
+    }
+    onClose?.()
+  }, Boolean(isOpen))
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -359,11 +369,12 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
              
              const txToSave = {
                ...tx,
+               amount: Math.abs(Number(tx.amount || 0)),
+               date: tx.date || format(new Date(), 'yyyy-MM-dd'),
                category: sanitizeCategoryPath(tx.category, tx.type),
                walletId: finalWalletId,
                currency: txCurrency,
-               id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-               createdAt: new Date().toISOString()
+               createdAt: Date.now()
              }
              
              if (tx.type === 'transfer' && tx.targetWalletId) {
@@ -371,7 +382,8 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                 if (wallets.find(w => w.id === twId)) txToSave.targetWalletId = twId
              }
              
-             await addTransaction(txToSave)
+             const newTxId = await addTransaction(txToSave)
+             txToSave.id = newTxId
              savedTxs.push(txToSave)
           }
           newMsgs.push({ id: Date.now() + 2, role: 'ai', type: 'success', data: savedTxs })
@@ -655,10 +667,10 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             walletId: fromWallet ? fromWallet.id : null,
             targetWalletId: toWallet ? toWallet.id : null,
             currency: defaultCurrency,
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-            createdAt: new Date().toISOString()
+            createdAt: Date.now()
           }
-          await addTransaction(txToSave)
+          const transferTxId = await addTransaction(txToSave)
+          txToSave.id = transferTxId
           
           newMsgs.push({ 
             id: Date.now()+3, 
@@ -760,6 +772,28 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
             })
           }
         }
+      }
+
+      if (result.type === 'financial_health') {
+        const healthMsg = {
+          id: aiMsgId,
+          role: 'ai',
+          type: 'financial_health',
+          score: result.score,
+          rating: result.rating,
+          metrics: result.metrics,
+          content: result.text,
+          chips: result.chips,
+        }
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === aiMsgId)
+          if (exists) {
+            return prev.map((m) => (m.id === aiMsgId ? healthMsg : m))
+          }
+          return [...prev, healthMsg]
+        })
+        setConsecutiveErrors(0)
+        return
       }
 
       if (newMsgs.length > 0) {
@@ -920,6 +954,58 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
                           subtitle={msg.data.subtitle}
                           embedded={true}
                         />
+                      ) : msg.type === 'financial_health' ? (
+                        <div className="mt-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-3 shadow-xs text-left">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">Skor Kesehatan Finansial</p>
+                              <div className="flex items-baseline gap-1 mt-0.5">
+                                <span className="text-2xl font-black text-[var(--fg)]">{msg.score}</span>
+                                <span className="text-xs font-bold text-[var(--muted)]">/100</span>
+                              </div>
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-black border ${
+                              msg.score >= 80 ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' :
+                              msg.score >= 60 ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/30' :
+                              msg.score >= 40 ? 'bg-amber-500/15 text-amber-500 border-amber-500/30' :
+                              'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                            }`}>
+                              {msg.rating}
+                            </span>
+                          </div>
+
+                          <div className="h-2 w-full bg-[var(--border)]/60 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                msg.score >= 80 ? 'bg-emerald-500' :
+                                msg.score >= 60 ? 'bg-indigo-500' :
+                                msg.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${msg.score}%` }}
+                            />
+                          </div>
+
+                          {msg.metrics && (
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <div className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)]">
+                                <p className="text-[9px] text-[var(--muted)] font-extrabold uppercase">Rasio Menabung</p>
+                                <p className="text-xs font-black text-[var(--fg)] mt-0.5">{msg.metrics.savingsRatio}%</p>
+                              </div>
+                              <div className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)]">
+                                <p className="text-[9px] text-[var(--muted)] font-extrabold uppercase">Beban Utang (DTI)</p>
+                                <p className="text-xs font-black text-[var(--fg)] mt-0.5">{msg.metrics.dti}%</p>
+                              </div>
+                              <div className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)]">
+                                <p className="text-[9px] text-[var(--muted)] font-extrabold uppercase">Dana Darurat</p>
+                                <p className="text-xs font-black text-[var(--fg)] mt-0.5">{msg.metrics.emergencyMonths} Bln</p>
+                              </div>
+                              <div className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)]">
+                                <p className="text-[9px] text-[var(--muted)] font-extrabold uppercase">Total Utang Aktif</p>
+                                <p className="text-xs font-black text-rose-500 mt-0.5">Rp {Number(msg.metrics.totalDebt || 0).toLocaleString('id-ID')}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : null
                     }
                   />

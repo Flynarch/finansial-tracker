@@ -67,9 +67,9 @@ const useSettingsStore = create((set, get) => ({
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
     })
   },
-  setTheme: async (theme) => {
+  setTheme: (theme) => {
     set({ theme })
-    await get().persist({ theme })
+    get().persist({ theme }).catch(() => {})
   },
   setDefaultCurrency: async (defaultCurrency) => {
     set({ defaultCurrency })

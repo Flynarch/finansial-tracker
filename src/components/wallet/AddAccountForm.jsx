@@ -4,11 +4,13 @@ import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
 import useWalletStore from '../../store/useWalletStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import { db } from '../../lib/db'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
+  useBackButton(onBack, Boolean(onBack))
   const { t } = useTranslation()
   const navigate = useNavigate()
   const createWallet = useWalletStore((state) => state.createWallet)
@@ -117,7 +119,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 <img
                   src={institution.logoUrl}
                   alt={name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
                   onError={(e) => {
                     e.target.style.display = 'none'
                     if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'

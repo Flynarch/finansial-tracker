@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#EA580C"/>
+  <text x="40" y="41" text-anchor="middle" font-size="15" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">MIRAE</text>
+  <text x="40" y="56" text-anchor="middle" font-size="8.5" font-weight="800" fill="#FFFFFF" opacity="0.9" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">ASSET</text>
+</svg>

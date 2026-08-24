@@ -111,7 +111,7 @@ const TodoItemCard = memo(function TodoItemCard({
           className={`relative z-10 flex h-full touch-pan-y flex-col justify-between rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-3 shadow-xs transition-colors ${doneStyle} ${dimCompleted} ${status?.borderClass || ''}`}
           style={{
             transform: isSwiping ? undefined : 'translateX(0px)',
-            transition: isSwiping ? 'none' : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+            transition: isSwiping ? 'none' : 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)',
             willChange: isSwiping ? 'transform' : 'auto',
           }}
           onTouchStart={(e) => {
@@ -145,7 +145,7 @@ const TodoItemCard = memo(function TodoItemCard({
               swipeTodoIdRef.current = null
               setSwipeTodoId(null)
               const currentTarget = e.currentTarget
-              currentTarget.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+              currentTarget.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
               currentTarget.style.transform = 'translateX(0px)'
               currentTarget.style.willChange = 'auto'
               updateBgVisual(currentTarget.previousElementSibling, 'none')
@@ -184,7 +184,7 @@ const TodoItemCard = memo(function TodoItemCard({
             setSwipeTodoId(null)
             
             const currentTarget = e.currentTarget
-            currentTarget.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+            currentTarget.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
             currentTarget.style.transform = 'translateX(0px)'
             currentTarget.style.willChange = 'auto'
             
@@ -308,6 +308,7 @@ function TodoList() {
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const [activeTab, setActiveTab] = useState('todo')
   const [filter, setFilter] = useState(() => 'all')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [isEntering, setIsEntering] = useState(false)
   const [sortPref, setSortPref] = useState(() => {
     if (typeof window === 'undefined') return 'latest'
@@ -363,17 +364,30 @@ function TodoList() {
   }, [allSubTasks])
 
   const filteredTodos = useMemo(() => {
-    const list = todos || []
-    if (filter === 'active') return list.filter((x) => !x?.completed)
-    if (filter === 'completed') return list.filter((x) => x?.completed)
+    let list = todos || []
+    if (filter === 'active') list = list.filter((x) => !x?.completed)
+    else if (filter === 'completed') list = list.filter((x) => x?.completed)
+
+    if (selectedCategory !== 'all') {
+      list = list.filter((x) => x?.category === selectedCategory)
+    }
     return list
-  }, [todos, filter])
+  }, [todos, filter, selectedCategory])
 
   const todoCounts = useMemo(() => {
     const list = todos || []
     const all = list.length
     const completed = list.filter((x) => Boolean(x?.completed)).length
     return { all, active: all - completed, completed }
+  }, [todos])
+
+  const categoryCounts = useMemo(() => {
+    const map = { all: (todos || []).length }
+    ;(todos || []).forEach((t) => {
+      const cat = t.category || 'lainnya'
+      map[cat] = (map[cat] || 0) + 1
+    })
+    return map
   }, [todos])
 
   const sortedTodos = useMemo(() => {
@@ -418,15 +432,6 @@ function TodoList() {
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(frameId)
-  }, [])
-
-  useEffect(() => {
-    const closePopovers = () => {
-      setSortOpen(false)
-      setAddCategoryOpen(false)
-    }
-    window.addEventListener('scroll', closePopovers, { passive: true })
-    return () => window.removeEventListener('scroll', closePopovers)
   }, [])
 
   useEffect(() => {
@@ -785,6 +790,43 @@ function TodoList() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Category Filter Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 pl-0.5 min-w-0 whitespace-nowrap">
+              <button
+                type="button"
+                className={`flex-shrink-0 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedCategory === 'all'
+                    ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs'
+                    : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+                onClick={() => setSelectedCategory('all')}
+              >
+                Semua ({categoryCounts.all || 0})
+              </button>
+              {TODO_CATEGORIES.map((catKey) => {
+                const meta = TODO_CATEGORY_META[catKey]
+                const IconComponent = meta?.icon || Folder
+                const count = categoryCounts[catKey] || 0
+                if (count === 0 && selectedCategory !== catKey) return null
+                return (
+                  <button
+                    key={catKey}
+                    type="button"
+                    className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedCategory === catKey
+                        ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs'
+                        : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
+                    }`}
+                    onClick={() => setSelectedCategory(catKey)}
+                  >
+                    <IconComponent className="h-3 w-3" />
+                    <span className="capitalize">{catKey}</span>
+                    {count > 0 && <span className="opacity-60 text-[10px]">({count})</span>}
+                  </button>
+                )
+              })}
             </div>
 
         {!isDataReady ? (

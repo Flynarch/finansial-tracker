@@ -313,11 +313,11 @@ export default function MonthPicker({ value, onChange, className = '', compact =
 
           {/* Panel */}
           <div
-            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-380 ${
+            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-300 ${
               visible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-12 sm:translate-y-4 opacity-0 scale-95'
             }`}
             style={{
-              transitionTimingFunction: visible ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionTimingFunction: visible ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             {/* Drag handle (mobile) */}

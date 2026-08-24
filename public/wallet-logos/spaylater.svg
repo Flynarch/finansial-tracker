@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#EE4D2D"/>
+  <text x="40" y="38" text-anchor="middle" font-size="13" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">SPay</text>
+  <text x="40" y="55" text-anchor="middle" font-size="11" font-weight="900" fill="#FDE047" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">Later</text>
+</svg>

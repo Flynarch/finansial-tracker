@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#0B132B"/>
+  <path d="M48 26C42 20 30 22 30 30C30 40 52 36 52 48C52 56 42 58 32 52" stroke="#FACC15" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <text x="40" y="70" text-anchor="middle" font-size="7.5" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">SUPERBANK</text>
+</svg>

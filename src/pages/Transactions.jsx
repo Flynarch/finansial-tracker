@@ -1,8 +1,9 @@
 import { format, parseISO, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar as CalendarIcon, ChevronDown, ChevronRight, Check } from 'lucide-react'
+import { ChevronDown, Check } from 'lucide-react'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import ToastBanner from '../components/ui/ToastBanner'
@@ -28,6 +29,7 @@ import { db } from '../lib/db'
 import useSettingsStore from '../store/useSettingsStore'
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
+import { getWalletLogoUrl } from '../data/walletInstitutions'
 
 const initialFormData = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -53,12 +55,18 @@ function computeFilteredTransactions(transactions, filters, userWalletsCount, us
   const searchLower = (filters.search || '').toLowerCase().trim()
   const startDate = filters.startDate
   const endDate = filters.endDate
+  const activeTag = filters.tag
 
   return transactions
     .filter((item) => {
       if (searchLower) {
-        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${item.rawText ?? ''}`.toLowerCase()
+        const tagsStr = Array.isArray(item.tags) ? item.tags.join(' ') : ''
+        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`.toLowerCase()
         if (!searchTarget.includes(searchLower)) return false
+      }
+
+      if (activeTag) {
+        if (!Array.isArray(item.tags) || !item.tags.includes(activeTag)) return false
       }
 
       if (!isAllTypes && !activeTypes.includes(item.type)) return false
@@ -129,6 +137,7 @@ function Transactions() {
   const {
     filters,
     setFilters,
+    addTransaction,
     updateTransaction,
     deleteTransaction,
   } = useTransactionStore()
@@ -201,7 +210,7 @@ function Transactions() {
   }
 
   useEffect(() => {
-    if (isBulkMode) {
+    if (isBulkMode || isFilterOpen) {
       document.body.classList.add('hide-bottom-nav')
     } else {
       document.body.classList.remove('hide-bottom-nav')
@@ -209,7 +218,7 @@ function Transactions() {
     return () => {
       document.body.classList.remove('hide-bottom-nav')
     }
-  }, [isBulkMode])
+  }, [isBulkMode, isFilterOpen])
 
   useEffect(() => {
     if (isFilterOpen) {
@@ -414,6 +423,27 @@ function Transactions() {
       currency: targetCurrency,
     })
   }, [allWallets, defaultCurrency])
+
+  const handleDuplicateTransaction = useCallback(
+    async (transaction) => {
+      try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd')
+        const payload = {
+          ...transaction,
+          date: todayStr,
+          createdAt: Date.now(),
+        }
+        delete payload.id
+        await addTransaction(payload)
+        setApiError(t('tx.duplicateSuccess', 'Transaksi berhasil diduplikasi ke hari ini.'))
+        setApiErrorTone('success')
+      } catch {
+        setApiError(t('common.error.saveFailed', 'Gagal menduplikasi transaksi.'))
+        setApiErrorTone('error')
+      }
+    },
+    [addTransaction, t],
+  )
 
   const handleExportCsv = () => {
     const csvContent = toTransactionsCsv(filteredTransactions)
@@ -703,6 +733,7 @@ function Transactions() {
           highlightedTransactionId={highlightedTransactionId}
           openEditTransaction={openEditTransaction}
           deleteTransaction={deleteTransaction}
+          onDuplicate={handleDuplicateTransaction}
           setSwipedTransactionId={setSwipedTransactionId}
           getSwipeHandlers={getSwipeHandlers}
           getCategoryColorClass={getCategoryColorClass}
@@ -735,491 +766,498 @@ function Transactions() {
       />
 
       {/* ── Advanced Filter Panel (BottomSheet Overlay) ─────────── */}
-      <div
-        className={`fixed inset-0 z-50 transition-opacity duration-250 ease-out ${
-          isFilterOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-      >
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/40 backdrop-blur-xs cursor-pointer"
-          onClick={() => {
-            setIsFilterOpen(false)
-          }}
-          aria-label={t('tx.filter.close')}
-        />
-        <div
-          className={`absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-380 ease-[cubic-bezier(0.34,1.56,0.64,1)] will-change-transform transform-gpu ${
-            isFilterOpen ? 'translate-y-0' : 'translate-y-full'
-          }`}
-        >
-          {/* Header */}
-          <div className="shrink-0 p-4 pb-3 border-b border-[var(--border)]/40 bg-[var(--panel-strong)] rounded-t-3xl">
-            <div className="mx-auto mb-2.5 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-black text-[var(--fg)] tracking-tight">{t('tx.filter.title')}</p>
-              <button
-                type="button"
-                className="rounded-xl px-3 py-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
-                onClick={() => {
-                  setIsFilterOpen(false)
-                }}
-              >
-                {t('tx.filter.close')}
-              </button>
-            </div>
-          </div>
-
-          {/* Middle Body (Single Scroll Container) */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3.5 ft-hide-scrollbar">
-            {/* 1. Rentang Waktu Accordion */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
-              <button
-                type="button"
-                onClick={() => setActiveFilterSection((prev) => (prev === 'date' ? null : 'date'))}
-                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0">Rentang Waktu</span>
-                  <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate">
-                    {(() => {
-                      const curStart = draftFilters?.startDate ?? filters.startDate
-                      const curEnd = draftFilters?.endDate ?? filters.endDate
-                      const datesToday = getDatesForQuickRange('today')
-                      const datesMonthly = getDatesForQuickRange('monthly')
-
-                      let activePreset = draftPeriodPreset
-                      if (!activePreset) {
-                        if (!curStart && !curEnd) activePreset = 'all'
-                        else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
-                        else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
-                        else activePreset = 'custom'
-                      }
-
-                      if (activePreset === 'all') return 'Semua'
-                      if (activePreset === 'today') return 'Hari ini'
-                      if (activePreset === 'monthly') return 'Bulan ini'
-                      if (curStart || curEnd) {
-                        const startLabel = curStart ? format(parseISO(curStart), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
-                        const endLabel = curEnd ? format(parseISO(curEnd), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
-                        return `${startLabel} - ${endLabel}`
-                      }
-                      return 'Kustom'
-                    })()}
-                  </span>
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className={`fixed inset-0 z-[60] transition-opacity duration-250 ease-out ${
+              isFilterOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          >
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40 backdrop-blur-xs cursor-pointer"
+              onClick={() => {
+                setIsFilterOpen(false)
+              }}
+              aria-label={t('tx.filter.close')}
+            />
+            <div
+              className={`absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform transform-gpu ${
+                isFilterOpen ? 'translate-y-0' : 'translate-y-full'
+              }`}
+            >
+              {/* Header */}
+              <div className="shrink-0 p-4 pb-3 border-b border-[var(--border)]/40 bg-[var(--panel-strong)] rounded-t-3xl">
+                <div className="mx-auto mb-2.5 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-[var(--fg)] tracking-tight">{t('tx.filter.title')}</p>
+                  <button
+                    type="button"
+                    className="rounded-xl px-3 py-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
+                    onClick={() => {
+                      setIsFilterOpen(false)
+                    }}
+                  >
+                    {t('tx.filter.close')}
+                  </button>
                 </div>
-                <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 shrink-0 ${activeFilterSection === 'date' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
-              </button>
+              </div>
 
-              {activeFilterSection === 'date' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1.5 bg-[var(--panel-strong)] ft-slide-in">
-                  {(() => {
-                    const curStart = draftFilters?.startDate ?? filters.startDate
-                    const curEnd = draftFilters?.endDate ?? filters.endDate
-                    const datesToday = getDatesForQuickRange('today')
-                    const datesMonthly = getDatesForQuickRange('monthly')
+              {/* Middle Body (Single Scroll Container) */}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3.5 ft-hide-scrollbar">
+                {/* 1. Rentang Waktu Accordion */}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterSection((prev) => (prev === 'date' ? null : 'date'))}
+                    className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0">Rentang Waktu</span>
+                      <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate">
+                        {(() => {
+                          const curStart = draftFilters?.startDate ?? filters.startDate
+                          const curEnd = draftFilters?.endDate ?? filters.endDate
+                          const datesToday = getDatesForQuickRange('today')
+                          const datesMonthly = getDatesForQuickRange('monthly')
 
-                    let activePreset = draftPeriodPreset
-                    if (!activePreset) {
-                      if (!curStart && !curEnd) activePreset = 'all'
-                      else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
-                      else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
-                      else activePreset = 'custom'
-                    }
+                          let activePreset = draftPeriodPreset
+                          if (!activePreset) {
+                            if (!curStart && !curEnd) activePreset = 'all'
+                            else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
+                            else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
+                            else activePreset = 'custom'
+                          }
 
-                    const periodOptions = [
-                      { id: 'today', label: 'Hari ini' },
-                      { id: 'monthly', label: 'Bulan ini' },
-                      { id: 'all', label: 'Semua' },
-                      { id: 'custom', label: 'Kustom (Pilih Tanggal)' },
-                    ]
+                          if (activePreset === 'all') return 'Semua'
+                          if (activePreset === 'today') return 'Hari ini'
+                          if (activePreset === 'monthly') return 'Bulan ini'
+                          if (curStart || curEnd) {
+                            const startLabel = curStart ? format(parseISO(curStart), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
+                            const endLabel = curEnd ? format(parseISO(curEnd), 'dd MMM', { locale: locale === 'en' ? enUS : idLocale }) : '...'
+                            return `${startLabel} - ${endLabel}`
+                          }
+                          return 'Kustom'
+                        })()}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 shrink-0 ${activeFilterSection === 'date' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
+                  </button>
 
-                    return (
-                      <>
-                        <div className="space-y-1">
-                          {periodOptions.map((item) => {
-                            const isSelected = activePreset === item.id
-                            return (
+                  {activeFilterSection === 'date' && (
+                    <div className="border-t border-[var(--border)] p-2 space-y-1.5 bg-[var(--panel-strong)] ft-slide-in">
+                      {(() => {
+                        const curStart = draftFilters?.startDate ?? filters.startDate
+                        const curEnd = draftFilters?.endDate ?? filters.endDate
+                        const datesToday = getDatesForQuickRange('today')
+                        const datesMonthly = getDatesForQuickRange('monthly')
+
+                        let activePreset = draftPeriodPreset
+                        if (!activePreset) {
+                          if (!curStart && !curEnd) activePreset = 'all'
+                          else if (curStart === datesToday.startDate && curEnd === datesToday.endDate) activePreset = 'today'
+                          else if (curStart === datesMonthly.startDate && curEnd === datesMonthly.endDate) activePreset = 'monthly'
+                          else activePreset = 'custom'
+                        }
+
+                        const periodOptions = [
+                          { id: 'today', label: 'Hari ini' },
+                          { id: 'monthly', label: 'Bulan ini' },
+                          { id: 'all', label: 'Semua' },
+                          { id: 'custom', label: 'Kustom (Pilih Tanggal)' },
+                        ]
+
+                        return (
+                          <>
+                            <div className="space-y-1">
+                              {periodOptions.map((item) => {
+                                const isSelected = activePreset === item.id
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setDraftPeriodPreset(item.id)
+                                      if (item.id !== 'custom') {
+                                        const dates = getDatesForQuickRange(item.id)
+                                        setDraftFilters((prev) => ({
+                                          ...(prev || filters),
+                                          startDate: dates.startDate,
+                                          endDate: dates.endDate,
+                                        }))
+                                      } else {
+                                        setIsDatePickerModalOpen(true)
+                                      }
+                                    }}
+                                    className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                        : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                    }`}
+                                  >
+                                    <span>{item.label}</span>
+                                    <div
+                                      className={`h-4 w-4 rounded-full border flex items-center justify-center transition ${
+                                        isSelected ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                      }`}
+                                    >
+                                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+
+                            {activePreset === 'custom' && (
                               <button
-                                key={item.id}
                                 type="button"
-                                onClick={() => {
-                                  setDraftPeriodPreset(item.id)
-                                  if (item.id !== 'custom') {
-                                    const dates = getDatesForQuickRange(item.id)
-                                    setDraftFilters((p) => ({
-                                      ...(p || filters),
-                                      startDate: dates.startDate,
-                                      endDate: dates.endDate,
-                                    }))
-                                  }
-                                }}
-                                className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                                    : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                                }`}
+                                onClick={() => setIsDatePickerModalOpen(true)}
+                                className="mt-1 flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:border-[var(--accent)] transition cursor-pointer"
                               >
-                                <span>{item.label}</span>
-                                <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition shrink-0 ${
-                                  isSelected ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                                }`}>
-                                  {isSelected && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                                </div>
+                                <span className="text-[var(--muted)]">Rentang Terpilih:</span>
+                                <span className="font-extrabold text-[var(--accent)]">
+                                  {curStart && curEnd
+                                    ? `${format(parseISO(curStart), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })} - ${format(parseISO(curEnd), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })}`
+                                    : 'Klik untuk pilih tanggal'}
+                                </span>
                               </button>
-                            )
-                          })}
-                        </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
 
-                        {/* Custom Date Range Display Card when Custom is active */}
-                        {activePreset === 'custom' && (
-                          <div className="pt-1">
+                {/* 2. Jenis Transaksi */}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterSection((prev) => (prev === 'type' ? null : 'type'))}
+                    className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{t('tx.filter.txType', 'Jenis Transaksi')}</span>
+                      <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate">
+                        {(() => {
+                          const currentTypes = draftFilters?.types ?? filters.types ?? ALL_TYPES
+                          if (currentTypes.length === 0 || currentTypes.length === ALL_TYPES.length) return 'Semua Tipe'
+                          if (currentTypes.length === 1) {
+                            if (currentTypes[0] === 'income') return t('tx.income', 'Pemasukan')
+                            if (currentTypes[0] === 'expense') return t('tx.expense', 'Pengeluaran')
+                            if (currentTypes[0] === 'transfer') return t('tx.transfer', 'Transfer')
+                          }
+                          return `${currentTypes.length} Dipilih`
+                        })()}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'type' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
+                  </button>
+
+                  {activeFilterSection === 'type' && (
+                    <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] ft-slide-in">
+                      {(() => {
+                        const currentTypes = draftFilters?.types ?? filters.types ?? ALL_TYPES
+                        const isAllChecked = currentTypes.length === ALL_TYPES.length
+
+                        return (
+                          <>
                             <button
                               type="button"
-                              onClick={() => setIsDatePickerModalOpen(true)}
-                              className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-[0.99] cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <CalendarIcon className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" strokeWidth={2.2} />
-                                <div className="flex items-center gap-1.5 min-w-0 text-left">
-                                  <span className="truncate">
-                                    {curStart
-                                      ? format(parseISO(curStart), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
-                                      : 'Dari Tanggal'}
-                                  </span>
-                                  <span className="text-[var(--muted)]">-</span>
-                                  <span className="truncate">
-                                    {curEnd
-                                      ? format(parseISO(curEnd), 'dd MMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
-                                      : 'Sampai Tanggal'}
-                                  </span>
-                                </div>
-                              </div>
-                              <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* 2. Jenis Transaksi */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden transition">
-              <button
-                type="button"
-                onClick={() => setActiveFilterSection((prev) => (prev === 'type' ? null : 'type'))}
-                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span>Jenis Transaksi</span>
-                  <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full">
-                    {(() => {
-                      const list = draftFilters?.types ?? filters.types ?? ALL_TYPES
-                      if (list.length === 0 || list.length === ALL_TYPES.length) return 'Semua'
-                      if (list.length === 1) {
-                        return list[0] === 'income' ? 'Pemasukan' : list[0] === 'expense' ? 'Pengeluaran' : 'Transfer'
-                      }
-                      return `${list.length} Dipilih`
-                    })()}
-                  </span>
-                </div>
-                <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'type' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
-              </button>
-              {activeFilterSection === 'type' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] ft-slide-in">
-                  {(() => {
-                    const list = draftFilters?.types ?? filters.types ?? ALL_TYPES
-                    const isAllChecked = list.length === ALL_TYPES.length
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => toggleTypeFilter('all')}
-                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                            isAllChecked
-                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                          }`}
-                        >
-                          <span>Semua Jenis Transaksi</span>
-                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
-                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                          }`}>
-                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                          </div>
-                        </button>
-                        {[
-                          { id: 'income', label: 'Pemasukan' },
-                          { id: 'expense', label: 'Pengeluaran' },
-                          { id: 'transfer', label: 'Transfer (Pindah Saldo)' },
-                        ].map((item) => {
-                          const isChecked = list.includes(item.id)
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => toggleTypeFilter(item.id)}
+                              onClick={() => toggleTypeFilter('all')}
                               className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                                isChecked
+                                isAllChecked
                                   ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
                                   : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
                               }`}
                             >
-                              <span>{item.label}</span>
+                              <span>{t('tx.filter.all', 'Semua')}</span>
                               <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
-                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                               }`}>
-                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                                {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
                               </div>
                             </button>
-                          )
-                        })}
-                      </>
-                    )
-                  })()}
-                </div>
-              )}
-            </div>
 
-            {/* 3. Akun / Dompet */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setActiveFilterSection((prev) => (prev === 'wallet' ? null : 'wallet'))}
-                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span>Akun / Dompet</span>
-                  <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                    {(() => {
-                      const allIds = userWallets.map((w) => String(w.id))
-                      const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
-                      if (list.length === 0 || list.length === allIds.length) return 'Semua Akun'
-                      if (list.length === 1) {
-                        const found = userWallets.find((w) => String(w.id) === list[0])
-                        return found ? found.name : '1 Dipilih'
-                      }
-                      return `${list.length} Dipilih`
-                    })()}
-                  </span>
+                            {ALL_TYPES.map((typeKey) => {
+                              const isChecked = currentTypes.includes(typeKey)
+                              const label =
+                                typeKey === 'income'
+                                  ? t('tx.income', 'Pemasukan')
+                                  : typeKey === 'expense'
+                                  ? t('tx.expense', 'Pengeluaran')
+                                  : t('tx.transfer', 'Transfer')
+
+                              return (
+                                <button
+                                  key={typeKey}
+                                  type="button"
+                                  onClick={() => toggleTypeFilter(typeKey)}
+                                  className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
+                                    isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                  }`}
+                                >
+                                  <span>{label}</span>
+                                  <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                    isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                  }`}>
+                                    {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
-                <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'wallet' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
-              </button>
-              {activeFilterSection === 'wallet' && (
-                <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
-                  {(() => {
-                    const allIds = userWallets.map((w) => String(w.id))
-                    const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
-                    const isAllChecked = list.length === allIds.length
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => toggleWalletFilter('all')}
-                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                            isAllChecked
-                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
-                              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-                          }`}
-                        >
-                          <span>Semua Akun</span>
-                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
-                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                          }`}>
-                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                          </div>
-                        </button>
-                        {userWallets.map((wallet) => {
-                          const isChecked = list.includes(String(wallet.id))
-                          return (
+
+                {/* 3. Akun / Dompet */}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterSection((prev) => (prev === 'wallet' ? null : 'wallet'))}
+                    className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>Akun / Dompet</span>
+                      <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
+                        {(() => {
+                          const allIds = userWallets.map((w) => String(w.id))
+                          const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+                          if (list.length === 0 || list.length === allIds.length) return 'Semua Akun'
+                          if (list.length === 1) {
+                            const found = userWallets.find((w) => String(w.id) === list[0])
+                            return found ? found.name : '1 Dipilih'
+                          }
+                          return `${list.length} Dipilih`
+                        })()}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'wallet' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
+                  </button>
+                  {activeFilterSection === 'wallet' && (
+                    <div className="border-t border-[var(--border)] p-2 space-y-1 bg-[var(--panel-strong)] max-h-52 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
+                      {(() => {
+                        const allIds = userWallets.map((w) => String(w.id))
+                        const list = (draftFilters?.walletIds ?? filters.walletIds ?? allIds).map(String)
+                        const isAllChecked = list.length === allIds.length
+                        return (
+                          <>
                             <button
-                              key={wallet.id}
                               type="button"
-                              onClick={() => toggleWalletFilter(wallet.id)}
+                              onClick={() => toggleWalletFilter('all')}
                               className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                                isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                isAllChecked
+                                  ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                  : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
                               }`}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-5 h-5 rounded-full bg-[var(--panel-strong)] flex items-center justify-center text-[9px] font-black border border-[var(--border)] overflow-hidden shrink-0">
-                                  {wallet.logoUrl ? (
-                                    <img src={wallet.logoUrl} alt={wallet.name} className="w-full h-full object-cover rounded-full" />
-                                  ) : (
-                                    wallet.name?.substring(0, 2).toUpperCase()
-                                  )}
-                                </div>
-                                <span className="truncate">{wallet.name}</span>
-                              </div>
+                              <span>Semua Akun</span>
                               <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
-                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                               }`}>
-                                {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                                {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
                               </div>
                             </button>
-                          )
-                        })}
-                      </>
-                    )
-                  })()}
+                            {userWallets.map((wallet) => {
+                              const isChecked = list.includes(String(wallet.id))
+                              return (
+                                <button
+                                  key={wallet.id}
+                                  type="button"
+                                  onClick={() => toggleWalletFilter(wallet.id)}
+                                  className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
+                                    isChecked ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]' : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-5 h-5 rounded-full aspect-square bg-[var(--panel-strong)] flex items-center justify-center text-[9px] font-black border border-[var(--border)] overflow-hidden shrink-0">
+                                      {getWalletLogoUrl(wallet) ? (
+                                        <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-cover rounded-full aspect-square" />
+                                      ) : (
+                                        wallet.name?.substring(0, 2).toUpperCase()
+                                      )}
+                                    </div>
+                                    <span className="truncate">{wallet.name}</span>
+                                  </div>
+                                  <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                    isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                  }`}>
+                                    {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* 4. Kategori Utama */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setActiveFilterSection((prev) => (prev === 'category' ? null : 'category'))}
-                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span>{t('tx.filter.mainCategory', 'Kategori Utama')}</span>
-                  <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                    {(() => {
-                      const list = draftFilters?.categories ?? filters.categories ?? usedCategories
-                      if (list.length === 0 || list.length === usedCategories.length) return t('tx.filter.allCategories', 'Semua Kategori')
-                      if (list.length === 1) return formatCategoryName(list[0], locale)
-                      return t('tx.filter.selectedCount', { count: list.length }, `${list.length} Dipilih`)
-                    })()}
-                  </span>
-                </div>
-                <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'category' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
-              </button>
-              {activeFilterSection === 'category' && (
-                <div className="border-t border-[var(--border)] grid grid-cols-2 gap-1.5 p-2 bg-[var(--panel-strong)] max-h-60 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
-                  {(() => {
-                    const list = draftFilters?.categories ?? filters.categories ?? usedCategories
-                    const isAllChecked = list.length === usedCategories.length
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => toggleCategoryFilter('all')}
-                          className={`col-span-2 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                            isAllChecked
-                              ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[var(--accent)]/30'
-                              : 'text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)]'
-                          }`}
-                        >
-                          <span>{t('tx.filter.allCategories', 'Semua Kategori')}</span>
-                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
-                            isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
-                          }`}>
-                            {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
-                          </div>
-                        </button>
-                        {usedCategories.map((category) => {
-                          const isChecked = list.includes(category)
-                          return (
+                {/* 4. Kategori Utama */}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterSection((prev) => (prev === 'category' ? null : 'category'))}
+                    className="flex w-full items-center justify-between px-3.5 py-3 text-left text-xs font-extrabold text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{t('tx.filter.mainCategory', 'Kategori Utama')}</span>
+                      <span className="text-[10px] font-bold text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] px-2 py-0.5 rounded-full truncate max-w-[120px]">
+                        {(() => {
+                          const list = draftFilters?.categories ?? filters.categories ?? usedCategories
+                          if (list.length === 0 || list.length === usedCategories.length) return t('tx.filter.allCategories', 'Semua Kategori')
+                          if (list.length === 1) return formatCategoryName(list[0], locale)
+                          return t('tx.filter.selectedCount', { count: list.length }, `${list.length} Dipilih`)
+                        })()}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition-transform duration-200 ${activeFilterSection === 'category' ? 'rotate-180 text-[var(--accent)]' : ''}`} />
+                  </button>
+                  {activeFilterSection === 'category' && (
+                    <div className="border-t border-[var(--border)] grid grid-cols-2 gap-1.5 p-2 bg-[var(--panel-strong)] max-h-60 overflow-y-auto overscroll-contain ft-hide-scrollbar ft-slide-in">
+                      {(() => {
+                        const list = draftFilters?.categories ?? filters.categories ?? usedCategories
+                        const isAllChecked = list.length === usedCategories.length
+                        return (
+                          <>
                             <button
-                              key={category}
                               type="button"
-                              onClick={() => toggleCategoryFilter(category)}
-                              className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
-                                isChecked
-                                  ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[var(--accent)]/30'
-                                  : 'text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)]'
+                              onClick={() => toggleCategoryFilter('all')}
+                              className={`col-span-2 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition cursor-pointer ${
+                                isAllChecked
+                                  ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                  : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
                               }`}
                             >
-                              <span className="truncate">{formatCategoryName(category, locale)}</span>
-                              <div className={`h-3.5 w-3.5 rounded-md border flex items-center justify-center transition shrink-0 ml-1 ${
-                                isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                              <span>{t('tx.filter.allCategories', 'Semua Kategori')}</span>
+                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition ${
+                                isAllChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
                               }`}>
-                                {isChecked && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                                {isAllChecked && <Check className="h-3 w-3" strokeWidth={3} />}
                               </div>
                             </button>
-                          )
-                        })}
-                      </>
-                    )
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Footer */}
-          <div className="shrink-0 p-4 pt-3 bg-[var(--panel-strong)] border-t border-[var(--border)] flex items-center gap-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-            <button
-              type="button"
-              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-              onClick={() => {
-                const resetValues = {
-                  search: filters.search,
-                  types: [...ALL_TYPES],
-                  walletIds: userWallets.map((w) => String(w.id)),
-                  categories: [...usedCategories],
-                  startDate: datesMonthly.startDate,
-                  endDate: datesMonthly.endDate,
-                }
-                setDraftFilters(resetValues)
-                setFilters(resetValues)
-                setDraftPeriodPreset(null)
-                setIsFilterOpen(false)
-              }}
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              className="ft-btn-primary flex-1 py-2.5 text-xs font-bold cursor-pointer"
-              onClick={() => {
-                if (draftFilters) {
-                  setFilters(draftFilters)
-                }
-                setIsFilterOpen(false)
-              }}
-            >
-              Terapkan Filter
-            </button>
-          </div>
-        </div>
-      </div>
+                            {usedCategories.map((catKey) => {
+                              const isChecked = list.includes(catKey)
+                              const catColorClass = getCategoryColorClass(catKey)
+                              return (
+                                <button
+                                  key={catKey}
+                                  type="button"
+                                  onClick={() => toggleCategoryFilter(catKey)}
+                                  className={`flex items-center justify-between p-2 rounded-xl text-xs font-bold transition text-left cursor-pointer border ${
+                                    isChecked
+                                      ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)]'
+                                      : 'border-[var(--border)]/60 text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${catColorClass}`} />
+                                    <span className="truncate text-[11px]">{formatCategoryName(catKey, locale)}</span>
+                                  </div>
+                                  <div className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 transition ${
+                                    isChecked ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)]'
+                                  }`}>
+                                    {isChecked && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="shrink-0 p-4 pt-3 bg-[var(--panel-strong)] border-t border-[var(--border)] flex items-center gap-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
+                  onClick={() => {
+                    const resetValues = {
+                      search: filters.search,
+                      types: [...ALL_TYPES],
+                      walletIds: userWallets.map((w) => String(w.id)),
+                      categories: [...usedCategories],
+                      startDate: datesMonthly.startDate,
+                      endDate: datesMonthly.endDate,
+                    }
+                    setDraftFilters(resetValues)
+                    setFilters(resetValues)
+                    setDraftPeriodPreset(null)
+                    setIsFilterOpen(false)
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="ft-btn-primary flex-1 py-2.5 text-xs font-bold cursor-pointer"
+                  onClick={() => {
+                    if (draftFilters) {
+                      setFilters(draftFilters)
+                    }
+                    setIsFilterOpen(false)
+                  }}
+                >
+                  Terapkan Filter
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* ── Bulk Actions Floating Bar ────────────────────────────── */}
-      {isBulkMode && (
-        <div className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-50 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--fg)]">{selectedTxIds.size} Dipilih</span>
-            <button
-              type="button"
-              onClick={selectAllVisible}
-              className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-            >
-              {t('tx.bulk.all', 'Semua')} ({filteredTransactions.length})
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsBatchCategoryModalOpen(true)}
-              disabled={selectedTxIds.size === 0}
-              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40 transition active:scale-95 cursor-pointer"
-            >
-              {t('tx.bulk.changeCategory', 'Ubah Kategori')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsBatchDeleteModalOpen(true)}
-              disabled={selectedTxIds.size === 0}
-              className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40 transition active:scale-95 cursor-pointer"
-            >
-              {t('tx.bulk.delete', 'Hapus')} ({selectedTxIds.size})
-            </button>
-            <button
-              type="button"
-              onClick={clearBulkSelection}
-              className="rounded-full p-2 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 text-xs font-bold cursor-pointer"
-              title={t('tx.bulk.cancel', 'Batal')}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
+      {isBulkMode && typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-50 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[var(--fg)]">{selectedTxIds.size} Dipilih</span>
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="rounded-lg bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
+              >
+                {t('tx.bulk.all', 'Semua')} ({filteredTransactions.length})
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBatchCategoryModalOpen(true)}
+                disabled={selectedTxIds.size === 0}
+                className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] hover:bg-[var(--border)]/40 disabled:opacity-40 transition active:scale-95 cursor-pointer"
+              >
+                {t('tx.bulk.changeCategory', 'Ubah Kategori')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBatchDeleteModalOpen(true)}
+                disabled={selectedTxIds.size === 0}
+                className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/25 disabled:opacity-40 transition active:scale-95 cursor-pointer"
+              >
+                {t('tx.bulk.delete', 'Hapus')} ({selectedTxIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={clearBulkSelection}
+                className="rounded-full p-2 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 text-xs font-bold cursor-pointer"
+                title={t('tx.bulk.cancel', 'Batal')}
+              >
+                ✕
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* ── Batch Delete Confirm Modal ──────────────────────────── */}
       <ConfirmDeleteModal

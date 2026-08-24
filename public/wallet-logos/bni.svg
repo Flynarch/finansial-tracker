@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#005E5D"/>
+  <path d="M48 16 L62 16 L34 64 L20 64 Z" fill="#F15A24"/>
+  <text x="41" y="48" text-anchor="middle" font-size="20" font-weight="900" fill="#FFFFFF" letter-spacing="0.5" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">BNI</text>
+</svg>

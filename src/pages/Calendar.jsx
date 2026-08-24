@@ -10,12 +10,15 @@ import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
+import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
+import useSettingsStore from '../store/useSettingsStore'
 import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../lib/utils'
+import { Trash2 } from 'lucide-react'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 
@@ -126,6 +129,8 @@ function EmptyMonthEvent() {
 
 function Calendar() {
   const { t, locale } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const [isEntering, setIsEntering] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -135,13 +140,15 @@ function Calendar() {
   }, [])
   const [isDayModalOpen, setIsDayModalOpen] = useState(false)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [dayTab, setDayTab] = useState('items') // items | add
   const [txForm, setTxForm] = useState({
     type: 'expense',
     category: '',
     amount: '',
-    currency: 'IDR',
+    currency: defaultCurrency || 'IDR',
     notes: '',
+    walletId: defaultWalletId || '',
   })
   const [amountInput, setAmountInput] = useState('')
   const [importantForm, setImportantForm] = useState({
@@ -163,9 +170,20 @@ function Calendar() {
     [calStart, calEnd],
     []
   )
+  const loans = useLiveQuery(
+    () => db.loans.where('dueDate').between(calStart, calEnd, true, true).toArray(),
+    [calStart, calEnd],
+    []
+  )
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+
+  const selectedWallet = useMemo(
+    () => (wallets || []).find((w) => String(w.id) === String(txForm.walletId || defaultWalletId)),
+    [wallets, txForm.walletId, defaultWalletId],
+  )
 
   const calendarEvents = useMemo(() => {
-    const txEvents = transactions.map((tx) => ({
+    const txEvents = (transactions || []).map((tx) => ({
       id: `tx-${tx.id}`,
       source: 'transaction',
       sourceId: tx.id,
@@ -177,7 +195,7 @@ function Calendar() {
       color: tx.type === 'income' ? 'var(--status-income)' : 'var(--status-expense)',
       raw: tx,
     }))
-    const customEvents = importantEvents.map((event) => ({
+    const customEvents = (importantEvents || []).map((event) => ({
       id: `event-${event.id}`,
       source: 'important',
       sourceId: event.id,
@@ -189,8 +207,20 @@ function Calendar() {
       color: event.color || 'var(--accent)',
       raw: event,
     }))
-    return [...txEvents, ...customEvents]
-  }, [importantEvents, transactions])
+    const loanEvents = (loans || []).map((loan) => ({
+      id: `loan-${loan.id}`,
+      source: 'loan',
+      sourceId: loan.id,
+      title: `${loan.type === 'debt' ? 'Jatuh Tempo Hutang' : 'Jatuh Tempo Piutang'}: ${loan.title || loan.personName}`,
+      start: toLocalDate(loan.dueDate),
+      end: toLocalDate(loan.dueDate),
+      allDay: true,
+      type: 'loan',
+      color: loan.type === 'debt' ? '#ef4444' : '#3b82f6',
+      raw: loan,
+    }))
+    return [...txEvents, ...customEvents, ...loanEvents]
+  }, [importantEvents, loans, transactions])
 
   const indicators = useMemo(() => {
     const map = new Map()
@@ -198,7 +228,7 @@ function Calendar() {
       const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
       map.set(dateKey, { ...prev, ...patch })
     }
-    transactions.forEach((tx) => {
+    ;(transactions || []).forEach((tx) => {
       if (!tx?.date) return
       const prev = map.get(tx.date) || { income: 0, expense: 0, reminder: 0 }
       map.set(tx.date, {
@@ -207,22 +237,28 @@ function Calendar() {
         expense: prev.expense + (tx.type === 'expense' ? 1 : 0),
       })
     })
-    importantEvents.forEach((ev) => {
+    ;(importantEvents || []).forEach((ev) => {
       if (!ev?.date) return
       const prev = map.get(ev.date) || { income: 0, expense: 0, reminder: 0 }
       map.set(ev.date, { ...prev, reminder: prev.reminder + 1 })
     })
+    ;(loans || []).forEach((l) => {
+      if (!l?.dueDate) return
+      const prev = map.get(l.dueDate) || { income: 0, expense: 0, reminder: 0 }
+      map.set(l.dueDate, { ...prev, reminder: prev.reminder + 1 })
+    })
     bump(toDateOnlyString(selectedDate), {})
     return map
-  }, [importantEvents, selectedDate, transactions])
+  }, [importantEvents, loans, selectedDate, transactions])
 
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)
     return {
-      transactions: transactions.filter((tx) => tx.date === target),
-      events: importantEvents.filter((event) => event.date === target),
+      transactions: (transactions || []).filter((tx) => tx.date === target),
+      events: (importantEvents || []).filter((event) => event.date === target),
+      loans: (loans || []).filter((loan) => loan.dueDate === target),
     }
-  }, [importantEvents, selectedDate, transactions])
+  }, [importantEvents, loans, selectedDate, transactions])
 
   const [txSubmitError, setTxSubmitError] = useState('')
 
@@ -243,6 +279,7 @@ function Calendar() {
       category: txForm.category,
       amount: parsedAmount,
       currency: txForm.currency,
+      walletId: txForm.walletId || defaultWalletId || (wallets?.[0]?.id ?? null),
       notes: txForm.notes,
       createdAt: Date.now(),
     })
@@ -446,25 +483,60 @@ function Calendar() {
                   {t('calendar.importantDates')}
                 </h4>
                 <div className="space-y-2">
-                  {dayItems.events.length === 0 ? (
+                  {dayItems.events.length === 0 && dayItems.loans.length === 0 ? (
                     <EmptyState title={t('calendar.noImportantDates')} />
                   ) : (
-                    dayItems.events.map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-center gap-3 rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_60%,transparent)] px-4 py-3"
-                      >
-                        <span
-                          className="h-3 w-3 shrink-0 rounded-full ring-2 ring-[color-mix(in_srgb,var(--bg)_10%,transparent)] shadow-sm"
-                          style={{ backgroundColor: event.color || 'var(--accent)' }}
-                          aria-hidden="true"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-[var(--fg)]">{event.title}</p>
-                          <p className="truncate text-xs font-medium uppercase tracking-wider text-[var(--muted)]">{event.type}</p>
+                    <>
+                      {dayItems.loans.map((loan) => (
+                        <div
+                          key={`loan-${loan.id}`}
+                          className="flex items-center justify-between gap-3 rounded-[1rem] border border-blue-500/30 bg-blue-500/10 px-4 py-3"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className={`h-3 w-3 shrink-0 rounded-full ring-2 ring-[color-mix(in_srgb,var(--bg)_10%,transparent)] shadow-sm ${
+                                loan.type === 'debt' ? 'bg-rose-500' : 'bg-blue-500'
+                              }`}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-[var(--fg)]">
+                                {loan.type === 'debt' ? 'Jatuh Tempo Hutang' : 'Jatuh Tempo Piutang'}: {loan.title || loan.personName}
+                              </p>
+                              <p className="truncate text-xs font-medium text-[var(--muted)]">
+                                Sisa: {formatCurrency(loan.remainingAmount ?? loan.totalAmount, loan.currency || defaultCurrency)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                      {dayItems.events.map((event) => (
+                        <div
+                          key={event.id}
+                          className="flex items-center justify-between gap-3 rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_60%,transparent)] px-4 py-3"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className="h-3 w-3 shrink-0 rounded-full ring-2 ring-[color-mix(in_srgb,var(--bg)_10%,transparent)] shadow-sm"
+                              style={{ backgroundColor: event.color || 'var(--accent)' }}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-[var(--fg)]">{event.title}</p>
+                              <p className="truncate text-xs font-medium uppercase tracking-wider text-[var(--muted)]">{event.type}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => db.calendarEvents.delete(event.id)}
+                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer shrink-0"
+                            title={t('calendar.deleteAgenda', 'Hapus Agenda')}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               </section>
@@ -548,6 +620,27 @@ function Calendar() {
                       txType={txForm.type || 'expense'}
                       selectedCategory={txForm.category}
                       onSelectCategory={(cat) => setTxForm((prev) => ({ ...prev, category: cat }))}
+                    />
+                  </div>
+
+                  <div className="grid gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-2)]">
+                      Dompet / Akun
+                    </label>
+                    <WalletSelectTrigger
+                      wallet={selectedWallet}
+                      placeholder={t('wallets.selectPlaceholder', 'Pilih Dompet')}
+                      onClick={() => setIsWalletModalOpen(true)}
+                    />
+                    <WalletSelectModal
+                      isOpen={isWalletModalOpen}
+                      onClose={() => setIsWalletModalOpen(false)}
+                      wallets={wallets || []}
+                      selectedWalletId={txForm.walletId || defaultWalletId}
+                      onSelectWallet={(wId) => {
+                        setTxForm((prev) => ({ ...prev, walletId: wId }))
+                        setIsWalletModalOpen(false)
+                      }}
                     />
                   </div>
 

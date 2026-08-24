@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#00A39D"/>
+  <g transform="translate(24, 13) scale(0.68)">
+    <path d="M24 0 C10.7 0 0 10.7 0 24 s 10.7 24 24 24 c 6.2 0 11.9-2.4 16.2-6.3 -9.8 0.9-18.4-6.8-18.4-16.8 0-8.8 6.5-16.1 15.1-17.4 C 32.9 1.3 28.7 0 24 0 z" fill="#D4AF37"/>
+    <polygon points="36,8 38,13 43,13 39,16 40,21 36,18 32,21 33,16 29,13 34,13" fill="#D4AF37"/>
+  </g>
+  <text x="40" y="60" text-anchor="middle" font-size="18" font-weight="900" fill="#FFFFFF" letter-spacing="0.5" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">BSI</text>
+</svg>

@@ -103,37 +103,56 @@ export default function Reports() {
     return [...monthMap.values()]
   }, [rangeMonths, filteredTransactions, defaultCurrency, rates])
 
+  const loans = useLiveQuery(() => db.loans.toArray(), [], [])
+
+  const netLoanPosition = useMemo(() => {
+    const active = (loans || []).filter((l) => l.status !== 'paid' && toSafeNumber(l.remainingAmount ?? l.totalAmount) > 0)
+    const debt = active
+      .filter((l) => l.type === 'debt')
+      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
+    const rec = active
+      .filter((l) => l.type === 'receivable')
+      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
+    return rec - debt
+  }, [loans, defaultCurrency, rates])
+
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map()
     filteredTransactions.forEach((tx) => {
       if (tx.type !== 'expense') return
-      const parsed = parseExpenseCategoryPath(tx.category)
-      let key
-      let label
-      let isParent
-      let parentId
+      const itemsToProcess = tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0
+        ? tx.splitItems.map((si) => ({ category: si.category, amount: si.amount }))
+        : [{ category: tx.category, amount: tx.amount }]
 
-      if (!selectedDrilldownParent) {
-        parentId = parsed?.parentId || tx.category || 'lainnya'
-        key = parentId
-        label = parsed?.parent?.names?.[locale === 'en' ? 'en' : 'id'] || formatExpenseCategory(key, locale)
-        isParent = true
-      } else {
-        const itemParent = parsed?.parentId || tx.category || 'lainnya'
-        if (itemParent !== selectedDrilldownParent) return
-        key = parsed?.childId || 'utama'
-        label = parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] || (locale === 'en' ? 'Utama / Umum' : 'Utama / Umum')
-        isParent = false
-        parentId = selectedDrilldownParent
-      }
+      itemsToProcess.forEach((item) => {
+        const parsed = parseExpenseCategoryPath(item.category)
+        let key
+        let label
+        let isParent
+        let parentId
 
-      const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
-      let val = toSafeNumber(tx.amount)
-      if (tx.currency && tx.currency !== defaultCurrency && rates) {
-        val = convertCurrency(val, tx.currency, defaultCurrency, rates)
-      }
-      current.value += val
-      categoryMap.set(key, current)
+        if (!selectedDrilldownParent) {
+          parentId = parsed?.parentId || item.category || 'lainnya'
+          key = parentId
+          label = parsed?.parent?.names?.[locale === 'en' ? 'en' : 'id'] || formatExpenseCategory(key, locale)
+          isParent = true
+        } else {
+          const itemParent = parsed?.parentId || item.category || 'lainnya'
+          if (itemParent !== selectedDrilldownParent) return
+          key = parsed?.childId || 'utama'
+          label = parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] || (locale === 'en' ? 'Main / General' : 'Utama / Umum')
+          isParent = false
+          parentId = selectedDrilldownParent
+        }
+
+        const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
+        let val = toSafeNumber(item.amount)
+        if (tx.currency && tx.currency !== defaultCurrency && rates) {
+          val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+        }
+        current.value += val
+        categoryMap.set(key, current)
+      })
     })
     return [...categoryMap.values()].sort((a, b) => b.value - a.value)
   }, [locale, filteredTransactions, selectedDrilldownParent, defaultCurrency, rates])
@@ -160,7 +179,7 @@ export default function Reports() {
   }, [locale, filteredTransactions, defaultCurrency, rates])
 
   const netWorthTrend = useMemo(() => {
-    let cumulativeNet = (wallets || []).reduce((sum, w) => {
+    const totalCash = (wallets || []).reduce((sum, w) => {
       return (
         sum +
         convertCurrency(
@@ -182,14 +201,18 @@ export default function Reports() {
         ),
       0,
     )
+    const currentNetWorth = totalCash + investmentValue + netLoanPosition
+    const totalNetFlow = monthlyIncomeExpense.reduce((sum, m) => sum + (m.income - m.expense), 0)
+    let runningNet = currentNetWorth - totalNetFlow
+
     return monthlyIncomeExpense.map((monthData) => {
-      cumulativeNet += monthData.income - monthData.expense
+      runningNet += monthData.income - monthData.expense
       return {
         month: monthData.month,
-        netWorth: cumulativeNet + investmentValue,
+        netWorth: runningNet,
       }
     })
-  }, [wallets, investments, monthlyIncomeExpense, defaultCurrency, rates])
+  }, [wallets, investments, netLoanPosition, monthlyIncomeExpense, defaultCurrency, rates])
 
   const thisMonth = monthlyIncomeExpense.at(-1) ?? { income: 0, expense: 0 }
   const previousMonth = monthlyIncomeExpense.at(-2) ?? { income: 0, expense: 0 }

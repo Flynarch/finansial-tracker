@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#121212"/>
+  <g transform="translate(19, 14) scale(0.7)">
+    <polygon points="30,0 60,17 30,34 0,17" fill="#00D2D3"/>
+    <polygon points="60,17 60,51 30,68 30,34" fill="#0079C1"/>
+    <polygon points="0,17 30,34 30,68 0,51" fill="#10B981"/>
+  </g>
+  <text x="40" y="67" text-anchor="middle" font-size="7.5" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">TOKOCRYPTO</text>
+</svg>

@@ -12,7 +12,10 @@ import {
   Sliders,
   Check,
   X,
-  Wallet as WalletIcon
+  Wallet as WalletIcon,
+  Archive,
+  Download,
+  Edit2,
 } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
@@ -26,7 +29,16 @@ import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
-import { formatCurrency, formatMoneyInput, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import {
+  formatCurrency,
+  formatMoneyInput,
+  formatMoneyValueForInput,
+  parseMoneyInput,
+  convertCurrency,
+  toTransactionsCsv,
+  downloadTextFile,
+  FALLBACK_EXCHANGE_RATES,
+} from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -78,6 +90,9 @@ export default function WalletDetailPage() {
   }, [])
 
   const deleteWallet = useWalletStore((state) => state.deleteWallet)
+  const archiveWallet = useWalletStore((state) => state.archiveWallet)
+  const unarchiveWallet = useWalletStore((state) => state.unarchiveWallet)
+  const updateWallet = useWalletStore((state) => state.updateWallet)
   const addTransaction = useTransactionStore((state) => state.addTransaction)
   const updateTransaction = useTransactionStore((state) => state.updateTransaction)
   const deleteTransaction = useTransactionStore((state) => state.deleteTransaction)
@@ -93,6 +108,13 @@ export default function WalletDetailPage() {
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false)
+  const [isEditWalletModalOpen, setIsEditWalletModalOpen] = useState(false)
+  const [editWalletForm, setEditWalletForm] = useState({
+    name: '',
+    institutionType: '',
+    accountNumber: '',
+    notes: '',
+  })
   const [newBalanceRaw, setNewBalanceRaw] = useState('')
 
   const [editingTransaction, setEditingTransaction] = useState(null)
@@ -148,6 +170,54 @@ export default function WalletDetailPage() {
     }
   }
 
+  const handleToggleArchive = async () => {
+    try {
+      if (wallet?.isArchived) {
+        await unarchiveWallet(walletId)
+      } else {
+        await archiveWallet(walletId)
+      }
+      setIsActionMenuOpen(false)
+    } catch (err) {
+      console.error('Failed to toggle archive', err)
+    }
+  }
+
+  const handleExportWalletCsv = () => {
+    const csvContent = toTransactionsCsv(allTransactions || [])
+    const filename = `transactions-${wallet?.name || 'wallet'}-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`
+    downloadTextFile(filename, csvContent, 'text/csv;charset=utf-8;')
+    setIsActionMenuOpen(false)
+  }
+
+  const handleOpenEditWallet = () => {
+    if (!wallet) return
+    setEditWalletForm({
+      name: wallet.name || '',
+      institutionType: wallet.institutionType || 'bank',
+      accountNumber: wallet.accountNumber || '',
+      notes: wallet.notes || '',
+    })
+    setIsActionMenuOpen(false)
+    setIsEditWalletModalOpen(true)
+  }
+
+  const handleSaveEditWallet = async (e) => {
+    e.preventDefault()
+    if (!editWalletForm.name.trim()) return
+    try {
+      await updateWallet(walletId, {
+        name: editWalletForm.name.trim(),
+        institutionType: editWalletForm.institutionType,
+        accountNumber: editWalletForm.accountNumber.trim(),
+        notes: editWalletForm.notes.trim(),
+      })
+      setIsEditWalletModalOpen(false)
+    } catch (err) {
+      setPageError(err.message || 'Gagal mengubah dompet.')
+    }
+  }
+
   const filteredTransactions = useMemo(() => {
     if (!allTransactions) return []
     const query = searchQuery.trim().toLowerCase()
@@ -160,6 +230,10 @@ export default function WalletDetailPage() {
         else if (tx.type === 'transfer') {
           if (activeTab === 'income' && tx.targetWalletId === walletId) matchesTab = true
           else if (activeTab === 'expense' && tx.walletId === walletId) matchesTab = true
+          else matchesTab = false
+        } else if (tx.type === 'balance_adjustment') {
+          if (activeTab === 'income' && Number(tx.amount || 0) > 0) matchesTab = true
+          else if (activeTab === 'expense' && Number(tx.amount || 0) < 0) matchesTab = true
           else matchesTab = false
         } else {
           matchesTab = false
@@ -222,6 +296,8 @@ export default function WalletDetailPage() {
             net += amt
           } else if (tx.type === 'expense' || (tx.type === 'transfer' && tx.walletId === walletId)) {
             net -= amt
+          } else if (tx.type === 'balance_adjustment') {
+            net += amt
           }
         })
 
@@ -599,7 +675,7 @@ export default function WalletDetailPage() {
               {wallet.customIcon === 'dollar' || wallet.customIcon === 'cash' || wallet.institutionType === 'cash' || String(wallet.name || '').toLowerCase().includes('cash') || String(wallet.name || '').toLowerCase().includes('uang tunai') ? (
                 <MoneyBagIcon size={20} className="text-amber-500" strokeWidth={2.5} />
               ) : getWalletLogoUrl(wallet) ? (
-                <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-cover" />
+                <img src={getWalletLogoUrl(wallet)} alt={wallet.name} className="w-full h-full object-cover rounded-full" />
               ) : (
                 getInitials(wallet.name)
               )}
@@ -647,7 +723,64 @@ export default function WalletDetailPage() {
             </button>
           )}
 
-          {/* Action 2: Delete Wallet */}
+          {/* Action 2: Edit Wallet Info */}
+          <button
+            type="button"
+            onClick={handleOpenEditWallet}
+            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
+                <Edit2 size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[var(--fg)]">Ubah Info Dompet</p>
+                <p className="text-[10px] text-[var(--muted)]">Ubah nama akun, tipe institusi, dan catatan</p>
+              </div>
+            </div>
+          </button>
+
+          {/* Action 3: Export CSV */}
+          <button
+            type="button"
+            onClick={handleExportWalletCsv}
+            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
+                <Download size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[var(--fg)]">Ekspor Transaksi (.CSV)</p>
+                <p className="text-[10px] text-[var(--muted)]">Unduh seluruh riwayat transaksi dompet ini ke file CSV</p>
+              </div>
+            </div>
+          </button>
+
+          {/* Action 4: Archive / Unarchive */}
+          <button
+            type="button"
+            onClick={handleToggleArchive}
+            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
+                <Archive size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[var(--fg)]">
+                  {wallet?.isArchived ? 'Buka Arsip Dompet' : 'Arsipkan Dompet'}
+                </p>
+                <p className="text-[10px] text-[var(--muted)]">
+                  {wallet?.isArchived
+                    ? 'Kembalikan dompet ke daftar aktif'
+                    : 'Sembunyikan dompet dari daftar transaksi aktif'}
+                </p>
+              </div>
+            </div>
+          </button>
+
+          {/* Action 5: Delete Wallet */}
           <button
             type="button"
             onClick={() => {
@@ -722,6 +855,72 @@ export default function WalletDetailPage() {
               className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
             >
               Simpan Saldo
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Edit Wallet Info Modal ────────────────────────────────────── */}
+      <Modal
+        isOpen={isEditWalletModalOpen}
+        onClose={() => setIsEditWalletModalOpen(false)}
+        title={t('wallets.editTitle', 'Ubah Info Dompet')}
+      >
+        <form onSubmit={handleSaveEditWallet} className="space-y-4 pt-1">
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('wallets.nameLabel', 'Nama Dompet / Akun *')}
+            </label>
+            <input
+              type="text"
+              required
+              value={editWalletForm.name}
+              onChange={(e) => setEditWalletForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder={t('wallets.namePlaceholder', 'Contoh: BCA Utama, Mandiri Tabungan')}
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3 text-sm font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('wallets.accountNumberLabel', 'Nomor Rekening / ID Akun (Opsional)')}
+            </label>
+            <input
+              type="text"
+              value={editWalletForm.accountNumber}
+              onChange={(e) => setEditWalletForm((p) => ({ ...p, accountNumber: e.target.value }))}
+              placeholder="1234567890"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3 text-sm font-bold text-[var(--fg)] outline-none focus:border-[var(--accent)] font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('wallets.notesLabel', 'Catatan (Opsional)')}
+            </label>
+            <textarea
+              rows={2}
+              value={editWalletForm.notes}
+              onChange={(e) => setEditWalletForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder={t('wallets.notesPlaceholder', 'Catatan penggunaan akun...')}
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3 text-xs font-medium text-[var(--fg)] outline-none focus:border-[var(--accent)] resize-none"
+            />
+          </div>
+
+          <div className="flex gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsEditWalletModalOpen(false)}
+              className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={!editWalletForm.name.trim()}
+              className="flex-1 py-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            >
+              Simpan
             </button>
           </div>
         </form>

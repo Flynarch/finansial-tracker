@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="22" fill="#7B0017"/>
+  <polygon points="26,18 54,18 64,38 54,58 26,58 16,38" fill="#ED1C24"/>
+  <text x="40" y="44" text-anchor="middle" font-size="13" font-weight="900" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">CIMB</text>
+</svg>

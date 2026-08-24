@@ -21,13 +21,20 @@ const useChatStore = create((set) => ({
   }),
 
   // Quick Log actions
+  autoScan: false,
   setIsQuickLogOpen: (isQuickLogOpen) => set({ isQuickLogOpen }),
-  openQuickLog: () => set({ isQuickLogOpen: true, isOpen: false }),
-  closeQuickLog: () => set({ isQuickLogOpen: false }),
+  openQuickLog: (options = {}) => set({
+    isQuickLogOpen: true,
+    isOpen: false,
+    autoScan: Boolean(options?.autoScan),
+  }),
+  clearAutoScan: () => set({ autoScan: false }),
+  closeQuickLog: () => set({ isQuickLogOpen: false, autoScan: false }),
   switchToFullChat: (prompt) => set({
     isQuickLogOpen: false,
     isOpen: true,
-    initialInput: prompt || ''
+    initialInput: prompt || '',
+    autoScan: false,
   }),
 }))
 

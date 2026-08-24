@@ -49,13 +49,24 @@ const useTransactionStore = create((set) => ({
     }
   },
   addTransaction: async (payload) => {
-    await db.transactions.add({
-      ...payload,
-      createdAt: Number.isFinite(Number(payload?.createdAt)) ? Number(payload.createdAt) : Date.now(),
+    const dataWithoutId = { ...payload }
+    delete dataWithoutId.id
+    const cleanDate = typeof payload?.date === 'string' && payload.date.trim()
+      ? payload.date.trim()
+      : new Date().toISOString().split('T')[0]
+    const rawAmount = Number(payload?.amount || 0)
+    const cleanAmount = payload?.type === 'balance_adjustment' ? rawAmount : Math.abs(rawAmount)
+    const cleanCreatedAt = Number.isFinite(Number(payload?.createdAt)) ? Number(payload.createdAt) : Date.now()
+
+    const createdId = await db.transactions.add({
+      ...dataWithoutId,
+      date: cleanDate,
+      amount: cleanAmount,
+      createdAt: cleanCreatedAt,
     })
     
     // Auto-check budget for new expenses
-    if (payload.type === 'expense' && payload.amount > 0 && payload.date) {
+    if (payload.type === 'expense' && cleanAmount > 0 && cleanDate) {
       try {
         const txMonth = String(payload.date).substring(0, 7) // "YYYY-MM"
         const txCategory = String(payload.category || '')
@@ -77,7 +88,7 @@ const useTransactionStore = create((set) => ({
               }
             }
             
-            const limit = Number(b.limit || 0)
+            const limit = Number(b.limit ?? b.amount ?? 0)
             if (limit > 0) {
               const pct = (spent / limit) * 100
               if (pct >= 80) {
@@ -120,6 +131,8 @@ const useTransactionStore = create((set) => ({
         console.error('Failed to check budget:', e)
       }
     }
+
+    return createdId
   },
   updateTransaction: async (id, payload) => {
     await db.transactions.update(id, payload)

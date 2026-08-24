@@ -62,17 +62,35 @@ const getTools = () => ([
                 properties: {
                   type: { type: "STRING", enum: ["income", "expense", "transfer"] },
                   category: { type: "STRING", description: "ID kategori dari daftar." },
-                  amount: { type: "NUMBER" },
+                  amount: { type: "NUMBER", description: "Nominal positif angka murni tanpa pemisah titik." },
+                  currency: { type: "STRING", description: "Kode mata uang 3-huruf ISO (IDR, USD, SGD, MYR, EUR, JPY, GBP) yang terdeteksi pada transaksi atau struk." },
                   date: { type: "STRING", description: "YYYY-MM-DD" },
-                  notes: { type: "STRING" },
+                  notes: { type: "STRING", description: "Deskripsi transaksi atau nama barang." },
                   merchant: { type: "STRING", description: "Nama toko/merchant jika ada (misal: Indomaret, Alfamart, Starbucks)." },
                   walletId: { type: "NUMBER", description: "ID dompet (wallet) yang digunakan." },
-                  targetWalletId: { type: "NUMBER", description: "ID dompet tujuan JIKA type='transfer'." }
+                  targetWalletId: { type: "NUMBER", description: "ID dompet tujuan JIKA type='transfer'." },
+                  items: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        name: { type: "STRING", description: "Nama barang/item." },
+                        price: { type: "NUMBER", description: "Total harga item." },
+                        qty: { type: "NUMBER", description: "Kuantitas/jumlah barang." }
+                      }
+                    },
+                    description: "Daftar rincian item barang pada struk belanja."
+                  },
+                  subtotal: { type: "NUMBER", description: "Nominal subtotal sebelum pajak/diskon jika ada." },
+                  tax: { type: "NUMBER", description: "Nominal pajak PPN/PB1 jika ada." },
+                  discount: { type: "NUMBER", description: "Nominal potongan harga/diskon jika ada." },
+                  paymentMethod: { type: "STRING", description: "Metode pembayaran pada struk (misal: BCA, GoPay, QRIS, Tunai)." }
                 },
                 required: ["type", "category", "amount", "date", "notes"]
               }
             },
             merchantName: { type: "STRING", description: "Nama toko/merchant utama yang tertera pada struk." },
+            currency: { type: "STRING", description: "Mata uang utama yang tertera pada struk." },
             replyMessage: { type: "STRING", description: "Pesan sukses ramah." },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
           },
@@ -261,6 +279,18 @@ const getTools = () => ([
           },
           required: ["action"]
         }
+      },
+      {
+        name: "calculate_financial_health",
+        description: "Hitung dan evaluasi skor kesehatan finansial pengguna (financial health score) berdasarkan rasio tabungan, beban hutang (DTI), dana darurat, dan konsistensi pengeluaran.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            focus: { type: "STRING", description: "Fokus evaluasi: all, savings, debt, spending" },
+            replyMessage: { type: "STRING", description: "Pesan balasan pengantar evaluasi kesehatan finansial" },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "2-4 rekomendasi pertanyaan/aksi berikutnya" }
+          }
+        }
       }
     ]
   }
@@ -270,6 +300,73 @@ export async function parseTransactionFromText(userMessage, context) {
   const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null, scanMode = 'all' } = context
 
   const normUserText = String(userMessage || '').toLowerCase()
+
+  if (
+    normUserText.includes('kesehatan keuangan') ||
+    normUserText.includes('kesehatan finansial') ||
+    normUserText.includes('skor keuangan') ||
+    normUserText.includes('kondisi finansial') ||
+    normUserText.includes('financial health') ||
+    normUserText.includes('evaluasi keuangan')
+  ) {
+    // Direct financial health calculator
+    const allWallets = await db.wallets.toArray()
+    const txs = await db.transactions.toArray()
+    const loans = await db.loans.toArray()
+
+    const totalCash = allWallets.filter((w) => !w.isArchived).reduce((acc, w) => acc + Number(w.balance || 0), 0)
+    const now = new Date()
+    const currentMonthKey = format(now, 'yyyy-MM')
+    const currentMonthTxs = txs.filter((t) => t.date && t.date.startsWith(currentMonthKey))
+    const monthlyIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0)
+    const monthlyExpense = currentMonthTxs.filter((t) => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount || 0), 0)
+
+    const totalDebt = loans.filter((l) => l.type === 'debt' && l.status !== 'paid').reduce((acc, l) => acc + Number(l.remainingAmount || 0), 0)
+    const totalReceivable = loans.filter((l) => l.type === 'receivable' && l.status !== 'paid').reduce((acc, l) => acc + Number(l.remainingAmount || 0), 0)
+
+    const savingsRatio = monthlyIncome > 0 ? Math.max(0, ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100) : 0
+    const dti = monthlyIncome > 0 ? (totalDebt / monthlyIncome) * 100 : (totalDebt > 0 ? 100 : 0)
+    const emergencyMonths = monthlyExpense > 0 ? (totalCash / monthlyExpense) : (totalCash > 0 ? 12 : 0)
+
+    let score = 50
+    if (savingsRatio >= 20) score += 20
+    else if (savingsRatio >= 10) score += 10
+    else if (savingsRatio < 0) score -= 20
+
+    if (dti <= 30) score += 15
+    else if (dti > 50) score -= 15
+
+    if (emergencyMonths >= 6) score += 15
+    else if (emergencyMonths >= 3) score += 10
+    else if (emergencyMonths < 1) score -= 10
+
+    score = Math.max(10, Math.min(100, Math.round(score)))
+
+    let rating
+    if (score >= 85) rating = 'Sangat Sehat'
+    else if (score >= 70) rating = 'Sehat'
+    else if (score >= 50) rating = 'Cukup'
+    else if (score >= 35) rating = 'Perlu Perhatian'
+    else rating = 'Kritis'
+
+    return {
+      type: 'financial_health',
+      score,
+      rating,
+      metrics: {
+        savingsRatio: Math.round(savingsRatio),
+        dti: Math.round(dti),
+        emergencyMonths: Number(emergencyMonths.toFixed(1)),
+        totalCash,
+        monthlyIncome,
+        monthlyExpense,
+        totalDebt,
+        totalReceivable,
+      },
+      text: `Berikut adalah evaluasi Skor Kesehatan Finansial Anda: ${score}/100 (${rating}).`,
+      chips: ["Bagaimana cara menaikkan skor?", "Analisis pengeluaranku", "Rekomendasi dana darurat"]
+    }
+  }
 
   if (
     normUserText.includes('utang piutang') ||
@@ -504,19 +601,72 @@ ${buildCategoryContext(locale)}`
   
   let receiptVisionInstruction = ''
   if (imageData) {
-    if (scanMode === 'per_item') {
-      receiptVisionInstruction = `\n[INSTRUKSI SCAN STRUK - MODE PER ITEM]:
-1. Ekstrak SETIAP BARIS ITEM BELANJA secara terpisah dari gambar struk ini.
-2. Untuk setiap item: tentukan nama barang spesifik di field 'notes', nominal harga riil per item di field 'amount', dan KATEGORISASIKAN SECARA MANDIRI ke ID kategori pengeluaran yang paling cocok dari daftar kategori.
-3. Ekstrak nama toko/merchant dari struk (misal: 'Indomaret', 'Alfamart', 'Superindo', 'Starbucks', dll) dan isi di field 'merchantName' serta 'merchant' tiap item.
-4. Panggil 'record_transactions' dengan array 'transactions' berisi SEMUA item tersebut secara rinci.`
-    } else {
-      receiptVisionInstruction = `\n[INSTRUKSI SCAN STRUK - MODE SEMUA (TOTAL)]:
-1. Ambil TOTAL KESELURUHAN belanja (Grand Total / Total Akhir) dari gambar struk ini.
-2. Catat sebagai 1 transaksi pengeluaran (type: 'expense') dengan total harga di 'amount', nama toko/merchant di field 'merchantName' & 'merchant', dan notes ringkasan belanja (contoh: 'Belanja di Indomaret').
-3. Kategori harus dipilih sesuai jenis toko/merchant tersebut (misal: 'belanja_harian/supermarket' atau 'makanan_minuman/restoran').
-4. Panggil 'record_transactions' dengan 1 transaksi total tersebut.`
-    }
+    const isPerItem = scanMode === 'per_item'
+    receiptVisionInstruction = `\n[PANDUAN LENGKAP ANALISIS STRUK BELANJA DENGAN GEMINI VISION]:
+Gambar yang dilampirkan adalah foto fisik struk belanja, nota pembayaran, struk kasir toko/restoran, e-receipt, atau tagihan.
+Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
+
+1. NAMA TOKO / MERCHANT ('merchantName' & 'merchant'):
+   - Ambil nama merek/toko di bagian header struk (misal: 'Indomaret Point', 'Alfamart', 'Starbucks', 'Super Indo', 'Kopi Kenangan', "McDonald's", 'SPBU Pertamina', 'Apotek Century', 'Guardian', 'Uniqlo', 'Fore Coffee', 'FamilyMart', 'Lawson', 'Bakmi GM', 'Solaria', 'KFC', dsb).
+   - Bersihkan dari nomor telepon, NPWP, atau alamat panjang. Cukup nama merek/toko yang bersih.
+
+2. MATA UANG ('currency'):
+   - Analisis simbol atau kode mata uang pada struk:
+     * 'Rp', 'IDR', atau nominal ribuan standar Indonesia (contoh: 25.000, 78.500) -> 'IDR'.
+     * '$', 'USD', 'US$' -> 'USD'.
+     * 'S$', 'SGD' -> 'SGD'.
+     * 'RM', 'MYR' -> 'MYR'.
+     * '€', 'EUR' -> 'EUR'.
+     * '¥', 'JPY' -> 'JPY'.
+     * '£', 'GBP' -> 'GBP'.
+     * Jika tidak ada indikasi eksplisit, gunakan '${defaultCurrency}'.
+   - WAJIB isi properti 'currency' di setiap objek transaksi dan di level utama!
+
+3. TANGGAL & WAKTU TRANSAKSI ('date'):
+   - Cari tanggal transaksi yang tercetak di struk (format DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, dsb).
+   - Konversikan ke format standar 'YYYY-MM-DD'. Jika tanggal di struk buram/tidak ditemukan, gunakan tanggal hari ini: '${today}'.
+
+4. TOTAL NOMINAL AKHIR ('amount'):
+   - Ambil TOTAL AKHIR (Grand Total / Total Akhir / Net Total / Total Bayar) yang benar-benar dibayar.
+   - JANGAN tertukar dengan Subtotal, Diskon, Kembalian (Change), atau Uang Tunai yang diserahkan (Cash Tendered).
+   - Pastikan nominal berupa angka murni tanpa titik pemisah ribuan.
+
+5. RINCIAN ITEM BARANG ('items', 'subtotal', 'tax', 'discount'):
+   - Ekstrak seluruh daftar barang yang dibeli ke array 'items':
+     * name: Nama barang (bersihkan dari nomor barcode/kode internal).
+     * price: Total harga baris item tersebut.
+     * qty: Jumlah barang (angka, default: 1).
+   - Ekstrak subtotal (sebelum pajak/diskon), nominal pajak/PPN/PB1 (tax), dan potongan harga/promo (discount) jika tertera pada struk.
+
+6. METODE PEMBAYARAN & PENCOCOKAN DOMPET ('paymentMethod' & 'walletId'):
+   - Cari metode pembayaran di struk (misal: 'BCA DEBIT', 'QRIS GOPAY', 'MANDIRI', 'SHOPEEPAY', 'DANA', 'OVO', 'TUNAI / CASH', 'CREDIT CARD').
+   - Jika cocok dengan salah satu dompet pengguna (${wallets.map(w => `ID:${w.id} (${w.name})`).join(', ')}), pilih 'walletId' dompet tersebut.
+
+7. KATEGORISASI PENGELUARAN ('category'):
+   - Pilih ID kategori yang paling sesuai dari daftar kategori:
+     * Toko ritel/supermarket/minimarket -> 'belanja_harian/supermarket' atau 'belanja_harian/kebutuhan_pokok'.
+     * Restoran/kafe/makanan -> 'makanan_minuman/restoran' atau 'makanan_minuman/kafe'.
+     * Bensin/SPBU -> 'transportasi/bensin'.
+     * Apotek/obat -> 'kesehatan/obat'.
+     * Elektronik/gadget -> 'elektronik/gadget'.
+     * Pakaian -> 'belanja_pribadi/pakaian'.
+
+8. MODE SCAN (${isPerItem ? 'PER ITEM (PECAH TRANSAKSI PER BARANG)' : 'TOTAL (1 TRANSAKSI RINGKASAN)'}):
+   ${isPerItem
+     ? `[ATURAN MUTLAK MODE PER ITEM]:
+     * DILARANG KERAS menggabungkan seluruh belanjaan menjadi 1 transaksi!
+     * PANGGIL tool 'record_transactions' dengan array 'transactions' yang berisi SATU OBJEK TRANSAKSI UNTUK SETIAP ITEM BARANG yang dibeli pada struk.
+     * Untuk SETIAP item barang:
+       - 'notes': Nama bersih barang yang dibeli (sertakan kuantitas jika > 1, misal: "Ultra Milk 250ml (x2)").
+       - 'amount': Total harga untuk baris barang tersebut (angka murni).
+       - 'category': Pilih ID KATEGORI SPESIFIK yang paling cocok untuk barang tersebut (contoh: susu/kopi/makanan -> 'makanan/kopi' atau 'makanan/jajan', sabun/shampoo/odol -> 'kebutuhan_harian/perlengkapan_mandi', obat/vitamin -> 'kesehatan/obat', pakaian -> 'pakaian/baju', sayur/beras/minyak -> 'kebutuhan_harian/belanja_bulanan'). JANGAN menyamakan semua barang ke 1 kategori generic!
+       - 'merchant': Nama toko/merchant di struk
+       - 'date': Tanggal struk (YYYY-MM-DD)
+       - 'currency': Mata uang yang terdeteksi
+       - 'walletId': ID dompet yang cocok`
+     : `[ATURAN MODE TOTAL]:
+     * Buat 1 objek transaksi utama di array 'transactions' dengan total belanja di 'amount', seluruh rincian barang di 'items', nama toko di 'merchant', subtotal, tax, discount, dan ringkasan di 'notes'.`
+   }`
   }
 
   const currentUserText = (userMessage || (imageData ? 'Lihat dan proses gambar struk ini' : 'Halo FinTrack AI')) + receiptVisionInstruction
@@ -635,19 +785,42 @@ ${buildCategoryContext(locale)}`
       if (fnCall.name === 'record_transactions') {
         const defaultWalletId = wallets[0]?.id || 1
         const extractedMerchant = fnCall.args.merchantName || fnCall.args.transactions?.[0]?.merchant || ''
+        const overallCurrency = fnCall.args.currency
+        
         const txs = fnCall.args.transactions?.map(t => {
           let resolvedWalletId = t.walletId
+          
+          // Smart wallet matching from paymentMethod or merchant if not explicitly valid
           if (!resolvedWalletId || (wallets.length > 0 && !wallets.some(w => String(w.id) === String(resolvedWalletId)))) {
-            resolvedWalletId = defaultWalletId
+            const searchTerms = [t.paymentMethod, t.merchant, extractedMerchant].filter(Boolean).map(s => String(s).toLowerCase())
+            const matchedWallet = wallets.find(w => {
+              const wName = String(w.name || '').toLowerCase()
+              const wType = String(w.institutionType || w.type || '').toLowerCase()
+              return searchTerms.some(term => 
+                term.includes(wName) || 
+                wName.includes(term) || 
+                (term.includes('tunai') && (wType === 'cash' || wName.includes('cash'))) || 
+                (term.includes('cash') && (wType === 'cash' || wName.includes('tunai')))
+              )
+            })
+            resolvedWalletId = matchedWallet ? matchedWallet.id : defaultWalletId
           }
+          
           const resolvedWallet = wallets.find(w => String(w.id) === String(resolvedWalletId))
-          const txCurrency = resolvedWallet?.currency || defaultCurrency
+          const detectedCurrency = t.currency || overallCurrency
+          const txCurrency = detectedCurrency || resolvedWallet?.currency || defaultCurrency
+          
           return {
             ...t,
             category: sanitizeCategoryPath(t.category, t.type),
             currency: txCurrency,
             merchant: t.merchant || extractedMerchant || undefined,
             walletId: resolvedWalletId,
+            items: Array.isArray(t.items) && t.items.length > 0 ? t.items : undefined,
+            subtotal: typeof t.subtotal === 'number' ? t.subtotal : undefined,
+            tax: typeof t.tax === 'number' ? t.tax : undefined,
+            discount: typeof t.discount === 'number' ? t.discount : undefined,
+            paymentMethod: t.paymentMethod || undefined,
           }
         }) || []
         return {
@@ -655,6 +828,7 @@ ${buildCategoryContext(locale)}`
           action: 'create',
           transactions: txs,
           merchant: extractedMerchant,
+          currency: overallCurrency,
           text: fnCall.args.replyMessage || "Berhasil dicatat!",
           chips: fnCall.args.suggestedChips
         }
@@ -974,11 +1148,15 @@ ${categoryContext}
 PETUNJUK EKSTRAKSI:
 1. "merchantName": Nama toko, resto, merchant, atau tempat pembayaran (misal: "Indomaret", "Alfamart", "Starbucks", "SPBU Pertamina", "Apotek Kimia Farma"). Jika tidak terbaca jelas, gunakan "Struk Belanja".
 2. "date": Tanggal transaksi dalam format "YYYY-MM-DD" (contoh: "${format(new Date(), 'yyyy-MM-dd')}"). Jika tanggal di struk tidak jelas atau tidak ditemukan, gunakan "${format(new Date(), 'yyyy-MM-dd')}".
-3. "totalAmount": Total nominal pembayaran akhir (angka positif tanpa titik/koma/simbol). Jangan ambil nominal diskon atau subtotal, tapi TOTAL AKHIR YANG DIBAYAR.
-4. "currency": Mata uang struk (misal: "${defaultCurrency}", "IDR", "USD").
+3. "totalAmount": Total nominal pembayaran akhir yang dibayar (angka positif tanpa titik/koma/simbol). Jangan ambil nominal diskon atau subtotal, tapi TOTAL AKHIR YANG DIBAYAR.
+4. "currency": Mata uang struk. Deteksi dari simbol ('Rp'/'IDR' -> "IDR", '$' -> "USD", 'S$' -> "SGD", 'RM' -> "MYR", '€' -> "EUR", '¥' -> "JPY", '£' -> "GBP"). Jika tidak tertera, gunakan "${defaultCurrency}".
 5. "suggestedCategory": Pilih salah satu ID kategori yang paling cocok dari daftar kategori di atas (format: "parentId/childId", contoh: "makanMinum/kopi", "makanMinum/restoran", "belanja/supermarket", "transportasi/bensin", "kesehatan/obat").
-6. "items": Daftar barang yang dibeli jika ada rincian item, dengan properti: "name" (nama barang), "price" (harga total item), "qty" (jumlah). Jika struk hanya mencantumkan total, buat 1 item dengan nama struk tersebut.
-7. "notes": Ringkasan catatan transaksi (contoh: "Alfamart: Kopi Susu, Roti Tawar").
+6. "items": Daftar barang yang dibeli jika ada rincian item, dengan properti: "name" (nama barang bersih), "price" (harga total item), "qty" (jumlah barang).
+7. "subtotal": Nominal subtotal sebelum pajak/diskon (angka, atau null jika tidak ada).
+8. "tax": Nominal pajak PPN/PB1 (angka, atau null jika tidak ada).
+9. "discount": Nominal potongan harga/diskon (angka, atau null jika tidak ada).
+10. "paymentMethod": Metode pembayaran yang tertera (misal: "BCA", "GoPay", "QRIS", "Tunai", atau null).
+11. "notes": Ringkasan catatan transaksi (contoh: "Alfamart: Kopi Susu, Roti Tawar").
 
 FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 {
@@ -991,6 +1169,10 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
     { "name": "Item 1", "price": 30000, "qty": 1 },
     { "name": "Item 2", "price": 20000, "qty": 1 }
   ],
+  "subtotal": 50000,
+  "tax": 5000,
+  "discount": 5000,
+  "paymentMethod": "BCA QRIS",
   "notes": "Nama Toko: Item 1, Item 2"
 }
 `
@@ -1063,6 +1245,10 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
       currency: parsed.currency || defaultCurrency,
       suggestedCategory: finalCategory,
       items: Array.isArray(parsed.items) ? parsed.items : [],
+      subtotal: typeof parsed.subtotal === 'number' ? parsed.subtotal : undefined,
+      tax: typeof parsed.tax === 'number' ? parsed.tax : undefined,
+      discount: typeof parsed.discount === 'number' ? parsed.discount : undefined,
+      paymentMethod: parsed.paymentMethod || undefined,
       notes: parsed.notes || parsed.merchantName || 'Struk Belanja',
     }
   } catch (err) {

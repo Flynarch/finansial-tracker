@@ -24,6 +24,7 @@ import AiQuickLogModal from '../chat/AiQuickLogModal'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 import useAuthDeepLink from '../../hooks/useAuthDeepLink'
+import { primeThemeTransition } from '../../lib/themeTransition'
 
 function AppShell() {
   useNotificationEngine()
@@ -113,6 +114,7 @@ function AppShell() {
 
   useEffect(() => {
     loadSettings()
+    primeThemeTransition()
   }, [loadSettings])
 
   useEffect(() => {
