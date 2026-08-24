@@ -7,6 +7,7 @@ import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import AnimatedCounter from '../ui/AnimatedCounter'
+import MaskedBalance from '../ui/MaskedBalance'
 
 export default function WalletCarousel({ 
   monthIncome, 
@@ -186,13 +187,13 @@ export default function WalletCarousel({
           </div>
 
           {/* Main amount */}
-          <p className="relative z-10 ft-hero-number mt-2 break-words">
+          <div className="relative z-10 ft-hero-number mt-2 break-words flex items-center min-h-[2.5rem]">
             {hideBalance ? (
-              <span className="tracking-widest font-mono text-2xl sm:text-3xl font-black">••••••</span>
+              <MaskedBalance size="hero" />
             ) : (
               <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
             )}
-          </p>
+          </div>
 
           {/* Income / Expense stat pills */}
           <div className="relative z-10 mt-5 flex gap-2">
@@ -205,9 +206,9 @@ export default function WalletCarousel({
                 <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-green)' }}>
                   {t('dashboard.income', 'Pemasukan')}
                 </p>
-                <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-green)' }}>
-                  {hideBalance ? '••••••' : <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />}
-                </p>
+                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem]" style={{ color: 'var(--earthy-green)' }}>
+                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />}
+                </div>
               </div>
             </div>
             
@@ -220,9 +221,9 @@ export default function WalletCarousel({
                 <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-terra)' }}>
                   {t('dashboard.expense', 'Pengeluaran')}
                 </p>
-                <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-terra)' }}>
-                  {hideBalance ? '••••••' : <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />}
-                </p>
+                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem]" style={{ color: 'var(--earthy-terra)' }}>
+                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />}
+                </div>
               </div>
             </div>
           </div>
@@ -271,13 +272,13 @@ export default function WalletCarousel({
             </div>
 
             {/* Main amount */}
-            <p className="relative z-10 ft-hero-number mt-2 break-all">
+            <div className="relative z-10 ft-hero-number mt-2 break-all flex items-center min-h-[2.5rem]">
               {hideBalance ? (
-                <span className="tracking-widest font-mono text-2xl sm:text-3xl font-black">••••••</span>
+                <MaskedBalance size="hero" />
               ) : (
                 <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
               )}
-            </p>
+            </div>
           </div>
 
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
@@ -326,8 +327,8 @@ export default function WalletCarousel({
                         <Star size={10} className="fill-amber-500 text-amber-500 shrink-0 inline-block self-center" />
                       )}
                     </div>
-                    <span className="ft-wallet-mini-balance">
-                      {hideBalance ? '••••••' : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
+                    <span className="ft-wallet-mini-balance flex items-center">
+                      {hideBalance ? <MaskedBalance size="sm" /> : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
                     </span>
                   </div>
                 </button>

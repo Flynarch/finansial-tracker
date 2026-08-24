@@ -11,6 +11,7 @@ import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
+import MaskedBalance from './MaskedBalance'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
   const num = Number(val ?? 0)
@@ -104,9 +105,9 @@ export function WalletSelectTrigger({
             <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
               {wallet.name}
             </p>
-            <p className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5">
-              Saldo: {hideBalance ? '••••••' : (abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency))}
-            </p>
+            <div className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5 flex items-center gap-1">
+              <span>Saldo:</span> {hideBalance ? <MaskedBalance size="sm" /> : (abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency))}
+            </div>
           </div>
         </div>
       ) : (
@@ -322,9 +323,9 @@ export default function WalletSelectModal({
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] font-bold text-[var(--muted)] tabular-nums mt-0.5">
-                        Saldo: <span className="text-[var(--fg)] font-black">{hideBalance ? '••••••' : formatCurrency(balance, w.currency || defaultCurrency)}</span>
-                      </p>
+                      <div className="text-[11px] font-bold text-[var(--muted)] tabular-nums mt-0.5 flex items-center gap-1">
+                        <span>Saldo:</span> <span className="text-[var(--fg)] font-black inline-flex items-center">{hideBalance ? <MaskedBalance size="sm" /> : formatCurrency(balance, w.currency || defaultCurrency)}</span>
+                      </div>
                     </div>
                   </div>
 
