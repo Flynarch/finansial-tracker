@@ -25,7 +25,6 @@ import {
   Folder,
   Check,
   Plus,
-  LayoutGrid,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -309,7 +308,6 @@ function TodoList() {
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const [activeTab, setActiveTab] = useState('todo')
   const [filter, setFilter] = useState(() => 'all')
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [isEntering, setIsEntering] = useState(false)
   const [sortPref, setSortPref] = useState(() => {
     if (typeof window === 'undefined') return 'latest'
@@ -365,30 +363,17 @@ function TodoList() {
   }, [allSubTasks])
 
   const filteredTodos = useMemo(() => {
-    let list = todos || []
-    if (filter === 'active') list = list.filter((x) => !x?.completed)
-    else if (filter === 'completed') list = list.filter((x) => x?.completed)
-
-    if (selectedCategory !== 'all') {
-      list = list.filter((x) => x?.category === selectedCategory)
-    }
+    const list = todos || []
+    if (filter === 'active') return list.filter((x) => !x?.completed)
+    if (filter === 'completed') return list.filter((x) => x?.completed)
     return list
-  }, [todos, filter, selectedCategory])
+  }, [todos, filter])
 
   const todoCounts = useMemo(() => {
     const list = todos || []
     const all = list.length
     const completed = list.filter((x) => Boolean(x?.completed)).length
     return { all, active: all - completed, completed }
-  }, [todos])
-
-  const categoryCounts = useMemo(() => {
-    const map = { all: (todos || []).length }
-    ;(todos || []).forEach((t) => {
-      const cat = t.category || 'lainnya'
-      map[cat] = (map[cat] || 0) + 1
-    })
-    return map
   }, [todos])
 
   const sortedTodos = useMemo(() => {
@@ -793,44 +778,6 @@ function TodoList() {
               </div>
             </div>
 
-            {/* Category Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 pl-0.5 min-w-0 whitespace-nowrap">
-              <button
-                type="button"
-                className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                  selectedCategory === 'all'
-                    ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs'
-                    : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
-                }`}
-                onClick={() => setSelectedCategory('all')}
-              >
-                <LayoutGrid className="h-3 w-3" />
-                <span>{t('todo.filter.allCategories', 'Semua Kategori')}</span>
-                {categoryCounts.all > 0 && <span className="opacity-60 text-[10px]">({categoryCounts.all})</span>}
-              </button>
-              {TODO_CATEGORIES.map((catKey) => {
-                const meta = TODO_CATEGORY_META[catKey]
-                const IconComponent = meta?.icon || Folder
-                const count = categoryCounts[catKey] || 0
-                if (count === 0 && selectedCategory !== catKey) return null
-                return (
-                  <button
-                    key={catKey}
-                    type="button"
-                    className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                      selectedCategory === catKey
-                        ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs'
-                        : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
-                    }`}
-                    onClick={() => setSelectedCategory(catKey)}
-                  >
-                    <IconComponent className="h-3 w-3" />
-                    <span className="capitalize">{catKey}</span>
-                    {count > 0 && <span className="opacity-60 text-[10px]">({count})</span>}
-                  </button>
-                )
-              })}
-            </div>
 
         {!isDataReady ? (
           <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-sheet-enter'}`}>
