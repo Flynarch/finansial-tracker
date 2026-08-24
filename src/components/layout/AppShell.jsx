@@ -179,9 +179,9 @@ function AppShell() {
     if (typeof document !== 'undefined') {
       document.body.style.overflow = ''
       document.body.style.touchAction = ''
-      document.body.style.overscrollBehavior = ''
+      document.body.style.overscrollBehavior = 'none'
       document.documentElement.style.overflow = ''
-      document.documentElement.style.overscrollBehavior = ''
+      document.documentElement.style.overscrollBehavior = 'none'
     }
     window.scrollTo(0, 0)
   }, [location.pathname])

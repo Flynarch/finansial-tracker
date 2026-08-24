@@ -37,6 +37,7 @@ const useSettingsStore = create((set, get) => ({
   budgetAlertsEnabled: true,
   emailVerified: false,
   emailVerificationDismissed: false,
+  hideBalance: typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false,
   isUnlocked: true,
   isLoaded: false,
   persist: async (updates) => {
@@ -65,7 +66,20 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
+      hideBalance: Boolean(next.hideBalance),
     })
+  },
+  toggleHideBalance: () => {
+    const next = !get().hideBalance
+    set({ hideBalance: next })
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('ft_hide_balance', next ? '1' : '0')
+      }
+    } catch {
+      /* ignore */
+    }
+    get().persist({ hideBalance: next }).catch(() => {})
   },
   setTheme: (theme) => {
     set({ theme })
@@ -255,6 +269,9 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
+      hideBalance: record.hideBalance !== undefined
+        ? Boolean(record.hideBalance)
+        : (typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false),
       isUnlocked: !securityEnabled,
       isLoaded: true,
     })

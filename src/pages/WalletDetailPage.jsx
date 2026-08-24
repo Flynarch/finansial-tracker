@@ -16,6 +16,8 @@ import {
   Archive,
   Download,
   Edit2,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
@@ -23,6 +25,7 @@ import { TransactionItemCard } from '../components/transactions/TransactionItemC
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import useTransactionStore from '../store/useTransactionStore'
 import useWalletStore from '../store/useWalletStore'
+import useSettingsStore from '../store/useSettingsStore'
 import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -41,7 +44,6 @@ import {
 } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
-import useSettingsStore from '../store/useSettingsStore'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../lib/categoryIcon'
 
 export default function WalletDetailPage() {
@@ -49,6 +51,8 @@ export default function WalletDetailPage() {
   const walletId = Number(id)
   const navigate = useNavigate()
   const [pageError, setPageError] = useState('')
+  const hideBalance = useSettingsStore((state) => state.hideBalance)
+  const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
   
   const wallet = useLiveQuery(() => (walletId && !isNaN(walletId) ? db.wallets.get(walletId) : null), [walletId])
   const cachedWallets = useWalletStore((state) => state.wallets)
@@ -511,9 +515,20 @@ export default function WalletDetailPage() {
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 sm:p-4 shadow-md space-y-2">
             {/* Top Row: Label Caption & Direct Adjust Balance Button */}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                Saldo Akun Saat Ini
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
+                  Saldo Akun Saat Ini
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleHideBalance}
+                  className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                  title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+                  aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+                >
+                  {hideBalance ? <EyeOff size={13} strokeWidth={2.3} /> : <Eye size={13} strokeWidth={2.3} />}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -531,7 +546,11 @@ export default function WalletDetailPage() {
             {/* Middle Row: Crisp Bold Balance Display */}
             <div>
               <p className="ft-display text-2xl sm:text-3xl font-black text-[var(--fg)] tabular-nums truncate leading-none">
-                {formatCurrency(currentBalance, wallet.currency || defaultCurrency)}
+                {hideBalance ? (
+                  <span className="tracking-widest font-mono text-2xl sm:text-3xl font-black">••••••</span>
+                ) : (
+                  formatCurrency(currentBalance, wallet.currency || defaultCurrency)
+                )}
               </p>
             </div>
 

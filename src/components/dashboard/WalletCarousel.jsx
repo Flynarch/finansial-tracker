@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
-import { ArrowDownLeft, ArrowUpRight, Plus, Star } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Plus, Star, Eye, EyeOff } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
@@ -18,6 +18,8 @@ export default function WalletCarousel({
   const navigate = useNavigate()
   const { t } = useTranslation()
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
+  const hideBalance = useSettingsStore((state) => state.hideBalance)
+  const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
   const [activeSlide, setActiveSlide] = useState(() => {
     const saved = sessionStorage.getItem('dashboard_carousel_slide')
     return saved ? parseInt(saved, 10) : 0
@@ -146,10 +148,22 @@ export default function WalletCarousel({
         <div className="w-full shrink-0 snap-center ft-hero-card ft-card-sheen">
           {/* Header row */}
           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
                 {t('dashboard.sisaKeuangan', 'Sisa Keuangan')}
               </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleHideBalance()
+                }}
+                className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+                aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+              >
+                {hideBalance ? <EyeOff size={13} strokeWidth={2.3} /> : <Eye size={13} strokeWidth={2.3} />}
+              </button>
               {/* Inline Slide Indicator */}
               <div className="flex items-center gap-1 ml-0.5">
                 <button 
@@ -173,7 +187,11 @@ export default function WalletCarousel({
 
           {/* Main amount */}
           <p className="relative z-10 ft-hero-number mt-2 break-words">
-            <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
+            {hideBalance ? (
+              <span className="tracking-widest font-mono text-2xl sm:text-3xl font-black">••••••</span>
+            ) : (
+              <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
+            )}
           </p>
 
           {/* Income / Expense stat pills */}
@@ -188,7 +206,7 @@ export default function WalletCarousel({
                   {t('dashboard.income', 'Pemasukan')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-green)' }}>
-                  <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />
+                  {hideBalance ? '••••••' : <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />}
                 </p>
               </div>
             </div>
@@ -203,7 +221,7 @@ export default function WalletCarousel({
                   {t('dashboard.expense', 'Pengeluaran')}
                 </p>
                 <p className="mt-0.5 text-[13px] font-black tabular-nums truncate" style={{ color: 'var(--earthy-terra)' }}>
-                  <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />
+                  {hideBalance ? '••••••' : <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />}
                 </p>
               </div>
             </div>
@@ -215,10 +233,22 @@ export default function WalletCarousel({
           <div>
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
                   {t('dashboard.totalBalance', 'Total Saldo')}
                 </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleHideBalance()
+                  }}
+                  className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                  title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+                  aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
+                >
+                  {hideBalance ? <EyeOff size={13} strokeWidth={2.3} /> : <Eye size={13} strokeWidth={2.3} />}
+                </button>
                 {/* Inline Slide Indicator */}
                 <div className="flex items-center gap-1 ml-0.5">
                   <button 
@@ -242,7 +272,11 @@ export default function WalletCarousel({
 
             {/* Main amount */}
             <p className="relative z-10 ft-hero-number mt-2 break-all">
-              <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
+              {hideBalance ? (
+                <span className="tracking-widest font-mono text-2xl sm:text-3xl font-black">••••••</span>
+              ) : (
+                <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
+              )}
             </p>
           </div>
 
@@ -255,7 +289,7 @@ export default function WalletCarousel({
                   key={w.id}
                   onClick={() => navigate(`/wallet/${w.id}`)}
                   className="ft-wallet-mini ft-spring-press"
-                  title={`${w.name} - ${formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
+                  title={`${w.name} - ${hideBalance ? '••••••' : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
                 >
 
                   {/* Logo (prominent) */}
@@ -293,7 +327,7 @@ export default function WalletCarousel({
                       )}
                     </div>
                     <span className="ft-wallet-mini-balance">
-                      {formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
+                      {hideBalance ? '••••••' : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
                     </span>
                   </div>
                 </button>

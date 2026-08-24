@@ -71,9 +71,9 @@ export default function useBottomSheet(configOrState = false) {
     return () => {
       body.style.overflow = prevBodyOverflow && prevBodyOverflow !== 'hidden' ? prevBodyOverflow : ''
       body.style.touchAction = ''
-      body.style.overscrollBehavior = ''
+      body.style.overscrollBehavior = 'none'
       documentElement.style.overflow = prevHtmlOverflow && prevHtmlOverflow !== 'hidden' ? prevHtmlOverflow : ''
-      documentElement.style.overscrollBehavior = ''
+      documentElement.style.overscrollBehavior = 'none'
     }
   }, [isOpen, lockBodyScroll])
 

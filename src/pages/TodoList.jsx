@@ -25,6 +25,7 @@ import {
   Folder,
   Check,
   Plus,
+  LayoutGrid,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -796,14 +797,16 @@ function TodoList() {
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 pl-0.5 min-w-0 whitespace-nowrap">
               <button
                 type="button"
-                className={`flex-shrink-0 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
                   selectedCategory === 'all'
                     ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs'
                     : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
                 }`}
                 onClick={() => setSelectedCategory('all')}
               >
-                Semua ({categoryCounts.all || 0})
+                <LayoutGrid className="h-3 w-3" />
+                <span>{t('todo.filter.allCategories', 'Semua Kategori')}</span>
+                {categoryCounts.all > 0 && <span className="opacity-60 text-[10px]">({categoryCounts.all})</span>}
               </button>
               {TODO_CATEGORIES.map((catKey) => {
                 const meta = TODO_CATEGORY_META[catKey]

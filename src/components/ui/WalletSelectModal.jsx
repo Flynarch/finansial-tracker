@@ -55,6 +55,7 @@ export function WalletSelectTrigger({
   abbreviateBalance = false,
 }) {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const hideBalance = useSettingsStore((state) => state.hideBalance)
 
   return (
     <button
@@ -104,7 +105,7 @@ export function WalletSelectTrigger({
               {wallet.name}
             </p>
             <p className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5">
-              Saldo: {abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency)}
+              Saldo: {hideBalance ? '••••••' : (abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency))}
             </p>
           </div>
         </div>
@@ -139,6 +140,7 @@ export default function WalletSelectModal({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const hideBalance = useSettingsStore((state) => state.hideBalance)
   const [search, setSearch] = useState('')
 
   const dbWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
@@ -321,7 +323,7 @@ export default function WalletSelectModal({
                         )}
                       </div>
                       <p className="text-[11px] font-bold text-[var(--muted)] tabular-nums mt-0.5">
-                        Saldo: <span className="text-[var(--fg)] font-black">{formatCurrency(balance, w.currency || defaultCurrency)}</span>
+                        Saldo: <span className="text-[var(--fg)] font-black">{hideBalance ? '••••••' : formatCurrency(balance, w.currency || defaultCurrency)}</span>
                       </p>
                     </div>
                   </div>

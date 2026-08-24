@@ -453,6 +453,25 @@ export default function SettingsRecurring() {
         )}
       </SettingsSection>
 
+      {/* Category Picker for Add Form */}
+      <CategoryPickerModal
+        isOpen={isCategoryPickerOpen}
+        onClose={() => setIsCategoryPickerOpen(false)}
+        type={recurringForm.type}
+        selectedCategory={recurringForm.category}
+        onSelectCategory={(cat) => setRecurringForm((prev) => ({ ...prev, category: cat }))}
+      />
+
+      {/* Wallet Picker for Add Form */}
+      <WalletSelectModal
+        isOpen={isWalletPickerOpen}
+        onClose={() => setIsWalletPickerOpen(false)}
+        wallets={wallets || []}
+        selectedWalletId={recurringForm.walletId}
+        onSelectWallet={(id) => setRecurringForm((prev) => ({ ...prev, walletId: id }))}
+        allowNone={false}
+      />
+
       <CategoryPickerModal
         isOpen={isEditCategoryPickerOpen}
         onClose={() => setIsEditCategoryPickerOpen(false)}

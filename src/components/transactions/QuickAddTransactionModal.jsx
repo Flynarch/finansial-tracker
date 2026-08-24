@@ -1,7 +1,7 @@
 import { format } from 'date-fns'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Camera, Sparkles, Tag, Split, Plus, Trash2, X } from 'lucide-react'
+import { Camera, Sparkles, Tag, Plus, X } from 'lucide-react'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import Modal from '../ui/Modal'
@@ -1252,14 +1252,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                     </div>
                     <button
                       type="button"
-                      onClick={handleToggleSplit}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isSplitMode ? 'bg-purple-500' : 'bg-[var(--border)]'}`}
+                      onClick={() => setIsSplit((prev) => !prev)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isSplit ? 'bg-purple-500' : 'bg-[var(--border)]'}`}
                     >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSplitMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSplit ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
 
-                  {isSplitMode && (
+                  {isSplit && (
                     <div className="space-y-2 pt-1 border-t border-[var(--border)]/60 animate-dropdown">
                       {splitItems.map((item, idx) => (
                         <div key={item.id} className="p-2 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)] space-y-1.5">

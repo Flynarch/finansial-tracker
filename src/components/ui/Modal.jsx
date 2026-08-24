@@ -30,7 +30,7 @@ function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 sm:p-6 bg-black/60 transition-opacity duration-280 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       // Prevent background scroll without breaking inner scroll containers.
@@ -39,8 +39,8 @@ function Modal({
       onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
     >
       <div
-        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-300 transform-gpu will-change-[transform,opacity] ${
-          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-4 opacity-0'
+        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-280 transform-gpu ${
+          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
         }`}
         style={{
           boxShadow: 'var(--shadow-card)',

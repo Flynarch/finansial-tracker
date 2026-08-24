@@ -25,7 +25,6 @@ import {
   Send,
   AlertCircle,
   Bell,
-  UserX,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -530,7 +529,7 @@ export default function SettingsHome() {
         <SettingsLinkRow
           to="/settings/data"
           label={t('settings.nav.data', 'Data & Cadangan')}
-          subtitle={t('settings.nav.dataSubtitle', 'Ekspor JSON, Reset Data & Hapus Akun')}
+          subtitle={t('settings.nav.dataSubtitle', 'Ekspor & Impor Data, Cadangan Cloud')}
           icon={Database}
         />
       </SettingsSection>
@@ -556,13 +555,6 @@ export default function SettingsHome() {
           icon={LogOut}
           iconColor="text-amber-500 bg-amber-500/10 border-amber-500/20"
           onClick={handleSwitchAccount}
-        />
-        <SettingsLinkRow
-          to="/settings/data"
-          label={t('settings.dangerZoneTitle', 'Reset Finansial & Hapus Akun')}
-          subtitle={t('settings.dangerZoneSub', 'Reset data transaksi atau hapus akun permanen')}
-          icon={UserX}
-          iconColor="text-rose-500 bg-rose-500/10 border-rose-500/20"
         />
       </SettingsSection>
 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Check, Star, ChevronRight } from 'lucide-react'
+import { Search, Plus, Check, ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { walletInstitutions, getWalletLogoUrl } from '../data/walletInstitutions'
@@ -250,7 +250,9 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
                               {inst.name}
                             </span>
                             {inst.isRecommended && (
-                              <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />
+                              <span className="inline-flex items-center rounded-md bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-1.5 py-0.2 text-[8.5px] font-black uppercase tracking-wider text-[var(--accent)] shrink-0">
+                                {t('wallets.recommendedBadge', 'Populer')}
+                              </span>
                             )}
                           </div>
                           <p className="text-[11px] sm:text-xs font-medium text-[var(--muted)] truncate mt-0.5">

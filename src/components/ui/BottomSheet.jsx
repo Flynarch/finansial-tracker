@@ -63,10 +63,10 @@ export default function BottomSheet({
 
   return createPortal(
     <div className="fixed inset-0 z-50 ft-motion-overlay">
-      {/* Dimmed glass backdrop */}
+      {/* Dimmed backdrop */}
       <button
         type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-320 ${
+        className={`ft-motion-overlay absolute inset-0 bg-black/60 transition-opacity duration-280 ${
           sheetVisible ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={closeSheet}
@@ -76,7 +76,7 @@ export default function BottomSheet({
       {/* Sheet Container with iOS / Vaul-style seamless slide-up and gesture drag-to-dismiss */}
       <div className={`absolute inset-x-0 bottom-0 mx-auto w-full sm:px-4 sm:pb-6 ${maxWidth}`}>
         <div
-          className={`${maxHeight} overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu will-change-[transform,opacity] ft-hide-scrollbar ${className}`}
+          className={`${maxHeight} overflow-y-auto overscroll-contain w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
             transform: sheetVisible

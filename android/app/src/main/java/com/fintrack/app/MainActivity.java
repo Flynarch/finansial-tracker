@@ -15,6 +15,14 @@ public class MainActivity extends BridgeActivity {
             if (webView != null) {
                 // Force GPU Hardware layer for 60fps smooth rendering
                 webView.setLayerType(WebView.LAYER_TYPE_HARDWARE, null);
+                
+                // Disable Android overscroll stretch / rubber-band effect completely
+                webView.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
+                
+                // Hide native Android WebView scrollbars
+                webView.setVerticalScrollBarEnabled(false);
+                webView.setHorizontalScrollBarEnabled(false);
+
                 WebSettings settings = webView.getSettings();
                 settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
                 settings.setEnableSmoothTransition(true);
