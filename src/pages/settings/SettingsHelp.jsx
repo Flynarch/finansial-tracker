@@ -362,12 +362,12 @@ export default function SettingsHelp() {
         <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
-            <h4 className="text-xs font-black text-[var(--fg)] truncate">
+            <h4 className="text-xs font-black text-[var(--fg)]">
               {t('help.contactCardTitle', 'Pusat Bantuan & Komunitas')}
             </h4>
           </div>
-          <p className="text-[11px] text-[var(--muted)] font-medium truncate">
-            {t('help.contactCardSubtitle', 'FinTrack v4.5.0 • Native Android & Offline-First')}
+          <p className="text-[11px] text-[var(--muted)] font-medium">
+            {t('help.contactCardSubtitle', 'FinTrack v4.6.4 • Native Android & Offline-First')}
           </p>
         </div>
       </div>

@@ -159,26 +159,30 @@ export default function WalletCarousel({
                   e.stopPropagation()
                   toggleHideBalance()
                 }}
-                className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                className="grid h-7 w-7 min-h-[36px] min-w-[36px] -m-1 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors active:scale-90 cursor-pointer"
                 title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
                 aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
               >
                 {hideBalance ? <EyeOff size={13} strokeWidth={2.3} /> : <Eye size={13} strokeWidth={2.3} />}
               </button>
               {/* Inline Slide Indicator */}
-              <div className="flex items-center gap-1 ml-0.5">
+              <div className="flex items-center gap-1.5 ml-1 py-1">
                 <button 
                   type="button"
                   onClick={() => scrollTo(0)} 
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
-                  aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')} 
-                />
+                  className="p-1.5 -m-1.5 flex items-center justify-center cursor-pointer"
+                  aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')}
+                >
+                  <span className={`h-1.5 rounded-full transition-all duration-300 block ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} />
+                </button>
                 <button 
                   type="button"
                   onClick={() => scrollTo(1)} 
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
-                  aria-label={t('dashboard.totalSaldo', 'Total Saldo')} 
-                />
+                  className="p-1.5 -m-1.5 flex items-center justify-center cursor-pointer"
+                  aria-label={t('dashboard.totalSaldo', 'Total Saldo')}
+                >
+                  <span className={`h-1.5 rounded-full transition-all duration-300 block ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} />
+                </button>
               </div>
             </div>
             <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -203,11 +207,11 @@ export default function WalletCarousel({
                 <ArrowDownLeft size={16} strokeWidth={2.5} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-green)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--status-income)]">
                   {t('dashboard.income', 'Pemasukan')}
                 </p>
-                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem]" style={{ color: 'var(--earthy-green)' }}>
-                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthIncome} currency={defaultCurrency} duration={500} />}
+                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem] text-[var(--status-income)]">
+                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthIncome} currency={defaultCurrency} />}
                 </div>
               </div>
             </div>
@@ -218,11 +222,11 @@ export default function WalletCarousel({
                 <ArrowUpRight size={16} strokeWidth={2.5} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--earthy-terra)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--status-expense)]">
                   {t('dashboard.expense', 'Pengeluaran')}
                 </p>
-                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem]" style={{ color: 'var(--earthy-terra)' }}>
-                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthExpense} currency={defaultCurrency} duration={500} />}
+                <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem] text-[var(--status-expense)]">
+                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthExpense} currency={defaultCurrency} />}
                 </div>
               </div>
             </div>
@@ -244,26 +248,30 @@ export default function WalletCarousel({
                     e.stopPropagation()
                     toggleHideBalance()
                   }}
-                  className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                  className="grid h-7 w-7 min-h-[36px] min-w-[36px] -m-1 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors active:scale-90 cursor-pointer"
                   title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
                   aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
                 >
                   {hideBalance ? <EyeOff size={13} strokeWidth={2.3} /> : <Eye size={13} strokeWidth={2.3} />}
                 </button>
                 {/* Inline Slide Indicator */}
-                <div className="flex items-center gap-1 ml-0.5">
+                <div className="flex items-center gap-1.5 ml-1 py-1">
                   <button 
                     type="button"
                     onClick={() => scrollTo(0)} 
-                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
-                    aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')} 
-                  />
+                    className="p-1.5 -m-1.5 flex items-center justify-center cursor-pointer"
+                    aria-label={t('dashboard.sisaKeuangan', 'Sisa Keuangan')}
+                  >
+                    <span className={`h-1.5 rounded-full transition-all duration-300 block ${activeSlide === 0 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} />
+                  </button>
                   <button 
                     type="button"
                     onClick={() => scrollTo(1)} 
-                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} 
-                    aria-label={t('dashboard.totalSaldo', 'Total Saldo')} 
-                  />
+                    className="p-1.5 -m-1.5 flex items-center justify-center cursor-pointer"
+                    aria-label={t('dashboard.totalSaldo', 'Total Saldo')}
+                  >
+                    <span className={`h-1.5 rounded-full transition-all duration-300 block ${activeSlide === 1 ? 'w-3.5 bg-[var(--fg)]' : 'w-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'}`} />
+                  </button>
                 </div>
               </div>
               <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">

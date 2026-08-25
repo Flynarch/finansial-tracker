@@ -16,10 +16,10 @@ export default function ConfirmDeleteModal({
 }) {
   const { t } = useTranslation()
 
-  const modalTitle = title || t('common.delete') || 'Hapus Data'
-  const displayMessage = description || message || 'Apakah Anda yakin ingin menghapus item ini? Tindakan ini tidak dapat dibatalkan.'
-  const textConfirm = confirmText || t('common.delete') || 'Hapus'
-  const textCancel = cancelText || t('common.cancel') || 'Batal'
+  const modalTitle = title || t('common.delete')
+  const displayMessage = description || message || t('common.deleteConfirmDefault', 'Apakah Anda yakin ingin menghapus item ini? Tindakan ini tidak dapat dibatalkan.')
+  const textConfirm = confirmText || t('common.delete')
+  const textCancel = cancelText || t('common.cancel')
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>

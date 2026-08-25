@@ -19,15 +19,10 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
   return (
     <section className="grid grid-cols-2 gap-3 sm:gap-4">
       {/* Pemasukan Card */}
-      <div className="group relative overflow-hidden rounded-[1.25rem] border border-[color-mix(in_srgb,var(--status-income)_25%,var(--border))] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition hover:border-[var(--status-income)]">
-        <div
-          className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-15 blur-[1.5rem] transition-opacity group-hover:opacity-25"
-          style={{ background: 'var(--status-income)' }}
-          aria-hidden="true"
-        />
+      <div className="group relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--status-income)_25%,var(--border))] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition hover:border-[var(--status-income)]">
         <div className="flex items-center justify-between gap-2">
           <div
-            className="grid h-8 w-8 place-items-center rounded-[0.6rem] border border-[color-mix(in_srgb,var(--status-income)_30%,transparent)] shadow-sm"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--status-income)_30%,transparent)] shadow-sm"
             style={{
               background: 'color-mix(in srgb, var(--status-income) 12%, var(--field-bg))',
               color: 'var(--status-income)',
@@ -53,15 +48,10 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
       </div>
 
       {/* Pengeluaran Card */}
-      <div className="group relative overflow-hidden rounded-[1.25rem] border border-[color-mix(in_srgb,var(--status-expense)_25%,var(--border))] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition hover:border-[var(--status-expense)]">
-        <div
-          className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-15 blur-[1.5rem] transition-opacity group-hover:opacity-25"
-          style={{ background: 'var(--status-expense)' }}
-          aria-hidden="true"
-        />
+      <div className="group relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--status-expense)_25%,var(--border))] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition hover:border-[var(--status-expense)]">
         <div className="flex items-center justify-between gap-2">
           <div
-            className="grid h-8 w-8 place-items-center rounded-[0.6rem] border border-[color-mix(in_srgb,var(--status-expense)_30%,transparent)] shadow-sm"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--status-expense)_30%,transparent)] shadow-sm"
             style={{
               background: 'color-mix(in srgb, var(--status-expense) 12%, var(--field-bg))',
               color: 'var(--status-expense)',

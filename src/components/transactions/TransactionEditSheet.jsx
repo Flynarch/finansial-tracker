@@ -4,6 +4,7 @@ import CustomDatePicker from '../ui/CustomDatePicker'
 import CategoryIcon from '../ui/CategoryIcon'
 import CategoryPickerModal from './CategoryPickerModal'
 import Button from '../ui/Button'
+import { ChevronRight } from 'lucide-react'
 import { resolveTransactionIconKey } from '../../lib/categoryIcon'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
@@ -148,7 +149,7 @@ export default function TransactionEditSheet({
             }}
             className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left transition-all cursor-pointer ${
               categoryError
-                ? 'border border-rose-500/60 bg-rose-500/[0.08] shadow-[0_0_12px_rgba(244,63,94,0.18)] ring-2 ring-rose-500/30'
+                ? 'border border-[var(--danger)] bg-[var(--status-expense-soft)] ring-1 ring-[var(--danger)]'
                 : 'border border-[var(--border)] bg-[var(--field-bg)] hover:border-[var(--border-strong)]'
             }`}
           >
@@ -161,7 +162,7 @@ export default function TransactionEditSheet({
                 className={`truncate text-sm ${
                   !formData.category
                     ? categoryError
-                      ? 'font-bold text-rose-500'
+                      ? 'font-bold text-[var(--danger)]'
                       : 'font-normal italic text-[var(--muted-2)]'
                     : 'font-semibold text-[var(--fg)]'
                 }`}
@@ -173,7 +174,10 @@ export default function TransactionEditSheet({
                     : formatIncomeCategory(formData.category, locale)}
               </span>
             </div>
-            <span className="shrink-0 text-xs font-bold text-[var(--accent)]">{t('tx.change', 'Ubah')} ›</span>
+            <span className="shrink-0 text-xs font-bold text-[var(--accent)] flex items-center gap-0.5">
+              {t('tx.change', 'Ubah')}
+              <ChevronRight size={13} strokeWidth={2.5} />
+            </span>
           </button>
           <CategoryPickerModal
             isOpen={isCatModalOpen}

@@ -1,9 +1,34 @@
 import { formatCurrency, toSafeNumber } from './utils'
 
 /**
+ * Escapes string for safe HTML rendering to prevent XSS.
+ */
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+/**
+ * Escapes CSV values and protects against CSV/Excel formula injection (DDE).
+ */
+export function escapeCsv(str) {
+  if (str === null || str === undefined) return '""'
+  let clean = String(str).replace(/"/g, '""')
+  if (/^[=+\-@\t\r]/.test(clean)) {
+    clean = `'${clean}`
+  }
+  return `"${clean}"`
+}
+
+/**
  * Exports transaction list to an Excel-compatible CSV file.
- * Includes UTF-8 BOM (\uFEFF) and sep=, for seamless opening in Microsoft Excel
- * across Indonesian and Global regional number settings.
+ * Includes UTF-8 BOM (\uFEFF) for seamless opening in Microsoft Excel
+ * and standard RFC 4180 parsers.
  */
 export function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR') {
   if (!transactions || transactions.length === 0) return false
@@ -11,12 +36,6 @@ export function exportTransactionsToCsv(transactions = [], wallets = [], default
   const walletMap = new Map()
   if (Array.isArray(wallets)) {
     wallets.forEach((w) => walletMap.set(String(w.id), w.name))
-  }
-
-  const escapeCsv = (str) => {
-    if (str === null || str === undefined) return '""'
-    const clean = String(str).replace(/"/g, '""')
-    return `"${clean}"`
   }
 
   const headers = [
@@ -52,8 +71,8 @@ export function exportTransactionsToCsv(transactions = [], wallets = [], default
     ].join(',')
   })
 
-  // Prepend UTF-8 BOM (\uFEFF) and Excel separator declaration
-  const csvContent = '\uFEFFsep=,\r\n' + [headers.join(','), ...rows].join('\r\n')
+  // Prepend UTF-8 BOM (\uFEFF)
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
 
@@ -96,6 +115,10 @@ export function generateMonthlyPdfStatement({
       ? Math.max(0, Math.min(100, Math.round((netSavings / totalIncome) * 100)))
       : 0
 
+  const safeTitle = escapeHtml(title)
+  const safePeriod = escapeHtml(periodName || 'FinTrack')
+  const safeProfileName = escapeHtml(profileName || 'Pengguna FinTrack')
+
   const walletMap = new Map()
   if (Array.isArray(wallets)) {
     wallets.forEach((w) => walletMap.set(String(w.id), w.name))
@@ -106,13 +129,13 @@ export function generateMonthlyPdfStatement({
     .map(
       (cat) => `
       <tr>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #1e293b;">${cat.name}</td>
+        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #1e293b;">${escapeHtml(cat.name)}</td>
         <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; width: 140px;">
           <div style="background: #f1f5f9; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
             <div style="background: #6366f1; height: 100%; width: ${Math.min(100, cat.percent || 0)}%; border-radius: 4px;"></div>
           </div>
         </td>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #64748b; font-weight: 700;">${cat.percent}%</td>
+        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #64748b; font-weight: 700;">${toSafeNumber(cat.percent)}%</td>
         <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 800; color: #0f172a;">${formatCurrency(cat.amount, defaultCurrency, locale)}</td>
       </tr>
     `,
@@ -134,17 +157,17 @@ export function generateMonthlyPdfStatement({
       const typeColor = isInc ? '#059669' : isExp ? '#e11d48' : '#2563eb'
       const sign = isInc ? '+' : isExp ? '-' : ''
       const amountColor = isInc ? '#059669' : isExp ? '#e11d48' : '#0f172a'
-      const walletName = walletMap.get(String(tx.walletId)) || 'Dompet Utama'
+      const walletName = escapeHtml(walletMap.get(String(tx.walletId)) || 'Dompet Utama')
 
       return `
         <tr>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #475569; white-space: nowrap;">${tx.date || '-'}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #475569; white-space: nowrap;">${escapeHtml(tx.date || '-')}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">
             <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; background: ${typeBg}; color: ${typeColor};">${typeLabel}</span>
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; font-weight: 600; color: #1e293b;">${tx.category || '-'}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; font-weight: 600; color: #1e293b;">${escapeHtml(tx.category || '-')}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #64748b;">${walletName}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #64748b; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.notes ? `"${tx.notes}"` : '-'}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #64748b; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.notes ? `"${escapeHtml(tx.notes)}"` : '-'}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-size: 12px; font-weight: 800; color: ${amountColor}; white-space: nowrap;">${sign}${formatCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, locale)}</td>
         </tr>
       `
@@ -156,7 +179,7 @@ export function generateMonthlyPdfStatement({
     <html lang="${locale}">
     <head>
       <meta charset="UTF-8" />
-      <title>${title} - ${periodName || 'FinTrack'}</title>
+      <title>${safeTitle} - ${safePeriod}</title>
       <style>
         @page {
           size: A4 portrait;
@@ -282,10 +305,10 @@ export function generateMonthlyPdfStatement({
       <div class="header">
         <div>
           <div class="app-title">FinTrack</div>
-          <div class="app-subtitle">${title} ${profileName ? `• ${profileName}` : ''}</div>
+          <div class="app-subtitle">${safeTitle} ${profileName ? `• ${safeProfileName}` : ''}</div>
         </div>
         <div class="period-badge">
-          <div class="period-name">${periodName || new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { year: 'numeric', month: 'long' })}</div>
+          <div class="period-name">${safePeriod || new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { year: 'numeric', month: 'long' })}</div>
           <div class="print-date">Dihasilkan: ${new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
         </div>
       </div>

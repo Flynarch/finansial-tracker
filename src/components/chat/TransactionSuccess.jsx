@@ -7,8 +7,10 @@ import { format, parseISO } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import useChatStore from '../../store/useChatStore'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function TransactionSuccess({ data, onUndo }) {
+  const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
   const isArray = Array.isArray(data)
@@ -51,8 +53,8 @@ export default function TransactionSuccess({ data, onUndo }) {
           </div>
           <span className="text-xs font-black text-[var(--fg)] tracking-tight">
             {txs.length > 1 
-              ? `${txs.length} ${locale === 'en' ? 'Transactions Saved' : 'Transaksi Dicatat'}`
-              : locale === 'en' ? 'Transaction Saved' : 'Transaksi Dicatat'}
+              ? t('ai.multipleTxLogged', '{{count}} Transaksi Dicatat', { count: txs.length })
+              : t('ai.txLogged', 'Transaksi Dicatat')}
           </span>
         </div>
         <button 
@@ -60,7 +62,7 @@ export default function TransactionSuccess({ data, onUndo }) {
           onClick={handleViewAll} 
           className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer"
         >
-          <span>{locale === 'en' ? 'View' : 'Lihat'}</span>
+          <span>{t('common.view', 'Lihat')}</span>
           <ArrowRight className="h-3 w-3" />
         </button>
       </div>
@@ -93,7 +95,7 @@ export default function TransactionSuccess({ data, onUndo }) {
                           {labels.main || tx.category}
                         </p>
                         {(labels.sub || tx.notes) && (
-                          <p className="truncate text-[10.5px] font-medium text-[var(--muted)] mt-0.5">
+                          <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5 line-clamp-2 break-words">
                             {labels.sub ? labels.sub + (tx.notes ? ` • "${tx.notes}"` : '') : `"${tx.notes}"`}
                           </p>
                         )}
@@ -128,7 +130,7 @@ export default function TransactionSuccess({ data, onUndo }) {
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
           >
             <RotateCcw className="h-3 w-3" />
-            <span>Batalkan</span>
+            <span>{t('common.undo', 'Batalkan')}</span>
           </button>
         )}
 

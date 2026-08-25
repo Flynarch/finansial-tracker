@@ -1,19 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
-import useWalletStore from '../../store/useWalletStore'
+import { createWallet } from '../../services/walletService'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
 import { db } from '../../lib/db'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
-import { formatMoneyInput, parseMoneyInput } from '../../lib/utils'
+import { formatMoneyInput, formatMoneyValueForInput, parseMoneyInput } from '../../lib/utils'
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
   useBackButton(onBack, Boolean(onBack))
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const createWallet = useWalletStore((state) => state.createWallet)
 
   const initialCurrency =
     institution?.defaultCurrency ||
@@ -187,10 +186,9 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 onChange={(e) => {
                   const nextCurr = e.target.value
                   setCurrency(nextCurr)
-                  if (displayBalance) {
-                    const formatted = formatMoneyInput(displayBalance, nextCurr)
+                  if (rawBalance > 0) {
+                    const formatted = formatMoneyValueForInput(rawBalance, nextCurr)
                     setDisplayBalance(formatted)
-                    setRawBalance(parseMoneyInput(formatted, nextCurr))
                   }
                 }}
                 className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl py-3 pl-4 pr-10 text-sm font-bold text-[var(--fg)] appearance-none outline-none focus:border-[var(--fg)] transition cursor-pointer shadow-xs"
@@ -199,6 +197,10 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 <option value="USD">US Dollar (USD)</option>
                 <option value="EUR">Euro (EUR)</option>
                 <option value="SGD">Singapore Dollar (SGD)</option>
+                <option value="MYR">Malaysian Ringgit (MYR)</option>
+                <option value="JPY">Japanese Yen (JPY)</option>
+                <option value="GBP">British Pound (GBP)</option>
+                <option value="AUD">Australian Dollar (AUD)</option>
               </select>
               <ChevronDown size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
             </div>
@@ -211,7 +213,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
             </label>
             <div className="relative flex items-center bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] rounded-2xl p-4 shadow-sm focus-within:border-[var(--fg)] transition">
               <span className="pr-2 text-[var(--fg)] font-black text-2xl sm:text-3xl shrink-0 select-none">
-                {currency === 'IDR' ? 'Rp' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency}
+                {currency === 'IDR' ? 'Rp' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'JPY' ? '¥' : currency === 'SGD' ? 'S$' : currency === 'MYR' ? 'RM' : currency}
               </span>
               <input
                 type="text"

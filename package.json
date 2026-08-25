@@ -1,11 +1,12 @@
 {
   "name": "finansial-tracker",
   "private": true,
-  "version": "4.6.3",
+  "version": "4.6.4",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "test": "vitest run",
     "lint": "eslint .",
     "lint:i18n": "node scripts/check-hardcoded-ui-text.mjs",
     "preview": "vite preview",
@@ -44,8 +45,10 @@
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^17.5.0",
     "tailwindcss": "^4.2.4",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.11"
   }
 }

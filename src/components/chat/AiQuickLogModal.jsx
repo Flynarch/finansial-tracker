@@ -7,7 +7,7 @@ import { db } from '../../lib/db'
 import { parseTransactionFromText } from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
-import useTransactionStore from '../../store/useTransactionStore'
+import { createTransaction as addTransaction } from '../../services/transactionService'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
@@ -283,7 +283,6 @@ export default function AiQuickLogModal() {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const addTransaction = useTransactionStore((s) => s.addTransaction)
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
   const sampleChips = useMemo(
@@ -972,8 +971,8 @@ function isObviousNonTransaction(text) {
           {/* MODE 2: Analyzing Shimmer State */}
           {modalMode === 'analyzing' && (
             <div className="ft-mode-enter py-3 px-1">
-              <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-xl ft-shimmer-scan flex flex-col items-center text-center space-y-4">
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-lg shadow-[var(--accent)]/10">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-sm ft-shimmer-scan flex flex-col items-center text-center space-y-4">
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-sm">
                   <Loader2 className="h-7 w-7 animate-spin" />
                   <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-[var(--accent)] animate-bounce" />
                 </div>

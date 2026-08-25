@@ -14,17 +14,29 @@ export const FALLBACK_EXCHANGE_RATES = Object.freeze({
 const _fmtCache = new Map()
 
 export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
+  const cleanCurrency = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'IDR'
+  const cleanLocale = typeof locale === 'string' && locale.trim() ? locale.trim() : 'id-ID'
   const numeric = Number(amount || 0)
-  const key = `${locale}:${currency}`
+  const key = `${cleanLocale}:${cleanCurrency}`
   let fmt = _fmtCache.get(key)
   if (!fmt) {
-    const isIdr = currency === 'IDR'
-    fmt = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: isIdr ? 0 : 0,
-      maximumFractionDigits: isIdr ? 0 : 2,
-    })
+    const zeroDecimalCurrencies = ['IDR', 'JPY', 'KRW', 'VND']
+    const isZeroDecimal = zeroDecimalCurrencies.includes(cleanCurrency)
+    try {
+      fmt = new Intl.NumberFormat(cleanLocale, {
+        style: 'currency',
+        currency: cleanCurrency,
+        minimumFractionDigits: isZeroDecimal ? 0 : 2,
+        maximumFractionDigits: isZeroDecimal ? 0 : 2,
+      })
+    } catch {
+      fmt = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })
+    }
     _fmtCache.set(key, fmt)
   }
   return fmt.format(Number.isFinite(numeric) ? numeric : 0)
@@ -174,7 +186,9 @@ export const LOAN_CATEGORIES = Object.freeze([
 export function isExcludeAnalyticsTx(tx) {
   if (!tx) return false
   if (tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
+  if (Array.isArray(tx.tags) && (tx.tags.includes('exclude_analytics') || tx.tags.includes('excludeFromAnalytics'))) return true
   if (tx.type === 'balance_adjustment') return true
+  if (tx.loanId != null || tx.splitBillId != null) return true
   if (LOAN_CATEGORIES.includes(tx.category)) return true
   return false
 }

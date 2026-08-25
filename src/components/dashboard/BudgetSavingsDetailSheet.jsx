@@ -39,7 +39,7 @@ const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
           : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
       }`}
     >
-      <span className="min-w-0 flex-1 truncate whitespace-nowrap">{child?.names?.[lang] || child?.id || ''}</span>
+      <span className="min-w-0 flex-1 truncate">{child?.names?.[lang] || child?.id || ''}</span>
       {active ? <span className="text-[var(--accent)] font-bold">✓</span> : null}
     </button>
   )

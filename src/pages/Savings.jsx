@@ -103,18 +103,18 @@ function Savings() {
       if (g.deadline && !isArch) {
         const daysLeft = differenceInDays(new Date(g.deadline), new Date())
         if (daysLeft < 0) {
-          deadlineText = 'Lewat Tenggat'
+          deadlineText = t('savings.overdue', 'Lewat Tenggat')
           isOverdue = true
         } else if (daysLeft === 0) {
-          deadlineText = 'Hari Ini'
+          deadlineText = t('common.today', 'Hari Ini')
         } else {
-          deadlineText = `${daysLeft} Hari Lagi`
+          deadlineText = t('savings.daysLeft', { count: daysLeft }, `${daysLeft} Hari Lagi`)
         }
       }
 
       return { ...g, target, current, pct, remaining, deadlineText, isOverdue, isArchived: isArch }
     })
-  }, [goals])
+  }, [goals, t])
 
   const activeGoals = useMemo(
     () => processedGoals.filter((g) => !g.isArchived).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
@@ -199,10 +199,10 @@ function Savings() {
             </button>
             <div className="min-w-0">
               <h2 className="text-xl font-black tracking-tight text-[var(--fg)]">
-                {showArchive ? 'Arsip Tabungan' : t('savings.title')}
+                {showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title')}
               </h2>
-              <p className="text-xs font-bold text-[var(--muted)] truncate">
-                {showArchive ? 'Daftar target tabungan yang telah tuntas & dicairkan' : t('savings.subtitle')}
+              <p className="text-xs font-bold text-[var(--muted)]">
+                {showArchive ? t('savings.archiveSubtitle', 'Daftar target tabungan yang telah tuntas & dicairkan') : t('savings.subtitle')}
               </p>
             </div>
           </div>
@@ -214,7 +214,7 @@ function Savings() {
                   type="button"
                   onClick={() => setSearchParams({ view: 'archive' })}
                   className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-                  title={'Buka Arsip Tabungan'}
+                  title={t('savings.openArchive', 'Buka Arsip Tabungan')}
                 >
                   <Archive className="h-4.5 w-4.5" />
                   {archivedGoals.length > 0 && (
@@ -230,7 +230,7 @@ function Savings() {
                   className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Target Baru
+                  {t('savings.newGoal', 'Target Baru')}
                 </button>
               </>
             )}
@@ -241,7 +241,7 @@ function Savings() {
                 onClick={() => setSearchParams({})}
                 className="px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
               >
-                Kembali ke Aktif
+                {t('savings.backToActive', 'Kembali ke Aktif')}
               </button>
             )}
           </div>
@@ -284,16 +284,18 @@ function Savings() {
         <div className="space-y-3 pt-1">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
-              {showArchive ? `Arsip Selesai (${archivedGoals.length})` : `Target Tabungan Aktif (${activeGoals.length})`}
+              {showArchive
+                ? t('savings.archivedListTitle', { count: archivedGoals.length }, `Arsip Selesai (${archivedGoals.length})`)
+                : t('savings.activeListTitle', { count: activeGoals.length }, `Target Tabungan Aktif (${activeGoals.length})`)}
             </h3>
           </div>
 
           {displayedRows.length === 0 ? (
             <EmptyState
-              title={showArchive ? 'Belum Ada Tabungan di Arsip' : t('savings.emptyTitle')}
+              title={showArchive ? t('savings.archiveEmptyTitle', 'Belum Ada Tabungan di Arsip') : t('savings.emptyTitle')}
               description={
                 showArchive
-                  ? 'Target tabungan yang telah 100% dan dicairkan ke dompet akan disimpan dengan aman di sini.'
+                  ? t('savings.archiveEmptyDesc', 'Target tabungan yang telah 100% dan dicairkan ke dompet akan disimpan dengan aman di sini.')
                   : t('savings.emptyDesc')
               }
               action={
@@ -487,8 +489,8 @@ function Savings() {
             setDeletingGoal(null)
           }
         }}
-        title={t('savings.delete') || 'Hapus Tabungan'}
-        message={t('savings.deleteConfirm') || 'Apakah Anda yakin ingin menghapus tujuan tabungan ini?'}
+        title={t('savings.delete')}
+        message={t('savings.deleteConfirm')}
       />
     </div>
   )

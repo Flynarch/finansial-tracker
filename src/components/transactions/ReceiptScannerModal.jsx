@@ -212,7 +212,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
                   <p className="leading-relaxed opacity-90">{errorMsg}</p>
                   {!geminiApiKey && (
                     <p className="text-[11px] text-[var(--muted)] mt-1">
-                      Tip: Anda dapat menambahkan API Key Google Gemini pribadi di Pengaturan untuk stabilitas optimal.
+                      {t('transactions.ocr.apiKeyTip', 'Tip: Anda dapat menambahkan API Key Google Gemini pribadi di Pengaturan untuk stabilitas optimal.')}
                     </p>
                   )}
                 </div>
@@ -235,7 +235,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5">
                     <span className="block text-[10px] font-bold uppercase text-[var(--muted)]">
-                      Total Nominal
+                      {t('addTx.amount', 'Total Nominal')}
                     </span>
                     <span className="block text-base font-black text-[var(--fg)] mt-0.5">
                       {formatCurrency(scanResult.totalAmount, scanResult.currency, locale)}
@@ -244,7 +244,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
 
                   <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5">
                     <span className="block text-[10px] font-bold uppercase text-[var(--muted)]">
-                      Tanggal
+                      {t('addTx.date', 'Tanggal')}
                     </span>
                     <span className="block text-xs font-black text-[var(--fg)] mt-1">
                       {scanResult.date}
@@ -256,7 +256,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
                   <div className="space-y-1.5 pt-1">
                     <span className="text-[11px] font-bold text-[var(--muted)] flex items-center gap-1.5">
                       <ShoppingBag className="h-3.5 w-3.5" />
-                      Rincian Barang ({scanResult.items.length} item)
+                      {t('transactions.ocr.itemsList', 'Rincian Barang ({{count}} item)', { count: scanResult.items.length })}
                     </span>
                     <div className="max-h-24 overflow-y-auto space-y-1 rounded-xl bg-[var(--field-bg)] p-2 border border-[var(--border)]">
                       {scanResult.items.map((item, idx) => (

@@ -19,6 +19,7 @@ import {
 import { id as idLocale, enUS } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function CustomDatePickerModal({
   isOpen,
@@ -26,8 +27,11 @@ export default function CustomDatePickerModal({
   startDate,
   endDate,
   onSelectRange,
-  locale = 'id',
+  locale: propLocale,
 }) {
+  const { t, locale: currentLocale } = useTranslation()
+  const activeLocale = propLocale || currentLocale || 'id'
+
   const [currentMonth, setCurrentMonth] = useState(() => {
     if (startDate && isValid(parseISO(startDate))) return parseISO(startDate)
     return new Date()
@@ -37,7 +41,7 @@ export default function CustomDatePickerModal({
   const [tempStart, setTempStart] = useState(startDate || '')
   const [tempEnd, setTempEnd] = useState(endDate || '')
 
-  const dateLocale = locale === 'en' ? enUS : idLocale
+  const dateLocale = activeLocale === 'en' ? enUS : idLocale
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(monthStart)
@@ -102,22 +106,26 @@ export default function CustomDatePickerModal({
 
   if (!isOpen) return null
 
+  const dayHeaders = activeLocale === 'en'
+    ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    : ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+
   return (
-    <Modal isOpen={isOpen} title={locale === 'en' ? 'Select Date Range' : 'Pilih Rentang Tanggal'} onClose={onClose}>
+    <Modal isOpen={isOpen} title={t('calendar.selectRange', activeLocale === 'en' ? 'Select Date Range' : 'Pilih Rentang Tanggal')} onClose={onClose}>
       <div className="space-y-4 py-1">
         {/* Quick Presets */}
         <div className="flex flex-wrap gap-1.5 pb-1">
           {[
-            { id: 'today', label: 'Hari Ini' },
-            { id: '7days', label: '7 Hari Terakhir' },
-            { id: 'month', label: 'Bulan Ini' },
-            { id: 'year', label: 'Tahun Ini' },
+            { id: 'today', label: t('tx.filter.today', 'Hari Ini') },
+            { id: '7days', label: activeLocale === 'en' ? 'Last 7 Days' : '7 Hari Terakhir' },
+            { id: 'month', label: t('tx.filter.thisMonth', 'Bulan Ini') },
+            { id: 'year', label: activeLocale === 'en' ? 'This Year' : 'Tahun Ini' },
           ].map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset.id)}
-              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95"
+              className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
             >
               {preset.label}
             </button>
@@ -129,34 +137,34 @@ export default function CustomDatePickerModal({
           <button
             type="button"
             onClick={() => setSelectingTarget('start')}
-            className={`rounded-xl p-2 text-left transition ${
+            className={`rounded-xl p-2 text-left transition cursor-pointer ${
               selectingTarget === 'start'
                 ? 'border border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] ring-1 ring-[var(--accent)]'
                 : 'hover:bg-[var(--panel)]'
             }`}
           >
             <span className="block text-[10px] font-extrabold uppercase text-[var(--muted)]">
-              Dari Tanggal
+              {activeLocale === 'en' ? 'Start Date' : 'Dari Tanggal'}
             </span>
-            <span className="mt-0.5 block text-xs font-black text-[var(--fg)] truncate">
-              {tempStart ? format(parseISO(tempStart), 'dd MMM yyyy', { locale: dateLocale }) : 'Pilih...'}
+            <span className="mt-0.5 block text-xs font-black text-[var(--fg)] leading-snug">
+              {tempStart ? format(parseISO(tempStart), 'dd MMM yyyy', { locale: dateLocale }) : (activeLocale === 'en' ? 'Select...' : 'Pilih...')}
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setSelectingTarget('end')}
-            className={`rounded-xl p-2 text-left transition ${
+            className={`rounded-xl p-2 text-left transition cursor-pointer ${
               selectingTarget === 'end'
                 ? 'border border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] ring-1 ring-[var(--accent)]'
                 : 'hover:bg-[var(--panel)]'
             }`}
           >
             <span className="block text-[10px] font-extrabold uppercase text-[var(--muted)]">
-              Sampai Tanggal
+              {activeLocale === 'en' ? 'End Date' : 'Sampai Tanggal'}
             </span>
-            <span className="mt-0.5 block text-xs font-black text-[var(--fg)] truncate">
-              {tempEnd ? format(parseISO(tempEnd), 'dd MMM yyyy', { locale: dateLocale }) : 'Pilih...'}
+            <span className="mt-0.5 block text-xs font-black text-[var(--fg)] leading-snug">
+              {tempEnd ? format(parseISO(tempEnd), 'dd MMM yyyy', { locale: dateLocale }) : (activeLocale === 'en' ? 'Select...' : 'Pilih...')}
             </span>
           </button>
         </div>
@@ -166,19 +174,19 @@ export default function CustomDatePickerModal({
           <button
             type="button"
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95"
-            aria-label={locale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
+            className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
+            aria-label={activeLocale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-xs font-black text-[var(--fg)]">
+          <span className="text-xs font-black text-[var(--fg)] capitalize">
             {format(currentMonth, 'MMMM yyyy', { locale: dateLocale })}
           </span>
           <button
             type="button"
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95"
-            aria-label={locale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
+            className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
+            aria-label={activeLocale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -188,7 +196,7 @@ export default function CustomDatePickerModal({
         <div className="space-y-1">
           {/* Day Headers */}
           <div className="grid grid-cols-7 text-center">
-            {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((d) => (
+            {dayHeaders.map((d) => (
               <span key={d} className="py-1 text-[10px] font-black uppercase text-[var(--muted)]">
                 {d}
               </span>
@@ -208,7 +216,7 @@ export default function CustomDatePickerModal({
                 isAfter(day, parsedStart) &&
                 isBefore(day, parsedEnd)
 
-              let dayClasses = 'h-9 w-full rounded-xl text-xs font-bold transition flex items-center justify-center '
+              let dayClasses = 'h-9 w-full rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer '
 
               if (!isCurrentMonth) {
                 dayClasses += 'text-[var(--muted)]/40 opacity-40 '
@@ -243,16 +251,16 @@ export default function CustomDatePickerModal({
           <button
             type="button"
             onClick={handleReset}
-            className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95"
+            className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
           >
-            Reset
+            {t('common.reset', 'Reset')}
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="ft-btn-primary flex-1 py-2 text-xs font-bold"
+            className="ft-btn-primary flex-1 py-2 text-xs font-bold cursor-pointer"
           >
-            Simpan Tanggal
+            {t('calendar.saveDate', activeLocale === 'en' ? 'Save Date' : 'Simpan Tanggal')}
           </button>
         </div>
       </div>

@@ -3,7 +3,6 @@ import CategoryIcon from '../ui/CategoryIcon'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
-import useWalletStore from '../../store/useWalletStore'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -45,7 +44,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     }
   }
 
-  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : useWalletStore.getState().wallets
+  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : []
 
   const getWalletName = (id) => {
     if (!id) return 'Wallet'
@@ -61,7 +60,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
   if (transaction.type === 'balance_adjustment') {
     iconKey = 'adjustment'
-    colorClass = 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/25'
+    colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
     labels = {
       main: locale === 'en' ? 'Balance Adjustment' : 'Penyesuaian Saldo',
       sub: locale === 'en' ? 'System' : 'Sistem',
@@ -91,15 +90,15 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       amountColorClass = 'ft-expense-text'
     } else {
       // Global view
-      colorClass = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
+      colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
       const fromName = getWalletName(transaction.walletId)
       const toName = getWalletName(transaction.targetWalletId)
       labels = {
         main: locale === 'en' ? 'Transfer' : 'Transfer',
-        sub: `${fromName} ➔ ${toName}`,
+        sub: `${fromName} -> ${toName}`,
       }
       amountPrefix = ''
-      amountColorClass = 'text-blue-600 dark:text-blue-400'
+      amountColorClass = 'text-[var(--accent)]'
     }
   }
 
@@ -202,13 +201,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                 </span>
               ) : null}
               {String(transaction.notes || '').includes('(Auto:') ? (
-                <span className="inline-flex items-center gap-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.2 text-[8.5px] font-extrabold text-sky-500 shrink-0" title={t('tx.autoRecurringTooltip', 'Otomatis dari jadwal berulang')}>
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)] shrink-0" title={t('tx.autoRecurringTooltip', 'Otomatis dari jadwal berulang')}>
                   <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                   <span>Auto</span>
                 </span>
               ) : null}
               {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
-                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.2 text-[8.5px] font-black tracking-wider text-[var(--bg)] shrink-0">
+                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white shrink-0">
                   BARU
                 </span>
               ) : null}
@@ -219,24 +218,21 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               {isTransfer ? (
                 <>
                   <span className="text-[var(--fg)]/90 font-bold">{sub}</span>
-                  {createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                  {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
+                  {createdTime ? <> • {createdTime}</> : null}
                 </>
               ) : (
                 <>
-                  {displayWalletName ? <span className="text-[var(--fg)]/80 font-bold">{displayWalletName}</span> : null}
-                  {displayWalletName && (sub || createdTime) ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                  {sub ? <span>{sub}</span> : null}
-                  {sub && createdTime ? <span className="mx-1 opacity-40 text-[9px]">•</span> : null}
-                  {createdTime ? <span className="tabular-nums opacity-75">{createdTime}</span> : null}
+                  <span className="text-[var(--fg)]/90 font-bold">{displayWalletName}</span>
+                  {sub ? <> • {sub}</> : null}
+                  {createdTime ? <> • {createdTime}</> : null}
                 </>
               )}
             </p>
 
             {/* Line 3: Notes (Dedicated Line with line-clamp-2) */}
             {noteStr ? (
-              <p className="mt-0.5 text-[11px] font-normal italic text-[var(--muted-2)] line-clamp-2 leading-snug break-words">
-                "{noteStr}"
+              <p className="mt-0.5 text-[11px] italic leading-tight text-[var(--muted)] line-clamp-2 break-words">
+                &ldquo;{noteStr}&rdquo;
               </p>
             ) : null}
 
@@ -246,7 +242,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                 {transaction.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-semibold text-[var(--muted)]"
+                    className="inline-flex items-center rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--muted)]"
                   >
                     #{tag}
                   </span>
@@ -261,7 +257,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           <p
             className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
           >
-            {isContextWalletMatch ? '' : amountPrefix}
+            {amountPrefix}
             {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
           </p>
           {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (
@@ -300,6 +296,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     prevProps.locale === nextProps.locale &&
     prevProps.defaultCurrency === nextProps.defaultCurrency &&
     prevProps.rates === nextProps.rates &&
-    prevProps.contextWalletId === nextProps.contextWalletId
+    prevProps.contextWalletId === nextProps.contextWalletId &&
+    prevProps.wallets === nextProps.wallets
   )
 })

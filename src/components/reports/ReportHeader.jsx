@@ -67,14 +67,7 @@ export default function ReportHeader({
   }
 
   return (
-    <section className="relative overflow-hidden rounded-[1.5rem] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'radial-gradient(ellipse 120% 120% at 10% -20%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 60%)',
-        }}
-        aria-hidden="true"
-      />
+    <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
       <div className="relative p-4 sm:p-5">
         {/* Top Row: Title + Action Buttons */}
         <div className="flex items-start justify-between gap-3">

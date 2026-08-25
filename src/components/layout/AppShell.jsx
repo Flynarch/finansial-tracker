@@ -249,8 +249,8 @@ function AppShell() {
             location.pathname.startsWith('/wallet/') || location.pathname === '/add-account'
               ? 'px-0 pt-0 pb-8'
               : isDetailPage
-              ? 'px-4 pt-4 pb-8'
-              : 'px-4 pt-4 pb-[calc(10.5rem+env(safe-area-inset-bottom))]'
+              ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-8'
+              : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(6.5rem+env(safe-area-inset-bottom))]'
           }`}
         >
           <div key={location.pathname} className="ft-page-transition">

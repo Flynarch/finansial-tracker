@@ -21,17 +21,17 @@ import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategor
 import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
-import useTransactionStore from '../../store/useTransactionStore'
+import { deleteTransaction, updateTransaction } from '../../services/transactionService'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 
 function generateReceiptRef() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let hash = ''
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 8; i++) {
     hash += chars.charAt(Math.floor(Math.random() * chars.length))
   }
-  return `FT-${format(new Date(), 'yyMMdd')}-${hash}`
+  return `REC-${hash.slice(0, 4)}-${hash.slice(4)}`
 }
 
 export default function AiDigitalReceipt({
@@ -46,8 +46,6 @@ export default function AiDigitalReceipt({
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const deleteTransaction = useTransactionStore((s) => s.deleteTransaction)
-  const updateTransaction = useTransactionStore((s) => s.updateTransaction)
   const closeQuickLog = useChatStore((s) => s.closeQuickLog)
 
   const [isUndone, setIsUndone] = useState(false)
@@ -84,7 +82,7 @@ export default function AiDigitalReceipt({
           glow: 'from-emerald-500/15 via-emerald-500/4 to-transparent',
           line: 'from-transparent via-emerald-500/50 to-transparent',
           badge: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
-          title: 'Pemasukan Tercatat',
+          title: t('ai.incomeLogged', 'Pemasukan Tercatat'),
           tag: 'text-emerald-500',
         }
       }
@@ -93,7 +91,7 @@ export default function AiDigitalReceipt({
           glow: 'from-sky-500/15 via-sky-500/4 to-transparent',
           line: 'from-transparent via-sky-500/50 to-transparent',
           badge: 'bg-sky-500/15 border-sky-500/25 text-sky-500',
-          title: 'Transfer Berhasil',
+          title: t('ai.transferLogged', 'Transfer Berhasil'),
           tag: 'text-sky-500',
         }
       }
@@ -101,7 +99,7 @@ export default function AiDigitalReceipt({
         glow: 'from-rose-500/12 via-rose-500/3 to-transparent',
         line: 'from-transparent via-rose-500/40 to-transparent',
         badge: 'bg-rose-500/15 border-rose-500/25 text-rose-500',
-        title: 'Pengeluaran Tercatat',
+        title: t('ai.expenseLogged', 'Pengeluaran Tercatat'),
         tag: 'text-rose-500',
       }
     }
@@ -114,7 +112,7 @@ export default function AiDigitalReceipt({
         glow: 'from-emerald-500/15 via-emerald-500/4 to-transparent',
         line: 'from-transparent via-emerald-500/50 to-transparent',
         badge: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
-        title: `${txList.length} Pemasukan Tercatat`,
+        title: t('ai.multipleIncomeLogged', '{{count}} Pemasukan Tercatat', { count: txList.length }),
         tag: 'text-emerald-500',
       }
     }
@@ -123,7 +121,7 @@ export default function AiDigitalReceipt({
         glow: 'from-rose-500/12 via-rose-500/3 to-transparent',
         line: 'from-transparent via-rose-500/40 to-transparent',
         badge: 'bg-rose-500/15 border-rose-500/25 text-rose-500',
-        title: `${txList.length} Pengeluaran Tercatat`,
+        title: t('ai.multipleExpenseLogged', '{{count}} Pengeluaran Tercatat', { count: txList.length }),
         tag: 'text-rose-500',
       }
     }
@@ -132,10 +130,10 @@ export default function AiDigitalReceipt({
       glow: 'from-[var(--accent)]/15 via-[var(--accent)]/4 to-transparent',
       line: 'from-transparent via-[var(--accent)]/50 to-transparent',
       badge: 'bg-[var(--accent)]/15 border-[var(--accent)]/25 text-[var(--accent)]',
-      title: `${txList.length} Transaksi Tercatat`,
+      title: t('ai.multipleTxLogged', '{{count}} Transaksi Tercatat', { count: txList.length }),
       tag: 'text-[var(--accent)]',
     }
-  }, [isSingle, singleTx.type, txList])
+  }, [isSingle, singleTx.type, txList, t])
 
   const totalExpense = txList
     .filter((t) => t.type === 'expense')
@@ -229,9 +227,9 @@ export default function AiDigitalReceipt({
           <RotateCcw className="h-7 w-7" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-base font-black text-[var(--fg)]">Transaksi Dibatalkan</h3>
+          <h3 className="text-base font-black text-[var(--fg)]">{t('ai.txUndone', 'Transaksi Dibatalkan')}</h3>
           <p className="text-xs text-[var(--muted)] max-w-xs mx-auto">
-            {txList.length > 1 ? `${txList.length} transaksi telah dihapus` : 'Transaksi telah dihapus'} dari riwayat keuangan Anda.
+            {txList.length > 1 ? t('ai.multipleTxUndoneDesc', '{{count}} transaksi telah dihapus dari riwayat keuangan Anda.', { count: txList.length }) : t('ai.txUndoneDesc', 'Transaksi telah dihapus dari riwayat keuangan Anda.')}
           </p>
         </div>
         <button
@@ -240,7 +238,7 @@ export default function AiDigitalReceipt({
           className="ft-btn-primary py-2.5 px-5 text-xs font-black flex items-center gap-1.5 cursor-pointer active:scale-95 transition mt-2"
         >
           <Plus className="h-4 w-4" />
-          <span>Catat Transaksi Lain</span>
+          <span>{t('ai.logAnother', 'Catat Transaksi Lain')}</span>
         </button>
       </div>
     )
@@ -281,7 +279,7 @@ export default function AiDigitalReceipt({
         {/* Prompt Citation if available */}
         {rawPrompt ? (
           <div className="px-3 py-1 bg-[var(--field-bg)]/20 border-b border-[var(--border)]/30 text-[10px] text-[var(--muted)] italic truncate">
-            "{rawPrompt}"
+            &ldquo;{rawPrompt}&rdquo;
           </div>
         ) : null}
 
@@ -312,7 +310,7 @@ export default function AiDigitalReceipt({
                     </span>
                     <div className="flex items-center gap-1 text-[10px] text-[var(--muted)] mt-0.5 truncate">
                       <span className={`font-bold ${isIncome ? 'text-emerald-500' : isTransfer ? 'text-sky-500' : 'text-rose-500'}`}>
-                        {isIncome ? 'Pemasukan' : isTransfer ? 'Transfer' : 'Pengeluaran'}
+                        {isIncome ? t('tx.income', 'Pemasukan') : isTransfer ? t('tx.transfer', 'Transfer') : t('tx.expense', 'Pengeluaran')}
                       </span>
                       {labels.sub ? <span>• {labels.sub}</span> : null}
                     </div>
@@ -334,14 +332,14 @@ export default function AiDigitalReceipt({
                 {/* Account / Wallet */}
                 <div className="min-w-0">
                   <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
-                    {isTransfer ? 'Sumber Saldo' : 'Dompet / Akun'}
+                    {isTransfer ? t('tx.transferSource', 'Sumber Saldo') : t('tx.walletOrAccount', 'Dompet / Akun')}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                     {walletLogo ? (
                       <img src={walletLogo} alt="" className="h-3.5 w-3.5 rounded-full object-cover shrink-0" />
                     ) : null}
                     <span className="font-bold text-[var(--fg)] truncate">
-                      {walletObj?.name || 'Dompet Utama'}
+                      {walletObj?.name || t('wallets.primaryBadge', 'Dompet Utama')}
                     </span>
                   </div>
                 </div>
@@ -350,7 +348,7 @@ export default function AiDigitalReceipt({
                 {isTransfer && targetWalletObj ? (
                   <div className="min-w-0">
                     <span className="text-[9.5px] font-bold text-sky-500 block uppercase tracking-wider">
-                      Dompet Tujuan
+                      {t('tx.targetWallet', 'Dompet Tujuan')}
                     </span>
                     <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                       {targetWalletLogo ? (
@@ -364,7 +362,7 @@ export default function AiDigitalReceipt({
                 ) : (
                   <div className="min-w-0">
                     <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
-                      Valuta & Metode
+                      {t('tx.currencyAndMethod', 'Valuta & Metode')}
                     </span>
                     <div className="flex items-center gap-1 mt-0.5 font-bold text-[var(--fg)] truncate">
                       <span className="px-1.5 py-0.2 rounded bg-[var(--panel)] border border-[var(--border)] text-[9.5px]">
@@ -383,10 +381,10 @@ export default function AiDigitalReceipt({
                 {tx.notes ? (
                   <div className="col-span-2 pt-1 mt-0.5 border-t border-[var(--border)]/30 min-w-0">
                     <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
-                      Catatan
+                      {t('addTx.notes', 'Catatan')}
                     </span>
-                    <p className="text-[11px] text-[var(--fg)] italic truncate mt-0.5">
-                      "{tx.notes}"
+                    <p className="text-[11px] text-[var(--fg)] italic line-clamp-2 break-words mt-0.5">
+                      &ldquo;{tx.notes}&rdquo;
                     </p>
                   </div>
                 ) : null}
@@ -398,7 +396,7 @@ export default function AiDigitalReceipt({
                   <div className="flex items-center justify-between text-[11px] font-bold text-[var(--muted)] px-0.5">
                     <span className="flex items-center gap-1">
                       <Receipt className="h-3 w-3 text-[var(--accent)]" />
-                      <span>Rincian Item ({tx.items.length})</span>
+                      <span>{t('transactions.ocr.itemsList', 'Rincian Item ({{count}})', { count: tx.items.length })}</span>
                     </span>
                   </div>
                   <div className="space-y-1 bg-[var(--field-bg)]/50 rounded-xl p-2 border border-[var(--border)]/40 text-[11px]">
@@ -423,19 +421,19 @@ export default function AiDigitalReceipt({
                       <div className="pt-1.5 mt-1 border-t border-[var(--border)]/40 space-y-0.5 text-[10px]">
                         {tx.subtotal ? (
                           <div className="flex justify-between text-[var(--muted)] font-medium">
-                            <span>Subtotal</span>
+                            <span>{t('tx.subtotal', 'Subtotal')}</span>
                             <span className="tabular-nums">{formatCurrency(Number(tx.subtotal), tx.currency || defaultCurrency)}</span>
                           </div>
                         ) : null}
                         {tx.tax ? (
                           <div className="flex justify-between text-amber-500 font-medium">
-                            <span>Pajak (PPN/PB1)</span>
+                            <span>{t('tx.tax', 'Pajak (PPN/PB1)')}</span>
                             <span className="tabular-nums font-bold">+{formatCurrency(Number(tx.tax), tx.currency || defaultCurrency)}</span>
                           </div>
                         ) : null}
                         {tx.discount ? (
                           <div className="flex justify-between text-emerald-500 font-medium">
-                            <span>Diskon</span>
+                            <span>{t('tx.discount', 'Diskon')}</span>
                             <span className="tabular-nums font-bold">-{formatCurrency(Number(tx.discount), tx.currency || defaultCurrency)}</span>
                           </div>
                         ) : null}
@@ -452,10 +450,10 @@ export default function AiDigitalReceipt({
             <div className="mb-2 flex items-center justify-between px-0.5">
               <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--muted)]">
                 <Layers className="h-3 w-3 text-[var(--accent)]" />
-                <span>{locale === 'en' ? 'Itemized Breakdown' : 'Rincian Item Belanja'}</span>
+                <span>{t('transactions.ocr.itemsListTitle', 'Rincian Item Belanja')}</span>
               </div>
               <span className="rounded-full bg-[var(--field-bg)] px-2 py-0.5 text-[9.5px] font-bold text-[var(--fg)] border border-[var(--border)]">
-                {txList.length} {locale === 'en' ? 'items' : 'item'}
+                {t('common.itemsCount', '{{count}} item', { count: txList.length })}
               </span>
             </div>
 
@@ -523,7 +521,7 @@ export default function AiDigitalReceipt({
             {/* Subtotals Breakdown */}
             <div className="mt-2.5 pt-2 border-t border-[var(--border)]/60 flex items-center justify-between text-[11px] font-bold">
               <span className="text-[var(--muted)]">
-                {locale === 'en' ? 'Total Amount' : 'Total Keseluruhan'} ({txList.length} item)
+                {t('tx.totalAmount', 'Total Keseluruhan')} ({txList.length} item)
               </span>
               <span className={`text-xs font-black tabular-nums ${netTotal >= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
                 {netTotal >= 0 ? '+' : '-'}
@@ -570,7 +568,7 @@ export default function AiDigitalReceipt({
           className="ft-btn-primary w-full py-2 px-3 text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99] transition rounded-xl"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-          <span>Catat Transaksi Lagi</span>
+          <span>{t('ai.logAnother', 'Catat Transaksi Lagi')}</span>
         </button>
 
         {/* Secondary CTAs */}
@@ -582,7 +580,7 @@ export default function AiDigitalReceipt({
               className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--field-bg)] active:scale-95 transition cursor-pointer"
             >
               <Pencil className="h-3 w-3 text-[var(--accent)]" />
-              <span>Edit</span>
+              <span>{t('common.edit', 'Edit')}</span>
             </button>
           )}
 
@@ -593,7 +591,7 @@ export default function AiDigitalReceipt({
             className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[11px] font-bold text-[var(--muted)] hover:text-rose-500 hover:border-rose-500/30 hover:bg-rose-500/10 active:scale-95 transition disabled:opacity-50 cursor-pointer"
           >
             <RotateCcw className="h-3 w-3" />
-            <span>{isUndoing ? 'Membatalkan...' : 'Batalkan'}</span>
+            <span>{isUndoing ? t('common.cancelling', 'Membatalkan...') : t('common.undo', 'Batalkan')}</span>
           </button>
 
           <button
@@ -601,7 +599,7 @@ export default function AiDigitalReceipt({
             onClick={handleViewTransactions}
             className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[11px] font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] active:scale-95 transition cursor-pointer"
           >
-            <span>Riwayat</span>
+            <span>{t('common.history', 'Riwayat')}</span>
             <ArrowRight className="h-3 w-3 text-[var(--muted)]" />
           </button>
         </div>

@@ -49,7 +49,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
     <section className="ft-stagger-in" style={{ '--stagger': 2 }}>
       <MiniChartCard
         t={t}
-        title={t('dashboard.netWorth') || 'Kekayaan Bersih'}
+        title={t('dashboard.netWorth')}
         value={formatCurrency(computeRevenueValue(miniRevenueRange), defaultCurrency)}
         trendBadge={
           <span

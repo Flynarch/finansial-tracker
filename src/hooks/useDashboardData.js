@@ -242,8 +242,12 @@ export function useDashboardData() {
       monthDelta,
       monthDeltaTone: monthDelta >= 0 ? 'success' : 'danger',
       monthDeltaPct: thisMonth.income > 0 ? (monthDelta / thisMonth.income) * 100 : 0,
-      incomeDeltaPct: lastMonth.income > 0 ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 : 0,
-      expenseDeltaPct: lastMonth.expense > 0 ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 : 0,
+      incomeDeltaPct: lastMonth.income > 0
+        ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100
+        : thisMonth.income > 0 ? 100 : 0,
+      expenseDeltaPct: lastMonth.expense > 0
+        ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100
+        : thisMonth.expense > 0 ? 100 : 0,
     }
   }, [transactions, investments, currentMonthKey, normalizedTransactions])
 
@@ -744,7 +748,9 @@ export function useDashboardData() {
         })
 
         return currentSeries.map((item) => {
-          const hour = new Date(item.time).getHours()
+          const timeMs = Number(item?.time)
+          const dateObj = Number.isFinite(timeMs) ? new Date(timeMs) : new Date()
+          const hour = isNaN(dateObj.getTime()) ? 0 : dateObj.getHours()
           const prevVal = yesterdayHourly[Math.min(23, Math.max(0, hour))] ?? startBalanceYesterday
           return {
             ...item,
@@ -787,10 +793,17 @@ export function useDashboardData() {
 
         return currentSeries.map((item, idx) => {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          let prevLabel = ''
+          if (prevData?.date) {
+            const dateObj = new Date(prevData.date)
+            if (!isNaN(dateObj.getTime())) {
+              prevLabel = format(dateObj, 'dd MMM yyyy')
+            }
+          }
           return {
             ...item,
             prevValue: prevData?.value ?? startBalancePrev,
-            prevLabel: prevData?.date ? format(new Date(prevData.date), 'dd MMM yyyy') : '',
+            prevLabel,
           }
         })
       }
@@ -823,10 +836,17 @@ export function useDashboardData() {
 
         return currentSeries.map((item, idx) => {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          let prevLabel = ''
+          if (prevData?.month) {
+            const dateObj = new Date(`${prevData.month}-01`)
+            if (!isNaN(dateObj.getTime())) {
+              prevLabel = format(dateObj, 'MMM yyyy')
+            }
+          }
           return {
             ...item,
             prevValue: prevData?.value ?? startBalancePrev,
-            prevLabel: prevData?.month ? format(new Date(`${prevData.month}-01`), 'MMM yyyy') : '',
+            prevLabel,
           }
         })
       }
@@ -836,10 +856,11 @@ export function useDashboardData() {
         const today = new Date()
         const prevMonths = Array.from({ length: totalMonths }, (_, idx) => {
           const d = subMonths(today, totalMonths * 2 - 1 - idx)
-          return format(d, 'yyyy-MM-dd')
+          return format(d, 'yyyy-MM')
         })
 
-        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition
+        const firstMonth = prevMonths[0]
+        const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + portfolioValue + netLoanPosition
         const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
@@ -858,10 +879,17 @@ export function useDashboardData() {
 
         return currentSeries.map((item, idx) => {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+          let prevLabel = ''
+          if (prevData?.month) {
+            const dateObj = new Date(`${prevData.month}-01`)
+            if (!isNaN(dateObj.getTime())) {
+              prevLabel = format(dateObj, 'MMM yyyy')
+            }
+          }
           return {
             ...item,
             prevValue: prevData?.value ?? startBalancePrev,
-            prevLabel: prevData?.month ? format(new Date(`${prevData.month}-01`), 'MMM yyyy') : '',
+            prevLabel,
           }
         })
       }
@@ -874,7 +902,11 @@ export function useDashboardData() {
   const zoomCombinedChartSeries = useMemo(() => {
     if (!zoomRevenueSeries || zoomRevenueSeries.length === 0) return []
     if (!comparePrevious) return zoomRevenueSeries
-    return buildPreviousPeriodRevenueSeries(zoomRevenueRange, zoomRevenueSeries)
+    try {
+      return buildPreviousPeriodRevenueSeries(zoomRevenueRange, zoomRevenueSeries)
+    } catch {
+      return zoomRevenueSeries
+    }
   }, [zoomRevenueSeries, comparePrevious, buildPreviousPeriodRevenueSeries, zoomRevenueRange])
 
   const comparisonSummary = useMemo(() => {
@@ -882,12 +914,12 @@ export function useDashboardData() {
 
     const first = zoomCombinedChartSeries[0]
     const last = zoomCombinedChartSeries[zoomCombinedChartSeries.length - 1]
-    const currentEndVal = last?.value ?? 0
-    const currentStartVal = first?.value ?? 0
+    const currentEndVal = toSafeNumber(last?.value)
+    const currentStartVal = toSafeNumber(first?.value)
     const currentNet = currentEndVal - currentStartVal
 
-    const prevEndVal = last?.prevValue ?? 0
-    const prevStartVal = first?.prevValue ?? 0
+    const prevEndVal = toSafeNumber(last?.prevValue)
+    const prevStartVal = toSafeNumber(first?.prevValue)
     const prevNet = prevEndVal - prevStartVal
 
     const diff = currentNet - prevNet
@@ -913,41 +945,62 @@ export function useDashboardData() {
     const min = Math.min(...vals)
 
     const net = rangedSummaryStats.net ?? 0
+    let unitKey = 'day'
     let unitLabel = 'hari'
     let duration = 30
 
     if (zoomRevenueRange === '1d') {
+      unitKey = 'hour'
       unitLabel = 'jam'
       duration = 24
     } else if (zoomRevenueRange === '1w') {
+      unitKey = 'day'
       unitLabel = 'hari'
       duration = 7
     } else if (zoomRevenueRange === '1m') {
+      unitKey = 'day'
       unitLabel = 'hari'
       duration = 30
     } else if (zoomRevenueRange === '3m') {
+      unitKey = 'day'
       unitLabel = 'hari'
       duration = 90
     } else if (zoomRevenueRange === 'ytd') {
+      unitKey = 'month'
       unitLabel = 'bulan'
       duration = Math.max(1, new Date().getMonth() + 1)
     } else if (zoomRevenueRange === '1y') {
+      unitKey = 'month'
       unitLabel = 'bulan'
       duration = 12
     } else if (zoomRevenueRange === 'all') {
+      unitKey = 'month'
       unitLabel = 'bulan'
       duration = Math.max(1, vals.length)
     }
 
     const rate = Math.round(net / duration)
-    return { max, min, unitLabel, netRate: rate }
+    return { max, min, unitKey, unitLabel, netRate: rate }
   }, [zoomRevenueSeries, rangedSummaryStats.net, zoomRevenueRange])
 
   const assetBreakdownData = useMemo(() => {
     const safeWallets = walletsWithBalance ?? []
     if (safeWallets.length === 0) return { total: 0, items: [] }
 
-    const total = safeWallets.reduce((acc, w) => acc + Math.max(0, toSafeNumber(w.currentBalance)), 0)
+    const convertedBalances = safeWallets.map((w) => ({
+      ...w,
+      convertedBalance: Math.max(
+        0,
+        convertCurrency(
+          Math.max(0, toSafeNumber(w.currentBalance)),
+          w.currency || defaultCurrency,
+          defaultCurrency,
+          rates,
+        ),
+      ),
+    }))
+
+    const total = convertedBalances.reduce((acc, w) => acc + w.convertedBalance, 0)
     if (total === 0) return { total: 0, items: [] }
 
     const colors = [
@@ -959,14 +1012,16 @@ export function useDashboardData() {
       'bg-violet-500',
     ]
 
-    const items = safeWallets
+    const items = convertedBalances
       .map((w, idx) => {
-        const bal = Math.max(0, toSafeNumber(w.currentBalance))
+        const bal = w.convertedBalance
         const pct = Math.round((bal / total) * 100)
         return {
           id: w.id || idx,
           name: w.name || 'Dompet',
           balance: bal,
+          rawBalance: Math.max(0, toSafeNumber(w.currentBalance)),
+          currency: w.currency || defaultCurrency,
           pct,
           color: colors[idx % colors.length],
         }
@@ -975,7 +1030,7 @@ export function useDashboardData() {
       .sort((a, b) => b.balance - a.balance)
 
     return { total, items }
-  }, [walletsWithBalance])
+  }, [walletsWithBalance, defaultCurrency, rates])
 
   const globalWeeklyTrend = useMemo(() => {
     return calculateGlobalWeeklyTrend(allHabits, allHabitLogs)

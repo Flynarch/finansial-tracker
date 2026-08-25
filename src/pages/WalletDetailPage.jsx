@@ -5,7 +5,6 @@ import { db, computeWalletBalance } from '../lib/db'
 import { format } from 'date-fns'
 import {
   Trash2,
-  Receipt,
   Search,
   MoreVertical,
   Star,
@@ -23,13 +22,14 @@ import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
-import useTransactionStore from '../store/useTransactionStore'
-import useWalletStore from '../store/useWalletStore'
+import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService'
+import { deleteWallet, archiveWallet, unarchiveWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
 import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
 import MaskedBalance from '../components/ui/MaskedBalance'
@@ -56,21 +56,11 @@ export default function WalletDetailPage() {
   const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
   
   const wallet = useLiveQuery(() => (walletId && !isNaN(walletId) ? db.wallets.get(walletId) : null), [walletId])
-  const cachedWallets = useWalletStore((state) => state.wallets)
-  const setStoreWallets = useWalletStore((state) => state.setWallets)
   const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
 
-  useEffect(() => {
-    if (dbWallets && dbWallets.length > 0 && setStoreWallets) {
-      setStoreWallets(dbWallets)
-    }
-  }, [dbWallets, setStoreWallets])
-
   const allWallets = useMemo(() => {
-    if (dbWallets !== undefined && dbWallets.length > 0) return dbWallets
-    if (cachedWallets && cachedWallets.length > 0) return cachedWallets
     return dbWallets || []
-  }, [dbWallets, cachedWallets])
+  }, [dbWallets])
 
   const allTransactions = useLiveQuery(async () => {
     if (!walletId || isNaN(walletId)) return []
@@ -93,14 +83,6 @@ export default function WalletDetailPage() {
     }
     loadRates()
   }, [])
-
-  const deleteWallet = useWalletStore((state) => state.deleteWallet)
-  const archiveWallet = useWalletStore((state) => state.archiveWallet)
-  const unarchiveWallet = useWalletStore((state) => state.unarchiveWallet)
-  const updateWallet = useWalletStore((state) => state.updateWallet)
-  const addTransaction = useTransactionStore((state) => state.addTransaction)
-  const updateTransaction = useTransactionStore((state) => state.updateTransaction)
-  const deleteTransaction = useTransactionStore((state) => state.deleteTransaction)
 
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
@@ -149,6 +131,7 @@ export default function WalletDetailPage() {
       category: transaction.category,
       notes: transaction.notes || '',
       currency: targetCurrency,
+      walletId: transaction.walletId,
     })
   }, [wallet?.currency, defaultCurrency])
 
@@ -356,7 +339,8 @@ export default function WalletDetailPage() {
     const newBal = parseMoneyInput(newBalanceRaw, targetCurrency)
     if (isNaN(newBal)) return
 
-    const diff = newBal - currentBalance
+    const isZeroDec = ['IDR', 'JPY', 'KRW', 'VND'].includes(targetCurrency)
+    const diff = isZeroDec ? Math.round(newBal - currentBalance) : Math.round((newBal - currentBalance) * 100) / 100
     if (diff !== 0) {
       await addTransaction({
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -546,7 +530,7 @@ export default function WalletDetailPage() {
 
             {/* Middle Row: Crisp Bold Balance Display */}
             <div className="flex items-center min-h-[2rem]">
-              <div className="ft-display text-2xl sm:text-3xl font-black text-[var(--fg)] tabular-nums truncate leading-none flex items-center">
+              <div className="ft-display text-xl sm:text-3xl font-black text-[var(--fg)] tabular-nums leading-tight flex items-center">
                 {hideBalance ? (
                   <MaskedBalance size="lg" />
                 ) : (
@@ -557,7 +541,7 @@ export default function WalletDetailPage() {
 
             {/* Bottom Row: Timestamp & Currency Info */}
             <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-[10px] text-[var(--muted)]">
-              <span>Terakhir update: {updatedAt}</span>
+              <span>{t('wallets.lastUpdated', 'Terakhir update: {{time}}', { time: updatedAt })}</span>
               <span className="rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 font-black text-[10px] text-[var(--muted)] uppercase tracking-wider">
                 {wallet.currency || defaultCurrency}
               </span>
@@ -572,10 +556,10 @@ export default function WalletDetailPage() {
             <div className="space-y-2.5 pb-2.5 border-b border-[var(--border)]/40">
               <div className="flex items-center justify-between px-0.5">
                 <h3 className="ft-display text-sm font-black text-[var(--fg)] tracking-tight">
-                  Riwayat Transaksi
+                  {t('wallets.txHistory', 'Riwayat Transaksi')}
                 </h3>
                 <span className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-0.5 text-[10px] font-extrabold tabular-nums text-[var(--muted)]">
-                  {filteredTransactions?.length || 0} transaksi
+                  {t('wallets.txCount', '{{count}} transaksi', { count: filteredTransactions?.length || 0 })}
                 </span>
               </div>
 
@@ -668,15 +652,10 @@ export default function WalletDetailPage() {
                 </section>
               ))
             ) : (
-              <div className="py-10 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center mx-auto mb-3 text-[var(--muted)]">
-                  <Receipt size={26} strokeWidth={1.5} />
-                </div>
-                <h3 className="text-sm font-bold text-[var(--fg)] mb-1">Belum ada transaksi</h3>
-                <p className="text-xs text-[var(--muted)] max-w-xs mx-auto">
-                  Belum ada catatan transaksi {activeTab !== 'all' ? activeTab : ''} di akun ini.
-                </p>
-              </div>
+              <EmptyState
+                title={t('wallets.emptyTxTitle', 'Belum Ada Transaksi')}
+                description={`Belum ada catatan transaksi ${activeTab !== 'all' ? activeTab : ''} di akun dompet ini.`}
+              />
             )}
           </div>
         </div>
@@ -706,7 +685,7 @@ export default function WalletDetailPage() {
             </div>
             {isDefaultWallet && (
               <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-black text-amber-500 shrink-0">
-                Utama
+                {t('wallets.primaryBadge', 'Utama')}
               </span>
             )}
           </div>
@@ -719,8 +698,8 @@ export default function WalletDetailPage() {
                   <Star size={18} className="fill-amber-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-[var(--fg)]">Akun Utama (Aktif)</p>
-                  <p className="text-[10px] text-[var(--muted)]">Akun ini sedang menjadi akun default Anda</p>
+                  <p className="text-xs font-bold text-[var(--fg)]">{t('wallets.primaryActive', 'Akun Utama (Aktif)')}</p>
+                  <p className="text-[10px] text-[var(--muted)]">{t('wallets.primaryActiveDesc', 'Akun ini sedang menjadi akun default Anda')}</p>
                 </div>
               </div>
               <Check size={16} className="text-amber-500 shrink-0" strokeWidth={3} />
@@ -736,8 +715,8 @@ export default function WalletDetailPage() {
                   <Star size={18} />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-[var(--fg)]">Jadikan Akun Utama</p>
-                  <p className="text-[10px] text-[var(--muted)]">Pilihan utama saat mencatat transaksi baru</p>
+                  <p className="text-xs font-bold text-[var(--fg)]">{t('wallets.setAsPrimary', 'Jadikan Akun Utama')}</p>
+                  <p className="text-[10px] text-[var(--muted)]">{t('wallets.setAsPrimaryDesc', 'Pilihan utama saat mencatat transaksi baru')}</p>
                 </div>
               </div>
             </button>
@@ -754,8 +733,8 @@ export default function WalletDetailPage() {
                 <Edit2 size={18} />
               </div>
               <div>
-                <p className="text-xs font-bold text-[var(--fg)]">Ubah Info Dompet</p>
-                <p className="text-[10px] text-[var(--muted)]">Ubah nama akun, tipe institusi, dan catatan</p>
+                <p className="text-xs font-bold text-[var(--fg)]">{t('wallets.editTitle', 'Ubah Info Dompet')}</p>
+                <p className="text-[10px] text-[var(--muted)]">{t('wallets.editDesc', 'Ubah nama akun, tipe institusi, dan catatan')}</p>
               </div>
             </div>
           </button>
@@ -771,8 +750,8 @@ export default function WalletDetailPage() {
                 <Download size={18} />
               </div>
               <div>
-                <p className="text-xs font-bold text-[var(--fg)]">Ekspor Transaksi (.CSV)</p>
-                <p className="text-[10px] text-[var(--muted)]">Unduh seluruh riwayat transaksi dompet ini ke file CSV</p>
+                <p className="text-xs font-bold text-[var(--fg)]">{t('wallets.exportCsv', 'Ekspor Transaksi (.CSV)')}</p>
+                <p className="text-[10px] text-[var(--muted)]">{t('wallets.exportCsvDesc', 'Unduh seluruh riwayat transaksi dompet ini ke file CSV')}</p>
               </div>
             </div>
           </button>
@@ -789,12 +768,12 @@ export default function WalletDetailPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-[var(--fg)]">
-                  {wallet?.isArchived ? 'Buka Arsip Dompet' : 'Arsipkan Dompet'}
+                  {wallet?.isArchived ? t('wallets.unarchive', 'Buka Arsip Dompet') : t('wallets.archive', 'Arsipkan Dompet')}
                 </p>
                 <p className="text-[10px] text-[var(--muted)]">
                   {wallet?.isArchived
-                    ? 'Kembalikan dompet ke daftar aktif'
-                    : 'Sembunyikan dompet dari daftar transaksi aktif'}
+                    ? t('wallets.unarchiveDesc', 'Kembalikan dompet ke daftar aktif')
+                    : t('wallets.archiveDesc', 'Sembunyikan dompet dari daftar transaksi aktif')}
                 </p>
               </div>
             </div>
@@ -813,8 +792,8 @@ export default function WalletDetailPage() {
               <Trash2 size={18} />
             </div>
             <div>
-              <p className="text-xs font-bold text-rose-500">Hapus Akun Dompet</p>
-              <p className="text-[10px] text-rose-500/80">Hapus akun ini dan seluruh riwayat transaksinya</p>
+              <p className="text-xs font-bold text-rose-500">{t('wallets.deleteTitle', 'Hapus Akun Dompet')}</p>
+              <p className="text-[10px] text-rose-500/80">{t('wallets.deleteDesc', 'Hapus akun ini dan seluruh riwayat transaksinya')}</p>
             </div>
           </button>
         </div>
@@ -839,7 +818,7 @@ export default function WalletDetailPage() {
         title={t('wallets.deleteTitle', 'Hapus Dompet')}
         message={
           <>
-            Apakah Anda yakin ingin menghapus dompet <strong className="text-[var(--fg)]">{wallet?.name}</strong>? Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.
+            {t('wallets.deleteConfirmPrefix', 'Apakah Anda yakin ingin menghapus dompet')} <strong className="text-[var(--fg)]">{wallet?.name}</strong>? {t('wallets.deleteConfirmSuffix', 'Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.')}
           </>
         }
       />
@@ -847,7 +826,7 @@ export default function WalletDetailPage() {
       <Modal isOpen={isEditBalanceModalOpen} onClose={() => setIsEditBalanceModalOpen(false)} title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}>
         <form onSubmit={handleEditBalance} className="pt-1">
           <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-4">
-            Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.
+            {t('wallets.adjustBalanceDesc', 'Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.')}
           </p>
           <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] focus-within:border-[var(--accent)] transition-colors mb-5">
             <span className="pl-4 text-[var(--muted)] font-bold text-sm select-none">
@@ -868,13 +847,13 @@ export default function WalletDetailPage() {
               onClick={() => setIsEditBalanceModalOpen(false)}
               className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
             >
-              Batal
+              {t('common.cancel', 'Batal')}
             </button>
             <button 
               type="submit"
-              className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
+              className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-white font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
             >
-              Simpan Saldo
+              {t('wallets.saveBalance', 'Simpan Saldo')}
             </button>
           </div>
         </form>
@@ -933,14 +912,14 @@ export default function WalletDetailPage() {
               onClick={() => setIsEditWalletModalOpen(false)}
               className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-[13px] transition hover:bg-[var(--panel)] active:scale-[0.98] cursor-pointer"
             >
-              Batal
+              {t('common.cancel', 'Batal')}
             </button>
             <button
               type="submit"
               disabled={!editWalletForm.name.trim()}
               className="flex-1 py-3 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-[13px] shadow-sm transition hover:opacity-90 active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
-              Simpan
+              {t('common.save', 'Simpan')}
             </button>
           </div>
         </form>

@@ -5,6 +5,7 @@ import CategoryIcon from '../ui/CategoryIcon'
 import BottomSheet from '../ui/BottomSheet'
 import MonthPicker from '../ui/MonthPicker'
 import ToastBanner from '../ui/ToastBanner'
+import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { resolveExpenseParentIconKey } from '../../lib/categoryIcon'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
@@ -23,14 +24,14 @@ const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
     <button
       type="button"
       onClick={() => onSelectChild(path)}
-      className={`flex h-[40px] w-full items-center gap-2 border-b border-[var(--border)]/30 px-3 text-left text-[12px] font-medium transition last:border-b-0 ${
+      className={`flex min-h-[44px] w-full items-center gap-2 border-b border-[var(--border)]/30 px-3 text-left text-xs font-medium transition last:border-b-0 cursor-pointer active:scale-[0.99] ${
         active
           ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--fg)]'
           : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
       }`}
     >
-      <span className="min-w-0 flex-1 truncate whitespace-nowrap">{child?.names?.[lang] || child?.id || ''}</span>
-      {active ? <span className="text-[var(--accent)]">✓</span> : null}
+      <span className="min-w-0 flex-1 truncate">{child?.names?.[lang] || child?.id || ''}</span>
+      {active ? <Check size={14} className="text-[var(--accent)] shrink-0" /> : null}
     </button>
   )
 }, function areChildPropsEqual(prev, next) {
@@ -75,11 +76,11 @@ const BudgetParentCategoryItem = memo(function BudgetParentCategoryItem({
 
         <button
           type="button"
-          className="flex w-[20%] items-center justify-center border-l border-[var(--border)]/40 text-[var(--muted)]"
+          className="flex w-[20%] items-center justify-center border-l border-[var(--border)]/40 text-[var(--muted)] cursor-pointer active:scale-90"
           onClick={() => onToggleExpand(parent.id)}
           aria-label={expanded ? t('budget.subCategory.close') : t('budget.subCategory.open')}
         >
-          <span>{expanded ? '▾' : '▸'}</span>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
       </div>
 
@@ -128,7 +129,15 @@ const BudgetParentCategoryItem = memo(function BudgetParentCategoryItem({
   return true
 })
 
-export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null, initialMonth, onSaved }) {
+export default function BudgetSheetModal({
+  isOpen,
+  onClose,
+  editingBudget = null,
+  initialMonth,
+  month,
+  initialCategory = '',
+  onSaved,
+}) {
   const { locale, t } = useTranslation()
   const [sheetError, setSheetError] = useState('')
   const [expandedParentId, setExpandedParentId] = useState(null)
@@ -138,9 +147,11 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
   const tree = useMemo(() => getMergedExpenseTree(), [])
   const lang = locale === 'en' ? 'en' : 'id'
 
+  const effectiveMonth = month || initialMonth || format(new Date(), 'yyyy-MM')
+
   const [form, setForm] = useState({
-    month: initialMonth || format(new Date(), 'yyyy-MM'),
-    categoryPath: '',
+    month: effectiveMonth,
+    categoryPath: initialCategory || '',
     limit: '',
   })
   const [limitInput, setLimitInput] = useState('')
@@ -190,20 +201,18 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
         const raw = String(editingBudget.category || '')
         setExpandedParentId(raw.includes('/') ? raw.split('/')[0] : raw || null)
       } else {
-        const defaultMonth = initialMonth || format(new Date(), 'yyyy-MM')
+        const defaultMonth = month || initialMonth || format(new Date(), 'yyyy-MM')
         setForm({
           month: defaultMonth,
-          categoryPath: '',
+          categoryPath: initialCategory || '',
           limit: '',
         })
         setLimitInput('')
-        setExpandedParentId(null)
+        setExpandedParentId(initialCategory ? (initialCategory.includes('/') ? initialCategory.split('/')[0] : initialCategory) : null)
       }
       setIsCategoryOpen(false)
     }
   }
-
-
 
   useEffect(() => {
     if (!isOpen || !isCategoryOpen) return undefined
@@ -216,8 +225,6 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
     window.addEventListener('pointerdown', onPointerDown, { passive: true })
     return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [isOpen, isCategoryOpen])
-
-
 
   const save = async () => {
     const payload = {
@@ -238,7 +245,13 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
       if (editingBudget?.id) {
         await db.budgets.update(editingBudget.id, payload)
       } else {
-        await db.budgets.add(payload)
+        // Upsert if budget for this month and category already exists
+        const existing = await db.budgets.where({ month: payload.month, category: payload.category }).first()
+        if (existing) {
+          await db.budgets.update(existing.id, { limit: payload.limit })
+        } else {
+          await db.budgets.add(payload)
+        }
       }
       onSaved?.()
       onClose()
@@ -289,7 +302,9 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
                   return String(form.categoryPath || '').trim()
                 })()}
               </span>
-              <span className="text-[var(--muted)]">{isCategoryOpen ? '▾' : '▸'}</span>
+              <span className="text-[var(--muted)]">
+                {isCategoryOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </span>
             </button>
 
             {isCategoryOpen ? (
@@ -353,7 +368,7 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">
           <Button
             type="button"
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)] !py-1.5 !px-3.5 text-xs active:scale-95 transition-all cursor-pointer"
+            className="min-h-[40px] px-4 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
             onClick={onClose}
           >
             {t('budget.cancel', 'Batal')}
@@ -361,7 +376,7 @@ export default function BudgetSheetModal({ isOpen, onClose, editingBudget = null
           <Button
             type="button"
             onClick={save}
-            className="!py-1.5 !px-4 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            className="min-h-[40px] px-5 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
             disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
           >
             {t('budget.save', 'Simpan')}

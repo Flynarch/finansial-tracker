@@ -439,7 +439,7 @@ export default function OnboardingFlow() {
                   <div>
                     <h1 className="font-black text-lg tracking-tight text-[var(--fg)]">FinTrack</h1>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                      v4.5.0 • Personal Finance
+                      v4.6.4 • Personal Finance
                     </p>
                   </div>
                 </div>
@@ -573,7 +573,7 @@ export default function OnboardingFlow() {
                   <button
                     type="button"
                     onClick={() => setIsChangePhotoOpen(true)}
-                    className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-lg shadow-[color-mix(in_srgb,var(--accent)_20%,transparent)] transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-md shadow-black/10 transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     title={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                     aria-label={t('auth.changePhotoBtn', 'Ganti Foto / Persona')}
                   >

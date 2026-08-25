@@ -47,7 +47,7 @@ function formatAbbreviatedBalance(val, currency = 'IDR') {
 
 export function WalletSelectTrigger({
   wallet,
-  placeholder = 'Pilih Dompet',
+  placeholder,
   onClick,
   className = '',
   disabled = false,
@@ -55,8 +55,10 @@ export function WalletSelectTrigger({
   compact = false,
   abbreviateBalance = false,
 }) {
+  const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const hideBalance = useSettingsStore((state) => state.hideBalance)
+  const displayPlaceholder = placeholder || t('wallets.selectPlaceholder', 'Pilih Dompet')
 
   return (
     <button
@@ -106,7 +108,7 @@ export function WalletSelectTrigger({
               {wallet.name}
             </p>
             <div className="text-[10px] font-medium text-[var(--muted)] truncate tabular-nums mt-0.5 flex items-center gap-1">
-              <span>Saldo:</span> {hideBalance ? <MaskedBalance size="sm" /> : (abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency))}
+              <span>{t('wallets.balance', 'Saldo')}:</span> {hideBalance ? <MaskedBalance size="sm" /> : (abbreviateBalance ? formatAbbreviatedBalance(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency) : formatCurrency(wallet.currentBalance ?? wallet.balance ?? 0, wallet.currency || defaultCurrency))}
             </div>
           </div>
         </div>
@@ -116,7 +118,7 @@ export function WalletSelectTrigger({
             <Wallet className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           </div>
           <span className="text-xs font-bold text-[var(--muted)] truncate">
-            {placeholder}
+            {displayPlaceholder}
           </span>
         </div>
       )}
@@ -133,10 +135,10 @@ export default function WalletSelectModal({
   selectedWalletId,
   onSelectWallet,
   onSelect,
-  title = 'Pilih Dompet / Akun',
-  subtitle = 'Pilih akun dompet untuk transaksi ini',
+  title,
+  subtitle,
   allowNone = false,
-  noneLabel = 'Tanpa Dompet (Manual Log)',
+  noneLabel,
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -197,11 +199,13 @@ export default function WalletSelectModal({
         <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[var(--border)]/60">
           <div>
             <h3 className="text-base font-black text-[var(--fg)] tracking-tight">
-              {title}
+              {title || t('wallets.selectWalletTitle', 'Pilih Dompet / Akun')}
             </h3>
-            {subtitle && (
+            {subtitle !== undefined ? (
+              subtitle ? <p className="text-xs font-semibold text-[var(--muted)] mt-0.5">{subtitle}</p> : null
+            ) : (
               <p className="text-xs font-semibold text-[var(--muted)] mt-0.5">
-                {subtitle}
+                {t('wallets.selectWalletSubtitle', 'Pilih akun dompet untuk transaksi ini')}
               </p>
             )}
           </div>
@@ -209,6 +213,7 @@ export default function WalletSelectModal({
             type="button"
             onClick={onClose}
             className="grid h-8 w-8 place-items-center rounded-full bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
+            aria-label={t('common.close', 'Tutup')}
           >
             <X className="h-4 w-4" />
           </button>
@@ -248,10 +253,10 @@ export default function WalletSelectModal({
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-black text-[var(--fg)] truncate">
-                    {noneLabel}
+                    {noneLabel || t('wallets.manualLogNone', 'Tanpa Dompet (Manual Log)')}
                   </p>
                   <p className="text-[10px] font-semibold text-[var(--muted)]">
-                    Tidak mencatat ke saldo dompet
+                    {t('wallets.noBalanceRecord', 'Tidak mencatat ke saldo dompet')}
                   </p>
                 </div>
               </div>
@@ -267,7 +272,7 @@ export default function WalletSelectModal({
           {filteredWallets.length === 0 ? (
             <div className="p-8 text-center space-y-2">
               <p className="text-xs font-bold text-[var(--muted)]">
-                {activeWallets.length === 0 ? 'Belum ada dompet tersimpan' : 'Dompet tidak ditemukan'}
+                {activeWallets.length === 0 ? t('wallets.noWalletsSaved', 'Belum ada dompet tersimpan') : t('wallets.notFound', 'Dompet tidak ditemukan')}
               </p>
             </div>
           ) : (
@@ -324,7 +329,7 @@ export default function WalletSelectModal({
                         )}
                       </div>
                       <div className="text-[11px] font-bold text-[var(--muted)] tabular-nums mt-0.5 flex items-center gap-1">
-                        <span>Saldo:</span> <span className="text-[var(--fg)] font-black inline-flex items-center">{hideBalance ? <MaskedBalance size="sm" /> : formatCurrency(balance, w.currency || defaultCurrency)}</span>
+                        <span>{t('wallets.balance', 'Saldo')}:</span> <span className="text-[var(--fg)] font-black inline-flex items-center">{hideBalance ? <MaskedBalance size="sm" /> : formatCurrency(balance, w.currency || defaultCurrency)}</span>
                       </div>
                     </div>
                   </div>
@@ -351,11 +356,11 @@ export default function WalletSelectModal({
             className="flex items-center gap-1.5 text-xs font-black text-[var(--accent)] hover:underline cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            Tambah Akun Dompet Baru
+            {t('wallets.addNewWallet', 'Tambah Akun Dompet Baru')}
           </button>
 
           <span className="text-[10px] font-bold text-[var(--muted)]">
-            {activeWallets.length} Akun Tersedia
+            {t('wallets.accountsAvailable', '{{count}} Akun Tersedia', { count: activeWallets.length })}
           </span>
         </div>
       </div>

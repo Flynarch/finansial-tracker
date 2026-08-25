@@ -5,6 +5,7 @@ import { Camera, Pencil } from 'lucide-react'
 import Modal from '../components/ui/Modal'
 import UserAvatar from '../components/ui/UserAvatar'
 import ChangePhotoModal from '../components/profile/ChangePhotoModal'
+import SplitBillModal from '../components/split-bill/SplitBillModal'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { db } from '../lib/db'
@@ -84,6 +85,13 @@ function ShortcutIcon({ name }) {
       </svg>
     )
   }
+  if (name === 'splitbill') {
+    return (
+      <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
   if (name === 'loans') {
     return (
       <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -134,6 +142,7 @@ function Profile() {
   const [isEntering, setIsEntering] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
+  const [splitBillOpen, setSplitBillOpen] = useState(false)
   const [editName, setEditName] = useState('')
   const nameInputRef = useRef(null)
 
@@ -179,25 +188,16 @@ function Profile() {
         }`}
       >
         {/* ── Hero profile card ── */}
-        <section className="relative overflow-hidden rounded-[1.5rem] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-          {/* subtle elegant gradient */}
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: 'radial-gradient(ellipse 120% 120% at 50% -20%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%)',
-            }}
-            aria-hidden="true"
-          />
-
+        <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
           <div className="relative flex flex-col items-center px-5 pb-8 pt-8">
             <div className="relative mb-4">
               {/* Profile Avatar Button */}
               <button
                 type="button"
                 onClick={() => setPhotoModalOpen(true)}
-                className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-lg shadow-[color-mix(in_srgb,var(--accent)_20%,transparent)] transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                title={t('profile.changePhoto', 'Ubah foto profil')}
-                aria-label={t('profile.changePhoto', 'Ubah foto profil')}
+                className="group/avatar relative block rounded-full p-1 border-[2.5px] border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--field-bg)] shadow-md shadow-black/10 transition hover:border-[var(--accent)] active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                title={t('profile.changePhoto')}
+                aria-label={t('profile.changePhoto')}
               >
                 <UserAvatar
                   size={88}
@@ -208,7 +208,7 @@ function Profile() {
                 <div className="absolute inset-1 rounded-full bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex flex-col items-center justify-center text-white backdrop-blur-[1px]">
                   <Camera size={20} strokeWidth={2.2} />
                   <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">
-                    {t('profile.edit', 'Ubah')}
+                    {t('profile.edit')}
                   </span>
                 </div>
               </button>
@@ -217,26 +217,26 @@ function Profile() {
               <button
                 type="button"
                 onClick={() => setPhotoModalOpen(true)}
-                className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[var(--panel-strong)] bg-[var(--fg)] text-[var(--bg)] shadow-md transition hover:scale-110 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                aria-label={t('profile.changePhoto', 'Ubah foto profil')}
-                title={t('profile.changePhoto', 'Ubah foto profil')}
+                className="absolute bottom-0 right-0 grid h-8 w-8 min-h-[36px] min-w-[36px] place-items-center rounded-full bg-[var(--accent)] text-white shadow-md transition hover:scale-105 active:scale-90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                aria-label={t('profile.changePhoto')}
+                title={t('profile.changePhoto')}
               >
                 <Camera size={14} strokeWidth={2.5} />
               </button>
             </div>
 
             <div className="flex items-center justify-center gap-1.5 mb-2 max-w-full">
-              <h2 className="truncate text-center text-[22px] font-bold tracking-tight text-[var(--fg)]">
+              <h1 className="truncate text-center text-xl font-black tracking-tight text-[var(--fg)]">
                 {displayName}
-              </h2>
+              </h1>
               <button
                 type="button"
                 onClick={openEditModal}
-                className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-90 cursor-pointer shrink-0"
-                title={t('profile.editName', 'Ubah nama')}
-                aria-label={t('profile.editName', 'Ubah nama')}
+                className="grid h-7 w-7 min-h-[36px] min-w-[36px] place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-90 cursor-pointer shrink-0"
+                title={t('profile.editName')}
+                aria-label={t('profile.editName')}
               >
-                <Pencil size={12.5} strokeWidth={2.2} />
+                <Pencil size={13} strokeWidth={2.2} />
               </button>
             </div>
 
@@ -250,7 +250,7 @@ function Profile() {
                   : authProvider === 'email'
                   ? `Email • ${authUserEmail || 'Registered'}`
                   : authProvider === 'anonymous'
-                  ? 'Akun Anonim (Tamu)'
+                  ? t('profile.badge.anonymous', 'Akun Anonim (Tamu)')
                   : t('profile.badge.local')}
               </span>
             </div>
@@ -280,17 +280,17 @@ function Profile() {
         <button
           type="button"
           onClick={() => navigate('/settings')}
-          className="group flex w-full items-center gap-4 rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] px-5 py-4 text-left shadow-[var(--shadow-card)] transition hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="group flex w-full items-center gap-4 rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] px-5 py-4 text-left shadow-[var(--shadow-card)] transition hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] cursor-pointer"
         >
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[0.85rem] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)] shadow-sm transition group-hover:scale-105">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)] shadow-sm transition group-hover:scale-105">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" strokeLinejoin="round" />
               <path d="M4 21a8 8 0 0 1 16 0" strokeLinecap="round" />
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[14.5px] font-bold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">{t('profile.accountPrefs')}</p>
-            <p className="mt-0.5 text-[11.5px] font-medium text-[var(--muted)]">{t('profile.accountPrefsDesc')}</p>
+            <p className="text-sm font-bold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">{t('profile.accountPrefs')}</p>
+            <p className="mt-0.5 text-xs font-medium text-[var(--muted)]">{t('profile.accountPrefsDesc')}</p>
           </div>
           <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--muted-2)] transition-transform group-hover:translate-x-1 group-hover:text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -299,10 +299,10 @@ function Profile() {
 
         {/* ── Shortcuts ── */}
         <div>
-          <h2 className="mb-2.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-2)]">
+          <h2 className="mb-2.5 px-0.5 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
             {t('profile.section.shortcuts')}
           </h2>
-          <div className="overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] divide-y divide-[color-mix(in_srgb,var(--border)_65%,transparent)]">
+          <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] divide-y divide-[color-mix(in_srgb,var(--border)_65%,transparent)]">
             <ShortcutRow
               icon="settings"
               label={t('profile.menu.settings')}
@@ -322,9 +322,15 @@ function Profile() {
               onClick={() => navigate('/reports')}
             />
             <ShortcutRow
+              icon="splitbill"
+              label={t('profile.menu.splitBill')}
+              sublabel={t('profile.menu.splitBillSub')}
+              onClick={() => setSplitBillOpen(true)}
+            />
+            <ShortcutRow
               icon="loans"
-              label={t('profile.menu.loans') || 'Utang & Piutang'}
-              sublabel={t('profile.menu.loansSub') || 'Kelola utang & tagihan piutang'}
+              label={t('profile.menu.loans')}
+              sublabel={t('profile.menu.loansSub')}
               onClick={() => navigate('/loans')}
             />
             <ShortcutRow
@@ -337,10 +343,10 @@ function Profile() {
         </div>
 
         {/* ── Version footer ── */}
-        <div className="flex items-center justify-center gap-2 pb-1">
+        <div className="flex items-center justify-center gap-3 pt-6 pb-2">
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
-          <div className="mt-8 text-center text-[11px] font-medium text-[var(--muted-2)] uppercase tracking-widest">
-            {t('profile.version', { value: '4.5.0' })}
+          <div className="text-center text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
+            {t('profile.version', { value: '4.6.4' })}
           </div>
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
         </div>
@@ -386,6 +392,9 @@ function Profile() {
 
       {/* ── Change Photo Modal ── */}
       <ChangePhotoModal isOpen={photoModalOpen} onClose={() => setPhotoModalOpen(false)} />
+
+      {/* ── Split Bill Modal ── */}
+      <SplitBillModal isOpen={splitBillOpen} onClose={() => setSplitBillOpen(false)} />
     </div>
   )
 }

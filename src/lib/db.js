@@ -307,6 +307,31 @@ db.version(17).stores({
   loanPayments: '++id, loanId, amount, date, notes, transactionId, createdAt',
 })
 
+// Version 18: added wallet balance cache table, compound indexes, and splitBillId for Split Bill feature
+db.version(18).stores({
+  transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, isSplit, *tags, [date+type], [walletId+date], createdAt',
+  investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
+  investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
+  budgets: '++id, category, limit, month',
+  goals: '++id, name, targetAmount, currentAmount, deadline, currency',
+  calendarEvents: '++id, date, title, type, color',
+  recurringTransactions:
+    '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
+  settings: 'key',
+  todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
+  sub_tasks: '++id, todoId, label, checked',
+  habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
+  habitLogs: '++id, habitId, date',
+  ideas: '++id, type, content, color, x, y, createdAt',
+  board_links: '++id, sourceId, targetId',
+  notifications: '++id, type, title, message, read, relatedId, createdAt',
+  goalLogs: '++id, goalId, amount, date',
+  wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
+  loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
+  loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
+  walletBalanceCache: 'walletId',
+})
+
 // Auto-migrate legacy wallet names (e.g. "Uang Tunai (Cash)" -> "Cash")
 db.on('ready', async () => {
   try {

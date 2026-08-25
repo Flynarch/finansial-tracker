@@ -1,7 +1,7 @@
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../lib/db'
+import { db, computeAllWalletBalances } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
@@ -179,11 +179,12 @@ export default function Reports() {
   }, [locale, filteredTransactions, defaultCurrency, rates])
 
   const netWorthTrend = useMemo(() => {
-    const totalCash = (wallets || []).reduce((sum, w) => {
+    const computedWallets = computeAllWalletBalances(wallets || [], transactions || [], rates)
+    const totalCash = computedWallets.reduce((sum, w) => {
       return (
         sum +
         convertCurrency(
-          toSafeNumber(w.balance),
+          toSafeNumber(w.currentBalance),
           w.currency || defaultCurrency,
           defaultCurrency,
           rates,
@@ -212,7 +213,7 @@ export default function Reports() {
         netWorth: runningNet,
       }
     })
-  }, [wallets, investments, netLoanPosition, monthlyIncomeExpense, defaultCurrency, rates])
+  }, [wallets, transactions, investments, netLoanPosition, monthlyIncomeExpense, defaultCurrency, rates])
 
   const thisMonth = monthlyIncomeExpense.at(-1) ?? { income: 0, expense: 0 }
   const previousMonth = monthlyIncomeExpense.at(-2) ?? { income: 0, expense: 0 }

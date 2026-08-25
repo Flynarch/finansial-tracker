@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, isToday, isTomorrow, isBefore, startOfDay } from 'date-fns'
-import { id as idLocale } from 'date-fns/locale'
+import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import CustomDateTimePicker from '../components/ui/CustomDateTimePicker'
 import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -100,26 +100,30 @@ function priorityConfig(p) {
   }
 }
 
-function getDueStatusConfig(dueStr, completed, t) {
+function getDueStatusConfig(dueDate, completed, t, dateLocale = idLocale) {
   if (completed) {
     return {
-      label: t('todo.completed'),
+      label: t('todo.statusCompleted'),
       badgeClass: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-500 font-bold',
       icon: <CheckCircle2 size={13} />,
     }
   }
-  if (!dueStr) return null
 
-  const dueKey = String(dueStr)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueKey)) return null
+  if (!dueDate) {
+    return {
+      label: t('todo.due.none'),
+      badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] font-medium',
+      icon: <Circle size={13} />,
+    }
+  }
 
-  const dueDateObj = startOfDay(new Date(dueKey + 'T00:00:00'))
   const todayObj = startOfDay(new Date())
+  const dueDateObj = startOfDay(new Date(String(dueDate) + 'T00:00:00'))
 
   if (isToday(dueDateObj)) {
     return {
       label: t('todo.due.today'),
-      badgeClass: 'border-amber-500/40 bg-amber-500/15 text-amber-500 font-bold',
+      badgeClass: 'border-amber-500/50 bg-amber-500/15 text-amber-500 font-bold',
       icon: <Clock size={13} />,
     }
   }
@@ -141,7 +145,7 @@ function getDueStatusConfig(dueStr, completed, t) {
   }
 
   return {
-    label: format(dueDateObj, 'dd MMM yyyy', { locale: idLocale }),
+    label: format(dueDateObj, 'dd MMM yyyy', { locale: dateLocale }),
     badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] font-semibold',
     icon: <Calendar size={13} />,
   }
@@ -152,7 +156,7 @@ export default function TodoDetailPage() {
   const todoId = Number(id)
   const isValidId = !isNaN(todoId) && todoId > 0
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   // View & subtask states
   const [newSubLabel, setNewSubLabel] = useState('')
@@ -332,10 +336,11 @@ export default function TodoDetailPage() {
     )
   }
 
-  const statusCfg = getDueStatusConfig(todo.dueDate, todo.completed, t)
+  const dateLocale = locale === 'en' ? enLocale : idLocale
+  const statusCfg = getDueStatusConfig(todo.dueDate, todo.completed, t, dateLocale)
   const priorityCfg = priorityConfig(todo.priority)
   const formattedDue = todo.dueDate
-    ? format(new Date(String(todo.dueDate) + 'T00:00:00'), 'dd MMMM yyyy', { locale: idLocale })
+    ? format(new Date(String(todo.dueDate) + 'T00:00:00'), 'dd MMMM yyyy', { locale: dateLocale })
     : ''
   const doneSubCount = (subTasks || []).filter((s) => s.checked).length
   const totalSubCount = (subTasks || []).length

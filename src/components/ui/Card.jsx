@@ -1,7 +1,7 @@
 function Card({ title, children, className = '', titleClassName = '', withDivider = false, glass = true }) {
   const baseClass = glass
-    ? 'rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-card'
-    : 'rounded-3xl border border-[var(--border)] bg-[var(--field-bg)] p-4 sm:p-5 shadow-2xs'
+    ? 'rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-[var(--shadow-card)]'
+    : 'rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--field-bg)] p-4 sm:p-5 shadow-2xs'
 
   return (
     <section className={`${baseClass} ${className}`}>

@@ -1,0 +1,2604 @@
+[
+  {
+    "key": "auth.sendResetLink",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kirim Tautan Reset Sandi"
+    ],
+    "files": [
+      "src/components/auth/AuthModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.backToSignIn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kembali ke Halaman Masuk"
+    ],
+    "files": [
+      "src/components/auth/AuthModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.magicLinkHowItWorks",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Cara Kerja Magic Link:"
+    ],
+    "files": [
+      "src/components/auth/AuthModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.magicLinkInstruction",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Masukkan email Gmail Anda, buka email di perangkat ini, dan klik tautan masuk. Anda akan langsung masuk ke FinTrack secara otomatis tanpa perlu mengingat kata sandi."
+    ],
+    "files": [
+      "src/components/auth/AuthModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.usePasswordInstead",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Masuk dengan Kata Sandi Biasa"
+    ],
+    "files": [
+      "src/components/auth/AuthModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.emailVerifiedSuccessTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Email Berhasil Terverifikasi!"
+    ],
+    "files": [
+      "src/components/auth/EmailVerificationBanner.jsx",
+      "src/pages/settings/SettingsHome.jsx"
+    ]
+  },
+  {
+    "key": "auth.emailVerifiedSuccessSubtitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Akun Anda telah diamankan & terhubung."
+    ],
+    "files": [
+      "src/components/auth/EmailVerificationBanner.jsx",
+      "src/pages/settings/SettingsHome.jsx"
+    ]
+  },
+  {
+    "key": "common.color",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Warna"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "common.duplicate",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Duplikat"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "common.unlock",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Buka Kunci"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "common.lock",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kunci"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "common.connect",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hubungkan"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.typeSomething",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ketik sesuatu..."
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.textPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Teks..."
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.groupNamePlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Grup"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.deleteFrame",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Frame"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.typeTextPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ketik teks..."
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.emojiPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "😀"
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.checklistTitlePlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Judul Checklist..."
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.itemPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Item..."
+    ],
+    "files": [
+      "src/components/board/Nodes.jsx"
+    ]
+  },
+  {
+    "key": "board.resize",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ubah Ukuran"
+    ],
+    "files": [
+      "src/components/board/NodeWrapper.jsx"
+    ]
+  },
+  {
+    "key": "common.copyRef",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Salin No. Referensi"
+    ],
+    "files": [
+      "src/components/chat/AiDigitalReceipt.jsx"
+    ]
+  },
+  {
+    "key": "common.loading",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Memuat...",
+      "Mengekspor Data...",
+      "Mengimpor Data..."
+    ],
+    "files": [
+      "src/components/currency/CurrencyConverterCard.jsx",
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.categoriesMonitored",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kategori Terpantau"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.monitorLimits",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pantau batas pengeluaran"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.activeGoals",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Target Aktif"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.dreamProgress",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Progres tujuan impian"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.spentPct",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Terpakai"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.collectedPct",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Terkumpul"
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx"
+    ]
+  },
+  {
+    "key": "savings.namePlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Beli Rumah, Dana Darurat, Liburan..."
+    ],
+    "files": [
+      "src/components/dashboard/BudgetSavingsDetailSheet.jsx",
+      "src/components/savings/SavingsSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.budget.unconfigured",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Atur"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardPulseBento.jsx"
+    ]
+  },
+  {
+    "key": "budget.createQuick",
+    "inId": true,
+    "inEn": false,
+    "idVal": "Atur Anggaran",
+    "fallbacks": [
+      "Atur Anggaran"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardPulseBento.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.totalPeriod",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Total Periode"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardZoomOverlay.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.compareVsPrev",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Perubahan vs Periode Lalu"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardZoomOverlay.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.currentPeriod",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Periode Ini"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardZoomOverlay.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.diff",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Selisih"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardZoomOverlay.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.avgRateShort",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Rata-rata"
+    ],
+    "files": [
+      "src/components/dashboard/DashboardZoomOverlay.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.totalBalance",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Total Saldo"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx"
+    ]
+  },
+  {
+    "key": "wallet.addAccount",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Akun"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.showBalance",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tampilkan Saldo"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx",
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.hideBalance",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Sembunyikan Saldo"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx",
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "dashboard.totalSaldo",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Total Saldo"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx"
+    ]
+  },
+  {
+    "key": "common.add",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah"
+    ],
+    "files": [
+      "src/components/dashboard/WalletCarousel.jsx"
+    ]
+  },
+  {
+    "key": "habits.colorPickerTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Warna Habit"
+    ],
+    "files": [
+      "src/components/habits/HabitColorPicker.jsx"
+    ]
+  },
+  {
+    "key": "habits.statsTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Statistik Habit"
+    ],
+    "files": [
+      "src/components/habits/HabitStatsModal.jsx"
+    ]
+  },
+  {
+    "key": "habits.notesPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tujuan atau detail cara ngerjain habit ini..."
+    ],
+    "files": [
+      "src/components/habits/HabitStatsModal.jsx",
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.noScheduledToday",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tidak ada habit yang dijadwalkan hari ini."
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.otherSchedules",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Jadwal Lainnya"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.createTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Buat Habit Baru"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.titlePlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Misal: Olahraga, Baca buku"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.timesPerWeek",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Berapa Kali Seminggu?"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.freqWeeklyPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Misal: 3"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.selectDays",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Hari"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.editTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Edit Habit"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "common.saveChanges",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Simpan Perubahan"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx",
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "habits.deleteTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Habit?"
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "habits.deleteConfirm",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Apakah Anda yakin ingin menghapus habit ini? Seluruh data riwayat dan streak habit ini akan hilang permanen."
+    ],
+    "files": [
+      "src/components/habits/HabitsView.jsx"
+    ]
+  },
+  {
+    "key": "profile.title",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Lihat Profil",
+      "Profil"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx",
+      "src/pages/settings/SettingsHome.jsx"
+    ]
+  },
+  {
+    "key": "notifications.new",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "baru"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "notifications.markAllRead",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tandai semua dibaca"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "notifications.read",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dibaca"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "common.deleteAll",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus semua"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "notifications.emptyTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Belum Ada Notifikasi"
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "notifications.emptyDesc",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pengingat tugas, utang-piutang, dan transaksi berulang akan muncul di sini."
+    ],
+    "files": [
+      "src/components/layout/Navbar.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.amountPositive",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nominal pembayaran harus lebih dari 0."
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.exceedsRemaining",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.saveFailed",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Gagal mencatat pembayaran. Silakan coba lagi."
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.remainingLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Sisa Tagihan"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.progressLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Progress Pelunasan"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.setNominal",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Set Nominal:"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.addNominal",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Nominal:"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.before",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Sebelum"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.newRemaining",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Sisa Baru"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.selectWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Dompet Transaksi"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.paymentDateTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal Pembayaran"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.paymentNotesPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Transfer BCA, dsb..."
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.historyCount",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.defaultLog",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pembayaran Cicilan"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.payment.saveReceivable",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Konfirmasi Penerimaan"
+    ],
+    "files": [
+      "src/components/loans/LoanPaymentModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.error.titleRequired",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Judul pinjaman wajib diisi."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.error.personRequired",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama pemberi/peminjam wajib diisi."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.error.amountPositive",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nominal harus lebih dari 0."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.error.saveFailed",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Gagal menyimpan data pinjaman. Silakan coba lagi."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.types.debt",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Utang (Saya Berutang)"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.types.receivable",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Piutang (Orang Lain Berutang)"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.title",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Judul / Keperluan"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.titlePlaceholderDebt",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pinjam Bank, Renovasi..."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.titlePlaceholderRec",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pinjaman Teman, Kasbon..."
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.lender",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pemberi Pinjaman"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.borrower",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Peminjam"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.receiveWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dompet Penerima Dana"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.sourceWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dompet Sumber Dana"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.selectWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Dompet (Opsional)"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "wallets.selectTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Dompet"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.startDate",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tanggal Pinjam"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.selectStartDate",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.selectDueDate",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Jatuh Tempo"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.modal.calcTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Simulasi Bunga & Tenor (Opsional)"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.notesPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nomor rekening, keterangan, dll"
+    ],
+    "files": [
+      "src/components/loans/LoanSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "auth.namePlaceholder",
+    "inId": true,
+    "inEn": false,
+    "idVal": "Nama lengkap Anda",
+    "fallbacks": [
+      "Nama lengkap Anda"
+    ],
+    "files": [
+      "src/components/onboarding/OnboardingFlow.jsx"
+    ]
+  },
+  {
+    "key": "common.primary",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Utama"
+    ],
+    "files": [
+      "src/components/onboarding/OnboardingFlow.jsx"
+    ]
+  },
+  {
+    "key": "wallets.setAsDefault",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Jadikan Dompet Utama"
+    ],
+    "files": [
+      "src/components/onboarding/OnboardingFlow.jsx"
+    ]
+  },
+  {
+    "key": "profile.removePhoto",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus"
+    ],
+    "files": [
+      "src/components/profile/ChangePhotoModal.jsx"
+    ]
+  },
+  {
+    "key": "profile.presetAvatars",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Atau Pilih Avatar Persona"
+    ],
+    "files": [
+      "src/components/profile/ChangePhotoModal.jsx"
+    ]
+  },
+  {
+    "key": "reports.aiTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Analisis Laporan dengan AI"
+    ],
+    "files": [
+      "src/components/reports/ReportHeader.jsx"
+    ]
+  },
+  {
+    "key": "reports.pdfTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Cetak Laporan / Simpan PDF"
+    ],
+    "files": [
+      "src/components/reports/ReportHeader.jsx"
+    ]
+  },
+  {
+    "key": "savings.noWalletDeduct",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tanpa Potong Dompet (Manual Log)"
+    ],
+    "files": [
+      "src/components/savings/SavingsFundSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "savings.selectTargetWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Dompet Tujuan"
+    ],
+    "files": [
+      "src/components/savings/SavingsFundSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "savings.selectSourceWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Sumber Dompet"
+    ],
+    "files": [
+      "src/components/savings/SavingsFundSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "tx.date.selectTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal Transaksi"
+    ],
+    "files": [
+      "src/components/savings/SavingsFundSheetModal.jsx",
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "savings.deadline",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Target Tanggal (Opsional)"
+    ],
+    "files": [
+      "src/components/savings/SavingsSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "savings.selectDeadline",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Target Tanggal"
+    ],
+    "files": [
+      "src/components/savings/SavingsSheetModal.jsx"
+    ]
+  },
+  {
+    "key": "todos.unmarkComplete",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/components/todos/TodoItemCard.jsx"
+    ]
+  },
+  {
+    "key": "todos.markComplete",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/components/todos/TodoItemCard.jsx"
+    ]
+  },
+  {
+    "key": "common.details",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Detail"
+    ],
+    "files": [
+      "src/components/todos/TodoItemCard.jsx"
+    ]
+  },
+  {
+    "key": "tx.transferAmount",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nominal Transfer"
+    ],
+    "files": [
+      "src/components/transactions/quick-add/AmountInput.jsx"
+    ]
+  },
+  {
+    "key": "invest.dateSelectTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal Investasi"
+    ],
+    "files": [
+      "src/components/transactions/quick-add/InvestmentForm.jsx"
+    ]
+  },
+  {
+    "key": "tx.tagsLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Label / Tag (Opsional)"
+    ],
+    "files": [
+      "src/components/transactions/quick-add/TagInput.jsx"
+    ]
+  },
+  {
+    "key": "tx.tagsPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah label (contoh: liburan, kantor)..."
+    ],
+    "files": [
+      "src/components/transactions/quick-add/TagInput.jsx"
+    ]
+  },
+  {
+    "key": "tx.transferFrom",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dari Dompet",
+      "Pilih Dompet Asal"
+    ],
+    "files": [
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "addTx.wallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dompet"
+    ],
+    "files": [
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "loans.selectWallet",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Wallet / Akun",
+      "Pilih Dompet / Akun"
+    ],
+    "files": [
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "tx.transferTo",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ke Dompet Tujuan",
+      "Pilih Dompet Tujuan"
+    ],
+    "files": [
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "categories.mainCategory",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kategori Utama"
+    ],
+    "files": [
+      "src/components/transactions/QuickAddTransactionModal.jsx"
+    ]
+  },
+  {
+    "key": "common.error.generic",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Terjadi Kendala"
+    ],
+    "files": [
+      "src/components/transactions/ReceiptScannerModal.jsx"
+    ]
+  },
+  {
+    "key": "tx.bulk.selected",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Dipilih"
+    ],
+    "files": [
+      "src/components/transactions/TransactionBulkBar.jsx"
+    ]
+  },
+  {
+    "key": "tx.dateSelectTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal Transaksi"
+    ],
+    "files": [
+      "src/components/transactions/TransactionEditSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.period",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Periode Waktu"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.thisMonth",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Bulan Ini"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.today",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hari Ini"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.allTime",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Semua"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.custom",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kustom"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.type",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tipe Transaksi"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.income",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pemasukan"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx",
+      "src/components/transactions/TransactionStatsBar.jsx"
+    ]
+  },
+  {
+    "key": "tx.expense",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pengeluaran"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx",
+      "src/components/transactions/TransactionStatsBar.jsx"
+    ]
+  },
+  {
+    "key": "tx.transfer",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Transfer"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "wallets.title",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Akun / Dompet"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.filter.allAccounts",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Semua Akun"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "common.reset",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Reset"
+    ],
+    "files": [
+      "src/components/transactions/TransactionFilterSheet.jsx"
+    ]
+  },
+  {
+    "key": "tx.autoRecurringTooltip",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Otomatis dari jadwal berulang"
+    ],
+    "files": [
+      "src/components/transactions/TransactionItemCard.jsx"
+    ]
+  },
+  {
+    "key": "common.loadMore",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tampilkan Lebih Banyak"
+    ],
+    "files": [
+      "src/components/transactions/TransactionListSection.jsx"
+    ]
+  },
+  {
+    "key": "reports.netFlow",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Arus Kas"
+    ],
+    "files": [
+      "src/components/transactions/TransactionStatsBar.jsx"
+    ]
+  },
+  {
+    "key": "common.balanceHidden",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Saldo disembunyikan"
+    ],
+    "files": [
+      "src/components/ui/MaskedBalance.jsx"
+    ]
+  },
+  {
+    "key": "common.modal",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Modal"
+    ],
+    "files": [
+      "src/components/ui/Modal.jsx"
+    ]
+  },
+  {
+    "key": "common.clear",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus"
+    ],
+    "files": [
+      "src/components/wallet/AddAccountForm.jsx"
+    ]
+  },
+  {
+    "key": "wallets.recommendedBadge",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Populer"
+    ],
+    "files": [
+      "src/pages/AddAccountPage.jsx"
+    ]
+  },
+  {
+    "key": "addTx.amountRequired",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nominal harus lebih dari 0."
+    ],
+    "files": [
+      "src/pages/Calendar.jsx"
+    ]
+  },
+  {
+    "key": "calendar.deleteAgenda",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Agenda"
+    ],
+    "files": [
+      "src/pages/Calendar.jsx"
+    ]
+  },
+  {
+    "key": "wallets.selectPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Dompet"
+    ],
+    "files": [
+      "src/pages/Calendar.jsx",
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "loans.moreReceivable",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "piutang lebih dominan"
+    ],
+    "files": [
+      "src/pages/Loans.jsx"
+    ]
+  },
+  {
+    "key": "loans.moreDebt",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "utang lebih dominan"
+    ],
+    "files": [
+      "src/pages/Loans.jsx"
+    ]
+  },
+  {
+    "key": "common.save",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Simpan"
+    ],
+    "files": [
+      "src/pages/Loans.jsx",
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "savings.newGoal",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Target Baru"
+    ],
+    "files": [
+      "src/pages/Savings.jsx"
+    ]
+  },
+  {
+    "key": "savings.completedAndCashed",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Selesai & Dicairkan",
+      "Tabungan Selesai & Dicairkan"
+    ],
+    "files": [
+      "src/pages/Savings.jsx",
+      "src/pages/SavingsDetail.jsx"
+    ]
+  },
+  {
+    "key": "savings.remainingShort",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kurang"
+    ],
+    "files": [
+      "src/pages/Savings.jsx"
+    ]
+  },
+  {
+    "key": "savings.goalReached",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Target 100% Tercapai!"
+    ],
+    "files": [
+      "src/pages/SavingsDetail.jsx"
+    ]
+  },
+  {
+    "key": "savings.emptyLogsTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Belum Ada Riwayat"
+    ],
+    "files": [
+      "src/pages/SavingsDetail.jsx"
+    ]
+  },
+  {
+    "key": "savings.emptyLogsDesc",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tekan "
+    ],
+    "files": [
+      "src/pages/SavingsDetail.jsx"
+    ]
+  },
+  {
+    "key": "savings.congratsGoalReached",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Selamat! Target 100% Tercapai"
+    ],
+    "files": [
+      "src/pages/SavingsDetail.jsx"
+    ]
+  },
+  {
+    "key": "settings.apiKeySaved",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "API Key Gemini berhasil disimpan!"
+    ],
+    "files": [
+      "src/pages/settings/SettingsAi.jsx"
+    ]
+  },
+  {
+    "key": "settings.apiKeyCleared",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "API Key dikembalikan ke kuota bawaan sistem."
+    ],
+    "files": [
+      "src/pages/settings/SettingsAi.jsx"
+    ]
+  },
+  {
+    "key": "common.expense",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pengeluaran",
+      "pengeluaran"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx",
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "common.income",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pemasukan",
+      "pemasukan"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx",
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "settings.subAddedSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Subkategori berhasil ditambahkan."
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.catAddedSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kategori utama berhasil ditambahkan."
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.subRemovedSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Subkategori berhasil dihapus dan riwayat transaksi dialihkan ke Lainnya."
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.addCategory",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Kategori"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.category",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kategori"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.resetDefault",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Reset ke Bawaan",
+      "Reset"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.categoriesDesc",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kelola daftar kategori dan subkategori sesuai kebiasaan finansial Anda"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.noCategoriesFound",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tidak ada kategori yang cocok dengan pencarian"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.addSubcategory",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Subkategori"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteSubcategory",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Subkategori"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.addSubcategoryTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.subNameId",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Subkategori (Bahasa Indonesia) *"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.subPlaceholderId",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Contoh: Kopi Kekinian, Donat, Susu"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.subNameEn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Subkategori (English - Opsional)"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.subPlaceholderEn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Example: Specialty Coffee, Donuts"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.addIncomeCategoryTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Kategori Utama Pemasukan"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.catNameId",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Kategori (Bahasa Indonesia) *"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.catPlaceholderId",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Contoh: Freelance, Dividen, Royalti"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.catNameEn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Kategori (English - Opsional)"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.catPlaceholderEn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Example: Freelance, Dividends, Royalties"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteSubConfirm",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [],
+    "files": [
+      "src/pages/settings/SettingsCategories.jsx"
+    ]
+  },
+  {
+    "key": "common.clearSearch",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus pencarian"
+    ],
+    "files": [
+      "src/pages/settings/settingsComponents.jsx"
+    ]
+  },
+  {
+    "key": "currency.refreshRates",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Segarkan Nilai Kurs"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCurrency.jsx"
+    ]
+  },
+  {
+    "key": "currency.swapCurrencies",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tukar Mata Uang"
+    ],
+    "files": [
+      "src/pages/settings/SettingsCurrency.jsx"
+    ]
+  },
+  {
+    "key": "settings.backup.exportSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Data cadangan berhasil diunduh (JSON)."
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.needConfirm",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ketik HAPUS untuk mengonfirmasi."
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.backup.sectionTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Cadangan & Pemulihan"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.backup.description",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ekspor seluruh transaksi dan pengaturan ke berkas JSON lokal untuk cadangan mandiri."
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.backup.exportJson",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Unduh Cadangan JSON"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.backup.importTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pulihkan Data Cadangan"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.title",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Akun Permanen"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.button",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Akun Permanen"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.modalTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Konfirmasi Hapus Akun Permanen"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.warningHeader",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Peringatan: Tindakan ini tidak dapat dibatalkan!"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.modalDesc",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Untuk mengonfirmasi penghapusan akun, silakan ketik"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.modalDescSuffix",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "di bawah ini."
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.modalType",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ketik HAPUS"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "settings.deleteAccount.confirmBtn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Akun Permanen"
+    ],
+    "files": [
+      "src/pages/settings/SettingsData.jsx"
+    ]
+  },
+  {
+    "key": "common.disabled",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nonaktif"
+    ],
+    "files": [
+      "src/pages/settings/SettingsNotifications.jsx"
+    ]
+  },
+  {
+    "key": "settings.recurring.addTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Jadwal Otomatis"
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "settings.recurring.placeholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Contoh: Gaji Bulanan, Tagihan WiFi, Netflix"
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "settings.recurring.activeList",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Daftar Jadwal Transaksi"
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "settings.recurring.footnote",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Transaksi akan otomatis dicatat pada dashboard dan saldo akun saat tanggal jatuh tempo tercapai."
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "recurring.editTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ubah Jadwal Otomatis"
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "calendar.selectDate",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Pilih Tanggal"
+    ],
+    "files": [
+      "src/pages/settings/SettingsRecurring.jsx"
+    ]
+  },
+  {
+    "key": "settings.securityBioSaved",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kunci sidik jari / sandi bawaan HP berhasil diaktifkan!"
+    ],
+    "files": [
+      "src/pages/settings/SettingsSecurity.jsx"
+    ]
+  },
+  {
+    "key": "settings.securityDisabledSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kunci aplikasi dinonaktifkan."
+    ],
+    "files": [
+      "src/pages/settings/SettingsSecurity.jsx"
+    ]
+  },
+  {
+    "key": "settings.securityTimeoutSaved",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Waktu kunci otomatis berhasil diperbarui!"
+    ],
+    "files": [
+      "src/pages/settings/SettingsSecurity.jsx"
+    ]
+  },
+  {
+    "key": "settings.biometricFootnote",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Aplikasi menggunakan keamanan bawaan HP (Sidik Jari, Face Unlock, atau Pola/PIN layar HP). Anda tidak perlu menghafal PIN terpisah."
+    ],
+    "files": [
+      "src/pages/settings/SettingsSecurity.jsx"
+    ]
+  },
+  {
+    "key": "todo.emptyState.title",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tidak ada tugas"
+    ],
+    "files": [
+      "src/pages/TodoList.jsx"
+    ]
+  },
+  {
+    "key": "todo.addBtn",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Tambah Tugas"
+    ],
+    "files": [
+      "src/pages/TodoList.jsx"
+    ]
+  },
+  {
+    "key": "tx.today",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "HARI INI"
+    ],
+    "files": [
+      "src/pages/Transactions.jsx"
+    ]
+  },
+  {
+    "key": "tx.yesterday",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "KEMARIN"
+    ],
+    "files": [
+      "src/pages/Transactions.jsx"
+    ]
+  },
+  {
+    "key": "tx.duplicateSuccess",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Transaksi berhasil diduplikasi ke hari ini."
+    ],
+    "files": [
+      "src/pages/Transactions.jsx"
+    ]
+  },
+  {
+    "key": "tx.menu.bulkEdit",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Edit Massal (Bulk)"
+    ],
+    "files": [
+      "src/pages/Transactions.jsx"
+    ]
+  },
+  {
+    "key": "tx.menu.splitBill",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Bagi Tagihan (Split Bill)"
+    ],
+    "files": [
+      "src/pages/Transactions.jsx"
+    ]
+  },
+  {
+    "key": "common.today",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hari Ini"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "common.yesterday",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kemarin"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.notFound",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Akun Tidak Ditemukan"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "common.backToDashboard",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Kembali ke Dashboard"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.options",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Opsi Akun"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.primaryBadge",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Akun Utama"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.adjustBalance",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Penyesuaian Saldo"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.emptyTxTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Belum Ada Transaksi"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.optionsTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Opsi Akun Dompet"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.deleteTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Hapus Dompet"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.editTitle",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Ubah Info Dompet"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.nameLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nama Dompet / Akun *"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.namePlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Contoh: BCA Utama, Mandiri Tabungan"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.accountNumberLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Nomor Rekening / ID Akun (Opsional)"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.notesLabel",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Catatan (Opsional)"
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  },
+  {
+    "key": "wallets.notesPlaceholder",
+    "inId": false,
+    "inEn": false,
+    "fallbacks": [
+      "Catatan penggunaan akun..."
+    ],
+    "files": [
+      "src/pages/WalletDetailPage.jsx"
+    ]
+  }
+]

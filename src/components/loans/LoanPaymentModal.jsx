@@ -9,7 +9,6 @@ import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
-import useBottomSheet from '../../hooks/useBottomSheet'
 import {
   formatCurrency,
   formatMoneyInput,
@@ -25,7 +24,6 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const { recordPayment } = useLoanStore()
-  const { closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetError, setSheetError] = useState('')
   const amountInputRef = useRef(null)
 
@@ -59,6 +57,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
       setAmount('')
       setDate(new Date().toISOString().split('T')[0])
       setNotes('')
+      setPaymentWalletId(loan?.walletId ? String(loan.walletId) : '')
     }
   }
 
@@ -117,7 +116,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
     try {
       await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId)
       onSaved?.()
-      closeSheet()
+      onClose?.()
     } catch (err) {
       setSheetError(err.message || t('loans.payment.saveFailed', 'Gagal mencatat pembayaran. Silakan coba lagi.'))
     }
@@ -126,7 +125,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   return (
     <Modal
       isOpen={isOpen}
-      onClose={closeSheet}
+      onClose={onClose}
       title={isDebt ? t('loans.payment.titleDebt', 'Bayar Cicilan Hutang') : t('loans.payment.titleReceivable', 'Terima Pembayaran Piutang')}
     >
       <div className="space-y-2.5 pt-0.5 pb-2">
@@ -318,7 +317,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-[var(--fg)] flex items-center gap-1">
               <Wallet className="h-3 w-3 text-[var(--muted)]" />
-              {isDebt ? 'Dompet Sumber Dana (Pengeluaran)' : 'Dompet Penerima Dana (Pemasukan)'}
+              {isDebt
+                ? t('loans.payment.walletSourceDebt', 'Dompet Sumber Dana (Pengeluaran)')
+                : t('loans.payment.walletSourceReceivable', 'Dompet Penerima Dana (Pemasukan)')}
             </label>
             <WalletSelectTrigger
               wallet={selectedPaymentWallet}
@@ -391,7 +392,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <Button type="button" variant="secondary" onClick={closeSheet}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel', 'Batal')}
           </Button>
           <Button

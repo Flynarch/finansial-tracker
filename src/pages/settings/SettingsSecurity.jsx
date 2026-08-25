@@ -31,12 +31,12 @@ export default function SettingsSecurity() {
 
   const timeoutOptions = useMemo(
     () => [
-      { value: 0, label: 'Segera' },
-      { value: 60, label: '1 Menit' },
-      { value: 300, label: '5 Menit' },
-      { value: 900, label: '15 Menit' },
+      { value: 0, label: t('settings.security.immediately', 'Segera') },
+      { value: 60, label: t('settings.security.oneMin', '1 Menit') },
+      { value: 300, label: t('settings.security.fiveMin', '5 Menit') },
+      { value: 900, label: t('settings.security.fifteenMin', '15 Menit') },
     ],
-    [],
+    [t],
   )
 
   const handleToggleSecurity = async (enabled) => {
@@ -99,13 +99,13 @@ export default function SettingsSecurity() {
           <div className="min-w-0 flex-1">
             <h3 className="text-base sm:text-lg font-black text-[var(--fg)] leading-tight">
               {isEnabledState
-                ? 'Proteksi Biometrik Aktif'
-                : 'Proteksi Kunci Nonaktif'}
+                ? t('settings.security.bioActive', 'Proteksi Biometrik Aktif')
+                : t('settings.security.bioInactive', 'Proteksi Kunci Nonaktif')}
             </h3>
             <p className="text-xs font-medium text-[var(--muted)] mt-1 leading-relaxed">
               {isEnabledState
-                ? 'Data transaksi dilindungi oleh autentikasi biometrik & sandi layar HP'
-                : 'Aktifkan untuk melindungi privasi data keuangan Anda saat aplikasi dibuka'}
+                ? t('settings.security.bioActiveDesc', 'Data transaksi dilindungi oleh autentikasi biometrik & sandi layar HP')
+                : t('settings.security.bioInactiveDesc', 'Aktifkan untuk melindungi privasi data keuangan Anda saat aplikasi dibuka')}
             </p>
           </div>
         </div>
@@ -113,13 +113,13 @@ export default function SettingsSecurity() {
         {isEnabledState && (
           <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--border)]/60">
             <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Metode Kunci</span>
-              <span className="block text-xs font-black text-[var(--fg)] mt-0.5">Sidik Jari / Sandi HP</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.security.methodLabel', 'Metode Kunci')}</span>
+              <span className="block text-xs font-black text-[var(--fg)] mt-0.5">{t('settings.security.fingerprintOrDevice', 'Sidik Jari / Sandi HP')}</span>
             </div>
             <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-3">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Waktu Kunci</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.security.timeoutLabel', 'Waktu Kunci')}</span>
               <span className="block text-xs font-black text-[var(--fg)] mt-0.5">
-                {timeoutOptions.find((opt) => opt.value === timeoutSec)?.label || (timeoutSec === 0 ? 'Segera' : `${timeoutSec}s`)}
+                {timeoutOptions.find((opt) => opt.value === timeoutSec)?.label || (timeoutSec === 0 ? t('settings.security.immediately', 'Segera') : `${timeoutSec}s`)}
               </span>
             </div>
           </div>
@@ -136,8 +136,8 @@ export default function SettingsSecurity() {
       >
         {/* iOS-Style Toggle Switch */}
         <SettingsToggleRow
-          label="Kunci Aplikasi & Biometrik"
-          description="Gunakan kunci default perangkat Anda"
+          label={t('settings.security.appLockTitle', 'Kunci Aplikasi & Biometrik')}
+          description={t('settings.security.appLockDesc', 'Gunakan kunci default perangkat Anda')}
           icon={Fingerprint}
           checked={isEnabledState}
           onChange={handleToggleSecurity}
@@ -147,15 +147,15 @@ export default function SettingsSecurity() {
           <>
             {/* Auto Lock Timeout */}
             <SettingsSplitRow
-              label="Waktu Kunci Otomatis"
-              description="Kunci saat aplikasi di latar belakang"
+              label={t('settings.security.autoLockTimeoutTitle', 'Waktu Kunci Otomatis')}
+              description={t('settings.security.autoLockTimeoutDesc', 'Kunci saat aplikasi di latar belakang')}
               icon={Clock}
             >
               <SettingsSegmentControl
                 options={timeoutOptions}
                 value={timeoutSec}
                 onChange={(val) => handleSaveTimeout(Number(val))}
-                ariaLabel="Waktu Kunci Otomatis"
+                ariaLabel={t('settings.security.autoLockTimeoutTitle', 'Waktu Kunci Otomatis')}
               />
             </SettingsSplitRow>
 
@@ -165,7 +165,7 @@ export default function SettingsSecurity() {
                 <Smartphone className="h-5 w-5" />
               </div>
               <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
-                Saat aplikasi dibuka atau diminimalkan, dialog biometrik/sandi bawaan HP Anda akan otomatis muncul untuk verifikasi cepat dan aman.
+                {t('settings.security.infoCellDesc', 'Saat aplikasi dibuka atau diminimalkan, dialog biometrik/sandi bawaan HP Anda akan otomatis muncul untuk verifikasi cepat dan aman.')}
               </p>
             </div>
           </>
@@ -180,7 +180,7 @@ export default function SettingsSecurity() {
               className="w-full h-12 flex items-center justify-center gap-2.5 rounded-2xl bg-[var(--fg)] text-[var(--bg)] py-3 px-4 text-sm font-black hover:opacity-90 transition active:scale-95 cursor-pointer shadow-xs"
             >
               <Lock className="h-4.5 w-4.5" />
-              <span>Kunci Aplikasi Sekarang</span>
+              <span>{t('settings.security.lockNow', 'Kunci Aplikasi Sekarang')}</span>
             </button>
           </div>
         )}

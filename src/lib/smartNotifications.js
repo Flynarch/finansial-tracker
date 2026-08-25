@@ -44,6 +44,16 @@ export async function initNotificationChannels() {
       importance: 5, // Max
       visibility: 1,
     }).catch(() => {})
+
+    await LocalNotifications.createChannel({
+      id: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+      name: isEn ? 'Bill & Recurring Reminders' : 'Pengingat Tagihan & Rutin',
+      description: isEn
+        ? 'Notifications for upcoming bills and recurring commitments.'
+        : 'Notifikasi untuk tagihan dan pengeluaran rutin yang akan jatuh tempo.',
+      importance: 4, // High
+      visibility: 1,
+    }).catch(() => {})
   } catch (err) {
     console.warn('initNotificationChannels error:', err)
   }

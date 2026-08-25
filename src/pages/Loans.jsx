@@ -10,6 +10,7 @@ import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useLoanStore from '../store/useLoanStore'
 import useBottomSheet from '../hooks/useBottomSheet'
+import useBackButton from '../hooks/useBackButton'
 import useSwipeAction from '../hooks/useSwipeAction'
 import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
@@ -27,7 +28,7 @@ import {
 import { differenceInDays } from 'date-fns'
 
 export default function Loans() {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const motionDelay = reduceMotion ? 0 : 220
@@ -57,6 +58,8 @@ export default function Loans() {
   // Inline note editing state
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [noteInputText, setNoteInputText] = useState('')
+
+  useBackButton(() => setEditingNoteId(null), editingNoteId !== null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -135,18 +138,18 @@ export default function Loans() {
         const daysLeft = differenceInDays(new Date(l.dueDate), new Date())
         if (daysLeft < 0) {
           dueBadge = {
-            text: 'Telat',
+            text: t('loans.badge.overdue', 'Telat'),
             color: 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25',
           }
           isOverdue = true
         } else if (daysLeft === 0) {
           dueBadge = {
-            text: 'Hari ini',
+            text: t('loans.badge.today', 'Hari ini'),
             color: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
           }
         } else {
           dueBadge = {
-            text: `${daysLeft}h`,
+            text: locale === 'en' ? `${daysLeft}d` : `${daysLeft}h`,
             color: 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]',
           }
         }
@@ -163,7 +166,7 @@ export default function Loans() {
         isOverdue,
       }
     })
-  }, [loans])
+  }, [loans, t, locale])
 
   const totals = useMemo(() => {
     let totalDebt = 0
@@ -224,17 +227,17 @@ export default function Loans() {
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
-              aria-label={t('loans.back') || 'Kembali'}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-all cursor-pointer active:scale-95"
+              aria-label={t('loans.back')}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
             </button>
             <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-[var(--fg)]">
-                {t('loans.title') || 'Utang & Piutang'}
-              </h2>
-              <p className="text-xs font-bold text-[var(--muted)] truncate">
-                {t('loans.subtitle') || 'Kelola kewajiban utang dan tagihan piutang.'}
+              <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">
+                {t('loans.title')}
+              </h1>
+              <p className="text-xs font-bold text-[var(--muted)]">
+                {t('loans.subtitle')}
               </p>
             </div>
           </div>
@@ -242,7 +245,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={openAdd}
-            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             {t('loans.recordNew', 'Catat Baru')}
@@ -250,7 +253,7 @@ export default function Loans() {
         </div>
 
         {/* Summary Card Header */}
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-sm space-y-3.5">
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-[var(--shadow-card)] space-y-3.5">
           <div className="grid grid-cols-2 gap-4 divide-x divide-[var(--border)]">
             {/* Total Debt */}
             <div className="min-w-0">
@@ -295,8 +298,8 @@ export default function Loans() {
                 {totals.receivablePct === totals.debtPct
                   ? t('loans.balanced', 'seimbang')
                   : totals.receivablePct > totals.debtPct
-                    ? t('loans.surplus', 'surplus')
-                    : t('loans.deficit', 'beban')}
+                  ? t('loans.moreReceivable', 'piutang lebih dominan')
+                  : t('loans.moreDebt', 'utang lebih dominan')}
               </span>
               <span className="text-[var(--earthy-terra)]">{t('loans.myDebt', 'Utang')} {totals.debtPct}%</span>
             </div>
@@ -363,7 +366,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('active')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
               statusFilter === 'active'
                 ? 'bg-[var(--fg)] text-[var(--bg)] border-[var(--fg)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -375,9 +378,9 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('paid')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
               statusFilter === 'paid'
-                ? 'bg-emerald-500 text-white border-emerald-500'
+                ? 'bg-[var(--status-income)] text-white border-[var(--status-income)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
@@ -387,7 +390,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
               statusFilter === 'all'
                 ? 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border-strong)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'

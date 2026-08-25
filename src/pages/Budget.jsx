@@ -58,7 +58,7 @@ function Budget() {
   const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingBudget, setDeletingBudget] = useState(null)
-  const { swipedId, setSwipedId, getSwipeHandlers } = useSwipeAction()
+  const { setSwipedId, getSwipeHandlers } = useSwipeAction()
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
@@ -148,9 +148,12 @@ function Budget() {
     return [...unbudgetedMap.values()].sort((a, b) => b.totalSpent - a.totalSpent)
   }, [monthExpenseTxs, sortedMonthBudgets, defaultCurrency, rates])
 
-  const openAdd = useCallback(() => {
+  const [selectedInitialCategory, setSelectedInitialCategory] = useState('')
+
+  const openAdd = useCallback((initialCat = '') => {
     setEditingId(null)
     setSwipedId(null)
+    setSelectedInitialCategory(initialCat)
     openSheet()
   }, [openSheet, setSwipedId])
 
@@ -158,6 +161,7 @@ function Budget() {
     e?.stopPropagation()
     setEditingId(budget.id)
     setSwipedId(null)
+    setSelectedInitialCategory('')
     openSheet()
   }
 
@@ -194,32 +198,29 @@ function Budget() {
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer active:scale-95"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-all cursor-pointer active:scale-95"
               aria-label={t('budget.back')}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
             </button>
             <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-[var(--fg)]">{t('budget.title')}</h2>
-              <p className="text-xs font-bold text-[var(--muted)] truncate">{t('budget.subtitle')}</p>
+              <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">{t('budget.title')}</h1>
+              <p className="text-xs font-bold text-[var(--muted)]">{t('budget.subtitle')}</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={openAdd}
-            className="px-4 py-2 rounded-full bg-[var(--fg)] text-[var(--bg)] font-black text-xs shadow-md transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             {t('budget.add')}
           </button>
         </div>
 
-        {/* Summary Hero Card (Modern Premium Design) */}
-        <div className="relative overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border)_75%,transparent)] bg-gradient-to-br from-[color-mix(in_srgb,var(--panel-strong)_95%,var(--accent)_5%)] via-[var(--panel-strong)] to-[color-mix(in_srgb,var(--panel-strong)_90%,var(--accent)_10%)] p-5 sm:p-6 shadow-sm shadow-black/5 space-y-4">
-          {/* Subtle Ambient Background Light */}
-          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
-
+        {/* Summary Hero Card */}
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-4">
           {/* Top Row: Month Picker & Category Counter */}
           <div className="flex items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-2">
@@ -251,7 +252,7 @@ function Budget() {
               <p className="mt-1 text-xs font-bold text-[var(--muted)] tabular-nums">
                 {t('budget.of')} <span className="font-extrabold text-[var(--fg)]">{formatCurrency(summary.totalLimit, defaultCurrency)}</span>
                 {summary.totalLimit > 0 && (
-                  <span className={`ml-2 font-bold ${summary.isOver ? 'text-rose-500' : 'text-[var(--muted)]'}`}>
+                  <span className={`ml-2 font-bold ${summary.isOver ? 'text-[var(--status-expense)]' : 'text-[var(--muted)]'}`}>
                     ({summary.isOver ? `${t('budget.overLimit', 'Kelebihan')}: ${formatCurrency(summary.overAmount, defaultCurrency)}` : `${t('budget.remaining', 'Sisa')}: ${formatCurrency(summary.remaining, defaultCurrency)}`})
                   </span>
                 )}
@@ -262,10 +263,10 @@ function Budget() {
               <div
                 className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black border shadow-2xs backdrop-blur-md ${
                   summary.pct >= 100
-                    ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                    ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/30'
                     : summary.pct >= 80
-                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                    : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                    ? 'bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30'
+                    : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
                 }`}
               >
                 {summary.pct >= 100 ? (
@@ -285,10 +286,10 @@ function Budget() {
             <div
               className={`h-full rounded-full transition-all duration-700 ease-out shadow-xs ${
                 summary.pct >= 100
-                  ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                  ? 'bg-[var(--status-expense)]'
                   : summary.pct >= 80
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                  : 'bg-gradient-to-r from-emerald-400 to-teal-500'
+                  ? 'bg-[var(--warning)]'
+                  : 'bg-[var(--status-income)]'
               }`}
               style={{ width: `${Math.min(100, summary.pct)}%` }}
             />
@@ -333,49 +334,43 @@ function Budget() {
                 const isWarn = pct >= 80 && pct < 100
 
                 const badgeClass = isDanger
-                  ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
+                  ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border border-[var(--status-expense)]/30'
                   : isWarn
-                  ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
+                  ? 'bg-[var(--warning)]/15 text-[var(--warning)] border border-[var(--warning)]/30'
+                  : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25'
 
                 const barClass = isDanger
-                  ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                  ? 'bg-[var(--status-expense)]'
                   : isWarn
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                  : 'bg-gradient-to-r from-emerald-400 to-teal-500'
+                  ? 'bg-[var(--warning)]'
+                  : 'bg-[var(--status-income)]'
 
                 return (
                   <div
                     key={b.id}
                     className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${
                       isDanger
-                        ? 'border-rose-500/30 bg-rose-500/5'
+                        ? 'border-[var(--status-expense)]/30 bg-[var(--status-expense-soft)]'
                         : isWarn
-                        ? 'border-amber-500/30 bg-amber-500/5'
+                        ? 'border-[var(--warning)]/30 bg-[var(--warning)]/5'
                         : 'border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)]'
                     }`}
                   >
                     {/* Progressive Swipe Background (Habits Style) */}
                     <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
-                    <article
-                      className="relative z-10 bg-[var(--panel-strong)] p-4 touch-pan-y cursor-pointer"
-                      onClick={(e) => {
-                        if (swipedId === b.id) {
-                          openEdit(b, e)
-                        }
-                      }}
-                      {...getSwipeHandlers(b.id, { onEdit: () => openEdit(b), onDelete: () => setDeletingBudget(b) })}
-                    >
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="relative z-10 p-4 sm:p-5" {...getSwipeHandlers(b.id, { onEdit: () => openEdit(b), onDelete: () => setDeletingBudget(b) })}>
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${colorClass} shadow-xs`}>
-                            <CategoryIcon iconKey={iconKey} className="h-5 w-5" />
+                          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${colorClass}`}>
+                            <CategoryIcon icon={iconKey} className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-extrabold text-[var(--fg)]">{displayLabel}</p>
-                            <p className="text-[11px] font-bold text-[var(--muted)] truncate tabular-nums">
-                              {formatCurrency(spent, defaultCurrency)} / {formatCurrency(limit, defaultCurrency)}
+                            <h3 className="truncate text-sm font-extrabold text-[var(--fg)]">
+                              {displayLabel}
+                            </h3>
+                            <p className="mt-0.5 text-xs font-bold text-[var(--muted)] tabular-nums">
+                              {formatCurrency(spent, defaultCurrency)} <span className="font-normal text-[var(--muted-2)]">/ {formatCurrency(limit, defaultCurrency)}</span>
                             </p>
                           </div>
                         </div>
@@ -386,7 +381,7 @@ function Budget() {
                           <button
                             type="button"
                             onClick={(e) => openEdit(b, e)}
-                            className="p-1.5 rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                            className="min-h-[36px] min-w-[36px] flex items-center justify-center p-2 rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors active:scale-90 cursor-pointer"
                             title={t('budget.edit')}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
@@ -394,7 +389,7 @@ function Budget() {
                         </div>
                       </div>
 
-                      <div className="mt-3.5 h-2 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
+                      <div className="mt-4 h-2 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${barClass}`}
                           style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -405,11 +400,11 @@ function Budget() {
                         <span className="text-[var(--muted)]">
                           {isOver ? t('budget.overBudget', 'Kelebihan anggaran') : t('budget.remainingBudget', 'Sisa anggaran')}
                         </span>
-                        <span className={isOver ? 'text-rose-500 font-extrabold' : 'text-[var(--fg)]'}>
+                        <span className={isOver ? 'text-[var(--status-expense)] font-extrabold' : 'text-[var(--fg)]'}>
                           {isOver ? formatCurrency(spent - limit, defaultCurrency) : formatCurrency(remaining, defaultCurrency)}
                         </span>
                       </div>
-                    </article>
+                    </div>
                   </div>
                 )
               })}
@@ -424,7 +419,7 @@ function Budget() {
               <div className="flex items-center gap-1.5">
                 <AlertOctagon className="h-4 w-4 text-amber-500" />
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--fg)]">
-                  Pengeluaran Tanpa Anggaran ({unbudgetedExpenses.length})
+                  {t('budget.unbudgetedTitle', 'Pengeluaran Tanpa Anggaran ({{count}})', { count: unbudgetedExpenses.length })}
                 </h3>
               </div>
               <span className="text-[11px] font-bold text-[var(--muted)]">
@@ -450,7 +445,7 @@ function Budget() {
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-[var(--fg)]">{displayLabel}</p>
                         <p className="text-[10px] text-[var(--muted)] font-medium">
-                          {item.count} Transaksi
+                          {t('wallets.txCount', '{{count}} Transaksi', { count: item.count })}
                         </p>
                       </div>
                     </div>
@@ -479,6 +474,7 @@ function Budget() {
           onClose={closeSheet}
           editingBudget={budgets?.find((b) => b.id === editingId)}
           month={month}
+          initialCategory={selectedInitialCategory}
         />
         <ConfirmDeleteModal
           isOpen={!!deletingBudget}
@@ -489,8 +485,8 @@ function Budget() {
               setDeletingBudget(null)
             }
           }}
-          title={t('budget.delete') || 'Hapus Anggaran'}
-          message={t('budget.deleteConfirm') || 'Apakah Anda yakin ingin menghapus anggaran ini?'}
+          title={t('budget.delete')}
+          message={t('budget.deleteConfirm')}
         />
       </div>
     </div>

@@ -274,7 +274,7 @@ export default function SettingsHome() {
                   {profileName || 'Rico'}
                 </h3>
                 <span className="rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)]">
-                  v4.5.0
+                  v4.6.4
                 </span>
               </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)] truncate font-medium">
@@ -286,10 +286,10 @@ export default function SettingsHome() {
                 {authProvider === 'google'
                   ? `Google • ${authUserEmail || 'Connected'}`
                   : authProvider === 'email'
-                  ? `Email • ${authUserEmail || 'Registered'}${emailVerified ? ' (Terverifikasi)' : ''}`
+                  ? `Email • ${authUserEmail || 'Registered'}${emailVerified ? ` (${t('auth.verified', 'Terverifikasi')})` : ''}`
                   : authProvider === 'anonymous'
-                  ? 'Akun Anonim (Tamu)'
-                  : 'Mode Tamu'}
+                  ? t('settings.anonymousAccount', 'Akun Anonim (Tamu)')
+                  : t('settings.guestMode', 'Mode Tamu')}
               </p>
             </div>
           </div>
@@ -384,7 +384,7 @@ export default function SettingsHome() {
                 <h4 className="font-extrabold text-sm text-emerald-400 tracking-tight">
                   {t('auth.emailVerifiedSuccessTitle', 'Email Berhasil Terverifikasi!')}
                 </h4>
-                <p className="text-xs text-emerald-500/90 leading-relaxed truncate mt-0.5">
+                <p className="text-xs text-emerald-500/90 leading-relaxed mt-0.5">
                   {authUserEmail} • {t('auth.emailVerifiedSuccessSubtitle', 'Akun Anda telah diamankan & terhubung.')}
                 </p>
               </div>
@@ -401,14 +401,14 @@ export default function SettingsHome() {
                       {t('auth.emailUnverifiedTitle', 'Verifikasi Alamat Email')}
                     </h4>
                   </div>
-                  <p className="text-xs text-[var(--muted)] leading-relaxed truncate">
+                  <p className="text-xs text-[var(--muted)] leading-relaxed">
                     {authUserEmail} • {t('auth.emailUnverifiedSubtitle', 'Amankan akun dan cadangan data Anda.')}
                   </p>
                 </div>
               </div>
 
               {verifFeedback && (
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 px-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500 px-1">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{verifFeedback}</span>
                 </div>
@@ -419,7 +419,7 @@ export default function SettingsHome() {
                   type="button"
                   onClick={handleSendVerification}
                   disabled={isVerifLoading || verifCooldown > 0}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-amber-500 text-white dark:text-slate-900 font-extrabold text-xs hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-xs hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <Send size={14} />
                   <span>
@@ -640,7 +640,7 @@ export default function SettingsHome() {
                 setIsGuestWarningOpen(false)
                 setIsConnectModalOpen(true)
               }}
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-[var(--bg)] font-bold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--accent)] text-white font-bold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
             >
               <ShieldCheck size={16} />
               <span>{t('settings.connectAccountNow', 'Hubungkan Akun Sekarang')}</span>

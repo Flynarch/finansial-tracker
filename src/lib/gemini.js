@@ -19,13 +19,11 @@ function getEffectiveApiKey() {
 }
 
 const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3-flash',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-2.5-pro',
   'gemini-2.0-flash',
-  'gemini-2.0-pro'
+  'gemini-2.0-pro',
 ]
 
 export function buildCategoryContext(locale) {
@@ -481,6 +479,10 @@ export async function parseTransactionFromText(userMessage, context) {
   const sysPrompt = `Kamu adalah AI Financial Companion FinTrack yang sangat cerdas, responsif, dan empathic (Proactive Smart Advisor).
 Hari ini adalah tanggal: ${today} dan waktu saat ini adalah jam ${currentTime} (Waktu Lokal).
 Gunakan waktu ini sebagai acuan konteks (pagi/siang/malam/sarapan/makan siang/makan malam). Default currency: ${defaultCurrency}.
+
+ATURAN EMAS (ZERO EMOJI RULE):
+DILARANG KERAS MENGGUNAKAN EMOJI DALAM SEMUA BENTUK BALASAN, KATA, CHIPS, ATAU FIELD JSON. Gunakan teks bersih, rapi, dan profesional.
+${locale === 'en' ? 'LANGUAGE: Respond strictly in English. All explanations, suggestions, and chips must be in English.' : 'BAHASA: Gunakan Bahasa Indonesia yang ramah, sopan, dan solutif.'}
 
 RINGKASAN REAL-TIME PENGGUNA SAAT INI:
 ${monthSummary}
@@ -1227,7 +1229,14 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
     ]
     const response = await callApiWithFallback(contents)
     const rawText = response.text || '{}'
-    const parsed = JSON.parse(rawText)
+    const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim()
+    let parsed = {}
+    try {
+      parsed = JSON.parse(cleanJson)
+    } catch {
+      const jsonMatch = cleanJson.match(/\{[\s\S]*\}/)
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+    }
 
     // Sanitize category
     let finalCategory = parsed.suggestedCategory || 'belanja/lainnya'

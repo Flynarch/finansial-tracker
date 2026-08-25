@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { translate } from '../../lib/i18n'
 import useSettingsStore from '../../store/useSettingsStore'
-import useTransactionStore from '../../store/useTransactionStore'
-import useWalletStore from '../../store/useWalletStore'
+import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../../services/transactionService'
+import { createWallet } from '../../services/walletService'
 import useLoanStore from '../../store/useLoanStore'
 import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -23,10 +23,7 @@ import useBackButton from '../../hooks/useBackButton'
 export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) {
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const addTransaction = useTransactionStore((s) => s.addTransaction)
-  const updateTransaction = useTransactionStore((s) => s.updateTransaction)
-  const deleteTransaction = useTransactionStore((s) => s.deleteTransaction)
-  const transactions = useTransactionStore((s) => s.transactions)
+  const transactions = useLiveQuery(() => db.transactions.toArray(), []) || []
   const addLoan = useLoanStore((s) => s.addLoan)
   const recordPayment = useLoanStore((s) => s.recordPayment)
   const updateLoan = useLoanStore((s) => s.updateLoan)
@@ -627,13 +624,11 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       }
 
       if (result.type === 'wallet') {
-        const createWalletFn = useWalletStore.getState().createWallet
-        
         if (result.action === 'create') {
           const walletName = result.name || 'Dompet Baru'
           const initialBal = result.initialBalance || 0
           const wType = result.walletType || 'bank'
-          await createWalletFn({
+          await createWallet({
             name: walletName,
             institutionType: wType,
             currency: defaultCurrency,

@@ -1,10 +1,13 @@
 import { MessageSquareText, Sparkles, ArrowRight, RotateCcw } from 'lucide-react'
+import useTranslation from '../../hooks/useTranslation'
 
 export default function AiIntentSwitchDialog({
   rawPrompt = '',
   onSwitchToChat,
   onStay,
 }) {
+  const { t } = useTranslation()
+
   return (
     <div className="flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-250 p-1">
       {/* Visual Notice Card */}
@@ -15,17 +18,17 @@ export default function AiIntentSwitchDialog({
 
         <div className="space-y-1">
           <h3 className="text-base font-black text-[var(--fg)] tracking-tight">
-            Wah, sepertinya ini bukan catatan transaksi!
+            {t('ai.intentNoticeTitle', 'Wah, sepertinya ini bukan catatan transaksi!')}
           </h3>
           <p className="text-xs text-[var(--muted)] max-w-xs mx-auto">
-            Input Anda berupa pertanyaan atau obrolan. Mau lanjut ke <strong>Mode Chat</strong> untuk berdiskusi dengan Asisten FinTrack?
+            {t('ai.intentNoticeDesc', 'Input Anda berupa pertanyaan atau obrolan. Mau lanjut ke Mode Chat untuk berdiskusi dengan Asisten FinTrack?')}
           </p>
         </div>
 
         {/* User Prompt Quote */}
         {rawPrompt ? (
-          <div className="rounded-2xl border border-[var(--border)]/60 bg-[var(--panel-strong)] p-3 text-xs font-semibold text-[var(--fg)] italic max-w-xs mx-auto truncate">
-            "{rawPrompt}"
+          <div className="rounded-2xl border border-[var(--border)]/60 bg-[var(--panel-strong)] p-3 text-xs font-semibold text-[var(--fg)] italic max-w-xs mx-auto break-words line-clamp-3">
+            &ldquo;{rawPrompt}&rdquo;
           </div>
         ) : null}
       </div>
@@ -38,7 +41,7 @@ export default function AiIntentSwitchDialog({
           className="flex-1 flex items-center justify-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] py-3 px-3.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          <span>Ubah Catatan</span>
+          <span>{t('ai.editNote', 'Ubah Catatan')}</span>
         </button>
 
         <button
@@ -47,7 +50,7 @@ export default function AiIntentSwitchDialog({
           className="ft-btn-primary flex-1 flex items-center justify-center gap-1.5 py-3 px-4 text-xs font-black cursor-pointer shadow-lg"
         >
           <MessageSquareText className="h-3.5 w-3.5" />
-          <span>Lanjut ke Chat</span>
+          <span>{t('ai.continueToChat', 'Lanjut ke Chat')}</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>

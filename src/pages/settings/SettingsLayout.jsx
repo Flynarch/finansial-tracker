@@ -22,7 +22,7 @@ export default function SettingsLayout() {
   return (
     <div className="ft-settings-page">
       {meta ? (
-        <header className="sticky top-0 z-20 mb-5 flex items-center gap-3.5 bg-[var(--bg)]/95 py-3.5 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--bg)]/80">
+        <header className="sticky top-0 z-20 mb-5 flex items-center gap-3.5 bg-[var(--bg)] py-3.5 border-b border-[var(--border)]/40 -mx-4 px-4 sm:-mx-6 sm:px-6">
           <button
             type="button"
             onClick={() => navigate('/settings')}

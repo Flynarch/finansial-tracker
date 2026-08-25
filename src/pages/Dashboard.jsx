@@ -42,6 +42,7 @@ export default function Dashboard() {
     rates,
     currentMonthLabel,
     walletsWithBalance,
+    totalWalletBalance,
     monthIncome,
     monthExpense,
     groupedRecentEntries,
@@ -89,16 +90,13 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (!walletsWithBalance) return
-    const active = walletsWithBalance.filter((w) => !w.isArchived)
-    const total = active.reduce((acc, w) => acc + (Number(w.currentBalance) || 0), 0)
     syncNativeWidgetData({
-      totalBalance: total,
+      totalBalance: Number(totalWalletBalance) || 0,
       monthIncome: Number(monthIncome) || 0,
       monthExpense: Number(monthExpense) || 0,
       defaultCurrency: defaultCurrency || 'IDR',
     })
-  }, [walletsWithBalance, monthIncome, monthExpense, defaultCurrency])
+  }, [totalWalletBalance, monthIncome, monthExpense, defaultCurrency])
 
   const closeZoom = useCallback(() => {
     if (zoomedChart === 'revenue') {
@@ -121,8 +119,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!zoomedChart) return undefined
-    window.requestAnimationFrame(() => setZoomVisible(true))
-    return undefined
+    let rId2
+    const rId1 = window.requestAnimationFrame(() => {
+      rId2 = window.requestAnimationFrame(() => {
+        setZoomVisible(true)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(rId1)
+      if (rId2) window.cancelAnimationFrame(rId2)
+    }
   }, [zoomedChart])
 
   useEffect(() => {

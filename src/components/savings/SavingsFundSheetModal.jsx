@@ -234,7 +234,7 @@ export default function SavingsFundSheetModal({
         </div>
 
         {/* Warning if withdrawal exceeds balance */}
-        {fundActionType === 'withdraw' && parseMoneyInput(amountInput) > Number(goal.currentAmount || 0) && (
+        {fundActionType === 'withdraw' && parseMoneyInput(amountInput, goal.currency || defaultCurrency) > Number(goal.currentAmount || 0) && (
           <div className="rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] p-2.5 text-center text-xs font-bold text-[var(--earthy-terra)]">
             Nominal penarikan melebihi saldo tabungan terkumpul.
           </div>
@@ -245,9 +245,9 @@ export default function SavingsFundSheetModal({
           type="button"
           disabled={
             !amountInput ||
-            parseMoneyInput(amountInput) <= 0 ||
+            parseMoneyInput(amountInput, goal.currency || defaultCurrency) <= 0 ||
             isSubmitting ||
-            (fundActionType === 'withdraw' && parseMoneyInput(amountInput) > Number(goal.currentAmount || 0))
+            (fundActionType === 'withdraw' && parseMoneyInput(amountInput, goal.currency || defaultCurrency) > Number(goal.currentAmount || 0))
           }
           onClick={handleSave}
           className={`w-full py-3.5 rounded-2xl font-black text-xs text-white shadow-md transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${

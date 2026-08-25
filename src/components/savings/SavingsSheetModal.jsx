@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -24,6 +25,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
     targetAmount: '',
     currentAmount: '',
     currency: defaultCurrency,
+    deadline: '',
   })
 
   const [prevOpen, setPrevOpen] = useState(isOpen)
@@ -40,6 +42,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
           targetAmount: formatMoneyValueForInput(editingGoal.targetAmount, editingGoal.currency || defaultCurrency),
           currentAmount: formatMoneyValueForInput(editingGoal.currentAmount, editingGoal.currency || defaultCurrency),
           currency: editingGoal.currency || defaultCurrency,
+          deadline: editingGoal.deadline || '',
         })
       } else {
         setForm({
@@ -47,6 +50,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
           targetAmount: '',
           currentAmount: '',
           currency: defaultCurrency,
+          deadline: '',
         })
       }
     }
@@ -58,6 +62,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
       targetAmount: parseMoneyInput(form.targetAmount, form.currency),
       currentAmount: parseMoneyInput(form.currentAmount, form.currency),
       currency: form.currency || defaultCurrency,
+      deadline: form.deadline || null,
     }
     if (!payload.name) {
       setSheetError(t('savings.validation.name'))
@@ -175,6 +180,14 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
               ))}
             </select>
           </label>
+          <div className="flex flex-col">
+            <span className="ft-label text-xs mb-1">{t('savings.deadline', 'Target Tanggal (Opsional)')}</span>
+            <CustomDatePicker
+              value={form.deadline}
+              onChange={(d) => setForm((p) => ({ ...p, deadline: d }))}
+              placeholder={t('savings.selectDeadline', 'Pilih Target Tanggal')}
+            />
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">

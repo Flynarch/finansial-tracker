@@ -66,20 +66,20 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
 
           if (latestTx?.type === 'transfer') {
             iconKey = 'transfer'
-            colorClass = 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
+            colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
             const fromW = wallets.find((w) => String(w.id) === String(latestTx.walletId))
             const toW = wallets.find((w) => String(w.id) === String(latestTx.targetWalletId))
             const fromName = fromW?.name || 'Wallet'
             const toName = toW?.name || 'Wallet'
             labels = {
               main: locale === 'en' ? 'Transfer' : 'Transfer',
-              sub: `${fromName} ➔ ${toName}`,
+              sub: `${fromName} -> ${toName}`,
             }
             amountPrefix = ''
-            amountColorClass = 'text-blue-600 dark:text-blue-400'
+            amountColorClass = 'text-[var(--accent)]'
           } else if (latestTx?.type === 'balance_adjustment') {
             iconKey = 'adjustment'
-            colorClass = 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/25'
+            colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
             labels = {
               main: locale === 'en' ? 'Balance Adjustment' : 'Penyesuaian Saldo',
               sub: locale === 'en' ? 'System' : 'Sistem',
@@ -110,7 +110,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
             <div className="flex flex-col gap-2 ft-smooth-in">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{dateLabel}</p>
-                <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[var(--bg)]">
+                <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white">
                   {t('dashboard.newBadge', 'BARU')}
                 </span>
               </div>
@@ -165,7 +165,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                         <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
                       ) : null}
                       {noteStr ? (
-                        <p className="mt-0.5 truncate text-[9px] italic leading-tight text-[var(--muted-2)]">{noteStr}</p>
+                        <p className="mt-0.5 text-[9.5px] italic leading-tight text-[var(--muted-2)] line-clamp-2 break-words">&ldquo;{noteStr}&rdquo;</p>
                       ) : null}
                     </div>
                   </div>

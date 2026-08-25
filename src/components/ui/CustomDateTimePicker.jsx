@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { format, addDays, startOfMonth, startOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns'
-import { id as idLocale } from 'date-fns/locale'
+import { id as idLocale, enUS } from 'date-fns/locale'
 import { Calendar, Clock, ChevronLeft, ChevronRight, Check, Trash2 } from 'lucide-react'
 import BottomSheet from './BottomSheet'
+import useTranslation from '../../hooks/useTranslation'
 
 const ITEM_HEIGHT = 40
 
@@ -105,7 +106,12 @@ function DrumWheelColumn({ items, value, onChange, label, formatLabel }) {
   )
 }
 
-export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDate, onChangeTime, label = 'Jatuh Tempo & Jam' }) {
+export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDate, onChangeTime, label }) {
+  const { t, locale } = useTranslation()
+  const activeLocale = locale === 'en' ? 'en' : 'id'
+  const dateLocale = activeLocale === 'en' ? enUS : idLocale
+
+  const resolvedLabel = label !== undefined ? label : (activeLocale === 'en' ? 'Due Date & Time' : 'Jatuh Tempo & Jam')
   const [isOpen, setIsOpen] = useState(false)
   const [tempDate, setTempDate] = useState(dateValue || '')
   const [tempTime, setTempTime] = useState(timeValue || '')
@@ -168,9 +174,13 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
     setIsOpen(false)
   }
 
+  const dayHeaders = activeLocale === 'en'
+    ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    : ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+
   return (
     <div className="relative min-w-0">
-      {label && <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">{label}</label>}
+      {resolvedLabel && <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">{resolvedLabel}</label>}
       <button
         type="button"
         onClick={() => {
@@ -182,7 +192,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
         <div className="flex items-center gap-2.5 min-w-0">
           <Calendar className={`h-4 w-4 shrink-0 ${selectedDate ? 'text-[var(--accent)]' : 'text-[var(--muted)]'}`} strokeWidth={2.2} />
           <span className={`truncate ${selectedDate ? 'text-[var(--fg)]' : 'text-[var(--muted)]'}`}>
-            {selectedDate ? format(selectedDate, 'dd MMMM yyyy', { locale: idLocale }) : 'Tanpa Tenggat Waktu (Opsional)'}
+            {selectedDate ? format(selectedDate, 'dd MMMM yyyy', { locale: dateLocale }) : (activeLocale === 'en' ? 'No Due Date (Optional)' : 'Tanpa Tenggat Waktu (Opsional)')}
           </span>
           {selectedDate && timeValue && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-xs font-bold text-[var(--accent)] shrink-0">
@@ -197,7 +207,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
       <BottomSheet
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        title={label || 'Pilih Tanggal & Jam'}
+        title={resolvedLabel || (activeLocale === 'en' ? 'Select Date & Time' : 'Pilih Tanggal & Jam')}
         maxWidth="max-w-sm"
         maxHeight="max-h-[min(88dvh,46rem)]"
         className="overflow-hidden touch-none"
@@ -212,7 +222,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
                 className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border border-rose-500/30 transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0"
               >
                 <Trash2 className="h-3 w-3" />
-                Tanpa Tanggal
+                {activeLocale === 'en' ? 'No Date' : 'Tanpa Tanggal'}
               </button>
             ) : null}
             <button
@@ -220,34 +230,35 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
               onClick={() => setQuickDate(0)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/40 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Hari Ini
+              {t('tx.filter.today', 'Hari Ini')}
             </button>
             <button
               type="button"
               onClick={() => setQuickDate(1)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/40 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Besok
+              {activeLocale === 'en' ? 'Tomorrow' : 'Besok'}
             </button>
             <button
               type="button"
               onClick={() => setQuickDate(7)}
               className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white border border-[var(--border)]/40 transition-colors whitespace-nowrap cursor-pointer shrink-0"
             >
-              Minggu Depan
+              {activeLocale === 'en' ? 'Next Week' : 'Minggu Depan'}
             </button>
           </div>
 
           {/* Month Header & Nav */}
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--fg)]">
-              {format(viewDate, 'MMMM yyyy', { locale: idLocale })}
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--fg)] capitalize">
+              {format(viewDate, 'MMMM yyyy', { locale: dateLocale })}
             </h4>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setViewDate((d) => subMonths(d, 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
+                aria-label={activeLocale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -255,6 +266,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
                 type="button"
                 onClick={() => setViewDate((d) => addMonths(d, 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
+                aria-label={activeLocale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -264,7 +276,9 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
           {/* Calendar Grid (Non-scrollable, touch-none to prevent sheet scrolling) */}
           <div className="touch-none select-none">
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-[var(--muted)] mb-1">
-              <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+              {dayHeaders.map((d) => (
+                <span key={d}>{d}</span>
+              ))}
             </div>
             <div className="grid grid-cols-7 gap-1 min-h-[13.5rem]">
               {calendarDays.map((day) => {
@@ -302,7 +316,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[var(--fg)] flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-[var(--accent)]" />
-                Atur Jam Pelaksanaan
+                {activeLocale === 'en' ? 'Set Execution Time' : 'Atur Jam Pelaksanaan'}
               </span>
               <span className="text-xs font-black tabular-nums bg-[var(--accent)]/15 text-[var(--accent)] px-2.5 py-0.5 rounded-full border border-[var(--accent)]/30">
                 {currentHour}:{currentMinute}
@@ -314,8 +328,8 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
                 items={hours}
                 value={currentHour}
                 onChange={handleHourChange}
-                label="Jam"
-                formatLabel={(h) => `${h} Jam`}
+                label={activeLocale === 'en' ? 'Hour' : 'Jam'}
+                formatLabel={(h) => (activeLocale === 'en' ? `${h}h` : `${h} Jam`)}
               />
 
               <div className="font-extrabold text-base text-[var(--accent)] opacity-60 self-center pt-4 shrink-0">:</div>
@@ -324,8 +338,8 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
                 items={minutes}
                 value={currentMinute}
                 onChange={handleMinuteChange}
-                label="Menit"
-                formatLabel={(m) => `${m} Menit`}
+                label={activeLocale === 'en' ? 'Min' : 'Menit'}
+                formatLabel={(m) => (activeLocale === 'en' ? `${m}m` : `${m} Menit`)}
               />
             </div>
           </div>
@@ -336,7 +350,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
             className="w-full py-2.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer mt-1"
           >
             <Check className="h-4 w-4" />
-            Selesai
+            {activeLocale === 'en' ? 'Done' : 'Selesai'}
           </button>
         </div>
       </BottomSheet>

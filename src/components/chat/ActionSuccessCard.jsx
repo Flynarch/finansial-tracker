@@ -14,142 +14,148 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import useChatStore from '../../store/useChatStore'
+import useTranslation from '../../hooks/useTranslation'
 
 const CONFIG = {
   habit: {
     create: {
-      label: 'Habit Baru Dibuat',
-      desc: 'Ditambahkan ke daftar kebiasaan harian',
+      labelKey: 'ai.action.habitCreated',
+      descKey: 'ai.action.habitCreatedDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: Flame,
       route: '/todos',
-      actionText: 'Lihat Habit',
+      actionKey: 'ai.action.viewHabit',
     },
     log: {
-      label: 'Habit Tercatat',
-      desc: 'Konsistensi hari ini terjaga',
+      labelKey: 'ai.action.habitLogged',
+      descKey: 'ai.action.habitLoggedDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: CalendarCheck,
       route: '/todos',
-      actionText: 'Lihat Habit',
+      actionKey: 'ai.action.viewHabit',
     },
     log_all: {
-      label: 'Semua Habit Tercatat',
-      desc: 'Konsistensi harian sempurna!',
+      labelKey: 'ai.action.allHabitsLogged',
+      descKey: 'ai.action.allHabitsLoggedDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: CalendarCheck,
       route: '/todos',
-      actionText: 'Lihat Habit',
+      actionKey: 'ai.action.viewHabit',
     },
   },
   todo: {
     create: {
-      label: 'Tugas Baru Dibuat',
-      desc: 'Ditambahkan ke daftar To-Do Anda',
+      labelKey: 'ai.action.taskCreated',
+      descKey: 'ai.action.taskCreatedDesc',
       badgeClass: 'bg-[var(--accent)]/15 border-[var(--accent)]/25 text-[var(--accent)]',
       Icon: ListChecks,
       route: '/todos',
-      actionText: 'Lihat Tugas',
+      actionKey: 'ai.action.viewTask',
     },
     done: {
-      label: 'Tugas Selesai',
-      desc: 'Berhasil diselesaikan',
+      labelKey: 'ai.action.taskDone',
+      descKey: 'ai.action.taskDoneDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: Check,
       route: '/todos',
-      actionText: 'Lihat Tugas',
+      actionKey: 'ai.action.viewTask',
     },
   },
   budget: {
     create: {
-      label: 'Anggaran Berhasil Diset',
-      desc: 'Batas pengeluaran kategori diperbarui',
+      labelKey: 'ai.action.budgetSet',
+      descKey: 'ai.action.budgetSetDesc',
       badgeClass: 'bg-amber-500/15 border-amber-500/25 text-amber-500',
       Icon: CircleDollarSign,
       route: '/budget',
-      actionText: 'Lihat Anggaran',
+      actionKey: 'ai.action.viewBudget',
     },
     update: {
-      label: 'Anggaran Diperbarui',
-      desc: 'Batas pengeluaran telah disesuaikan',
+      labelKey: 'ai.action.budgetUpdated',
+      descKey: 'ai.action.budgetUpdatedDesc',
       badgeClass: 'bg-amber-500/15 border-amber-500/25 text-amber-500',
       Icon: CircleDollarSign,
       route: '/budget',
-      actionText: 'Lihat Anggaran',
+      actionKey: 'ai.action.viewBudget',
     },
   },
   savings: {
     create: {
-      label: 'Target Tabungan Dibuat',
-      desc: 'Tujuan baru berhasil ditambahkan',
+      labelKey: 'ai.action.savingsCreated',
+      descKey: 'ai.action.savingsCreatedDesc',
       badgeClass: 'bg-[var(--accent)]/15 border-[var(--accent)]/25 text-[var(--accent)]',
       Icon: Target,
       route: '/savings',
-      actionText: 'Lihat Tabungan',
+      actionKey: 'ai.action.viewSavings',
     },
     add: {
-      label: 'Setoran Tabungan Berhasil',
-      desc: 'Progres impian Anda bertambah',
+      labelKey: 'ai.action.savingsDeposit',
+      descKey: 'ai.action.savingsDepositDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: PiggyBank,
       route: '/savings',
-      actionText: 'Lihat Tabungan',
+      actionKey: 'ai.action.viewSavings',
     },
   },
   recurring: {
     create: {
-      label: 'Tagihan Rutin Dibuat',
-      desc: 'Jadwal transaksi berulang dikonfigurasi',
+      labelKey: 'ai.action.recurringCreated',
+      descKey: 'ai.action.recurringCreatedDesc',
       badgeClass: 'bg-[var(--accent)]/15 border-[var(--accent)]/25 text-[var(--accent)]',
       Icon: CircleDollarSign,
       route: '/settings/recurring',
-      actionText: 'Lihat Jadwal',
+      actionKey: 'ai.action.viewRecurring',
     },
   },
   wallet: {
     create: {
-      label: 'Dompet Baru Dibuat',
-      desc: 'Akun baru siap digunakan',
+      labelKey: 'ai.action.walletCreated',
+      descKey: 'ai.action.walletCreatedDesc',
       badgeClass: 'bg-sky-500/15 border-sky-500/25 text-sky-500',
       Icon: Wallet,
       route: '/dashboard',
-      actionText: 'Lihat Dompet',
+      actionKey: 'ai.action.viewWallet',
     },
     transfer: {
-      label: 'Transfer Saldo Berhasil',
-      desc: 'Pemindahan dana antar dompet selesai',
+      labelKey: 'ai.action.transferSuccess',
+      descKey: 'ai.action.transferSuccessDesc',
       badgeClass: 'bg-sky-500/15 border-sky-500/25 text-sky-500',
       Icon: ArrowRightLeft,
       route: '/dashboard',
-      actionText: 'Lihat Dompet',
+      actionKey: 'ai.action.viewWallet',
     },
   },
   loan: {
     create: {
-      label: 'Catatan Pinjaman Dibuat',
-      desc: 'Utang / piutang berhasil dicatat',
+      labelKey: 'ai.action.loanCreated',
+      descKey: 'ai.action.loanCreatedDesc',
       badgeClass: 'bg-rose-500/15 border-rose-500/25 text-rose-500',
       Icon: HandCoins,
       route: '/loans',
-      actionText: 'Lihat Pinjaman',
+      actionKey: 'ai.action.viewLoan',
     },
     pay: {
-      label: 'Cicilan Berhasil Dicatat',
-      desc: 'Sisa tagihan pinjaman telah berkurang',
+      labelKey: 'ai.action.loanPaid',
+      descKey: 'ai.action.loanPaidDesc',
       badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
       Icon: CheckCircle2,
       route: '/loans',
-      actionText: 'Lihat Pinjaman',
+      actionKey: 'ai.action.viewLoan',
     },
   },
 }
 
 export default function ActionSuccessCard({ type = 'todo', action = 'create', title = '', subtitle = '' }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const onClose = useChatStore((s) => s.closeChat)
 
   const cfg = CONFIG[type]?.[action] || CONFIG.todo?.create || CONFIG.habit.create
   const IconComp = cfg.Icon
+
+  const label = t(cfg.labelKey, cfg.label || 'Tindakan Berhasil')
+  const desc = t(cfg.descKey, cfg.desc || 'Berhasil diproses')
+  const actionText = cfg.actionKey ? t(cfg.actionKey, 'Lihat') : null
 
   const handleActionClick = () => {
     if (onClose) onClose()
@@ -170,8 +176,8 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
             <IconComp size={15} strokeWidth={2.5} />
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-black text-[var(--fg)] leading-tight">{cfg.label}</span>
-            <span className="text-[10px] text-[var(--muted)] font-medium">{cfg.desc}</span>
+            <span className="text-xs font-black text-[var(--fg)] leading-tight">{label}</span>
+            <span className="text-[10px] text-[var(--muted)] font-medium">{desc}</span>
           </div>
         </div>
       </div>
@@ -182,13 +188,13 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
           <div className="text-xs font-black text-[var(--fg)] truncate">{title}</div>
           {subtitle && <div className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5">{subtitle}</div>}
         </div>
-        {cfg.actionText && (
+        {actionText && (
           <button
             type="button"
             onClick={handleActionClick}
             className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer"
           >
-            <span>{cfg.actionText}</span>
+            <span>{actionText}</span>
             <ArrowRight size={12} strokeWidth={2.5} />
           </button>
         )}

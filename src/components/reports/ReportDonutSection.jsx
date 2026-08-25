@@ -336,7 +336,7 @@ export default function ReportDonutSection({
                         </div>
                         {row.isParent ? (
                           <span className="rounded bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition shrink-0">
-                            {locale === 'en' ? 'Sub ›' : 'Lihat Sub ›'}
+                            {t('reports.viewSub', 'Lihat Sub ›')}
                           </span>
                         ) : null}
                       </div>

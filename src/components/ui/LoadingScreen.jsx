@@ -1,9 +1,10 @@
+import useTranslation from '../../hooks/useTranslation'
+
 function LoadingScreen() {
+  const { t } = useTranslation()
+
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--bg)] text-[var(--fg)] relative overflow-hidden">
-      {/* Background ambient glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[300px] w-[300px] rounded-full bg-[var(--accent)] opacity-[0.07] blur-[100px]" />
-      
       <div className="flex flex-col items-center gap-8 relative z-10">
         <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[var(--fg)] shadow-[0_16px_40px_rgba(0,0,0,0.3)] ring-1 ring-white/5">
           <span className="text-3xl font-black tracking-[0.15em] text-[var(--bg)] ml-2">FT</span>
@@ -16,7 +17,7 @@ function LoadingScreen() {
         <div className="flex flex-col items-center gap-2.5">
           <h1 className="text-[13px] font-bold tracking-[0.3em] uppercase text-[var(--fg)] ml-1">FinTrack</h1>
           <span className="text-[9px] font-bold tracking-widest text-[var(--muted)] uppercase animate-pulse">
-            Memuat Data...
+            {t('common.loadingData', 'Memuat Data...')}
           </span>
         </div>
       </div>

@@ -12,13 +12,14 @@ import CategoryIcon from '../components/ui/CategoryIcon'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import { db } from '../lib/db'
+import { createTransaction } from '../services/transactionService'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../lib/utils'
-import { Trash2 } from 'lucide-react'
+import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 
@@ -50,17 +51,15 @@ function Toolbar({ label, onNavigate, t }) {
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--panel-strong)] text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--panel-strong)] text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95 cursor-pointer"
           onClick={() => onNavigate('PREV')}
           aria-label={t('calendar.nav.prev')}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
         </button>
         <button
           type="button"
-          className="flex h-9 items-center justify-center rounded-xl bg-[var(--panel-strong)] px-4 text-xs font-bold uppercase tracking-wider text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95"
+          className="flex h-11 items-center justify-center rounded-xl bg-[var(--panel-strong)] px-4 text-xs font-bold uppercase tracking-wider text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95 cursor-pointer"
           onClick={() => onNavigate('TODAY')}
           aria-label={t('calendar.nav.today')}
         >
@@ -68,13 +67,11 @@ function Toolbar({ label, onNavigate, t }) {
         </button>
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--panel-strong)] text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--panel-strong)] text-[var(--fg)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_80%,var(--border))] active:scale-95 cursor-pointer"
           onClick={() => onNavigate('NEXT')}
           aria-label={t('calendar.nav.next')}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronRight className="h-5 w-5" strokeWidth={2.2} />
         </button>
       </div>
       <div className="px-2 text-[15px] font-bold tracking-tight text-[var(--fg)]" aria-live="polite">
@@ -211,7 +208,7 @@ function Calendar() {
       id: `loan-${loan.id}`,
       source: 'loan',
       sourceId: loan.id,
-      title: `${loan.type === 'debt' ? 'Jatuh Tempo Hutang' : 'Jatuh Tempo Piutang'}: ${loan.title || loan.personName}`,
+      title: `${loan.type === 'debt' ? t('loans.debtDueDate', 'Jatuh Tempo Hutang') : t('loans.receivableDueDate', 'Jatuh Tempo Piutang')}: ${loan.title || loan.personName}`,
       start: toLocalDate(loan.dueDate),
       end: toLocalDate(loan.dueDate),
       allDay: true,
@@ -220,7 +217,7 @@ function Calendar() {
       raw: loan,
     }))
     return [...txEvents, ...customEvents, ...loanEvents]
-  }, [importantEvents, loans, transactions])
+  }, [importantEvents, loans, transactions, t])
 
   const indicators = useMemo(() => {
     const map = new Map()
@@ -273,7 +270,7 @@ function Calendar() {
       setTxSubmitError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
       return
     }
-    await db.transactions.add({
+    await createTransaction({
       date: toDateOnlyString(selectedDate),
       type: txForm.type,
       category: txForm.category,
@@ -310,17 +307,7 @@ function Calendar() {
         }`}
       >
         {/* ── Premium Header ── */}
-      <section className="relative overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: [
-              'radial-gradient(ellipse 120% 120% at 20% -20%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 50%)',
-              'radial-gradient(ellipse 80% 80% at 80% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 50%)',
-            ].join(','),
-          }}
-          aria-hidden="true"
-        />
+      <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
         <div className="relative p-5">
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl">{t('calendar.title')}</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">{t('calendar.subtitle')}</p>
@@ -444,17 +431,25 @@ function Calendar() {
                                 const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                                 const sub = labels.sub || null
                                 const noteStr = tx.notes ? String(tx.notes).trim() : ''
+                                const txWallet = wallets?.find((w) => String(w.id) === String(tx.walletId))
+                                const walletName = txWallet?.name || 'Wallet'
+                                let createdTime = null
+                                const createdAtMs = Number(tx.createdAt)
+                                if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
+                                  createdTime = format(new Date(createdAtMs), 'HH:mm')
+                                }
+
                                 return (
                                   <>
-                                    <p className="truncate text-sm font-semibold text-[var(--fg)]">{labels.main}</p>
-                                    {sub ? (
-                                      <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-[var(--muted)]">
-                                        {sub}
-                                      </p>
-                                    ) : null}
+                                    <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
+                                    <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-[var(--muted)]">
+                                      <span className="text-[var(--fg)]/90 font-bold">{walletName}</span>
+                                      {sub ? <> • {sub}</> : null}
+                                      {createdTime ? <> • {createdTime}</> : null}
+                                    </p>
                                     {noteStr ? (
-                                      <p className="mt-0.5 truncate text-[10px] italic leading-tight text-[var(--muted-2)]">
-                                        {noteStr}
+                                      <p className="mt-0.5 text-[11px] italic leading-tight text-[var(--muted)] line-clamp-2 break-words">
+                                        &ldquo;{noteStr}&rdquo;
                                       </p>
                                     ) : null}
                                   </>
@@ -462,12 +457,12 @@ function Calendar() {
                               })()}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <p
-                              className="text-[15px] font-bold tabular-nums tracking-tight"
+                              className="text-sm sm:text-[15px] font-extrabold tabular-nums tracking-tight"
                               style={{ color: tx.type === 'income' ? 'var(--status-income)' : 'var(--status-expense)' }}
                             >
-                              {formatCurrency(tx.amount, tx.currency)}
+                              {tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount, tx.currency)}
                             </p>
                           </div>
                         </div>
@@ -501,10 +496,10 @@ function Calendar() {
                             />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-[var(--fg)]">
-                                {loan.type === 'debt' ? 'Jatuh Tempo Hutang' : 'Jatuh Tempo Piutang'}: {loan.title || loan.personName}
+                                {loan.type === 'debt' ? t('loans.debtDueDate', 'Jatuh Tempo Hutang') : t('loans.receivableDueDate', 'Jatuh Tempo Piutang')}: {loan.title || loan.personName}
                               </p>
                               <p className="truncate text-xs font-medium text-[var(--muted)]">
-                                Sisa: {formatCurrency(loan.remainingAmount ?? loan.totalAmount, loan.currency || defaultCurrency)}
+                                {t('loans.remaining', 'Sisa')}: {formatCurrency(loan.remainingAmount ?? loan.totalAmount, loan.currency || defaultCurrency)}
                               </p>
                             </div>
                           </div>
@@ -612,7 +607,10 @@ function Calendar() {
                               : formatIncomeCategory(txForm.category, locale)}
                         </span>
                       </div>
-                      <span className="shrink-0 text-xs font-bold text-[var(--accent)]">{t('tx.change') || 'Ubah'} ›</span>
+                      <span className="shrink-0 text-xs font-bold text-[var(--accent)] flex items-center gap-0.5">
+                        {t('tx.change') || 'Ubah'}
+                        <ChevronRight size={13} strokeWidth={2.5} />
+                      </span>
                     </button>
                     <CategoryPickerModal
                       isOpen={isCatModalOpen}
@@ -732,7 +730,7 @@ function Calendar() {
                     type="button"
                     onClick={handleAddImportantDate}
                     disabled={!importantForm.title.trim()}
-                    className="w-full rounded-xl bg-amber-500 py-3 text-[13px] font-bold uppercase tracking-wider text-amber-950 shadow-sm transition hover:bg-amber-400 active:scale-95 disabled:opacity-50"
+                    className="ft-btn-primary w-full py-3 text-xs font-black uppercase tracking-wider disabled:opacity-50"
                   >
                     {t('calendar.addImportantDate')}
                   </button>

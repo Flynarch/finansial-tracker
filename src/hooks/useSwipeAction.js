@@ -149,7 +149,7 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
         const absDy = Math.abs(dy)
 
         // Cancel horizontal swipe if user starts scrolling vertically
-        if (absDy > absDx * 1.2 && absDy > 10 && absDx < 15) {
+        if (absDy > absDx * 1.1 && absDy > 8) {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current)
             rafIdRef.current = null
@@ -215,7 +215,7 @@ export default function useSwipeAction(initialSwipedId = null, { closeOnScroll =
           }
           ignoreNextClickRef.current = true
           setTimeout(() => { ignoreNextClickRef.current = false }, 150)
-        } else if (finalDx <= -30) {
+        } else if (finalDx <= -55) {
           // Stage 1: Edit action on release
           setSwipedId(null)
           if (callbacks.onEdit) {

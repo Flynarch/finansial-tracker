@@ -36,7 +36,7 @@ export default class ErrorBoundary extends Component {
           <button
             type="button"
             onClick={this.handleReset}
-            className="flex items-center gap-2 rounded-2xl bg-[var(--accent)] text-white px-4 py-2.5 text-xs font-black shadow-md hover:bg-[var(--accent-dark)] transition active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 rounded-2xl bg-[var(--accent)] text-white px-4 py-2.5 text-xs font-black shadow-md hover:bg-[var(--accent-strong)] transition active:scale-95 cursor-pointer"
           >
             <RefreshCw className="h-4 w-4" />
             Muat Ulang Halaman

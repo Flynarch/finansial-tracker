@@ -39,7 +39,10 @@ function Modal({
       onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
     >
       <div
-        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-all duration-280 transform-gpu ${
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
+        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl transition-all duration-280 transform-gpu ${
           isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
         }`}
         style={{
@@ -56,7 +59,7 @@ function Modal({
               <button
                 type="button"
                 onClick={closeSheet}
-                className="flex h-7 w-7 items-center justify-center rounded-full transition-colors text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] cursor-pointer"
+                className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">

@@ -87,20 +87,22 @@ export async function exportAllDataAsJson() {
 }
 
 export async function importAllDataFromJsonPayload(payload) {
-  const parsed = payload && typeof payload === 'object' ? payload : {}
-  const data = parsed.data || {}
+  if (!payload || typeof payload !== 'object' || !payload.data || typeof payload.data !== 'object') {
+    throw new Error('Format berkas cadangan tidak valid atau data kosong.')
+  }
+  const data = payload.data || {}
 
-  if (parsed.categoryCustomizations?.expense) {
+  if (payload.categoryCustomizations?.expense) {
     try {
-      localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(parsed.categoryCustomizations.expense))
+      localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
       window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
     } catch {
       /* ignore */
     }
   }
-  if (parsed.categoryCustomizations?.income) {
+  if (payload.categoryCustomizations?.income) {
     try {
-      localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(parsed.categoryCustomizations.income))
+      localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
       window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
     } catch {
       /* ignore */
@@ -131,6 +133,20 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.loans) && data.loans.length > 0) await db.loans.bulkAdd(data.loans)
     if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkAdd(data.loanPayments)
   })
+
+  // Ensure at least one wallet exists if none were in the backup
+  const walletCount = await db.wallets.count()
+  if (walletCount === 0) {
+    const defaultCurrency = localStorage.getItem('ft_default_currency') || 'IDR'
+    await db.wallets.add({
+      name: 'Kas Utama',
+      institutionType: 'cash',
+      logoUrl: '/logos/wallets/cash.svg',
+      currency: defaultCurrency,
+      balance: 0,
+      createdAt: new Date().toISOString(),
+    })
+  }
 }
 
 export async function isLocalDataEmpty() {

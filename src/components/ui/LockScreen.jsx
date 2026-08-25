@@ -42,10 +42,10 @@ function LockScreen({ onUnlock }) {
         </div>
 
         <h2 className="text-base font-black tracking-tight text-[var(--fg)]">
-          FinTrack Terkunci
+          {t('lock.title', 'FinTrack Terkunci')}
         </h2>
         <p className="mt-1 text-xs font-medium text-[var(--muted)]">
-          Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka
+          {t('lock.desc', 'Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka')}
         </p>
 
         {/* Error Alert */}
@@ -69,7 +69,7 @@ function LockScreen({ onUnlock }) {
             <span>
               {isAuthenticating
                 ? t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
-                : 'Buka dengan Sidik Jari / Sandi HP'}
+                : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
             </span>
           </button>
         </div>

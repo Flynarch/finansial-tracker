@@ -27,9 +27,9 @@ export class ErrorBoundary extends React.Component {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="mb-2 text-xl font-bold text-[var(--fg)]">Yah, ada yang error nih! 😭</h2>
+          <h2 className="mb-2 text-xl font-bold text-[var(--fg)]">Terjadi Kesalahan pada Aplikasi</h2>
           <p className="mb-4 text-sm text-[var(--muted)] max-w-md">
-            Mungkin fitur ini (Database/Penyimpanan Lokal) sedang diblokir oleh browser ponselmu, atau ada bug lain.
+            Penyimpanan lokal mungkin tidak dapat diakses atau terjadi kendala sistem. Silakan muat ulang halaman.
           </p>
           <div className="w-full max-w-md overflow-auto rounded-lg bg-[var(--panel-strong)] p-4 text-left text-xs text-red-400 font-mono shadow-inner border border-red-500/20">
             <p className="font-bold mb-2 break-all">
@@ -40,8 +40,9 @@ export class ErrorBoundary extends React.Component {
             <p className="whitespace-pre-wrap">{this.state.errorInfo?.componentStack}</p>
           </div>
           <button 
+            type="button"
             onClick={() => window.location.reload()} 
-            className="mt-6 rounded-full bg-[var(--fg)] px-6 py-2.5 text-sm font-bold text-[var(--bg)] shadow-md active:scale-95 transition"
+            className="mt-6 rounded-full bg-[var(--fg)] px-6 py-2.5 text-sm font-bold text-[var(--bg)] shadow-md active:scale-95 transition cursor-pointer"
           >
             Muat Ulang Halaman
           </button>

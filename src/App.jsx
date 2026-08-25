@@ -7,7 +7,6 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const TodoList = lazy(() => import('./pages/TodoList'))
-const Investments = lazy(() => import('./pages/Investments'))
 const Calendar = lazy(() => import('./pages/Calendar'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Profile = lazy(() => import('./pages/Profile'))
@@ -39,7 +38,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/todos" element={<TodoList />} />
-            <Route path="/investments" element={<Investments />} />
+            <Route path="/investments" element={<Navigate to="/dashboard" replace />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/profile" element={<Profile />} />

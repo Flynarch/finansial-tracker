@@ -404,9 +404,9 @@ export default function HabitsView() {
               <path d="M3 3v5h5"></path>
             </svg>
           </div>
-          <h3 className="text-[15px] font-bold text-[var(--fg)] mb-1">Belum ada kebiasaan</h3>
+          <h3 className="text-[15px] font-bold text-[var(--fg)] mb-1">{t('habits.emptyTitle', 'Belum Ada Kebiasaan')}</h3>
           <p className="text-[13px] font-medium text-[var(--muted)] max-w-[220px] leading-relaxed">
-            Mulai bangun rutinitas baikmu hari ini.
+            {t('habits.emptyDesc', 'Mulai bangun rutinitas baikmu hari ini.')}
           </p>
         </div>
       ) : (

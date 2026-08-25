@@ -66,7 +66,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
           <div>
             <h3 className="text-lg font-bold text-[var(--fg)] leading-tight">{activeHabit.title}</h3>
             <p className="text-sm font-medium text-[var(--muted)]">
-              Dibuat: {activeHabit.createdAt ? format(new Date(activeHabit.createdAt), 'dd MMM yyyy') : 'Hari ini'}
+              {t('habits.createdDatePrefix', 'Dibuat')}: {activeHabit.createdAt ? format(new Date(activeHabit.createdAt), 'dd MMM yyyy') : t('common.today', 'Hari ini')}
             </p>
           </div>
         </div>
@@ -76,10 +76,10 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
           {isEditingNotes ? (
             <div className="animate-dropdown">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Edit Catatan</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.editNotes', 'Edit Catatan')}</span>
                 <div className="flex gap-3">
-                  <button type="button" onClick={handleCancelNotes} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)]">Batal</button>
-                  <button type="button" onClick={handleSaveNotes} className="text-[11px] font-bold text-[var(--accent)] hover:underline">Simpan</button>
+                  <button type="button" onClick={handleCancelNotes} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)]">{t('common.cancel', 'Batal')}</button>
+                  <button type="button" onClick={handleSaveNotes} className="text-[11px] font-bold text-[var(--accent)] hover:underline">{t('common.save', 'Simpan')}</button>
                 </div>
               </div>
               <textarea
@@ -93,8 +93,8 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
           ) : activeHabit.notes ? (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Catatan</span>
-                <button type="button" onClick={handleStartEdit} className="text-[11px] font-bold text-[var(--accent)] hover:underline">Edit</button>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.notes', 'Catatan')}</span>
+                <button type="button" onClick={handleStartEdit} className="text-[11px] font-bold text-[var(--accent)] hover:underline">{t('common.edit', 'Edit')}</button>
               </div>
               <p className="text-sm text-[var(--fg)] whitespace-pre-wrap">{activeHabit.notes}</p>
             </div>
@@ -105,7 +105,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
               className="flex w-full items-center justify-center gap-2 py-1 text-sm font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-strong)]"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Tambah Catatan
+              {t('habits.addNotes', 'Tambah Catatan')}
             </button>
           )}
         </div>
@@ -117,7 +117,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
               <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
             </svg>
             <span className="text-2xl font-black text-[var(--fg)]">{stats.currentStreak}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Streak Saat Ini</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.currentStreak', 'Streak Saat Ini')}</span>
           </div>
           <div className="flex flex-col items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 shadow-sm">
             <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--warning)] mb-2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -125,25 +125,25 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
               <path d="M5 21h14"/>
             </svg>
             <span className="text-2xl font-black text-[var(--fg)]">{stats.bestStreak}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Rekor Terbaik</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.bestStreak', 'Rekor Terbaik')}</span>
           </div>
           <div className="flex flex-col items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 shadow-sm">
             <span className="block text-2xl font-black text-[var(--fg)]">{stats.completionRate}%</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-1 text-center">Tingkat Penyelesaian</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-1 text-center">{t('habits.completionRate', 'Tingkat Penyelesaian')}</span>
           </div>
           <div className="flex flex-col items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 shadow-sm">
             <span className="block text-2xl font-black text-[var(--fg)]">{stats.totalCompleted}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-1 text-center">Total Selesai</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mt-1 text-center">{t('habits.totalCompleted', 'Total Selesai')}</span>
           </div>
           <div className="col-span-2 flex items-center justify-between rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 shadow-sm">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Progress Minggu Ini</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.weeklyProgress', 'Progress Minggu Ini')}</span>
             <span className="block text-lg font-bold text-[var(--fg)]">{stats.currentWeekCompleted} <span className="text-sm text-[var(--muted)]">/ {stats.currentWeekTarget}</span></span>
           </div>
         </div>
 
         {/* Trend Chart */}
         <div>
-          <h4 className="mb-3 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Peta Aktivitas</h4>
+          <h4 className="mb-3 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.activityMap', 'Peta Aktivitas')}</h4>
           <div className="rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4">
             <HabitHeatmapWidget habitId={activeHabit.id} />
           </div>
@@ -151,7 +151,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
 
         {/* Weekly Completion Rate */}
         <div>
-          <h4 className="mb-3 mt-4 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">Tren Penyelesaian Mingguan</h4>
+          <h4 className="mb-3 mt-4 text-[12px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.weeklyTrend', 'Tren Penyelesaian Mingguan')}</h4>
           <div className="h-40 rounded-2xl bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] p-4 text-[var(--fg)]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={weeklyTrend} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
@@ -164,7 +164,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
                 <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} />
                 <Tooltip 
-                  formatter={(val) => [`${val}%`, 'Tingkat Penyelesaian']}
+                  formatter={(val) => [`${val}%`, t('habits.completionRate', 'Tingkat Penyelesaian')]}
                   contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--fg)', fontSize: 12 }}
                   labelStyle={{ color: 'var(--muted)' }}
                 />

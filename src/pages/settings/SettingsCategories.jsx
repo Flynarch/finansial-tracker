@@ -205,7 +205,7 @@ export default function SettingsCategories() {
             <h3 className="text-base font-black text-[var(--fg)] leading-tight">
               {t('settings.categoriesTitle', 'Kategori Transaksi')}
             </h3>
-            <p className="text-xs font-medium text-[var(--muted)] truncate mt-1">
+            <p className="text-xs font-medium text-[var(--muted)] mt-1">
               {t('settings.categoriesSummary', {
                 expense: expenseTree.length,
                 income: incomeTree.length,

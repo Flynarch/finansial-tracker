@@ -81,28 +81,8 @@ export default function SettingsData() {
     try {
       setBusyAction('reset')
 
-      // 1. Clear all financial data tables in Dexie
-      const dataTables = [
-        db.transactions,
-        db.budgets,
-        db.goals,
-        db.savings,
-        db.loans,
-        db.investments,
-        db.investmentOrders,
-        db.calendarEvents,
-        db.recurringTransactions,
-        db.todos,
-        db.sub_tasks,
-        db.habits,
-        db.habitLogs,
-        db.ideas,
-        db.board_links,
-        db.notifications,
-        db.goalLogs,
-        db.wallets,
-      ]
-      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch(() => {})))
+      // 1. Clear all data tables in Dexie
+      await Promise.all(db.tables.map((tbl) => tbl.clear().catch(() => {})))
 
       // 2. Re-create a clean initial wallet with default currency so UI has a primary wallet ready
       const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
@@ -245,7 +225,7 @@ export default function SettingsData() {
                 {t('settings.backup.importTitle', 'Pulihkan Data Cadangan')}
               </h3>
               <p className="text-xs font-medium text-[var(--muted)] mt-1">
-                Pilih file backup .json sebelumnya untuk mengembalikan riwayat data.
+                {t('settings.backup.importSubtitle', 'Pilih file backup .json sebelumnya untuk mengembalikan riwayat data.')}
               </p>
             </div>
           </div>
@@ -295,7 +275,7 @@ export default function SettingsData() {
                     {t('settings.reset.title', 'Reset Riwayat Finansial')}
                   </h3>
                   <span className="inline-block mt-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                    Sesi Akun Tetap Aktif
+                    {t('settings.reset.sessionActive', 'Sesi Akun Tetap Aktif')}
                   </span>
                 </div>
               </div>
@@ -330,7 +310,7 @@ export default function SettingsData() {
                     {t('settings.deleteAccount.title', 'Hapus Akun Permanen')}
                   </h3>
                   <span className="inline-block mt-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded">
-                    Hapus Total
+                    {t('settings.deleteAccount.totalWipe', 'Hapus Total')}
                   </span>
                 </div>
               </div>

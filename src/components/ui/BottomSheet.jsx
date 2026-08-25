@@ -76,6 +76,9 @@ export default function BottomSheet({
       {/* Sheet Container with iOS / Vaul-style seamless slide-up and gesture drag-to-dismiss */}
       <div className={`absolute inset-x-0 bottom-0 mx-auto w-full sm:px-4 sm:pb-6 ${maxWidth}`}>
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={typeof title === 'string' ? title : defaultCloseLabel}
           className={`${maxHeight} overflow-y-auto overscroll-contain w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
@@ -107,7 +110,7 @@ export default function BottomSheet({
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchEnd}
-              className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3 cursor-grab select-none"
+              className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3 cursor-grab select-none touch-none"
             >
               {title ? (
                 typeof title === 'string' ? (
@@ -119,7 +122,7 @@ export default function BottomSheet({
               {showCloseButton ? (
                 <button
                   type="button"
-                  className="rounded-xl px-3 py-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer ft-spring-press"
+                  className="rounded-xl px-3.5 py-1.5 min-h-[36px] flex items-center text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] active:scale-95 transition-all cursor-pointer ft-spring-press"
                   onClick={closeSheet}
                 >
                   {defaultCloseLabel}

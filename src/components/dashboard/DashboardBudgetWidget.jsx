@@ -114,8 +114,8 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                 className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                   activeBudgetSlide === 0 ? 'w-5 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
                 }`}
-                title={t('dashboard.budget') || 'Anggaran'}
-                aria-label={t('dashboard.budget') || 'Anggaran'}
+                title={t('dashboard.budget')}
+                aria-label={t('dashboard.budget')}
               />
               <button
                 type="button"
@@ -123,8 +123,8 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                 className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                   activeBudgetSlide === 1 ? 'w-5 bg-[var(--fg)]' : 'w-2 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/60'
                 }`}
-                title={t('dashboard.savings') || 'Target'}
-                aria-label={t('dashboard.savings') || 'Target'}
+                title={t('dashboard.savings')}
+                aria-label={t('dashboard.savings')}
               />
             </div>
 
@@ -283,8 +283,8 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                   className="w-full rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-5 text-center transition hover:bg-[var(--panel)] cursor-pointer"
                   onClick={() => navigate('/budget')}
                 >
-                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.budget.emptyCta') || 'Atur Anggaran Pertama'}</p>
-                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.budget.emptyDesc') || 'Kendalikan pengeluaran bulananmu'}</p>
+                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.budget.emptyCta')}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.budget.emptyDesc')}</p>
                 </button>
               )}
             </div>
@@ -293,30 +293,19 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
             <div className="w-full shrink-0 pl-0.5 space-y-3">
               {goalCalc ? (
                 <>
-                  {/* Overall Total Saved & Bar */}
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
-                    <div className="flex items-center justify-between gap-2 min-w-0">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
-                        Total Tabungan Terkumpul
-                      </span>
-                      <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                        {goalCalc.overallPct}% Terkumpul
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-extrabold">
+                      <span className="text-[var(--muted)]">{t('dashboard.totalSavingsCollected', 'Total Tabungan')}</span>
+                      <span className="text-emerald-500 font-black">
+                        {goalCalc.overallPct}% {t('dashboard.collectedPct', 'Terkumpul')}
                       </span>
                     </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-baseline justify-between gap-2 flex-wrap tabular-nums">
-                        <p className="text-base sm:text-lg font-black text-[var(--fg)]">
-                          {formatCurrency(goalCalc.totalCurrent, defaultCurrency, locale)}
-                          <span className="text-xs font-normal text-[var(--muted)] ml-1">
-                            / {formatCurrency(goalCalc.totalTarget, defaultCurrency, locale)}
-                          </span>
-                        </p>
-                        <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
-                          {goalCalc.count} Target Aktif
-                        </p>
-                      </div>
-                    </div>
+                    <p className="text-lg font-black tracking-tight text-[var(--fg)]">
+                      {formatCurrency(goalCalc.totalCurrent, defaultCurrency, locale)}
+                      <span className="text-xs font-bold text-[var(--muted)] ml-1">
+                        / {formatCurrency(goalCalc.totalTarget, defaultCurrency, locale)}
+                      </span>
+                    </p>
 
                     <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)] border border-[var(--border)]/60">
                       <div
@@ -328,9 +317,6 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
 
                   {/* Top Goals List */}
                   <div className="space-y-1.5 pt-0.5">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1">
-                      <Target className="h-3 w-3" /> Progres Target Teratas
-                    </p>
                     <div className="space-y-1.5">
                       {goalCalc.topGoals.map((row) => (
                         <div
@@ -343,40 +329,39 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                               <Target className="h-3.5 w-3.5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="font-bold text-[var(--fg)] truncate text-xs leading-tight">
-                                {String(row.name || '').replace(/_/g, ' ')}
-                              </p>
-                              <p className="text-[10px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
-                                {formatCurrency(row.current, defaultCurrency, locale)}{' '}
-                                <span className="opacity-75">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
-                              </p>
+                              <p className="font-bold text-[var(--fg)] truncate">{row.name}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="h-1 w-16 rounded-full bg-[var(--border)] overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                                    style={{ width: `${row.pct}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-bold text-[var(--muted)]">{row.pct}%</span>
+                              </div>
                             </div>
                           </div>
-
-                          <span className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-black tabular-nums bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border)]">
-                            {Math.round(row.pct)}%
+                          <span className="font-black text-[var(--fg)] text-[11px] tabular-nums shrink-0">
+                            {formatCurrency(row.current, defaultCurrency, locale)}
                           </span>
                         </div>
                       ))}
                     </div>
-                  </div>
 
-                  {/* Footer Link to /savings */}
-                  <div className="pt-1 text-right">
                     <button
                       type="button"
                       onClick={() => navigate('/savings')}
-                      className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--accent)] hover:underline cursor-pointer"
+                      className="w-full text-center py-1 text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center justify-center gap-1 pt-1 cursor-pointer"
                     >
-                      Lihat Semua {goalCalc.count} Target Tabungan
+                      {t('dashboard.viewAllGoals', { count: goalCalc.count }, `Lihat Semua ${goalCalc.count} Target Tabungan`)}
                       <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-5 text-center">
-                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.savings.empty') || 'Belum Ada Target Tabungan'}</p>
-                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.savings.emptyDesc') || 'Buat impian finansialmu sekarang'}</p>
+                  <p className="text-xs font-bold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t('dashboard.savings.emptyDesc')}</p>
                 </div>
               )}
             </div>

@@ -87,20 +87,20 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
       <button
         type="button"
         onClick={onCloseZoom}
-        className={`ft-motion-overlay absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`ft-motion-overlay absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-350 ease-out ${
           zoomVisible ? 'opacity-100' : 'opacity-0'
         }`}
-        aria-label={t('dashboard.zoom.close') || 'Tutup'}
+        aria-label={t('dashboard.zoom.close')}
       />
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl sm:px-3 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
-          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transition-all duration-300 ft-hide-scrollbar ${
-            zoomVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'
+          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu transition-all duration-350 ft-hide-scrollbar ${
+            zoomVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-full opacity-0 scale-[0.98]'
           }`}
           style={{
             boxShadow: 'var(--shadow)',
-            transitionTimingFunction: zoomVisible ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+            transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
@@ -172,7 +172,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                   onClick={onCloseZoom}
                   className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-5 py-2 text-xs font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
                 >
-                  {t('dashboard.zoom.close') || 'Tutup'}
+                  {t('dashboard.zoom.close')}
                 </button>
               </div>
             </>
@@ -180,7 +180,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
             <>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">{t('dashboard.savings') || 'Target Tabungan'}</h3>
+                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">{t('dashboard.savings')}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -191,7 +191,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     }}
                     className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] cursor-pointer"
                   >
-                    + {t('savings.title', 'Target')}
+                    + {t('savings.title')}
                   </button>
                   <button
                     type="button"
@@ -221,7 +221,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.savings.empty') || 'Belum ada target'}</p>
+                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
                   </div>
                 )}
               </div>
@@ -230,7 +230,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
             <>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">{t('dashboard.budget') || 'Anggaran'}</h3>
+                  <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">{t('dashboard.budget')}</h3>
                   <p className="text-[10px] font-semibold text-[var(--muted)]">{currentMonthLabel}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     }}
                     className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-semibold text-[var(--fg)] hover:bg-[var(--field-bg)] cursor-pointer"
                   >
-                    + {t('budget.title', 'Anggaran')}
+                    + {t('budget.title')}
                   </button>
                   <button
                     type="button"
@@ -278,7 +278,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.budget.empty') || 'Belum ada anggaran'}</p>
+                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.budget.empty')}</p>
                   </div>
                 )}
               </div>
@@ -467,6 +467,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       tickFormatter={(timeMs) => {
                         if (!timeMs || !Number.isFinite(timeMs)) return ''
                         const d = new Date(timeMs)
+                        if (isNaN(d.getTime())) return ''
                         if (zoomRevenueRange === '1d') return format(d, 'HH:mm')
                         if (zoomRevenueRange === 'all') return format(d, 'MMM yy')
                         if (zoomRevenueRange === '1y' || zoomRevenueRange === 'ytd') return format(d, 'MMM')
@@ -495,10 +496,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                         const valStr = formatCurrency(rawVal, defaultCurrency, locale)
                         const ts = Number(payloadItem?.time ?? props.label)
                         const isMonthlyData = ['1y', 'ytd', 'all'].includes(zoomRevenueRange)
-                        const labelStr =
-                          Number.isFinite(ts) && ts > 0
-                            ? format(new Date(ts), isMonthlyData ? 'MMMM yyyy' : 'dd MMM yyyy, HH:mm')
-                            : '-'
+                        let labelStr = '-'
+                        if (Number.isFinite(ts) && ts > 0) {
+                          const d = new Date(ts)
+                          if (!isNaN(d.getTime())) {
+                            labelStr = format(d, isMonthlyData ? 'MMMM yyyy' : 'dd MMM yyyy, HH:mm')
+                          }
+                        }
                         const prevVal = payloadItem?.prevValue
                         const hasPrev = comparePrevious && prevVal !== undefined && Number.isFinite(prevVal)
                         const diff = hasPrev ? rawVal - prevVal : 0
@@ -551,6 +555,8 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                         dot={false}
                         activeDot={{ r: 4, strokeWidth: 1.5, stroke: 'var(--panel-strong)', fill: 'var(--muted)' }}
                         isAnimationActive={!reduceMotion}
+                        animationDuration={450}
+                        animationEasing="ease-out"
                       />
                     )}
                     <Area
@@ -562,6 +568,8 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       dot={false}
                       activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--panel-strong)', fill: 'var(--accent)' }}
                       isAnimationActive={!reduceMotion}
+                      animationDuration={450}
+                      animationEasing="ease-out"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -657,7 +665,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                           {formatCurrency(zoomPeakAndFloor?.netRate ?? 0, defaultCurrency, locale)}
                         </p>
                         <p className="text-[9px] font-semibold text-[var(--muted)] truncate">
-                          / {zoomPeakAndFloor?.unitLabel || (locale === 'en' ? 'day' : 'hari')}
+                          / {t(`dashboard.unit.${zoomPeakAndFloor?.unitKey || 'day'}`, zoomPeakAndFloor?.unitKey === 'hour' ? (locale === 'en' ? 'hour' : 'jam') : zoomPeakAndFloor?.unitKey === 'month' ? (locale === 'en' ? 'month' : 'bulan') : (locale === 'en' ? 'day' : 'hari'))}
                         </p>
                       </div>
                     </div>

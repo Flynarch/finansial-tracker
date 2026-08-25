@@ -63,32 +63,32 @@ export default function SettingsAi() {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-base sm:text-lg font-black text-[var(--fg)] leading-tight">
-              Integrasi Asisten AI (Gemini)
+              {t('settings.ai.heroTitle', 'Integrasi Asisten AI (Gemini)')}
             </h3>
             <p className="text-xs font-medium text-[var(--muted)] mt-1">
-              Ditenagai model Google Gemini untuk analisis finansial, scanning struk & kategorisasi cerdas.
+              {t('settings.ai.heroSubtitle', 'Ditenagai model Google Gemini untuk analisis finansial, scanning struk & kategorisasi cerdas.')}
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border)]/60 text-center">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Status Kuota</span>
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.ai.quotaStatus', 'Status Kuota')}</span>
             <span className="block text-xs font-black text-[var(--fg)] mt-0.5">
-              {geminiApiKey ? 'Tanpa Batas (Pribadi)' : 'Kuota Bersama'}
+              {geminiApiKey ? t('settings.ai.unlimitedPersonal', 'Tanpa Batas (Pribadi)') : t('settings.ai.sharedQuota', 'Kuota Bersama')}
             </span>
           </div>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Enkripsi</span>
-            <span className="block text-xs font-black text-emerald-500 mt-0.5">100% Lokal di HP</span>
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.ai.encryption', 'Enkripsi')}</span>
+            <span className="block text-xs font-black text-emerald-500 mt-0.5">{t('settings.ai.localOnDevice', '100% Lokal di HP')}</span>
           </div>
         </div>
       </div>
 
       {/* API Key Configuration Form */}
       <SettingsSection
-        label="Konfigurasi API Key"
-        footnote="API Key Anda disimpan secara lokal di memori perangkat ini dan tidak pernah dibagikan ke server lain."
+        label={t('settings.ai.configApiKey', 'Konfigurasi API Key')}
+        footnote={t('settings.ai.configApiKeyDesc', 'API Key Anda disimpan secara lokal di memori perangkat ini dan tidak pernah dibagikan ke server lain.')}
       >
         <div className="ft-settings-cell space-y-4">
           <form onSubmit={handleSaveApiKey} className="space-y-3.5">
@@ -109,7 +109,7 @@ export default function SettingsAi() {
                   type="button"
                   onClick={() => setShowKey(!showKey)}
                   className="absolute right-3 grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition cursor-pointer"
-                  aria-label={showKey ? 'Sembunyikan Key' : 'Tampilkan Key'}
+                  aria-label={showKey ? t('settings.hideKey', 'Sembunyikan Key') : t('settings.showKey', 'Tampilkan Key')}
                 >
                   {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -139,9 +139,9 @@ export default function SettingsAi() {
           {/* Quick Guide Card */}
           <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <span className="block text-xs font-black text-[var(--fg)]">Belum punya API Key?</span>
+              <span className="block text-xs font-black text-[var(--fg)]">{t('settings.ai.noKeyYet', 'Belum punya API Key?')}</span>
               <span className="block text-[11px] font-medium text-[var(--muted)] mt-0.5">
-                Dapatkan API Key Google Gemini secara gratis dan cepat di Google AI Studio.
+                {t('settings.ai.getKeyDesc', 'Dapatkan API Key Google Gemini secara gratis dan cepat di Google AI Studio.')}
               </span>
             </div>
             <a
@@ -150,7 +150,7 @@ export default function SettingsAi() {
               rel="noreferrer"
               className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] px-3.5 py-2 text-xs font-black text-[var(--bg)] hover:opacity-90 transition active:scale-95 shadow-xs"
             >
-              <span>Dapatkan</span>
+              <span>{t('settings.ai.getKeyBtn', 'Dapatkan')}</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -160,7 +160,7 @@ export default function SettingsAi() {
       {/* AI Capabilities Cards */}
       <div className="mb-2 px-1">
         <h2 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-          Kemampuan AI di FinTrack
+          {t('settings.ai.capabilitiesTitle', 'Kemampuan AI di FinTrack')}
         </h2>
       </div>
 
@@ -170,9 +170,9 @@ export default function SettingsAi() {
             <MessageSquare className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-[var(--fg)]">Asisten Finansial Interaktif</span>
+            <span className="block text-sm font-black text-[var(--fg)]">{t('settings.ai.capAssistantTitle', 'Asisten Finansial Interaktif')}</span>
             <p className="text-xs font-medium text-[var(--muted)] mt-0.5 leading-relaxed">
-              Tanyakan ringkasan pengeluaran, evaluasi target tabungan, dan rekomendasi pos anggaran harian via chat.
+              {t('settings.ai.capAssistantDesc', 'Tanyakan ringkasan pengeluaran, evaluasi target tabungan, dan rekomendasi pos anggaran harian via chat.')}
             </p>
           </div>
         </div>
@@ -182,9 +182,9 @@ export default function SettingsAi() {
             <Receipt className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-[var(--fg)]">OCR Pemindai Struk Digital</span>
+            <span className="block text-sm font-black text-[var(--fg)]">{t('settings.ai.capOcrTitle', 'OCR Pemindai Struk Digital')}</span>
             <p className="text-xs font-medium text-[var(--muted)] mt-0.5 leading-relaxed">
-              Cukup upload atau foto struk belanja, AI akan membaca total nominal, merchant, dan item secara otomatis.
+              {t('settings.ai.capOcrDesc', 'Cukup upload atau foto struk belanja, AI akan membaca total nominal, merchant, dan item secara otomatis.')}
             </p>
           </div>
         </div>
@@ -194,9 +194,9 @@ export default function SettingsAi() {
             <Tag className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-[var(--fg)]">Auto Smart-Categorization</span>
+            <span className="block text-sm font-black text-[var(--fg)]">{t('settings.ai.capCategoryTitle', 'Auto Smart-Categorization')}</span>
             <p className="text-xs font-medium text-[var(--muted)] mt-0.5 leading-relaxed">
-              Secara otomatis mengelompokkan catatan transaksi ke kategori dan subkategori yang paling akurat.
+              {t('settings.ai.capCategoryDesc', 'Secara otomatis mengelompokkan catatan transaksi ke kategori dan subkategori yang paling akurat.')}
             </p>
           </div>
         </div>
