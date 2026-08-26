@@ -2047,6 +2047,12 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   background: color-mix(in srgb, var(--earthy-green) 8%, transparent);
 }
 
+.loan-stamp-forgiven {
+  border: 2.5px double #a855f7;
+  color: #a855f7;
+  background: color-mix(in srgb, #a855f7 8%, transparent);
+}
+
 .loan-stamp-text {
   font-size: 0.75rem;
   font-weight: 900;

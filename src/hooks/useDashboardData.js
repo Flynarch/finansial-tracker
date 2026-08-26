@@ -412,7 +412,7 @@ export function useDashboardData() {
         const paid = Math.max(0, total - remaining)
         const paidPct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
         const val = convertCurrency(remaining, l.currency || defaultCurrency, defaultCurrency, rates)
-        const isPaid = l.status === 'paid' || remaining <= 0
+        const isPaid = l.status === 'paid' || l.status === 'forgiven' || remaining <= 0
 
         let isOverdue = false
         let daysLeft = null

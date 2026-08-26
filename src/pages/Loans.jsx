@@ -24,7 +24,9 @@ import {
   StickyNote,
   Pencil,
   Scale,
+  HeartHandshake,
 } from 'lucide-react'
+import LoanForgiveModal from '../components/loans/LoanForgiveModal'
 import { differenceInDays } from 'date-fns'
 
 export default function Loans() {
@@ -85,6 +87,9 @@ export default function Loans() {
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
 
+  const [forgiveLoanItem, setForgiveLoanItem] = useState(null)
+  const [isForgiveOpen, setIsForgiveOpen] = useState(false)
+
   const handleBack = () => {
     if (isLeaving) return
     setIsLeaving(true)
@@ -111,6 +116,12 @@ export default function Loans() {
     setIsPayOpen(true)
   }
 
+  const openForgiveModal = (loan, e) => {
+    e?.stopPropagation()
+    setForgiveLoanItem(loan)
+    setIsForgiveOpen(true)
+  }
+
   const startEditNote = (item, e) => {
     e?.stopPropagation()
     setEditingNoteId(item.id)
@@ -128,13 +139,15 @@ export default function Loans() {
     return (loans ?? []).map((l) => {
       const total = toSafeNumber(l.totalAmount)
       const remaining = toSafeNumber(l.remainingAmount)
-      const paid = Math.max(0, total - remaining)
-      const isPaid = l.status === 'paid' || remaining <= 0
+      const isForgiven = l.status === 'forgiven'
+      const isPaid = l.status === 'paid' || (remaining <= 0 && !isForgiven)
+      const isSettled = isPaid || isForgiven
+      const paid = isForgiven ? Math.max(0, total - toSafeNumber(l.forgivenAmount || remaining)) : Math.max(0, total - remaining)
       const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0
 
       let dueBadge = null
       let isOverdue = false
-      if (l.dueDate && !isPaid) {
+      if (l.dueDate && !isSettled) {
         const daysLeft = differenceInDays(new Date(l.dueDate), new Date())
         if (daysLeft < 0) {
           dueBadge = {
@@ -162,6 +175,8 @@ export default function Loans() {
         paid,
         pct,
         isPaid,
+        isForgiven,
+        isSettled,
         dueBadge,
         isOverdue,
       }
@@ -178,13 +193,13 @@ export default function Loans() {
 
     rows.forEach((r) => {
       const val = convertCurrency(r.remaining, r.currency || defaultCurrency, defaultCurrency, rates)
-      if (r.type === 'debt' && !r.isPaid) {
+      if (r.type === 'debt' && !r.isSettled) {
         totalDebt += val
-      } else if (r.type === 'receivable' && !r.isPaid) {
+      } else if (r.type === 'receivable' && !r.isSettled) {
         totalReceivable += val
       }
 
-      if (r.dueDate && r.dueDate.startsWith(currentMonthStr) && !r.isPaid) {
+      if (r.dueDate && r.dueDate.startsWith(currentMonthStr) && !r.isSettled) {
         dueThisMonthCount += 1
       }
     })
@@ -200,14 +215,16 @@ export default function Loans() {
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       if (r.type !== activeTab) return false
-      if (statusFilter === 'active') return !r.isPaid
+      if (statusFilter === 'active') return !r.isSettled
       if (statusFilter === 'paid') return r.isPaid
+      if (statusFilter === 'forgiven') return r.isForgiven
       return true
     })
   }, [rows, activeTab, statusFilter])
 
-  const activeCountInTab = rows.filter((r) => r.type === activeTab && !r.isPaid).length
+  const activeCountInTab = rows.filter((r) => r.type === activeTab && !r.isSettled).length
   const paidCountInTab = rows.filter((r) => r.type === activeTab && r.isPaid).length
+  const forgivenCountInTab = rows.filter((r) => r.type === activeTab && r.isForgiven).length
   const totalCountInTab = rows.filter((r) => r.type === activeTab).length
 
   return (
@@ -341,7 +358,7 @@ export default function Loans() {
               activeTab === 'debt' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            {t('loans.myDebt', 'Utang Saya')} ({rows.filter((r) => r.type === 'debt' && !r.isPaid).length})
+            {t('loans.myDebt', 'Utang Saya')} ({rows.filter((r) => r.type === 'debt' && !r.isSettled).length})
             {activeTab === 'debt' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-terra)]" />
             )}
@@ -354,21 +371,23 @@ export default function Loans() {
               activeTab === 'receivable' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            {t('loans.myReceivable', 'Piutang Saya')} ({rows.filter((r) => r.type === 'receivable' && !r.isPaid).length})
+            {t('loans.myReceivable', 'Piutang Saya')} ({rows.filter((r) => r.type === 'receivable' && !r.isSettled).length})
             {activeTab === 'receivable' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-green)]" />
             )}
           </button>
         </div>
 
-        {/* Secondary Status Filter Tabs (Aktif | Lunas | Semua) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {/* Secondary Status Filter Tabs (Aktif | Lunas | Diikhlaskan | Semua) */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
           <button
             type="button"
             onClick={() => setStatusFilter('active')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'active'
-                ? 'bg-[var(--fg)] text-[var(--bg)] border-[var(--fg)]'
+                ? activeTab === 'debt'
+                  ? 'bg-[var(--earthy-terra)] text-white border-[var(--earthy-terra)]'
+                  : 'bg-[var(--earthy-green)] text-white border-[var(--earthy-green)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
@@ -378,7 +397,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('paid')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'paid'
                 ? 'bg-[var(--status-income)] text-white border-[var(--status-income)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -389,8 +408,20 @@ export default function Loans() {
 
           <button
             type="button"
+            onClick={() => setStatusFilter('forgiven')}
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
+              statusFilter === 'forgiven'
+                ? 'bg-purple-600 text-white border-purple-600'
+                : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
+            }`}
+          >
+            {t('loans.filter.forgiven', { count: forgivenCountInTab }, `Diikhlaskan (${forgivenCountInTab})`)}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setStatusFilter('all')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'all'
                 ? 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border-strong)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -405,18 +436,22 @@ export default function Loans() {
           {filteredRows.length === 0 ? (
             <EmptyState
               title={
-                statusFilter === 'paid'
-                  ? t('loans.empty.paid.title', 'Belum Ada Catatan Lunas')
-                  : activeTab === 'debt'
-                    ? t('loans.empty.debt.title', 'Belum Ada Catatan Utang Aktif')
-                    : t('loans.empty.receivable.title', 'Belum Ada Catatan Piutang Aktif')
+                statusFilter === 'forgiven'
+                  ? t('loans.empty.forgiven.title', 'Belum Ada Catatan yang Diikhlaskan')
+                  : statusFilter === 'paid'
+                    ? t('loans.empty.paid.title', 'Belum Ada Catatan Lunas')
+                    : activeTab === 'debt'
+                      ? t('loans.empty.debt.title', 'Belum Ada Catatan Utang Aktif')
+                      : t('loans.empty.receivable.title', 'Belum Ada Catatan Piutang Aktif')
               }
               description={
-                statusFilter === 'paid'
-                  ? t('loans.empty.paid.desc', 'Catatan pinjaman yang sudah lunas 100% akan tersimpan di sini.')
-                  : activeTab === 'debt'
-                    ? t('loans.empty.debt.desc', 'Tekan "Catat Baru" untuk menambah catatan utang Anda.')
-                    : t('loans.empty.receivable.desc', 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.')
+                statusFilter === 'forgiven'
+                  ? t('loans.empty.forgiven.desc', 'Catatan pinjaman yang diputihkan atau direlakan akan tersimpan di sini.')
+                  : statusFilter === 'paid'
+                    ? t('loans.empty.paid.desc', 'Catatan pinjaman yang sudah lunas 100% akan tersimpan di sini.')
+                    : activeTab === 'debt'
+                      ? t('loans.empty.debt.desc', 'Tekan "Catat Baru" untuk menambah catatan utang Anda.')
+                      : t('loans.empty.receivable.desc', 'Tekan "Catat Baru" untuk menambah catatan uang yang dipinjam orang lain.')
               }
               action={
                 <button
@@ -433,6 +468,8 @@ export default function Loans() {
             <div className="space-y-3 ft-stagger-in">
               {filteredRows.map((item) => {
                 const isPaid = item.isPaid
+                const isForgiven = item.isForgiven
+                const isSettled = item.isSettled
                 const isDebt = item.type === 'debt'
                 const isEditingThisNote = editingNoteId === item.id
                 const isSwiped = swipedId === item.id
@@ -455,16 +492,21 @@ export default function Loans() {
                       }}
                       {...getSwipeHandlers(item.id, { onEdit: () => openEdit(item), onDelete: () => setDeletingLoan(item) })}
                     >
-                      {/* Circular LUNAS Stamp for Paid Items */}
-                      {isPaid && (
+                      {/* Circular Stamp for Paid or Forgiven Items */}
+                      {isForgiven ? (
+                        <div className="loan-stamp loan-stamp-forgiven">
+                          <b className="loan-stamp-text">{t('loans.stamp.forgiven', 'DIIKHLASKAN')}</b>
+                          <span className="loan-stamp-sub">{item.forgivenAt ? new Date(item.forgivenAt).toLocaleDateString() : '100%'}</span>
+                        </div>
+                      ) : isPaid ? (
                         <div className={`loan-stamp ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'}`}>
                           <b className="loan-stamp-text">{t('loans.badge.paid', 'LUNAS')}</b>
                           <span className="loan-stamp-sub">{item.dueDate || '100%'}</span>
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Row 1 & 2: Header Block (Icon + Title + Due Badge / Person · Wallet) */}
-                      <div className={`flex items-start justify-between gap-2.5 ${isPaid ? 'pr-14' : ''}`}>
+                      <div className={`flex items-start justify-between gap-2.5 ${isSettled ? 'pr-14' : ''}`}>
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           {/* Category Icon */}
                           <div className="relative shrink-0">
@@ -477,14 +519,21 @@ export default function Loans() {
                             >
                               {isDebt ? <HandCoins className="h-4.5 w-4.5" /> : <Receipt className="h-4.5 w-4.5" />}
                             </div>
-                            {isPaid && (
+                            {isForgiven ? (
+                              <span
+                                className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-purple-500 text-white ring-2 ring-[var(--panel-strong)]"
+                                title={t('loans.badge.forgiven', 'Diikhlaskan')}
+                              >
+                                <HeartHandshake className="h-2.5 w-2.5" strokeWidth={3} />
+                              </span>
+                            ) : isPaid ? (
                               <span
                                 className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-[var(--panel-strong)]"
                                 title={t('loans.paid', 'Lunas')}
                               >
                                 <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={3} />
                               </span>
-                            )}
+                            ) : null}
                           </div>
 
                           {/* Title & Combined Subtitle */}
@@ -493,14 +542,19 @@ export default function Loans() {
                               <h4 className="truncate text-sm font-extrabold text-[var(--fg)]">
                                 {item.title}
                               </h4>
-                              {!isPaid && item.dueBadge && (
+                              {!isSettled && item.dueBadge && (
                                 <span
                                   className={`shrink-0 rounded-full px-1.5 py-0.2 text-[9px] font-black border ${item.dueBadge.color}`}
                                 >
                                   {item.dueBadge.text}
                                 </span>
                               )}
-                              {statusFilter === 'paid' && (
+                              {isForgiven && (
+                                <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black bg-purple-500/15 text-purple-500 border border-purple-500/30">
+                                  <HeartHandshake className="h-2.5 w-2.5" /> {t('loans.badge.forgiven', 'Diikhlaskan')}
+                                </span>
+                              )}
+                              {statusFilter === 'paid' && isPaid && !isForgiven && (
                                 <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
                                   <CheckCircle2 className="h-2.5 w-2.5" /> {t('loans.paid', 'Lunas')}
                                 </span>
@@ -515,7 +569,7 @@ export default function Loans() {
                               )}
                               {item.interestRate ? <span> · {item.interestRate}%/thn</span> : null}
                               {item.tenorMonths ? <span> · {item.tenorMonths} bln</span> : null}
-                              {item.monthlyPayment && !isPaid ? (
+                              {item.monthlyPayment && !isSettled ? (
                                 <span className="text-[var(--accent)] font-semibold"> (Cicilan: {formatCurrency(item.monthlyPayment, item.currency || defaultCurrency)}/bln)</span>
                               ) : null}
                             </p>
@@ -528,14 +582,24 @@ export default function Loans() {
                         <div className="h-2 flex-1 rounded-full bg-[var(--field-bg)] border border-[var(--border)] overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              isPaid ? 'bg-emerald-500' : isDebt ? 'bg-[var(--earthy-terra)]' : 'bg-[var(--earthy-green)]'
+                              isForgiven
+                                ? 'bg-purple-500'
+                                : isPaid
+                                  ? 'bg-emerald-500'
+                                  : isDebt
+                                    ? 'bg-[var(--earthy-terra)]'
+                                    : 'bg-[var(--earthy-green)]'
                             }`}
-                            style={{ width: `${isPaid ? 100 : item.pct}%` }}
+                            style={{ width: `${isSettled ? 100 : item.pct}%` }}
                           />
                         </div>
 
                         <div className="shrink-0 text-[11px] font-extrabold tabular-nums">
-                          {isPaid ? (
+                          {isForgiven ? (
+                            <span className="text-purple-500 flex items-center gap-1 font-black">
+                              <HeartHandshake className="h-3 w-3" /> {formatCurrency(item.total, item.currency || defaultCurrency)}
+                            </span>
+                          ) : isPaid ? (
                             <span className="text-emerald-500 flex items-center gap-1 font-black">
                               <CheckCircle2 className="h-3 w-3" /> {formatCurrency(item.total, item.currency || defaultCurrency)}
                             </span>
@@ -606,19 +670,30 @@ export default function Loans() {
                           </div>
 
                           {/* CTA Button side (right) */}
-                          {!isPaid && (
-                            <button
-                              type="button"
-                              onClick={(e) => openPaymentModal(item, e)}
-                              className={`shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 border ${
-                                isDebt
-                                  ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25 hover:bg-[var(--earthy-terra)]/20'
-                                  : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25 hover:bg-[var(--earthy-green)]/20'
-                              }`}
-                            >
-                              <Plus className="h-3 w-3" strokeWidth={3} />
-                              {isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')}
-                            </button>
+                          {!isSettled && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => openForgiveModal(item, e)}
+                                className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-purple-500 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                title={t('loans.action.forgive', 'Ikhlaskan')}
+                              >
+                                <HeartHandshake className="h-3 w-3" />
+                                <span>{t('loans.action.forgive', 'Ikhlaskan')}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => openPaymentModal(item, e)}
+                                className={`shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 border ${
+                                  isDebt
+                                    ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25 hover:bg-[var(--earthy-terra)]/20'
+                                    : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25 hover:bg-[var(--earthy-green)]/20'
+                                }`}
+                              >
+                                <Plus className="h-3 w-3" strokeWidth={3} />
+                                {isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')}
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
@@ -640,6 +715,12 @@ export default function Loans() {
       />
 
       <LoanPaymentModal isOpen={isPayOpen} onClose={() => setIsPayOpen(false)} loan={payLoan} />
+
+      <LoanForgiveModal
+        isOpen={isForgiveOpen}
+        onClose={() => setIsForgiveOpen(false)}
+        loan={forgiveLoanItem}
+      />
 
       <ConfirmDeleteModal
         isOpen={!!deletingLoan}

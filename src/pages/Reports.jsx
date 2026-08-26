@@ -106,7 +106,7 @@ export default function Reports() {
   const loans = useLiveQuery(() => db.loans.toArray(), [], [])
 
   const netLoanPosition = useMemo(() => {
-    const active = (loans || []).filter((l) => l.status !== 'paid' && toSafeNumber(l.remainingAmount ?? l.totalAmount) > 0)
+    const active = (loans || []).filter((l) => l.status !== 'paid' && l.status !== 'forgiven' && toSafeNumber(l.remainingAmount ?? l.totalAmount) > 0)
     const debt = active
       .filter((l) => l.type === 'debt')
       .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates), 0)

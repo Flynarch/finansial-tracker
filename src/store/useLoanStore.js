@@ -166,6 +166,39 @@ const useLoanStore = create((set) => ({
       })
     })
   },
+
+  forgiveLoan: async (loanId, notes = '') => {
+    const loan = await db.loans.get(loanId)
+    if (!loan) throw new Error('Catatan pinjaman tidak ditemukan.')
+
+    const remaining = Number(loan.remainingAmount) || 0
+    if (remaining <= 0) {
+      throw new Error('Pinjaman ini sudah lunas / tidak memiliki sisa tagihan.')
+    }
+
+    const forgiveDate = new Date().toISOString().split('T')[0]
+    const forgiveNoteText = notes.trim() || 'Diikhlaskan / Pemutihan'
+
+    await db.transaction('rw', db.loans, db.loanPayments, async () => {
+      await db.loanPayments.add({
+        loanId,
+        amount: remaining,
+        date: forgiveDate,
+        notes: forgiveNoteText,
+        isForgive: true,
+        transactionId: null,
+        createdAt: Date.now(),
+      })
+
+      await db.loans.update(loanId, {
+        remainingAmount: 0,
+        status: 'forgiven',
+        forgivenAt: Date.now(),
+        forgivenAmount: remaining,
+        forgivenNotes: forgiveNoteText,
+      })
+    })
+  },
 }))
 
 export default useLoanStore

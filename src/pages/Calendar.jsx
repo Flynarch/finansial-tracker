@@ -18,7 +18,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
-import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput } from '../lib/utils'
+import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput, toSafeNumber } from '../lib/utils'
 import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
@@ -204,7 +204,9 @@ function Calendar() {
       color: event.color || 'var(--accent)',
       raw: event,
     }))
-    const loanEvents = (loans || []).map((loan) => ({
+    const loanEvents = (loans || [])
+      .filter((loan) => loan.status !== 'paid' && loan.status !== 'forgiven' && toSafeNumber(loan.remainingAmount ?? loan.totalAmount) > 0)
+      .map((loan) => ({
       id: `loan-${loan.id}`,
       source: 'loan',
       sourceId: loan.id,
