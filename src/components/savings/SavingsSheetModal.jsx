@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import BottomSheet from '../ui/BottomSheet'
@@ -13,7 +13,7 @@ import {
   parseMoneyInput,
 } from '../../lib/utils'
 
-export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null, onSaved }) {
+export default memo(function SavingsSheetModal({ isOpen, onClose, editingGoal = null, onSaved }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [sheetError, setSheetError] = useState('')
@@ -62,7 +62,7 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
       targetAmount: parseMoneyInput(form.targetAmount, form.currency),
       currentAmount: parseMoneyInput(form.currentAmount, form.currency),
       currency: form.currency || defaultCurrency,
-      deadline: form.deadline || null,
+      deadline: form.deadline ? form.deadline : '',
     }
     if (!payload.name) {
       setSheetError(t('savings.validation.name'))
@@ -214,4 +214,4 @@ export default function SavingsSheetModal({ isOpen, onClose, editingGoal = null,
       </div>
     </BottomSheet>
   )
-}
+})

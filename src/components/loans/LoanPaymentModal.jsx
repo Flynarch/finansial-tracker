@@ -19,6 +19,7 @@ import {
 } from '../../lib/utils'
 import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History, HeartHandshake } from 'lucide-react'
 import LoanForgiveModal from './LoanForgiveModal'
+import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 
 export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved }) {
   const { t } = useTranslation()
@@ -100,11 +101,13 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
   const handleSave = async () => {
     const payAmt = parseMoneyInput(amount, currency)
     if (payAmt <= 0) {
+      hapticWarning()
       setSheetError(t('loans.payment.amountPositive', 'Nominal pembayaran harus lebih dari 0.'))
       return
     }
 
     if (payAmt > remaining) {
+      hapticWarning()
       setSheetError(
         t(
           'loans.payment.exceedsRemaining',
@@ -117,9 +120,11 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
 
     try {
       await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId)
+      hapticSuccess()
       onSaved?.()
       onClose?.()
     } catch (err) {
+      hapticWarning()
       setSheetError(err.message || t('loans.payment.saveFailed', 'Gagal mencatat pembayaran. Silakan coba lagi.'))
     }
   }

@@ -50,7 +50,7 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
 
   if (chipsList) {
     return (
-      <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar">
+      <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar w-full min-w-0 max-w-full">
         {chipsList.map((chipText, idx) => (
           <button
             key={idx}
@@ -67,7 +67,7 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar mt-1">
+    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar mt-1 w-full min-w-0 max-w-full">
       {defaultCategoryChips.map((item, idx) => (
         <button
           key={idx}

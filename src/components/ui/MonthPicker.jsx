@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 
-const ITEM_HEIGHT = 44
+const ITEM_HEIGHT = 48
 const VISIBLE_ITEMS = 5
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS
 
@@ -145,7 +145,7 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
               key={item.key ?? idx}
               type="button"
               onClick={() => { onSelect(idx); scrollToIndex(idx) }}
-              className="w-full select-none transition-all duration-150"
+              className="w-full select-none transition-all duration-150 cursor-pointer"
               style={{
                 height: ITEM_HEIGHT,
                 scrollSnapAlign: 'center',
@@ -157,12 +157,12 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
               <span
                 className={`text-center transition-all duration-150 ${
                   isSelected
-                    ? 'text-[15px] font-bold text-[var(--fg)]'
-                    : 'text-[13px] font-medium text-[var(--muted)]'
+                    ? 'text-base sm:text-lg font-black text-[var(--fg)]'
+                    : 'text-sm font-semibold text-[var(--muted)]'
                 }`}
                 style={{
-                  opacity: isSelected ? 1 : 0.6,
-                  transform: isSelected ? 'scale(1.05)' : 'scale(0.95)',
+                  opacity: isSelected ? 1 : 0.55,
+                  transform: isSelected ? 'scale(1.06)' : 'scale(0.94)',
                 }}
               >
                 {item[labelKey]}
@@ -326,15 +326,15 @@ export default function MonthPicker({ value, onChange, className = '', compact =
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-4 pb-3">
               <div>
-                <p className="text-[13px] font-bold tracking-tight text-[var(--fg)]">
+                <p className="text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">
                   {locale === 'en' ? 'Select Period' : 'Pilih Periode'}
                 </p>
-                <p className="mt-0.5 text-xs font-semibold capitalize text-[var(--accent)]">{previewLabel}</p>
+                <p className="mt-0.5 text-xs sm:text-sm font-extrabold capitalize text-[var(--accent)]">{previewLabel}</p>
               </div>
               <button
                 type="button"
                 onClick={handleSelectCurrentMonth}
-                className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-[11px] font-bold text-[var(--fg)] transition hover:bg-[var(--panel)] active:scale-95"
+                className="rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-1.5 text-xs font-bold text-[var(--fg)] transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
               >
                 {locale === 'en' ? 'Today' : 'Bulan Ini'}
               </button>
@@ -347,7 +347,7 @@ export default function MonthPicker({ value, onChange, className = '', compact =
             <div className="flex gap-0 px-4 py-2">
               {/* Month Column */}
               <div className="flex-1">
-                <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-widest text-[var(--muted-2)]">
+                <p className="mb-2 text-center text-xs sm:text-sm font-black uppercase tracking-wider text-[var(--fg)]">
                   {locale === 'en' ? 'Month' : 'Bulan'}
                 </p>
                 <DrumColumn
@@ -358,11 +358,11 @@ export default function MonthPicker({ value, onChange, className = '', compact =
               </div>
 
               {/* Divider */}
-              <div className="mx-1 mt-6 w-px self-stretch bg-[var(--border)]/30" />
+              <div className="mx-1 mt-8 w-px self-stretch bg-[var(--border)]/30" />
 
               {/* Year Column */}
               <div className="flex-1">
-                <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-widest text-[var(--muted-2)]">
+                <p className="mb-2 text-center text-xs sm:text-sm font-black uppercase tracking-wider text-[var(--fg)]">
                   {locale === 'en' ? 'Year' : 'Tahun'}
                 </p>
                 <DrumColumn

@@ -6,6 +6,7 @@ import useTranslation from '../../hooks/useTranslation'
 import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import useSettingsStore from '../../store/useSettingsStore'
 import useLoanStore from '../../store/useLoanStore'
+import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 
 export default function LoanForgiveModal({
   isOpen,
@@ -31,9 +32,11 @@ export default function LoanForgiveModal({
       setIsLoading(true)
       setError('')
       await forgiveLoan(loan.id, notes.trim())
+      hapticSuccess()
       onSuccess?.()
       onClose()
     } catch (err) {
+      hapticWarning()
       setError(err.message || t('common.error.generic', 'Terjadi Kendala'))
     } finally {
       setIsLoading(false)

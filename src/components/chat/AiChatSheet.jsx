@@ -903,15 +903,15 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
           </div>
         </div>
 
-        <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 overscroll-contain">
+        <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4 overscroll-contain w-full min-w-0 max-w-full">
           {messages.filter(m => m.type !== 'hidden').map((msg, index) => {
             const visibleMessages = messages.filter(m => m.type !== 'hidden')
             const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
             const isLatestMessage = index === visibleMessages.length - 1
             return (
-            <div key={msg.id} className="flex flex-col gap-2">
+            <div key={msg.id} className="flex flex-col gap-2 w-full min-w-0 max-w-full">
               {msg.role === 'user' && (
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full">
                   {msg.image && <img src={msg.image} alt="Upload" className="max-w-[200px] rounded-2xl border border-[var(--border)] shadow-xs" />}
                   {msg.content && <UserBubble content={msg.content} />}
                 </div>

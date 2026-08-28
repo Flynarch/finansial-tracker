@@ -202,13 +202,14 @@ export default function BudgetSheetModal({
         setExpandedParentId(raw.includes('/') ? raw.split('/')[0] : raw || null)
       } else {
         const defaultMonth = month || initialMonth || format(new Date(), 'yyyy-MM')
+        const safeInitialCat = typeof initialCategory === 'string' ? initialCategory : ''
         setForm({
           month: defaultMonth,
-          categoryPath: initialCategory || '',
+          categoryPath: safeInitialCat,
           limit: '',
         })
         setLimitInput('')
-        setExpandedParentId(initialCategory ? (initialCategory.includes('/') ? initialCategory.split('/')[0] : initialCategory) : null)
+        setExpandedParentId(safeInitialCat ? (safeInitialCat.includes('/') ? safeInitialCat.split('/')[0] : safeInitialCat) : null)
       }
       setIsCategoryOpen(false)
     }
@@ -246,7 +247,11 @@ export default function BudgetSheetModal({
         await db.budgets.update(editingBudget.id, payload)
       } else {
         // Upsert if budget for this month and category already exists
-        const existing = await db.budgets.where({ month: payload.month, category: payload.category }).first()
+        const existing = await db.budgets
+          .where('month')
+          .equals(payload.month)
+          .and((b) => b.category === payload.category)
+          .first()
         if (existing) {
           await db.budgets.update(existing.id, { limit: payload.limit })
         } else {

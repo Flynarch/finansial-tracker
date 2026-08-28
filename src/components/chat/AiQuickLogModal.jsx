@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { Sparkles, X, Mic, MicOff, Image as ImageIcon, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
@@ -338,6 +338,10 @@ export default function AiQuickLogModal() {
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const touchStartY = useRef(0)
+  const touchStartTime = useRef(0)
 
   const [prevOpen, setPrevOpen] = useState(isOpen)
   if (prevOpen !== isOpen) {
@@ -356,14 +360,44 @@ export default function AiQuickLogModal() {
   const sheetRef = useRef(null)
   const baseInputBeforeRecordingRef = useRef('')
 
-  // Open / Close animations (No disruptive auto-focus on open)
+  const handleTouchStart = useCallback((e) => {
+    touchStartY.current = e.touches[0].clientY
+    touchStartTime.current = Date.now()
+    setIsDragging(true)
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    if (!touchStartY.current) return
+    const currentY = e.touches[0].clientY
+    const deltaY = currentY - touchStartY.current
+    if (deltaY > 0) {
+      setDragOffset(deltaY)
+    } else {
+      setDragOffset(deltaY * 0.15)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = dragOffset / (elapsed || 1)
+    setIsDragging(false)
+    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      closeQuickLog()
+    }
+    setDragOffset(0)
+    touchStartY.current = 0
+  }, [dragOffset, closeQuickLog])
+
+  // Open / Close animations with clean frame scheduling
   useEffect(() => {
     let timeoutId
     let frameId
 
     if (isOpen) {
       frameId = requestAnimationFrame(() => {
-        setIsAnimatingIn(true)
+        requestAnimationFrame(() => {
+          setIsAnimatingIn(true)
+        })
       })
     } else {
       if (recognitionRef.current) {
@@ -383,7 +417,8 @@ export default function AiQuickLogModal() {
         setRecordedMerchant('')
         setRecordedTransactions([])
         setErrorMessage('')
-      }, 300)
+        setDragOffset(0)
+      }, 320)
     }
 
     return () => {
@@ -705,15 +740,15 @@ function isObviousNonTransaction(text) {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 transition-all duration-300 ease-out ${
-        isAnimatingIn ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+      className={`fixed inset-0 z-50 ${
+        isAnimatingIn ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
     >
       {/* Backdrop */}
       <button
         type="button"
-        className={`absolute inset-0 cursor-pointer transition-opacity duration-200 ${
-          isAnimatingIn ? 'bg-black/50 opacity-100' : 'bg-black/0 opacity-0'
+        className={`absolute inset-0 cursor-pointer transition-opacity duration-300 ease-out ${
+          isAnimatingIn ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0'
         }`}
         onClick={closeQuickLog}
         aria-label={t('common.close', 'Tutup Modal AI')}
@@ -722,13 +757,26 @@ function isObviousNonTransaction(text) {
       {/* Slide-Up Bottom Sheet */}
       <div
         ref={sheetRef}
-        className={`absolute inset-x-0 bottom-0 ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl ft-quicklog-sheet max-w-lg mx-auto ${
-          isAnimatingIn ? 'ft-quicklog-sheet--open' : ''
-        }`}
+        style={{
+          boxShadow: 'var(--shadow-card)',
+          transform: isAnimatingIn
+            ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
+            : 'translate3d(0, 100%, 0)',
+          transition: isDragging
+            ? 'none'
+            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
+        }}
+        className={`absolute inset-x-0 bottom-0 ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
       >
         {/* Top Drag Handle & Header (Fixed stable dimensions to prevent mobile jumping) */}
-        <div className={`shrink-0 ${modalMode === 'receipt' ? 'px-4 py-2.5' : 'p-4 pb-3'} border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl`}>
-          <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-[var(--border-strong)]/40" />
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className={`shrink-0 ${modalMode === 'receipt' ? 'px-4 py-2.5' : 'p-4 pb-3'} border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl cursor-grab active:cursor-grabbing touch-none select-none`}
+        >
+          <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex h-6.5 w-6.5 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">

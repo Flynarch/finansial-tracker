@@ -38,6 +38,7 @@ import {
   getCachedCurrencyRates,
 } from '../../lib/api'
 import { db, computeAllWalletBalances } from '../../lib/db'
+import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
   formatMoneyInput,
   parseMoneyInput,
@@ -183,7 +184,10 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const [categoryCustomVersion, setCategoryCustomVersion] = useState(0)
   const [submitError, setSubmitError] = useState('')
   const [categoryError, setCategoryError] = useState(false)
+  const [walletError, setWalletError] = useState(false)
+  const [amountError, setAmountError] = useState(false)
   const categoryButtonRef = useRef(null)
+  const walletButtonRef = useRef(null)
   const [goldAutoPrice, setGoldAutoPrice] = useState(0)
 
   const mergedExpenseTree = useMemo(() => {
@@ -265,6 +269,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     if (isOpen) {
       setTxType('expense')
       setCategoryError(false)
+      setWalletError(false)
+      setAmountError(false)
       setSubmitError('')
       setForm((prev) => ({
         ...prev,
@@ -330,6 +336,38 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     if (txType === 'income') syncIncomeParentFromCategory(form.category)
     requestAnimationFrame(() => requestAnimationFrame(() => setCategorySheetEnter(true)))
   }
+
+  const handleSelectType = useCallback(
+    (nextType) => {
+      if (nextType === txType) return
+      setTxType(nextType)
+      setCategoryError(false)
+      setWalletError(false)
+      setAmountError(false)
+      setSubmitError('')
+
+      if (nextType === 'expense') {
+        if (!isValidExpenseCategoryPath(form.category)) {
+          setForm((p) => ({ ...p, category: '' }))
+          setExpenseParentId(null)
+        } else {
+          syncExpenseParentFromCategory(form.category)
+        }
+      } else if (nextType === 'income') {
+        if (!isValidIncomeCategoryPath(form.category)) {
+          setForm((p) => ({ ...p, category: '' }))
+          setIncomeParentId(null)
+        } else {
+          syncIncomeParentFromCategory(form.category)
+        }
+      } else {
+        setForm((p) => ({ ...p, category: '' }))
+        setExpenseParentId(null)
+        setIncomeParentId(null)
+      }
+    },
+    [txType, form.category, syncExpenseParentFromCategory, syncIncomeParentFromCategory],
+  )
 
   const activeTree = txType === 'expense' ? mergedExpenseTree : mergedIncomeTree
   const activeParentId = txType === 'expense' ? expenseParentId : incomeParentId
@@ -442,6 +480,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           }
         })
       }
+      setWalletError(false)
       setWalletModalMode(null)
     },
     [walletModalMode, txType, wallets, defaultCurrency]
@@ -579,21 +618,27 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         }
       } else {
         if (txType !== 'transfer' && (!form.category || !form.category.trim())) {
+          hapticWarning()
           setCategoryError(true)
           setSubmitError('')
           categoryButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
           return
         }
         if (!form.walletId) {
-          setSubmitError('Silakan pilih wallet terlebih dahulu.')
+          hapticWarning()
+          setWalletError(true)
+          setSubmitError('')
+          walletButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
           return
         }
         if (txType === 'transfer') {
           if (!form.targetWalletId) {
+            hapticWarning()
             setSubmitError(t('tx.selectTargetWallet', 'Silakan pilih wallet tujuan.'))
             return
           }
           if (String(form.walletId) === String(form.targetWalletId)) {
+            hapticWarning()
             setSubmitError(t('tx.sameWalletTransfer', 'Wallet asal dan tujuan tidak boleh sama.'))
             return
           }
@@ -605,7 +650,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           : parseMoneyInput(form.amount, form.currency)
 
         if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
-          setSubmitError(t('tx.error.invalidAmount', 'Nominal harus lebih dari 0 dan berupa angka valid.'))
+          hapticWarning()
+          setAmountError(true)
+          setSubmitError('')
           return
         }
 
@@ -622,27 +669,24 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           targetWalletId: txType === 'transfer' ? Number(form.targetWalletId) : undefined,
           tags: tags.length > 0 ? tags : undefined,
         })
+        hapticSuccess()
       }
       onClose?.()
     } catch {
+      hapticWarning()
       setSubmitError('Gagal menyimpan transaksi. Cek kembali data Anda.')
     }
   }
 
   return (
     <Modal key={nonce} isOpen={isOpen} title={t('addTx.title')} onClose={onClose}>
-      {/* Visual Drag Handle */}
-      <div className="flex justify-center -mt-2 mb-3">
-        <div className="h-1 w-9 shrink-0 rounded-full bg-[var(--border)]" />
-      </div>
-
       {submitError ? <ToastBanner message={submitError} /> : null}
 
       {/* Mode Toggle - Sliding Segmented Track */}
       <div className="mb-4">
         <TransactionTypeSelector
           txType={txType}
-          onSelectType={setTxType}
+          onSelectType={handleSelectType}
         />
       </div>
 
@@ -660,13 +704,20 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           <>
             <AmountInput
               amount={form.amount}
-              onChangeAmount={(val) => setForm((p) => ({ ...p, amount: val }))}
+              onChangeAmount={(val) => {
+                setAmountError(false)
+                setForm((p) => ({ ...p, amount: val }))
+              }}
               currency={form.currency}
-              onChangeCurrency={(val) => setForm((p) => ({ ...p, currency: val }))}
+              onChangeCurrency={(val) => {
+                setAmountError(false)
+                setForm((p) => ({ ...p, currency: val }))
+              }}
               isCashWallet={isCashWallet}
               txType={txType}
               onOpenAiScan={handleOpenAiScan}
               modeAccent={modeAccent}
+              hasError={amountError}
             />
 
             {/* Form Fields Container */}
@@ -688,17 +739,30 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
-                    {txType === 'transfer' ? t('tx.transferFrom', 'Dari Dompet') : t('addTx.wallet', 'Dompet')}
+                  <div className="flex items-center justify-between mb-1 h-[14px]">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                      {txType === 'transfer' ? t('tx.transferFrom', 'Dari Dompet') : t('addTx.wallet', 'Dompet')}
+                    </div>
+                    {walletError && (
+                      <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out]">
+                        {t('addTx.selectWalletRequired', 'Wajib dipilih')}
+                      </span>
+                    )}
                   </div>
-                  <WalletSelectTrigger
-                    wallet={selectedWallet}
-                    placeholder={txType === 'transfer' ? t('tx.transferFrom', 'Pilih Dompet Asal') : t('loans.selectWallet', 'Pilih Wallet / Akun')}
-                    compact
-                    abbreviateBalance
-                    onClick={() => setWalletModalMode('walletId')}
-                    className="!h-[42px]"
-                  />
+                  <div ref={walletButtonRef}>
+                    <WalletSelectTrigger
+                      wallet={selectedWallet}
+                      placeholder={txType === 'transfer' ? t('tx.transferFrom', 'Pilih Dompet Asal') : t('loans.selectWallet', 'Pilih Wallet / Akun')}
+                      compact
+                      error={walletError}
+                      abbreviateBalance
+                      onClick={() => {
+                        setWalletError(false)
+                        setWalletModalMode('walletId')
+                      }}
+                      className="!h-[42px]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -752,7 +816,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                       ref={categoryButtonRef}
                       type="button"
                       onClick={openCategorySheet}
-                      className={`group flex w-full min-h-[42px] items-center justify-between gap-2.5 rounded-xl px-3 py-1.5 text-left transition-all duration-200 focus-visible:outline-none active:scale-[0.99] cursor-pointer ${
+                      className={`group flex w-full h-[42px] min-h-[42px] items-center justify-between gap-2.5 rounded-xl px-3 py-1 text-left transition-all duration-200 focus-visible:outline-none active:scale-[0.99] cursor-pointer ${
                         categoryError
                           ? 'border border-rose-500/35 bg-rose-500/[0.04]'
                           : 'border-none bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
@@ -766,13 +830,13 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                               className="h-4 w-4 text-[var(--fg)]/80"
                             />
                           </div>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 leading-tight">
                             <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
                               {txType === 'expense'
                                 ? formatExpenseCategory(form.category, locale)
                                 : formatIncomeCategory(form.category, locale)}
                             </p>
-                            <div className="text-[10px] font-medium text-[var(--muted)] truncate mt-0.5">
+                            <div className="text-[10px] font-medium text-[var(--muted)] truncate mt-0.5 leading-none">
                               {form.category.includes('/')
                                 ? txType === 'expense'
                                   ? formatExpenseCategory(form.category.split('/')[0], locale)
@@ -782,7 +846,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div
                             className={`h-7 w-7 rounded-full aspect-square grid shrink-0 place-items-center border transition-colors ${
                               categoryError

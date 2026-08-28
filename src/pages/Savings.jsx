@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Plus, Minus, Target, Edit2, Trash2, ArrowLeft, Star, Archive, RotateCcw, CheckCircle2, MoreVertical } from 'lucide-react'
+import { differenceInDays } from 'date-fns'
 import EmptyState from '../components/ui/EmptyState'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
@@ -18,11 +20,9 @@ import {
   FALLBACK_EXCHANGE_RATES,
 } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import { Plus, Minus, Target, Edit2, Trash2, ChevronLeft, Star, Archive, RotateCcw } from 'lucide-react'
-import { differenceInDays } from 'date-fns'
 
 function Savings() {
-  const { t } = useTranslation()
+  const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const motionDelay = reduceMotion ? 0 : 220
@@ -64,6 +64,7 @@ function Savings() {
   const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingGoal, setDeletingGoal] = useState(null)
+  const [menuOpenId, setMenuOpenId] = useState(null)
   const { setSwipedId } = useSwipeAction()
 
   const [fundGoal, setFundGoal] = useState(null)
@@ -139,7 +140,8 @@ function Savings() {
       0
     )
     const pct = target > 0 ? clampPercent((current / target) * 100) : 0
-    return { target, current, pct }
+    const remaining = Math.max(0, target - current)
+    return { target, current, pct, remaining }
   }, [defaultCurrency, goals, rates])
 
   const openAdd = useCallback(() => {
@@ -176,9 +178,9 @@ function Savings() {
   }
 
   return (
-    <div className="bg-[var(--bg)] min-h-[100dvh] pb-28">
+    <div className="bg-[var(--bg)] min-h-[100dvh] pb-24">
       <div
-        className={`ft-motion-page min-h-full max-w-lg mx-auto space-y-5 px-4 transform-gpu ${
+        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
           isLeaving
             ? '-translate-x-2 opacity-0'
             : isEntering
@@ -186,39 +188,34 @@ function Savings() {
               : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* Top Header */}
-        <div className="flex items-center justify-between gap-3 pt-3">
+        {/* Header (Compact Single Row) */}
+        <div className="flex items-center justify-between gap-2.5 pt-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
-              aria-label={t('savings.back')}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
+              aria-label={t('savings.back', 'Kembali')}
             >
-              <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+              <ArrowLeft className="h-4.5 w-4.5" />
             </button>
-            <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-[var(--fg)]">
-                {showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title')}
-              </h2>
-              <p className="text-xs font-bold text-[var(--muted)]">
-                {showArchive ? t('savings.archiveSubtitle', 'Daftar target tabungan yang telah tuntas & dicairkan') : t('savings.subtitle')}
-              </p>
-            </div>
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] truncate">
+              {showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title', 'Target Tabungan')}
+            </h1>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {!showArchive && (
               <>
                 <button
                   type="button"
                   onClick={() => setSearchParams({ view: 'archive' })}
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs transition-all active:scale-95 cursor-pointer relative"
                   title={t('savings.openArchive', 'Buka Arsip Tabungan')}
                 >
                   <Archive className="h-4.5 w-4.5" />
                   {archivedGoals.length > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--earthy-green)] text-[9px] font-black text-white shadow-2xs">
+                    <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--status-income)] text-[9px] font-black text-white shadow-2xs">
                       {archivedGoals.length}
                     </span>
                   )}
@@ -226,11 +223,11 @@ function Savings() {
 
                 <button
                   type="button"
-                  onClick={openAdd}
-                  className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => openAdd()}
+                  className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  {t('savings.newGoal', 'Target Baru')}
+                  <span>{t('savings.newGoal', 'Target Baru')}</span>
                 </button>
               </>
             )}
@@ -239,7 +236,7 @@ function Savings() {
               <button
                 type="button"
                 onClick={() => setSearchParams({})}
-                className="px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                className="h-10 px-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs active:scale-95 transition-all cursor-pointer"
               >
                 {t('savings.backToActive', 'Kembali ke Aktif')}
               </button>
@@ -247,34 +244,60 @@ function Savings() {
           </div>
         </div>
 
-        {/* Hero Summary Card (Active View Only) */}
+        {/* Summary Hero Card (Active View Only) */}
         {!showArchive && (
-          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-xs space-y-4">
-            <div className="flex items-start justify-between gap-3 relative z-10">
-              <div className="min-w-0">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
-                  {t('savings.totalSaved')} (Aktif)
-                </span>
-                <p className="mt-0.5 text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                  {formatCurrency(totals.current, defaultCurrency)}
-                </p>
-                <p className="mt-1 text-xs font-extrabold text-[var(--muted)] tabular-nums">
-                  {t('savings.of')}{' '}
-                  <span className="text-[var(--fg)] font-black">{formatCurrency(totals.target, defaultCurrency)}</span>
-                </p>
+          <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5">
+            {/* Main Metric Section */}
+            <div className="relative z-10 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 -mt-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+                    {t('savings.totalSaved', 'Total Terkumpul')}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums border transition-all ${
+                      totals.pct >= 100
+                        ? 'bg-[var(--status-income)] text-white border-[var(--status-income)] shadow-xs'
+                        : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
+                    }`}
+                  >
+                    <CheckCircle2 size={11} className="shrink-0" />
+                    <span>{Math.round(totals.pct)}%</span>
+                  </span>
+                </div>
               </div>
 
-              <div className="text-right shrink-0">
-                <span className="inline-flex items-center rounded-full bg-[var(--earthy-green-soft)] px-3 py-1 text-xs font-black text-[var(--earthy-green)] border border-[var(--earthy-green)]/25">
-                  {Math.round(totals.pct)}%
+              <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
+                <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+                  {formatCurrency(totals.current, defaultCurrency)}
+                </p>
+                <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
+                  / {formatCurrency(totals.target, defaultCurrency)}
+                </span>
+              </div>
+
+              {/* Sub-row: Kurang / Sisa Kekurangan on left, Goals Count on right */}
+              <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-xs font-bold tabular-nums">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--muted)]">{t('savings.remainingShort', 'Kurang')}:</span>
+                  <span className="font-black text-[var(--fg)]">
+                    {totals.remaining > 0
+                      ? formatCurrency(totals.remaining, defaultCurrency)
+                      : t('savings.completed', 'Tercapai')}
+                  </span>
+                </div>
+
+                <span className="rounded-full bg-[var(--field-bg)] border border-[var(--border)]/60 px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] tabular-nums shrink-0">
+                  {activeGoals.length} {locale === 'en' ? 'Goals' : 'Target'}
                 </span>
               </div>
             </div>
 
-            <div className="h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative z-10">
+            {/* Bottom Row: Smooth Full-width Progress Bar */}
+            <div className="h-3 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden relative z-10 p-0.5">
               <div
-                className="h-full rounded-full bg-[var(--earthy-green)] transition-all duration-700 ease-out"
-                style={{ width: `${totals.pct}%` }}
+                className="h-full rounded-full bg-[var(--status-income)] transition-all duration-700 ease-out shadow-xs transform-gpu"
+                style={{ width: `${Math.min(100, Math.max(totals.pct > 0 ? totals.pct : 0, 0))}%` }}
               />
             </div>
           </div>
@@ -286,7 +309,7 @@ function Savings() {
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
               {showArchive
                 ? t('savings.archivedListTitle', { count: archivedGoals.length }, `Arsip Selesai (${archivedGoals.length})`)
-                : t('savings.activeListTitle', { count: activeGoals.length }, `Target Tabungan Aktif (${activeGoals.length})`)}
+                : t('savings.activeListTitle', { count: activeGoals.length }, `Daftar Target Tabungan (${activeGoals.length})`)}
             </h3>
           </div>
 
@@ -302,8 +325,8 @@ function Savings() {
                 !showArchive ? (
                   <button
                     type="button"
-                    onClick={openAdd}
-                    className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 mx-auto cursor-pointer"
+                    onClick={() => openAdd()}
+                    className="min-h-[40px] px-4 py-2 rounded-xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 mx-auto cursor-pointer"
                   >
                     <Plus className="h-4 w-4" strokeWidth={2.5} />
                     {t('savings.newGoal', 'Target Baru')}
@@ -312,146 +335,175 @@ function Savings() {
               }
             />
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 ft-stagger-in">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ft-stagger-in">
               {displayedRows.map((g) => {
                 const isComplete = g.isArchived
+
                 return (
                   <div
                     key={g.id}
                     onClick={() => navigate(`/savings/${g.id}`)}
-                    className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-2xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between space-y-3.5"
+                    className="relative overflow-visible rounded-2xl border transition-all duration-200 border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)] cursor-pointer"
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${
-                              isComplete
-                                ? 'bg-[var(--earthy-green)] text-white border-[var(--earthy-green)] shadow-xs'
-                                : 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border-[var(--earthy-green)]/25'
-                            }`}
-                          >
-                            <Target className="h-4.5 w-4.5" strokeWidth={2.2} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <h4 className="truncate text-xs font-bold text-[var(--fg)] group-hover:text-[var(--earthy-green)] transition-colors">
-                                {g.name}
-                              </h4>
-                              {g.isPinned && <Star className="h-3 w-3 fill-amber-500 text-amber-500 shrink-0" />}
-                            </div>
-                            <p className="mt-0.5 text-[10px] font-semibold text-[var(--muted)] truncate">
-                              {isComplete
-                                ? t('savings.completedAndCashed', 'Selesai & Dicairkan')
-                                : `${t('savings.remainingShort', 'Kurang')}: ${formatCurrency(g.remaining, g.currency || defaultCurrency)}`}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span className="rounded-full border border-[var(--earthy-green)]/25 bg-[var(--earthy-green-soft)] px-2.5 py-0.5 text-[10px] font-black text-[var(--earthy-green)] tabular-nums">
-                            {Math.round(g.pct)}%
-                          </span>
-                          {g.deadlineText && !isComplete && (
-                            <span
-                              className={`text-[9px] font-extrabold ${
-                                g.isOverdue ? 'text-[var(--earthy-terra)]' : 'text-[var(--muted)]'
+                    <div className="relative z-10 p-4 sm:p-5 flex flex-col justify-between h-full space-y-4">
+                      {/* Top Part: Icon, Name + Percentage next to name, Amount & 3-dots Menu */}
+                      <div>
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${
+                                isComplete
+                                  ? 'bg-[var(--status-income)] text-white border-[var(--status-income)] shadow-xs'
+                                  : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
                               }`}
                             >
-                              {g.deadlineText}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                              <Target className="h-5 w-5" strokeWidth={2.2} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                <h3 className="truncate text-sm font-extrabold text-[var(--fg)]">
+                                  {g.name}
+                                </h3>
+                                <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25 shrink-0">
+                                  {Math.round(g.pct)}%
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs font-bold text-[var(--muted)] tabular-nums">
+                                {formatCurrency(g.current, g.currency || defaultCurrency)}{' '}
+                                <span className="font-normal text-[var(--muted-2)]">
+                                  / {formatCurrency(g.target, g.currency || defaultCurrency)}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] font-bold tabular-nums">
-                          <span className="text-[var(--fg)] font-black">
-                            {formatCurrency(g.current, g.currency || defaultCurrency)}
-                          </span>
-                          <span className="text-[var(--muted)] font-semibold">
-                            / {formatCurrency(g.target, g.currency || defaultCurrency)}
-                          </span>
+                          {/* Star Pin & 3-Dots Menu */}
+                          <div className="flex items-center gap-0.5 shrink-0 relative">
+                            <button
+                              type="button"
+                              onClick={(e) => togglePin(g.id, g.isPinned, e)}
+                              className={`h-8 w-8 flex items-center justify-center rounded-xl transition-colors active:scale-90 cursor-pointer ${
+                                g.isPinned
+                                  ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                                  : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)]'
+                              }`}
+                              title={g.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
+                            >
+                              <Star className="h-3.5 w-3.5" fill={g.isPinned ? 'currentColor' : 'none'} />
+                            </button>
+
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setMenuOpenId(menuOpenId === g.id ? null : g.id)
+                                }}
+                                className="h-8 w-8 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors active:scale-90 cursor-pointer"
+                                title={t('savings.options', 'Opsi')}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+
+                              {menuOpenId === g.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setMenuOpenId(null)
+                                    }}
+                                  />
+                                  <div className="absolute right-0 top-full mt-1 w-32 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95">
+                                    {!isComplete && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          setMenuOpenId(null)
+                                          openEdit(g, e)
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] rounded-xl transition-colors cursor-pointer"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5 text-[var(--muted)]" />
+                                        <span>{t('savings.edit', 'Edit')}</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setMenuOpenId(null)
+                                        setDeletingGoal(g)
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[var(--status-expense)] hover:bg-[var(--status-expense-soft)] rounded-xl transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      <span>{t('savings.delete', 'Hapus')}</span>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden">
+
+                        {/* Progress Bar */}
+                        <div className="mt-3.5 h-2 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-[var(--earthy-green)] transition-all duration-500"
-                            style={{ width: `${g.pct}%` }}
+                            className="h-full rounded-full bg-[var(--status-income)] transition-all duration-500"
+                            style={{ width: `${Math.min(100, Math.max(0, g.pct))}%` }}
                           />
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="pt-2.5 border-t border-[var(--border)]/60 flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5">
-                        {!isComplete && (
-                          <>
+                        {/* Bottom Status Row */}
+                        <div className="mt-2 flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-[var(--muted)]">
+                            {isComplete
+                              ? t('savings.completedAndCashed', 'Selesai & Dicairkan')
+                              : g.deadlineText
+                              ? g.deadlineText
+                              : t('savings.remainingShort', 'Sisa kekurangan')}
+                          </span>
+                          <span className="text-[var(--fg)] font-extrabold">
+                            {isComplete
+                              ? '100%'
+                              : formatCurrency(g.remaining, g.currency || defaultCurrency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: Setor, Tarik, Reopen */}
+                      <div className="pt-2.5 border-t border-[var(--border)]/50 flex items-center justify-between gap-2">
+                        {!isComplete ? (
+                          <div className="flex items-center gap-2 w-full">
                             <button
                               type="button"
                               onClick={(e) => openFundModal(g, 'add', e)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[var(--earthy-green-soft)] text-[var(--earthy-green)] border border-[var(--earthy-green)]/25 hover:bg-[var(--earthy-green)]/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25 hover:bg-[var(--status-income)]/20 active:scale-95 transition flex items-center justify-center gap-1 cursor-pointer"
                             >
-                              <Plus className="h-3 w-3" strokeWidth={3} />
-                              Setor
+                              <Plus className="h-3.5 w-3.5" strokeWidth={2.8} />
+                              <span>{t('savings.deposit', 'Setor')}</span>
                             </button>
                             <button
                               type="button"
                               onClick={(e) => openFundModal(g, 'withdraw', e)}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[var(--panel)] text-[var(--fg)] border border-[var(--border)] hover:bg-[var(--field-bg)] transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)] hover:bg-[var(--panel-strong)] active:scale-95 transition flex items-center justify-center gap-1 cursor-pointer"
                             >
-                              <Minus className="h-3 w-3" strokeWidth={3} />
-                              Tarik
+                              <Minus className="h-3.5 w-3.5" strokeWidth={2.8} />
+                              <span>{t('savings.withdraw', 'Tarik')}</span>
                             </button>
-                          </>
-                        )}
-
-                        {isComplete && (
+                          </div>
+                        ) : (
                           <button
                             type="button"
                             onClick={(e) => toggleArchiveStatus(g.id, true, e)}
-                            className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] hover:text-[var(--fg)] transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                            title={'Kembalikan ke Target Aktif'}
+                            className="w-full py-1.5 px-3 rounded-xl text-xs font-bold bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)] hover:bg-[var(--panel-strong)] active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            <RotateCcw className="h-3 w-3" />
-                            Aktifkan Kembali
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            <span>{t('savings.reopen', 'Aktifkan Kembali')}</span>
                           </button>
                         )}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => togglePin(g.id, g.isPinned, e)}
-                          className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
-                            g.isPinned
-                              ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                              : 'bg-[var(--panel)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
-                          }`}
-                          title={g.isPinned ? 'Lepas Pin' : 'Pin Target'}
-                        >
-                          <Star className="h-3.5 w-3.5" fill={g.isPinned ? 'currentColor' : 'none'} />
-                        </button>
-                        {!isComplete && (
-                          <button
-                            type="button"
-                            onClick={(e) => openEdit(g, e)}
-                            className="p-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-                            title={'Edit Target'}
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeletingGoal(g)
-                          }}
-                          className="p-1.5 rounded-xl border border-[var(--earthy-terra)]/30 bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] hover:bg-[var(--earthy-terra)]/20 transition-colors cursor-pointer"
-                          title={'Hapus Target'}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -489,8 +541,8 @@ function Savings() {
             setDeletingGoal(null)
           }
         }}
-        title={t('savings.delete')}
-        message={t('savings.deleteConfirm')}
+        title={t('savings.delete', 'Hapus')}
+        message={t('savings.deleteConfirm', 'Hapus tujuan tabungan ini?')}
       />
     </div>
   )

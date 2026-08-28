@@ -17,7 +17,7 @@ import { calculateBudgetSpent } from '../lib/budgetUtils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { ChevronLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
 import { isTxMatchingBudget } from '../lib/budgetUtils'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
 
@@ -51,14 +51,19 @@ function Budget() {
     return () => window.cancelAnimationFrame(id)
   }, [])
 
-  const budgets = useLiveQuery(() => db.budgets.toArray(), [], [])
-  const currentMonth = format(new Date(), 'yyyy-MM')
-
-  const [month, setMonth] = useState(currentMonth)
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
   const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingBudget, setDeletingBudget] = useState(null)
   const { setSwipedId, getSwipeHandlers } = useSwipeAction()
+
+  const budgets = useLiveQuery(async () => {
+    try {
+      return await db.budgets.toArray()
+    } catch {
+      return []
+    }
+  }, [], [])
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
@@ -153,7 +158,7 @@ function Budget() {
   const openAdd = useCallback((initialCat = '') => {
     setEditingId(null)
     setSwipedId(null)
-    setSelectedInitialCategory(initialCat)
+    setSelectedInitialCategory(typeof initialCat === 'string' ? initialCat : '')
     openSheet()
   }, [openSheet, setSwipedId])
 
@@ -192,106 +197,116 @@ function Budget() {
               : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 pt-2">
+        {/* Header (Compact Single Row) */}
+        <div className="flex items-center justify-between gap-2.5 pt-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-all cursor-pointer active:scale-95"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
               aria-label={t('budget.back')}
             >
-              <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+              <ArrowLeft className="h-4.5 w-4.5" />
             </button>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">{t('budget.title')}</h1>
-              <p className="text-xs font-bold text-[var(--muted)]">{t('budget.subtitle')}</p>
-            </div>
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] truncate">
+              {t('budget.title')}
+            </h1>
           </div>
 
           <button
             type="button"
-            onClick={openAdd}
-            className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+            onClick={() => openAdd()}
+            className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            {t('budget.add')}
+            <span>{t('budget.add')}</span>
           </button>
         </div>
 
         {/* Summary Hero Card */}
-        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-4">
-          {/* Top Row: Month Picker & Category Counter */}
-          <div className="flex items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
-                {t('budget.month')}
-              </span>
-              <MonthPicker
-                value={month}
-                onChange={setMonth}
-                compact
-                className="min-w-[130px]"
-              />
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">{t('budget.totalCategories', 'Total Kategori')}</span>
-              <p className="text-xs font-black tabular-nums text-[var(--fg)]">{monthBudgets.length} {locale === 'en' ? 'Categories' : 'Kategori'}</p>
-            </div>
-          </div>
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5">
+          {/* Main Metric Section */}
+          <div className="relative z-10 space-y-2.5">
+            {/* Top Row: Total Terpakai + Status Badge on left, MonthPicker on top right */}
+            <div className="flex items-center justify-between gap-2 -mt-0.5">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+                  {t('budget.totalSpent', 'Total Terpakai')}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums border transition-all ${
+                    summary.pct >= 100
+                      ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/30'
+                      : summary.pct >= 80
+                      ? 'bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30'
+                      : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
+                  }`}
+                >
+                  {summary.pct >= 100 ? (
+                    <AlertCircle size={11} className="shrink-0" />
+                  ) : summary.pct >= 80 ? (
+                    <AlertTriangle size={11} className="shrink-0" />
+                  ) : (
+                    <CheckCircle2 size={11} className="shrink-0" />
+                  )}
+                  <span>{Math.round(summary.pct)}%</span>
+                </span>
+              </div>
 
-          {/* Middle Row: Main Metric & Status Badge */}
-          <div className="flex items-end justify-between gap-3 relative z-10 pt-1">
-            <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                {t('budget.totalSpent', 'Total Terpakai')}
-              </span>
-              <p className="mt-0.5 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+              <div className="shrink-0">
+                <MonthPicker
+                  value={month}
+                  onChange={setMonth}
+                  compact
+                  className="min-w-[105px]"
+                />
+              </div>
+            </div>
+
+            {/* Middle Row: Inline Big Amount + Limit */}
+            <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
+              <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
                 {formatCurrency(summary.totalSpent, defaultCurrency)}
               </p>
-              <p className="mt-1 text-xs font-bold text-[var(--muted)] tabular-nums">
-                {t('budget.of')} <span className="font-extrabold text-[var(--fg)]">{formatCurrency(summary.totalLimit, defaultCurrency)}</span>
-                {summary.totalLimit > 0 && (
-                  <span className={`ml-2 font-bold ${summary.isOver ? 'text-[var(--status-expense)]' : 'text-[var(--muted)]'}`}>
-                    ({summary.isOver ? `${t('budget.overLimit', 'Kelebihan')}: ${formatCurrency(summary.overAmount, defaultCurrency)}` : `${t('budget.remaining', 'Sisa')}: ${formatCurrency(summary.remaining, defaultCurrency)}`})
-                  </span>
-                )}
-              </p>
+              <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
+                / {formatCurrency(summary.totalLimit, defaultCurrency)}
+              </span>
             </div>
 
-            <div className="text-right shrink-0 pb-0.5">
-              <div
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black border shadow-2xs backdrop-blur-md ${
-                  summary.pct >= 100
-                    ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/30'
-                    : summary.pct >= 80
-                    ? 'bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30'
-                    : 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/25'
-                }`}
-              >
-                {summary.pct >= 100 ? (
-                  <AlertCircle size={13} className="shrink-0" />
-                ) : summary.pct >= 80 ? (
-                  <AlertTriangle size={13} className="shrink-0" />
-                ) : (
-                  <CheckCircle2 size={13} className="shrink-0" />
-                )}
-                <span>{Math.round(summary.pct)}%</span>
+            {/* Sub-row: Sisa Anggaran / Kelebihan on left, Category Count on right */}
+            <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-xs font-bold tabular-nums">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[var(--muted)]">
+                  {summary.isOver ? t('budget.overLimit', 'Kelebihan') : t('budget.remaining', 'Sisa')}:
+                </span>
+                <span
+                  className={`font-black ${
+                    summary.isOver ? 'text-[var(--status-expense)]' : 'text-[var(--fg)]'
+                  }`}
+                >
+                  {summary.isOver
+                    ? formatCurrency(summary.overAmount, defaultCurrency)
+                    : formatCurrency(summary.remaining, defaultCurrency)}
+                </span>
               </div>
+
+              <span className="rounded-full bg-[var(--field-bg)] border border-[var(--border)]/60 px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--muted)] tabular-nums shrink-0">
+                {monthBudgets.length} {locale === 'en' ? 'Categories' : 'Kategori'}
+              </span>
             </div>
           </div>
 
           {/* Bottom Row: Smooth Progress Bar */}
           <div className="h-3 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden relative z-10 p-0.5">
             <div
-              className={`h-full rounded-full transition-all duration-700 ease-out shadow-xs ${
+              className={`h-full rounded-full transition-all duration-700 ease-out shadow-xs transform-gpu ${
                 summary.pct >= 100
                   ? 'bg-[var(--status-expense)]'
                   : summary.pct >= 80
                   ? 'bg-[var(--warning)]'
                   : 'bg-[var(--status-income)]'
               }`}
-              style={{ width: `${Math.min(100, summary.pct)}%` }}
+              style={{ width: `${Math.min(100, Math.max(summary.pct > 0 ? summary.pct : 0, 0))}%` }}
             />
           </div>
         </div>

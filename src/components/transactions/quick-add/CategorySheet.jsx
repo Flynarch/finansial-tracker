@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import CategoryIcon from '../../ui/CategoryIcon'
 import Button from '../../ui/Button'
 import { getCategoryToneClass } from '../../../lib/categoryIcon'
@@ -38,6 +38,10 @@ export default function CategorySheet({
   const [editMode, setEditMode] = useState(false)
   const [newSubName, setNewSubName] = useState('')
   const [newParentName, setNewParentName] = useState('')
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const touchStartY = useRef(0)
+  const touchStartTime = useRef(0)
 
   if (!isOpen) return null
 
@@ -71,24 +75,72 @@ export default function CategorySheet({
     onCategoryCustomChanged?.()
   }
 
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY
+    touchStartTime.current = Date.now()
+    setIsDragging(true)
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartY.current) return
+    const currentY = e.touches[0].clientY
+    const deltaY = currentY - touchStartY.current
+    if (deltaY > 0) {
+      setDragOffset(deltaY)
+    } else {
+      setDragOffset(deltaY * 0.15)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = dragOffset / (elapsed || 1)
+    setIsDragging(false)
+    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      onClose()
+    }
+    setDragOffset(0)
+    touchStartY.current = 0
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col justify-end pointer-events-auto" role="presentation">
       <button
         type="button"
-        className={`absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300 ease-out ${
+        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ease-out ${
           isEnter ? 'opacity-100' : 'opacity-0'
         }`}
         aria-label={t('addTx.closeSheet', 'Tutup')}
         onClick={onClose}
       />
       <div
-        className={`relative flex max-h-[min(88vh,36rem)] w-full flex-col rounded-t-2xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-transform duration-300 ease-out ${
-          isEnter ? 'translate-y-0' : 'translate-y-full'
-        }`}
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        className="relative flex max-h-[min(88vh,36rem)] w-full flex-col rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu"
+        style={{
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+          transform: isEnter
+            ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
+            : 'translate3d(0, 100%, 0)',
+          transition: isDragging
+            ? 'none'
+            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
       >
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-[var(--border-strong)]/40" />
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/70 px-4 py-3">
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className="mx-auto mt-2 h-6 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+        >
+          <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)]/60" />
+        </div>
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className="flex items-center justify-between gap-2 border-b border-[var(--border)]/70 px-4 py-2.5 cursor-grab select-none touch-none"
+        >
           <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--fg)]">
             {txType === 'expense'
               ? editMode
@@ -101,7 +153,7 @@ export default function CategorySheet({
           <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
-              className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)]"
+              className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] active:scale-95 transition-all"
               aria-label={editMode ? t('addTx.doneEditing', 'Selesai') : t('common.edit', 'Edit')}
               onClick={() => {
                 setEditMode((prev) => !prev)

@@ -14,6 +14,7 @@ import useBackButton from '../hooks/useBackButton'
 import useSwipeAction from '../hooks/useSwipeAction'
 import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
+import { triggerHaptic } from '../lib/haptics'
 import {
   Plus,
   ChevronLeft,
@@ -27,7 +28,7 @@ import {
   HeartHandshake,
 } from 'lucide-react'
 import LoanForgiveModal from '../components/loans/LoanForgiveModal'
-import { differenceInDays } from 'date-fns'
+import { differenceInDays, format } from 'date-fns'
 
 export default function Loans() {
   const { t, locale } = useTranslation()
@@ -70,12 +71,36 @@ export default function Loans() {
   }, [])
 
   const loans = useLiveQuery(() => db.loans.toArray(), [], [])
+  const loanPayments = useLiveQuery(() => db.loanPayments.toArray(), [], [])
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const walletMap = useMemo(() => {
     const map = new Map()
     wallets?.forEach((w) => map.set(w.id, w.name))
     return map
   }, [wallets])
+
+  const latestPaymentDateMap = useMemo(() => {
+    const map = new Map()
+    ;(loanPayments ?? []).forEach((lp) => {
+      if (!lp?.loanId || !lp?.date) return
+      const prev = map.get(lp.loanId)
+      if (!prev || lp.date > prev) {
+        map.set(lp.loanId, lp.date)
+      }
+    })
+    return map
+  }, [loanPayments])
+
+  const formatStampDate = (rawDate) => {
+    if (!rawDate) return '100%'
+    try {
+      const d = typeof rawDate === 'number' ? new Date(rawDate) : new Date(rawDate)
+      if (isNaN(d.getTime())) return String(rawDate)
+      return format(d, 'dd/MM/yyyy')
+    } catch {
+      return String(rawDate)
+    }
+  }
 
   const deleteLoan = useLoanStore((s) => s.deleteLoan)
   const updateLoan = useLoanStore((s) => s.updateLoan)
@@ -168,6 +193,11 @@ export default function Loans() {
         }
       }
 
+      const rawSettledDate = isForgiven
+        ? (l.forgivenAt || latestPaymentDateMap.get(l.id) || l.dueDate || l.startDate)
+        : (l.paidDate || latestPaymentDateMap.get(l.id) || l.dueDate || l.startDate)
+      const settledDate = formatStampDate(rawSettledDate)
+
       return {
         ...l,
         total,
@@ -177,11 +207,12 @@ export default function Loans() {
         isPaid,
         isForgiven,
         isSettled,
+        settledDate,
         dueBadge,
         isOverdue,
       }
     })
-  }, [loans, t, locale])
+  }, [loans, latestPaymentDateMap, t, locale])
 
   const totals = useMemo(() => {
     let totalDebt = 0
@@ -353,7 +384,10 @@ export default function Loans() {
         <div className="flex items-center gap-6 px-3 border-b border-[var(--border)] pt-1">
           <button
             type="button"
-            onClick={() => setActiveTab('debt')}
+            onClick={() => {
+              triggerHaptic('light')
+              setActiveTab('debt')
+            }}
             className={`pb-3 text-sm font-extrabold transition-all cursor-pointer relative ${
               activeTab === 'debt' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
@@ -366,7 +400,10 @@ export default function Loans() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('receivable')}
+            onClick={() => {
+              triggerHaptic('light')
+              setActiveTab('receivable')
+            }}
             className={`pb-3 text-sm font-extrabold transition-all cursor-pointer relative ${
               activeTab === 'receivable' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
@@ -379,11 +416,14 @@ export default function Loans() {
         </div>
 
         {/* Secondary Status Filter Tabs (Aktif | Lunas | Diikhlaskan | Semua) */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
           <button
             type="button"
-            onClick={() => setStatusFilter('active')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
+            onClick={() => {
+              triggerHaptic('light')
+              setStatusFilter('active')
+            }}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'active'
                 ? activeTab === 'debt'
                   ? 'bg-[var(--earthy-terra)] text-white border-[var(--earthy-terra)]'
@@ -396,8 +436,11 @@ export default function Loans() {
 
           <button
             type="button"
-            onClick={() => setStatusFilter('paid')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
+            onClick={() => {
+              triggerHaptic('light')
+              setStatusFilter('paid')
+            }}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'paid'
                 ? 'bg-[var(--status-income)] text-white border-[var(--status-income)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -409,7 +452,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('forgiven')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'forgiven'
                 ? 'bg-purple-600 text-white border-purple-600'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -421,7 +464,7 @@ export default function Loans() {
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'all'
                 ? 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border-strong)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
@@ -496,17 +539,17 @@ export default function Loans() {
                       {isForgiven ? (
                         <div className="loan-stamp loan-stamp-forgiven">
                           <b className="loan-stamp-text">{t('loans.stamp.forgiven', 'DIIKHLASKAN')}</b>
-                          <span className="loan-stamp-sub">{item.forgivenAt ? new Date(item.forgivenAt).toLocaleDateString() : '100%'}</span>
+                          <span className="loan-stamp-sub">{item.settledDate}</span>
                         </div>
                       ) : isPaid ? (
                         <div className={`loan-stamp ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'}`}>
                           <b className="loan-stamp-text">{t('loans.badge.paid', 'LUNAS')}</b>
-                          <span className="loan-stamp-sub">{item.dueDate || '100%'}</span>
+                          <span className="loan-stamp-sub">{item.settledDate}</span>
                         </div>
                       ) : null}
 
                       {/* Row 1 & 2: Header Block (Icon + Title + Due Badge / Person · Wallet) */}
-                      <div className={`flex items-start justify-between gap-2.5 ${isSettled ? 'pr-14' : ''}`}>
+                      <div className={`flex items-start justify-between gap-2.5 ${isSettled ? 'pr-20 sm:pr-24' : ''}`}>
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           {/* Category Icon */}
                           <div className="relative shrink-0">

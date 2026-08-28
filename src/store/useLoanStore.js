@@ -69,12 +69,14 @@ const useLoanStore = create((set) => ({
     const newRemaining = Math.max(0, existing.remainingAmount + diffTotal)
     const newStatus = newRemaining <= 0 ? 'paid' : (loanData.status || existing.status)
 
+    const isNowPaid = newRemaining <= 0
     const updated = {
       ...existing,
       ...loanData,
       totalAmount: total,
       remainingAmount: newRemaining,
       status: newStatus,
+      ...(isNowPaid && !existing.paidDate ? { paidDate: loanData.paidDate || new Date().toISOString().split('T')[0], paidAt: Date.now() } : {}),
     }
 
     await db.loans.put(updated)
@@ -159,10 +161,12 @@ const useLoanStore = create((set) => ({
       const existingPaymentTxIds = Array.isArray(loan.paymentTransactionIds) ? loan.paymentTransactionIds : []
       const nextPaymentTxIds = generatedTxId ? [...existingPaymentTxIds, generatedTxId] : existingPaymentTxIds
 
+      const isNowPaid = newRemaining <= 0
       await db.loans.update(loanId, {
         remainingAmount: newRemaining,
         status: newStatus,
         paymentTransactionIds: nextPaymentTxIds,
+        ...(isNowPaid ? { paidDate: payDate, paidAt: Date.now() } : {}),
       })
     })
   },

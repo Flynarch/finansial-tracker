@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -67,7 +67,11 @@ export function WalletSelectTrigger({
       disabled={disabled}
       className={`group flex w-full items-center justify-between gap-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
         compact
-          ? 'min-h-[42px] rounded-xl bg-[var(--field-bg)] px-3 py-1.5 border-none hover:bg-[var(--panel-strong)] active:scale-[0.99] cursor-pointer'
+          ? `min-h-[42px] rounded-xl px-3 py-1.5 active:scale-[0.99] cursor-pointer ${
+              error
+                ? 'border border-rose-500/35 bg-rose-500/[0.04]'
+                : 'border-none bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+            }`
           : `min-h-[50px] rounded-2xl border bg-[var(--field-bg)] px-3.5 py-2.5 ${
               disabled
                 ? 'opacity-60 cursor-not-allowed border-[var(--border)]'
@@ -169,6 +173,39 @@ export default function WalletSelectModal({
     )
   }, [activeWallets, search])
 
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const touchStartY = useRef(0)
+  const touchStartTime = useRef(0)
+
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY
+    touchStartTime.current = Date.now()
+    setIsDragging(true)
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartY.current) return
+    const currentY = e.touches[0].clientY
+    const deltaY = currentY - touchStartY.current
+    if (deltaY > 0) {
+      setDragOffset(deltaY)
+    } else {
+      setDragOffset(deltaY * 0.15)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = dragOffset / (elapsed || 1)
+    setIsDragging(false)
+    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      onClose()
+    }
+    setDragOffset(0)
+    touchStartY.current = 0
+  }
+
   useBackButton(onClose, Boolean(isOpen))
 
   if (!isOpen) return null
@@ -181,22 +218,42 @@ export default function WalletSelectModal({
   }
 
   const modalContent = (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4 pointer-events-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all max-h-[85vh] flex flex-col z-10 animate-[ft-spring-up_0.28s_cubic-bezier(0.16,1,0.3,1)_both]">
+      <div
+        className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-h-[85vh] flex flex-col z-10 transform-gpu"
+        style={{
+          transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
+          transition: isDragging
+            ? 'none'
+            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
         {/* Drag handle for mobile */}
-        <div className="flex justify-center pt-2.5 pb-1 sm:hidden">
-          <div className="h-1.5 w-12 rounded-full bg-[var(--border)]/60" />
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className="flex justify-center pt-2.5 pb-1 sm:hidden cursor-grab active:cursor-grabbing touch-none select-none"
+        >
+          <div className="h-1.5 w-12 rounded-full bg-[var(--border-strong)]/60" />
         </div>
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[var(--border)]/60">
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[var(--border)]/60 cursor-grab select-none touch-none"
+        >
           <div>
             <h3 className="text-base font-black text-[var(--fg)] tracking-tight">
               {title || t('wallets.selectWalletTitle', 'Pilih Dompet / Akun')}

@@ -62,12 +62,16 @@ export default function BottomSheet({
   if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 ft-motion-overlay">
+    <div
+      className={`fixed inset-0 z-50 ${
+        sheetVisible ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
+    >
       {/* Dimmed backdrop */}
       <button
         type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/60 transition-opacity duration-280 ${
-          sheetVisible ? 'opacity-100' : 'opacity-0'
+        className={`absolute inset-0 bg-black/60 cursor-pointer ${
+          sheetVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit'
         }`}
         onClick={closeSheet}
         aria-label={defaultCloseLabel}
@@ -79,16 +83,22 @@ export default function BottomSheet({
           role="dialog"
           aria-modal="true"
           aria-label={typeof title === 'string' ? title : defaultCloseLabel}
-          className={`${maxHeight} overflow-y-auto overscroll-contain w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${className}`}
+          className={`${maxHeight} overflow-y-auto overscroll-contain w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${
+            isDragging || dragOffset > 0
+              ? ''
+              : sheetVisible
+              ? 'ft-sheet-enter'
+              : 'ft-sheet-exit'
+          } ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            transform: sheetVisible
-              ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
-              : 'translate3d(0, 100%, 0)',
-            transition: isDragging
-              ? 'none'
-              : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease',
-            opacity: sheetVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
+            ...(isDragging || dragOffset > 0
+              ? {
+                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
+                  opacity: Math.max(0.4, 1 - dragOffset / 300),
+                  transition: 'none',
+                }
+              : {}),
           }}
         >
           {/* Tactile drag handle & touch zone */}

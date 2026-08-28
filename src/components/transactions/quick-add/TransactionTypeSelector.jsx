@@ -1,4 +1,5 @@
 import useTranslation from '../../../hooks/useTranslation'
+import { hapticSelection } from '../../../lib/haptics'
 
 const TYPES = [
   { key: 'expense', labelKey: 'tx.expense', fallback: 'Pengeluaran' },
@@ -34,7 +35,10 @@ export default function TransactionTypeSelector({ txType, onSelectType }) {
           <button
             key={item.key}
             type="button"
-            onClick={() => onSelectType(item.key)}
+            onClick={() => {
+              hapticSelection()
+              onSelectType(item.key)
+            }}
             className={`relative z-10 flex-1 py-2 text-center text-xs font-bold transition-colors duration-200 active:scale-[0.98] cursor-pointer ${
               isActive
                 ? 'text-white'

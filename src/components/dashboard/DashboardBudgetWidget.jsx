@@ -261,7 +261,7 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                   ) : (
                     <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-500 font-bold">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
-                      <span>Semua {budgetCalc.count} anggaran dalam batas aman ✓</span>
+                      <span>{t('dashboard.budget.allSafe', { count: budgetCalc.count }, `Semua ${budgetCalc.count} anggaran dalam batas aman`)}</span>
                     </div>
                   )}
 
@@ -272,7 +272,7 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                       onClick={() => navigate('/budget')}
                       className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--accent)] hover:underline cursor-pointer"
                     >
-                      Lihat Semua {budgetCalc.count} Anggaran
+                      {t('dashboard.budget.viewAll', { count: budgetCalc.count }, `Lihat Semua ${budgetCalc.count} Anggaran`)}
                       <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   </div>

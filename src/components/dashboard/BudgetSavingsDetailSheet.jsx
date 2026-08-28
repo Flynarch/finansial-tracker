@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { PieChart, Target, Plus, AlertTriangle, CheckCircle2, ArrowRight, X, ArrowLeft } from 'lucide-react'
+import { PieChart, Target, Plus, AlertTriangle, CheckCircle2, ArrowRight, X, ArrowLeft, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   formatCurrency,
@@ -15,6 +15,7 @@ import { formatExpenseCategory, getMergedExpenseTree, parseExpenseCategoryPath }
 import { getCategoryColorClass, resolveExpenseParentIconKey, resolveTransactionIconKey } from '../../lib/categoryIcon'
 import CategoryIcon from '../ui/CategoryIcon'
 import MonthPicker from '../ui/MonthPicker'
+import CustomDatePicker from '../ui/CustomDatePicker'
 import ToastBanner from '../ui/ToastBanner'
 import Button from '../ui/Button'
 import { db } from '../../lib/db'
@@ -33,14 +34,14 @@ const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
     <button
       type="button"
       onClick={() => onSelectChild(path)}
-      className={`flex h-[40px] w-full items-center gap-2 border-b border-[var(--border)]/30 px-3 text-left text-[12px] font-medium transition last:border-b-0 ${
+      className={`flex h-[40px] w-full items-center gap-2 border-b border-[var(--border)]/30 px-3 text-left text-[12px] font-medium transition last:border-b-0 cursor-pointer active:scale-[0.99] ${
         active
           ? 'bg-[color-mix(in_srgb,var(--accent)_12%,var(--field-bg))] text-[var(--fg)]'
           : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
       }`}
     >
       <span className="min-w-0 flex-1 truncate">{child?.names?.[lang] || child?.id || ''}</span>
-      {active ? <span className="text-[var(--accent)] font-bold">✓</span> : null}
+      {active ? <Check size={14} className="text-[var(--accent)] shrink-0" /> : null}
     </button>
   )
 })
@@ -135,6 +136,7 @@ export default function BudgetSavingsDetailSheet({
     targetAmount: '',
     currentAmount: '',
     currency: defaultCurrency,
+    deadline: '',
   })
   const [goalError, setGoalError] = useState('')
   const goalTargetRef = useRef(null)
@@ -160,13 +162,6 @@ export default function BudgetSavingsDetailSheet({
     return parseExpenseCategoryPath(budgetForm.categoryPath)
   }, [budgetForm.categoryPath])
 
-  const selectedParentId = useMemo(() => {
-    const raw = String(budgetForm.categoryPath || '')
-    if (!raw) return ''
-    if (raw.includes('/')) return raw.split('/')[0]
-    return raw
-  }, [budgetForm.categoryPath])
-
   const handleSelectParent = useCallback((parentId) => {
     setBudgetForm((p) => ({ ...p, categoryPath: parentId }))
     setExpandedParentId(null)
@@ -188,6 +183,7 @@ export default function BudgetSavingsDetailSheet({
       targetAmount: parseMoneyInput(goalForm.targetAmount, goalForm.currency),
       currentAmount: parseMoneyInput(goalForm.currentAmount, goalForm.currency),
       currency: goalForm.currency || defaultCurrency,
+      deadline: goalForm.deadline ? goalForm.deadline : '',
     }
     if (!payload.name) {
       setGoalError(t('savings.validation.name', 'Nama target wajib diisi.'))
@@ -209,6 +205,7 @@ export default function BudgetSavingsDetailSheet({
         targetAmount: '',
         currentAmount: '',
         currency: defaultCurrency,
+        deadline: '',
       })
       setSheetView('detail')
     } catch {
@@ -232,7 +229,16 @@ export default function BudgetSavingsDetailSheet({
     }
     try {
       setBudgetError('')
-      await db.budgets.add(payload)
+      const existing = await db.budgets
+        .where('month')
+        .equals(payload.month)
+        .and((b) => b.category === payload.category)
+        .first()
+      if (existing) {
+        await db.budgets.update(existing.id, { limit: payload.limit })
+      } else {
+        await db.budgets.add(payload)
+      }
       setBudgetForm({
         month: format(new Date(), 'yyyy-MM'),
         categoryPath: '',
@@ -244,6 +250,42 @@ export default function BudgetSavingsDetailSheet({
       setBudgetError(t('common.error.saveFailed', 'Gagal menyimpan data.'))
     }
   }
+
+  // Touch drag-to-dismiss states
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const touchStartY = useRef(0)
+  const touchStartTime = useRef(0)
+
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY
+    touchStartTime.current = Date.now()
+    setIsDragging(true)
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartY.current) return
+    const currentY = e.touches[0].clientY
+    const deltaY = currentY - touchStartY.current
+    if (deltaY > 0) {
+      setDragOffset(deltaY)
+    } else {
+      setDragOffset(deltaY * 0.15)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = dragOffset / (elapsed || 1)
+    setIsDragging(false)
+    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      closeSheet()
+    }
+    setDragOffset(0)
+    touchStartY.current = 0
+  }
+
+  const isBudget = initialMode === 'budget'
 
   // Budget calculations
   const budgetCalc = useMemo(() => {
@@ -289,38 +331,50 @@ export default function BudgetSavingsDetailSheet({
 
   if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
 
-  const isBudget = initialMode === 'budget'
-
   return createPortal(
-    <div className="fixed inset-0 z-50 ft-motion-overlay">
-      {/* Backdrop */}
+    <div
+      className={`fixed inset-0 z-50 transition-opacity duration-300 ease-out ${
+        sheetVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+    >
       <button
         type="button"
-        className={`ft-motion-overlay absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-320 ${
-          sheetVisible ? 'opacity-100' : 'opacity-0'
-        }`}
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm cursor-pointer"
         onClick={closeSheet}
         aria-label={t('common.close', 'Tutup')}
       />
 
-      {/* Sheet Container with Seamless iOS / Vaul-style slide-up */}
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full sm:max-w-lg sm:px-4 sm:pb-6">
         <div
-          className={`max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transition-all duration-320 transform-gpu will-change-[transform,opacity] ft-hide-scrollbar ${
-            sheetVisible
-              ? 'translate-y-0 scale-100 opacity-100'
-              : 'translate-y-full sm:translate-y-6 sm:scale-96 opacity-0'
-          }`}
+          className="max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar"
           style={{
             boxShadow: 'var(--shadow-card)',
-            transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
+            transform: sheetVisible
+              ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
+              : 'translate3d(0, 100%, 0)',
+            transition: isDragging
+              ? 'none'
+              : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease',
+            opacity: sheetVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
           }}
         >
-          {/* Top Handle */}
-          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/60 transition-colors hover:bg-[var(--border-strong)]" />
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            className="mx-auto -mt-2 mb-3 pt-2 pb-1.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+          >
+            <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)]" />
+          </div>
 
-          {/* Header Row */}
-          <div className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5">
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5 cursor-grab select-none touch-none"
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               {sheetView !== 'detail' ? (
                 <button
@@ -332,11 +386,13 @@ export default function BudgetSavingsDetailSheet({
                   <ArrowLeft className="h-4 w-4" />
                 </button>
               ) : (
-                <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl border ${
-                  isBudget
-                    ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/25'
-                    : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
-                }`}>
+                <div
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl border ${
+                    isBudget
+                      ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/25'
+                      : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                  }`}
+                >
                   {isBudget ? <PieChart className="h-4.5 w-4.5" /> : <Target className="h-4.5 w-4.5" />}
                 </div>
               )}
@@ -358,8 +414,8 @@ export default function BudgetSavingsDetailSheet({
                         ? `${budgetCalc.count} ${t('dashboard.categoriesMonitored', 'Kategori Terpantau')}`
                         : t('dashboard.monitorLimits', 'Pantau batas pengeluaran')
                       : goalCalc
-                        ? `${goalCalc.count} ${t('dashboard.activeGoals', 'Target Aktif')}`
-                        : t('dashboard.dreamProgress', 'Progres tujuan impian')}
+                      ? `${goalCalc.count} ${t('dashboard.activeGoals', 'Target Aktif')}`
+                      : t('dashboard.dreamProgress', 'Progres tujuan impian')}
                   </p>
                 )}
               </div>
@@ -390,7 +446,6 @@ export default function BudgetSavingsDetailSheet({
             </div>
           </div>
 
-          {/* Body Multi-Pane Slide Container */}
           <div className="relative w-full overflow-hidden">
             <div
               className={`flex w-[200%] transition-transform duration-320 transform-gpu ${
@@ -400,14 +455,11 @@ export default function BudgetSavingsDetailSheet({
                 transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
               }}
             >
-              {/* ── Pane 1: Detail Summary View ── */}
               <div className="w-1/2 shrink-0 pr-1.5 space-y-4">
                 {isBudget ? (
-                  /* Budget Detail View */
                   <div className="space-y-4">
                     {budgetCalc ? (
                       <>
-                        {/* Overall Total Spent Card */}
                         <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
                           <div className="flex items-center justify-between gap-2 min-w-0">
                             <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
@@ -419,10 +471,10 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                  : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+                                  : 'bg-indigo-500/15 text-indigo-500 border-indigo-500/30'
                               }`}
                             >
-                              {budgetCalc.overallPct}% {t('dashboard.spentPct', 'Terpakai')}
+                              {budgetCalc.overallPct}% {t('dashboard.usedPct', 'Terpakai')}
                             </span>
                           </div>
 
@@ -435,14 +487,7 @@ export default function BudgetSavingsDetailSheet({
                                 </span>
                               </p>
                               <p className="text-xs font-extrabold text-[var(--muted)] shrink-0">
-                                {t('dashboard.budgetRemaining', 'Sisa')}:{' '}
-                                <span
-                                  className={
-                                    budgetCalc.isOverBudget ? 'text-rose-500 font-black' : 'text-[var(--fg)] font-black'
-                                  }
-                                >
-                                  {formatCurrency(budgetCalc.totalRemaining, defaultCurrency, locale)}
-                                </span>
+                                {t('dashboard.remaining', 'Sisa')}: {formatCurrency(budgetCalc.totalRemaining, defaultCurrency, locale)}
                               </p>
                             </div>
                           </div>
@@ -454,71 +499,80 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
+                                  : 'bg-indigo-500'
                               }`}
-                              style={{ width: `${budgetCalc.overallPct}%` }}
+                              style={{ width: `${Math.min(100, Math.max(budgetCalc.overallPct, 3))}%` }}
                             />
                           </div>
                         </div>
 
-                        {/* Warning / Active List */}
-                        {budgetCalc.warningItems.length > 0 ? (
+                        {budgetCalc.warningItems.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                              <AlertTriangle className="h-3.5 w-3.5" /> {t('dashboard.needsAttention', 'Perlu Diperhatikan')} ({budgetCalc.warningItems.length})
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                              <span>{t('dashboard.nearingLimitAlert', 'Mendekati / Melebihi Batas')} ({budgetCalc.warningItems.length})</span>
                             </p>
-                            <div className="space-y-2">
-                              {budgetCalc.warningItems.map((row) => {
-                                const isDanger = row.pct >= 100
-                                const iconKey = resolveTransactionIconKey(row.category, 'expense')
-                                const colorClass = getCategoryColorClass(iconKey, 'expense', row.category)
-
-                                return (
-                                  <div
-                                    key={row.id}
-                                    onClick={() => {
-                                      closeSheet()
-                                      navigate('/budget')
-                                    }}
-                                    className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${colorClass}`}>
-                                        <CategoryIcon iconKey={iconKey} className="h-4 w-4" />
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <p className="font-bold text-[var(--fg)] truncate text-xs">
-                                          {formatExpenseCategory(row.category, locale)}
-                                        </p>
-                                        <p className="text-[10.5px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
-                                          {formatCurrency(row.spent, defaultCurrency, locale)}{' '}
-                                          <span className="opacity-75">/ {formatCurrency(row.limit, defaultCurrency, locale)}</span>
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    <span
-                                      className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black tabular-nums border ${
-                                        isDanger
-                                          ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                                          : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                      }`}
-                                    >
-                                      {Math.round(row.pct)}%
-                                    </span>
+                            <div className="space-y-1.5">
+                              {budgetCalc.warningItems.map((item) => (
+                                <div
+                                  key={item.category}
+                                  className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-3 text-xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <CategoryIcon icon={resolveTransactionIconKey(item.category, 'expense')} className="h-4 w-4 shrink-0 text-amber-500" />
+                                    <span className="font-extrabold text-[var(--fg)] truncate">{formatExpenseCategory(item.category, locale)}</span>
                                   </div>
-                                );
-                              })}
+                                  <span className="font-black tabular-nums text-amber-600 dark:text-amber-400 shrink-0">
+                                    {Math.round(item.pct)}% ({formatCurrency(item.spent, defaultCurrency, locale)})
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-500 font-bold">
-                            <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
-                            <span>{t('dashboard.allBudgetsSafe', { count: budgetCalc.count }, `Semua ${budgetCalc.count} anggaran dalam batas aman`)}</span>
                           </div>
                         )}
 
-                        {/* Footer Action to /budget */}
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>{t('dashboard.allBudgetList', 'Semua Kategori Anggaran')} ({budgetCalc.count})</span>
+                          </p>
+                          <div className="space-y-2">
+                            {budgetCalc.rows.map((row) => (
+                              <div
+                                key={row.category}
+                                onClick={() => {
+                                  closeSheet()
+                                  navigate('/budget')
+                                }}
+                                className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <CategoryIcon icon={resolveTransactionIconKey(row.category, 'expense')} className={`h-4 w-4 shrink-0 ${getCategoryColorClass(row.category)}`} />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-[var(--fg)] truncate text-xs">{formatExpenseCategory(row.category, locale)}</p>
+                                    <p className="text-[10.5px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
+                                      {formatCurrency(row.spent, defaultCurrency, locale)}{' '}
+                                      <span className="opacity-75">/ {formatCurrency(row.limit, defaultCurrency, locale)}</span>
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <span
+                                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black tabular-nums border ${
+                                    row.pct > 100
+                                      ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                                      : row.pct >= 80
+                                      ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                      : 'bg-[var(--panel-strong)] text-[var(--fg)] border-[var(--border)]'
+                                  }`}
+                                >
+                                  {Math.round(row.pct)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
                         <button
                           type="button"
                           onClick={() => {
@@ -547,11 +601,9 @@ export default function BudgetSavingsDetailSheet({
                     )}
                   </div>
                 ) : (
-                  /* Savings Goals Detail View */
                   <div className="space-y-4">
                     {goalCalc ? (
                       <>
-                        {/* Overall Total Collected Card */}
                         <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 space-y-2.5">
                           <div className="flex items-center justify-between gap-2 min-w-0">
                             <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
@@ -584,7 +636,6 @@ export default function BudgetSavingsDetailSheet({
                           </div>
                         </div>
 
-                        {/* Goals List */}
                         <div className="space-y-2">
                           <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
                             <Target className="h-3.5 w-3.5" /> {t('dashboard.goalsList', 'Daftar Target Tabungan')} ({goalCalc.count})
@@ -622,7 +673,6 @@ export default function BudgetSavingsDetailSheet({
                           </div>
                         </div>
 
-                        {/* Footer Action to /savings */}
                         <button
                           type="button"
                           onClick={() => {
@@ -653,10 +703,8 @@ export default function BudgetSavingsDetailSheet({
                 )}
               </div>
 
-              {/* ── Pane 2: In-Sheet Create Form (Slides In from Right) ── */}
               <div className="w-1/2 shrink-0 pl-1.5 space-y-3">
                 {sheetView === 'create-goal' ? (
-                  /* In-Sheet Goal Form */
                   <div className="space-y-3 pt-0.5">
                     {goalError ? <ToastBanner message={goalError} type="error" onDismiss={() => setGoalError('')} /> : null}
 
@@ -721,27 +769,38 @@ export default function BudgetSavingsDetailSheet({
                       </label>
                     </div>
 
-                    <label className="ft-label text-xs block">
-                      {t('savings.currency', 'Mata Uang')}
-                      <select
-                        value={goalForm.currency}
-                        onChange={(e) =>
-                          setGoalForm((p) => ({
-                            ...p,
-                            currency: e.target.value,
-                            targetAmount: formatMoneyInput(p.targetAmount, e.target.value),
-                            currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
-                          }))
-                        }
-                        className="ft-field mt-1 w-full text-xs font-semibold py-2 px-3 rounded-xl"
-                      >
-                        {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <label className="ft-label text-xs block">
+                        {t('savings.currency', 'Mata Uang')}
+                        <select
+                          value={goalForm.currency}
+                          onChange={(e) =>
+                            setGoalForm((p) => ({
+                              ...p,
+                              currency: e.target.value,
+                              targetAmount: formatMoneyInput(p.targetAmount, e.target.value),
+                              currentAmount: formatMoneyInput(p.currentAmount, e.target.value),
+                            }))
+                          }
+                          className="ft-field mt-1 w-full text-xs font-semibold py-2 px-3 rounded-xl"
+                        >
+                          {['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'].map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <div className="flex flex-col">
+                        <span className="ft-label text-xs mb-1">{t('savings.deadline', 'Target Tanggal (Opsional)')}</span>
+                        <CustomDatePicker
+                          value={goalForm.deadline}
+                          onChange={(d) => setGoalForm((p) => ({ ...p, deadline: d }))}
+                          placeholder={t('savings.selectDeadline', 'Pilih Target Tanggal')}
+                        />
+                      </div>
+                    </div>
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-2">
                       <Button
@@ -767,7 +826,6 @@ export default function BudgetSavingsDetailSheet({
                     </div>
                   </div>
                 ) : (
-                  /* In-Sheet Budget Form */
                   <div className="space-y-3 pt-0.5">
                     {budgetError ? <ToastBanner message={budgetError} type="error" onDismiss={() => setBudgetError('')} /> : null}
 
@@ -794,7 +852,7 @@ export default function BudgetSavingsDetailSheet({
                         >
                           <span className="text-[13px] font-medium text-[var(--fg)] truncate">
                             {(() => {
-                              if (!budgetForm.categoryPath) return t('budget.category.placeholder', 'Pilih kategori')
+                              if (!budgetForm.categoryPath) return t('budget.category.placeholder', 'Pilih Kategori')
                               if (parsedCategoryPath) {
                                 const parentName = parsedCategoryPath.parent?.names?.[lang] || parsedCategoryPath.parent?.id || ''
                                 const childName = parsedCategoryPath.child?.names?.[lang] || parsedCategoryPath.child?.id || ''
@@ -803,18 +861,20 @@ export default function BudgetSavingsDetailSheet({
                               return String(budgetForm.categoryPath || '').trim()
                             })()}
                           </span>
-                          <span className="text-[var(--muted)]">{isCategoryOpen ? '▾' : '▸'}</span>
+                          <span className="text-[var(--muted)]">
+                            {isCategoryOpen ? '▾' : '▸'}
+                          </span>
                         </button>
 
                         {isCategoryOpen ? (
                           <div className="border-t border-[var(--border)]/40 animate-collapse-in">
                             <ul
-                              className="ft-hide-scrollbar max-h-[300px] min-w-0 overflow-y-auto"
+                              className="ft-hide-scrollbar max-h-[220px] min-w-0 overflow-y-auto"
                               style={{ touchAction: 'pan-y' }}
                             >
                               {tree.map((parent) => {
                                 const expanded = expandedParentId === parent.id
-                                const activeMain = selectedParentId === parent.id && !String(budgetForm.categoryPath || '').includes('/')
+                                const activeMain = budgetForm.categoryPath === parent.id
                                 const hasSub = (parent.children || []).length > 0
 
                                 return (
@@ -831,7 +891,7 @@ export default function BudgetSavingsDetailSheet({
                                     onSelectChild={handleSelectChild}
                                     t={t}
                                   />
-                                );
+                                )
                               })}
                             </ul>
                           </div>
@@ -840,19 +900,18 @@ export default function BudgetSavingsDetailSheet({
                     </label>
 
                     <label className="ft-label text-xs block">
-                      {t('budget.limit', 'Batas Anggaran')}
+                      {t('budget.limit', 'Batas Nominal')}
                       <input
                         ref={budgetLimitRef}
                         type="text"
                         inputMode="numeric"
                         value={budgetLimitInput}
                         onChange={(e) => {
-                          const rawValue = e.target.value
-                          const formatted = formatGroupedIntegerInput(rawValue)
-                          const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart)
-                          const numericOnly = formatted.replace(/[^0-9]/g, '')
-                          setBudgetForm((p) => ({ ...p, limit: numericOnly }))
-                          setBudgetLimitInput(formatted)
+                          const val = e.target.value
+                          const next = formatGroupedIntegerInput(val)
+                          const caret = getMoneyInputCaret(val, next, e.target.selectionStart ?? val.length, 'IDR')
+                          setBudgetLimitInput(next)
+                          setBudgetForm((p) => ({ ...p, limit: next }))
                           window.requestAnimationFrame(() => {
                             const el = budgetLimitRef.current
                             if (!el) return

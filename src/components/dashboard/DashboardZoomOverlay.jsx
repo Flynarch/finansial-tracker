@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect } from 'react'
+import { memo, useRef, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -49,6 +49,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
   useBackButton(onCloseZoom, Boolean(zoomedChart))
 
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const touchStartY = useRef(0)
+  const touchStartTime = useRef(0)
+
   useEffect(() => {
     const handleTapOutside = (event) => {
       if (zoomChartRef.current && !zoomChartRef.current.contains(event.target)) {
@@ -82,32 +87,81 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
 
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY
+    touchStartTime.current = Date.now()
+    setIsDragging(true)
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartY.current) return
+    const currentY = e.touches[0].clientY
+    const deltaY = currentY - touchStartY.current
+    if (deltaY > 0) {
+      setDragOffset(deltaY)
+    } else {
+      setDragOffset(deltaY * 0.15)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = dragOffset / (elapsed || 1)
+    setIsDragging(false)
+    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      onCloseZoom()
+    }
+    setDragOffset(0)
+    touchStartY.current = 0
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div
+      className={`fixed inset-0 z-50 transition-opacity duration-300 ease-out ${
+        zoomVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+    >
       <button
         type="button"
         onClick={onCloseZoom}
-        className={`ft-motion-overlay absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-350 ease-out ${
-          zoomVisible ? 'opacity-100' : 'opacity-0'
-        }`}
+        className="absolute inset-0 bg-black/60 backdrop-blur-md cursor-pointer"
         aria-label={t('dashboard.zoom.close')}
       />
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl sm:px-3 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
-          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu transition-all duration-350 ft-hide-scrollbar ${
-            zoomVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-full opacity-0 scale-[0.98]'
-          }`}
+          className="origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu ft-hide-scrollbar"
           style={{
             boxShadow: 'var(--shadow)',
-            transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            transform: zoomVisible
+              ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
+              : 'translate3d(0, 100%, 0)',
+            transition: isDragging
+              ? 'none'
+              : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease',
+            opacity: zoomVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
           }}
         >
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border-strong)]/40" />
+          {/* Top Tactile Handle */}
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            className="mx-auto -mt-1 mb-2.5 pt-1.5 pb-1.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+          >
+            <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)]" />
+          </div>
 
           {zoomedChart === 'habits' ? (
             <>
-              <div className="mb-3 flex items-center justify-between">
+              <div
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                className="mb-3 flex items-center justify-between cursor-grab select-none touch-none"
+              >
                 <div>
                   <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">
                     {t('habits.activityTitle', 'Aktivitas Kebiasaan')}

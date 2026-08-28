@@ -98,29 +98,6 @@ export default function WalletCarousel({
     )
   }
 
-  // Empty state handling
-  if (wallets.length === 0) {
-    return (
-      <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
-        <div className="ft-hero-card flex flex-col items-center justify-center text-center" style={{ minHeight: '200px' }}>
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--muted-2)]">
-            {t('dashboard.totalBalance', 'Total Saldo')}
-          </p>
-          <p className="ft-display mt-2 text-[2.25rem] leading-[1.1] font-black tracking-tight tabular-nums text-[var(--fg)]">
-            {formatCurrency(0, defaultCurrency)}
-          </p>
-          <button 
-            onClick={() => navigate('/add-account')}
-            className="mt-6 w-full flex items-center justify-center gap-2 bg-[var(--accent)] text-[var(--bg)] rounded-xl py-3 font-bold transition active:scale-[0.98]"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-            {t('wallet.addAccount', 'Tambah Akun')}
-          </button>
-        </div>
-      </section>
-    )
-  }
-
   const handleScroll = () => {
     if (!scrollRef.current || isRestoring.current) return
     const scrollLeft = scrollRef.current.scrollLeft

@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
-import { formatCurrency } from '../../lib/utils'
+import { formatCompactCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
@@ -13,31 +13,35 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
 }) {
   const { t } = useTranslation()
 
-  if (isDbLoading) {
+  if (isDbLoading || !budgetGoalSummary) {
     return (
       <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
         <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[120px] flex flex-col justify-between">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[128px] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+                <div className="h-3.5 w-16 rounded bg-[var(--border)]/60" />
+              </div>
               <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
             </div>
             <div className="space-y-1">
-              <div className="h-2.5 w-14 rounded bg-[var(--border)]/50" />
-              <div className="h-4 w-20 rounded bg-[var(--border)]/70" />
+              <div className="h-5 w-20 rounded bg-[var(--border)]/70" />
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[var(--border)]/40" />
+            <div className="h-2 w-full rounded-full bg-[var(--border)]/40" />
           </div>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[120px] flex flex-col justify-between">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[128px] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
+                <div className="h-3.5 w-16 rounded bg-[var(--border)]/60" />
+              </div>
               <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
             </div>
             <div className="space-y-1">
-              <div className="h-2.5 w-14 rounded bg-[var(--border)]/50" />
-              <div className="h-4 w-20 rounded bg-[var(--border)]/70" />
+              <div className="h-5 w-20 rounded bg-[var(--border)]/70" />
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[var(--border)]/40" />
+            <div className="h-2 w-full rounded-full bg-[var(--border)]/40" />
           </div>
         </div>
       </section>
@@ -71,81 +75,94 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') onOpenBudgetDetail?.()
           }}
-          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[120px]"
+          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[128px]"
         >
           <div>
-            <div className="flex items-center justify-between">
-              <div className="grid h-7 w-7 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20">
-                <PieChart className="h-3.5 w-3.5" />
+            {/* Top Row: Icon + Title on left, Chevron on right */}
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20 shrink-0">
+                  <PieChart className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
+                  {t('budget.title', 'Anggaran')}
+                </p>
               </div>
-              <div className="flex items-center gap-1">
-                {!hasBudgets ? (
-                  <span className="rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-indigo-500 border border-indigo-500/15">
-                    {t('dashboard.budget.unconfigured', 'Atur')}
-                  </span>
-                ) : null}
-                <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-              </div>
+
+              <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
             </div>
 
-            <p className="mt-2 text-[11px] font-bold text-[var(--muted)] truncate">
-              {t('budget.title', 'Anggaran')}
-            </p>
-
+            {/* Main Metric */}
             {hasBudgets ? (
-              <p className="mt-0.5 text-sm sm:text-base font-black tabular-nums tracking-tight text-[var(--fg)]">
-                {budgetPct}% <span className="text-[10px] font-medium text-[var(--muted)]">{t('budget.used', 'terpakai')}</span>
-              </p>
+              <div className="mt-2.5 flex items-baseline gap-1.5">
+                <p className="text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+                  {budgetPct}%
+                </p>
+                <span className="text-[11px] font-bold text-[var(--muted)]">
+                  {t('budget.used', 'terpakai')}
+                </span>
+              </div>
             ) : (
-              <p className="mt-0.5 text-xs font-black text-[var(--fg)]">
-                {t('budget.notSet', 'Belum Diatur')}
-              </p>
+              <div className="mt-2">
+                <p className="text-xs sm:text-[13px] font-black text-[var(--fg)] tracking-tight">
+                  {t('budget.notSet', 'Belum Diatur')}
+                </p>
+                <p className="mt-0.5 text-[10px] sm:text-[10.5px] font-semibold text-[var(--muted-2)] line-clamp-1">
+                  {locale === 'en' ? 'Track monthly budget' : 'Kelola batas belanja bulanan'}
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="mt-2.5 pt-2 border-t border-[var(--border)]/60">
+          <div className="mt-3 pt-2 border-t border-[var(--border)]/60 space-y-1.5">
             {hasBudgets ? (
-              <div className="space-y-1.5">
+              <>
+                {/* Progress Bar */}
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)]">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       isOverBudget
-                        ? 'bg-rose-500'
+                        ? 'bg-[var(--status-expense)]'
                         : budgetPct >= 80
-                        ? 'bg-amber-500'
+                        ? 'bg-[var(--warning)]'
                         : 'bg-indigo-500'
                     }`}
-                    style={{ width: `${Math.min(100, Math.max(budgetPct, totalBudgetSpent > 0 ? 3 : 0))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(budgetPct, totalBudgetSpent > 0 ? 4 : 0))}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[9.5px] font-semibold text-[var(--muted)]">
+
+                {/* Sub-row below bar */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--muted)] tabular-nums">
                   <span className="truncate">
                     {budgetWarnings.length > 0 ? (
-                      <span className="text-amber-500 flex items-center gap-0.5 font-bold">
-                        <AlertTriangle className="h-2.5 w-2.5" /> {budgetWarnings.length} {t('budget.warning', 'waspada')}
+                      <span className="text-[var(--warning)] flex items-center gap-0.5 font-bold">
+                        <AlertTriangle className="h-2.5 w-2.5 shrink-0" /> {budgetWarnings.length} {t('budget.warning', 'waspada')}
                       </span>
                     ) : (
-                      <span className="text-emerald-500 flex items-center gap-0.5 font-bold">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> {t('budget.safe', 'Aman')}
+                      <span className="text-[var(--status-income)] flex items-center gap-0.5 font-bold">
+                        <CheckCircle2 className="h-2.5 w-2.5 shrink-0" /> {t('budget.safe', 'Aman')}
                       </span>
                     )}
                   </span>
-                  <span className="tabular-nums font-bold">
-                    {formatCurrency(totalBudgetSpent, defaultCurrency, locale)}
+                  <span className="tabular-nums font-bold text-[var(--fg)]">
+                    {formatCompactCurrency(totalBudgetSpent, defaultCurrency, locale)}
                   </span>
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="space-y-1.5">
+              <>
+                {/* Progress Bar Empty */}
                 <div className="h-1.5 w-full rounded-full bg-[var(--field-bg)] border border-dashed border-[var(--border)]" />
-                <div className="flex items-center justify-between text-[9.5px] font-extrabold text-[var(--accent)]">
-                  <span className="flex items-center gap-0.5">
-                    <Plus size={11} strokeWidth={2.5} />
-                    {t('budget.createQuick', 'Atur Anggaran')}
+
+                {/* Sub-row below bar */}
+                <div className="flex items-center justify-between text-[10px] font-bold text-indigo-500 tabular-nums">
+                  <span className="flex items-center gap-1">
+                    <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                    {t('budget.createQuick', 'Buat Anggaran')}
                   </span>
-                  <span className="text-[9px] font-semibold text-[var(--muted-2)]">0 Kategori</span>
+                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">0 Kategori</span>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -158,65 +175,78 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') onOpenSavingsDetail?.()
           }}
-          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[120px]"
+          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[128px]"
         >
           <div>
-            <div className="flex items-center justify-between">
-              <div className="grid h-7 w-7 place-items-center rounded-xl bg-emerald-500/12 text-emerald-500 border border-emerald-500/20">
-                <Target className="h-3.5 w-3.5" />
+            {/* Top Row: Icon + Title on left, Chevron on right */}
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-emerald-500/12 text-emerald-500 border border-emerald-500/20 shrink-0">
+                  <Target className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
+                  {t('savings.title', 'Target Tabungan')}
+                </p>
               </div>
-              <div className="flex items-center gap-1">
-                {!hasGoals ? (
-                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-emerald-500 border border-emerald-500/15">
-                    {t('savings.create', 'Mulai')}
-                  </span>
-                ) : null}
-                <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-              </div>
+
+              <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
             </div>
 
-            <p className="mt-2 text-[11px] font-bold text-[var(--muted)] truncate">
-              {t('savings.title', 'Target Tabungan')}
-            </p>
-
+            {/* Main Metric */}
             {hasGoals ? (
-              <p className="mt-0.5 text-sm sm:text-base font-black tabular-nums tracking-tight text-[var(--fg)]">
-                {goalPct}% <span className="text-[10px] font-medium text-[var(--muted)]">{t('savings.collected', 'terkumpul')}</span>
-              </p>
+              <div className="mt-2.5 flex items-baseline gap-1.5">
+                <p className="text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+                  {goalPct}%
+                </p>
+                <span className="text-[11px] font-bold text-[var(--muted)]">
+                  {t('savings.collected', 'terkumpul')}
+                </span>
+              </div>
             ) : (
-              <p className="mt-0.5 text-xs font-black text-[var(--fg)]">
-                {t('savings.emptyTitle', 'Belum Ada Target')}
-              </p>
+              <div className="mt-2">
+                <p className="text-xs sm:text-[13px] font-black text-[var(--fg)] tracking-tight">
+                  {t('savings.emptyTitle', 'Belum Ada Target')}
+                </p>
+                <p className="mt-0.5 text-[10px] sm:text-[10.5px] font-semibold text-[var(--muted-2)] line-clamp-1">
+                  {locale === 'en' ? 'Plan your dream savings' : 'Wujudkan impian finansialmu'}
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="mt-2.5 pt-2 border-t border-[var(--border)]/60">
+          <div className="mt-3 pt-2 border-t border-[var(--border)]/60 space-y-1.5">
             {hasGoals ? (
-              <div className="space-y-1.5">
+              <>
+                {/* Progress Bar */}
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)]">
                   <div
-                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.max(goalPct, totalGoalCurrent > 0 ? 3 : 0))}%` }}
+                    className="h-full rounded-full bg-[var(--status-income)] transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(goalPct, totalGoalCurrent > 0 ? 4 : 0))}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[9.5px] font-semibold text-[var(--muted)]">
+
+                {/* Sub-row below bar */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--muted)] tabular-nums">
                   <span>{goalRows.length} {t('savings.goalsCount', 'Target')}</span>
-                  <span className="tabular-nums font-bold">
-                    {formatCurrency(totalGoalCurrent, defaultCurrency, locale)}
+                  <span className="tabular-nums font-bold text-[var(--fg)]">
+                    {formatCompactCurrency(totalGoalCurrent, defaultCurrency, locale)}
                   </span>
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="space-y-1.5">
+              <>
+                {/* Progress Bar Empty */}
                 <div className="h-1.5 w-full rounded-full bg-[var(--field-bg)] border border-dashed border-[var(--border)]" />
-                <div className="flex items-center justify-between text-[9.5px] font-extrabold text-emerald-500">
-                  <span className="flex items-center gap-0.5">
-                    <Plus size={11} strokeWidth={2.5} />
+
+                {/* Sub-row below bar */}
+                <div className="flex items-center justify-between text-[10px] font-bold text-emerald-500 tabular-nums">
+                  <span className="flex items-center gap-1">
+                    <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                     {t('savings.createQuick', 'Mulai Menabung')}
                   </span>
-                  <span className="text-[9px] font-semibold text-[var(--muted-2)]">0 Target</span>
+                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">0 Target</span>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

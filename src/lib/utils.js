@@ -42,6 +42,41 @@ export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
   return fmt.format(Number.isFinite(numeric) ? numeric : 0)
 }
 
+export function formatCompactCurrency(amount, currency = 'IDR', locale = 'id', includeSymbol = true) {
+  const n = Number(amount || 0)
+  const isEn = locale === 'en'
+  const isIDR = currency === 'IDR'
+  const prefix = includeSymbol ? (isIDR ? 'Rp\u00A0' : `${currency}\u00A0`) : ''
+
+  if (!isIDR && currency !== 'USD') {
+    return formatCurrency(n, currency, locale)
+  }
+
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  const activeLocale = isEn ? 'en-US' : 'id-ID'
+
+  const fmt = (val, maxDigits = 1) =>
+    val.toLocaleString(activeLocale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: val % 1 === 0 ? 0 : maxDigits,
+    })
+
+  if (abs >= 1_000_000_000_000) {
+    return `${prefix}${sign}${fmt(abs / 1_000_000_000_000, 1)}\u00A0T`
+  }
+  if (abs >= 1_000_000_000) {
+    return `${prefix}${sign}${fmt(abs / 1_000_000_000, 1)}\u00A0${isEn ? 'B' : 'M'}`
+  }
+  if (abs >= 1_000_000) {
+    return `${prefix}${sign}${fmt(abs / 1_000_000, 1)}\u00A0${isEn ? 'M' : 'jt'}`
+  }
+  if (abs >= 100_000) {
+    return `${prefix}${sign}${fmt(abs / 1_000, 0)}\u00A0${isEn ? 'k' : 'rb'}`
+  }
+  return formatCurrency(n, currency, locale)
+}
+
 export function toSafeNumber(value) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0

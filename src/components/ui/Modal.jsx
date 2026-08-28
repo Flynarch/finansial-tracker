@@ -30,30 +30,33 @@ function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 sm:p-6 bg-black/60 transition-opacity duration-280 ${
-        isVisible ? 'opacity-100' : 'opacity-0'
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3.5 sm:p-6 bg-black/60 transition-opacity duration-260 ease-out ${
+        isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
-      // Prevent background scroll without breaking inner scroll containers.
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
       onTouchMove={(event) => event.target === event.currentTarget && event.preventDefault()}
-      onClick={(e) => { if (e.target === e.currentTarget) closeSheet() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeSheet()
+      }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
-        className={`w-full ${maxWidth} max-h-[min(94dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl transition-all duration-280 transform-gpu ${
-          isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
-        }`}
+        className={`w-full ${maxWidth} max-h-[min(92dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl transform-gpu`}
         style={{
           boxShadow: 'var(--shadow-card)',
-          transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
+          transform: isVisible
+            ? 'scale(1) translate3d(0, 0, 0)'
+            : 'scale(0.94) translate3d(0, 8px, 0)',
+          opacity: isVisible ? 1 : 0,
+          transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out',
         }}
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
       >
         {showHeader && (Boolean(title) || showCloseButton) && (
-          <div className="mb-3 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
+          <div className="mb-3.5 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
             <h3 className="ft-display text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h3>
             {showCloseButton && (
               <button
@@ -73,7 +76,7 @@ function Modal({
         {children}
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }
 

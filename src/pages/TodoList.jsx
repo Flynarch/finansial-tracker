@@ -328,53 +328,72 @@ function TodoList() {
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
-        <header className="flex items-center justify-between px-1">
+        <header className="flex items-center justify-between px-1 min-h-[44px]">
           <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)]">{t('todo.pageTitle')}</h1>
-          {activeTab === 'todo' && (
-            <button
-              type="button"
-              onClick={() => {
-                resetAddForm()
-                setAddOpen(true)
-              }}
-              className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
-              aria-label={t('todo.add')}
-            >
-              <Plus size={15} strokeWidth={3} />
-              <span>Tugas</span>
-            </button>
-          )}
+          <div className="relative flex items-center min-h-[44px]">
+            {activeTab === 'todo' && (
+              <button
+                type="button"
+                onClick={() => {
+                  resetAddForm()
+                  setAddOpen(true)
+                }}
+                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer ft-smooth-in"
+                aria-label={t('todo.add')}
+              >
+                <Plus size={15} strokeWidth={3} />
+                <span>Tugas</span>
+              </button>
+            )}
+          </div>
         </header>
 
-        {/* Segmented Control */}
-        <div className="flex rounded-[1rem] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] p-1 border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-inner">
+        {/* Segmented Control with Smooth Sliding Indicator */}
+        <div className="relative grid grid-cols-2 rounded-[1rem] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] p-1 border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-inner select-none overflow-hidden">
+          {/* Sliding Animated Pill */}
+          <div
+            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-[0.75rem] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+              activeTab === 'todo' ? 'translate-x-0' : 'translate-x-[calc(100%+4px)]'
+            }`}
+          />
+
           <button
             type="button"
-            className={`flex-1 rounded-[0.75rem] py-2.5 text-[14px] font-bold transition-all duration-200 cursor-pointer ${
+            className={`relative z-10 flex-1 rounded-[0.75rem] py-2.5 text-[14px] font-bold transition-colors duration-200 cursor-pointer active:scale-[0.98] ${
               activeTab === 'todo'
-                ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)]'
+                ? 'text-[var(--fg)]'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
-            onClick={() => setActiveTab('todo')}
+            onClick={() => {
+              triggerHaptic('light')
+              setActiveTab('todo')
+            }}
           >
             Tasks
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-[0.75rem] py-2.5 text-[14px] font-bold transition-all duration-200 cursor-pointer ${
+            className={`relative z-10 flex-1 rounded-[0.75rem] py-2.5 text-[14px] font-bold transition-colors duration-200 cursor-pointer active:scale-[0.98] ${
               activeTab === 'habits'
-                ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)]'
+                ? 'text-[var(--fg)]'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
-            onClick={() => setActiveTab('habits')}
+            onClick={() => {
+              triggerHaptic('light')
+              setActiveTab('habits')
+            }}
           >
             Habits
           </button>
         </div>
 
-        {activeTab === 'habits' && <HabitsView />}
+        {activeTab === 'habits' && (
+          <div key="tab-habits" className="ft-smooth-in">
+            <HabitsView />
+          </div>
+        )}
         {activeTab === 'todo' && (
-          <div className="space-y-5">
+          <div key="tab-todo" className="space-y-5 ft-smooth-in">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 pl-0.5 min-w-0 flex-1 whitespace-nowrap">
                 <button type="button" className={pillClass(filter === 'all')} onClick={() => setFilter('all')}>

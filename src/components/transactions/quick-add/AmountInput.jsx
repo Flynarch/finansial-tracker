@@ -14,6 +14,7 @@ export default function AmountInput({
   onOpenAiScan,
   currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'],
   modeAccent = 'var(--accent)',
+  hasError = false,
 }) {
   const { t } = useTranslation()
   const [isAmountFocused, setIsAmountFocused] = useState(false)
@@ -64,12 +65,19 @@ export default function AmountInput({
   return (
     <div className="py-2">
       <div className="flex h-7 items-center justify-between mb-2 px-0.5">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] flex items-center gap-1.5">
-          <span>{txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}</span>
-          {calcEvaluation.hasExpression && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]">
-              <Calculator className="w-3 h-3 text-[var(--muted)]" />
-              <span>{t('calculator.title', 'Kalkulator')}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] flex items-center gap-1.5 shrink-0">
+            <span>{txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}</span>
+            {calcEvaluation.hasExpression && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]">
+                <Calculator className="w-3 h-3 text-[var(--muted)]" />
+                <span>{t('calculator.title', 'Kalkulator')}</span>
+              </span>
+            )}
+          </div>
+          {hasError && (
+            <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out] truncate">
+              {t('addTx.invalidAmountSubtle', 'Wajib diisi & > 0')}
             </span>
           )}
         </div>
@@ -77,7 +85,7 @@ export default function AmountInput({
           <button
             type="button"
             onClick={onOpenAiScan}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 text-xs font-semibold cursor-pointer shadow-2xs group h-7"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 text-xs font-semibold cursor-pointer shadow-2xs group h-7 shrink-0"
             title={t('transactions.ocr.pillBtn', 'Pindai Struk')}
           >
             <Camera className="w-3.5 h-3.5 text-[var(--muted)] group-hover:text-[var(--fg)] transition-colors" />
@@ -139,7 +147,7 @@ export default function AmountInput({
             required
             placeholder={t('addTx.amountPlaceholderCalc', '0 (misal: 25k + 15k)')}
             className={`w-full min-w-0 bg-transparent py-0 font-extrabold outline-none tracking-tight leading-none transition-all ${
-              amount ? 'text-[var(--fg)]' : 'text-[var(--muted-2)]/50 font-medium'
+              amount ? (hasError ? 'text-rose-500 dark:text-rose-400' : 'text-[var(--fg)]') : 'text-[var(--muted-2)]/50 font-medium'
             } ${
               String(amount || '').length > 11
                 ? 'text-xl sm:text-2xl'
@@ -166,10 +174,12 @@ export default function AmountInput({
 
       {/* Decorative Mode-Themed Baseline */}
       <div
-        className="mt-2 h-[2px] w-full rounded-full transition-all duration-300"
+        className={`mt-2 h-[2px] w-full rounded-full transition-all duration-300 ${
+          hasError ? 'bg-rose-500/70' : isAmountFocused ? '' : 'bg-[var(--border)]'
+        }`}
         style={{
-          backgroundColor: isAmountFocused ? modeAccent : 'var(--border)',
-          transform: isAmountFocused ? 'scaleX(1)' : 'scaleX(0.98)',
+          backgroundColor: hasError ? undefined : isAmountFocused ? modeAccent : undefined,
+          transform: isAmountFocused || hasError ? 'scaleX(1)' : 'scaleX(0.98)',
         }}
       />
     </div>

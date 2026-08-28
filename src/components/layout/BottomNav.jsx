@@ -161,7 +161,12 @@ function BottomNav() {
 
             <div className="relative z-10 grid h-full grid-cols-5 items-end gap-1 px-1.5 pb-1.5 pt-1">
               {leftItems.map((item) => (
-                <NavLink key={item.path} to={item.path} className={linkClassName}>
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={linkClassName}
+                  onClick={() => triggerHaptic('light')}
+                >
                   {({ isActive }) => (
                     <>
                       <NavIcon name={item.icon} isActive={isActive} />
@@ -180,7 +185,12 @@ function BottomNav() {
               <div aria-hidden="true" />
 
               {rightItems.map((item) => (
-                <NavLink key={item.path} to={item.path} className={linkClassName}>
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={linkClassName}
+                  onClick={() => triggerHaptic('light')}
+                >
                   {({ isActive }) => (
                     <>
                       <NavIcon name={item.icon} isActive={isActive} />

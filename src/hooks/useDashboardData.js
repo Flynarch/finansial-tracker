@@ -93,7 +93,13 @@ export function useDashboardData() {
   const allHabitLogs = useMemo(() => rawHabitLogs || [], [rawHabitLogs])
   const allHabits = useMemo(() => rawHabits || [], [rawHabits])
 
-  const isDbLoading = transactions === null || wallets === null || allTransactionsForBalance === null
+  const isDbLoading =
+    transactions === null ||
+    wallets === null ||
+    allTransactionsForBalance === null ||
+    budgets === null ||
+    goals === null ||
+    loans === null
 
   const [zoomRevenueRange, setZoomRevenueRangeState] = useState(() => getSavedNetWorthRange())
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())

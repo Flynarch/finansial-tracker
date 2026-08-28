@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { App } from '@capacitor/app'
+import { StatusBar, Style } from '@capacitor/status-bar'
+import { SplashScreen } from '@capacitor/splash-screen'
+import { Capacitor } from '@capacitor/core'
+import { hapticImpact } from '../../lib/haptics'
 import { backButtonManager } from '../../lib/backButtonManager'
 import { getParentRoute } from '../../lib/navigationHierarchy'
 import { notifyTodayEvents, processRecurringTransactions } from '../../lib/automation'
@@ -46,6 +50,7 @@ function AppShell() {
 
   const historyStack = useRef([])
   const backgroundTimeRef = useRef(null)
+  const lastBackPressRef = useRef(0)
 
   // Hide global navigation & AI trigger bar on dedicated sub-detail pages
   const isDetailPage =
@@ -89,19 +94,37 @@ function AppShell() {
     }
   }, [location.pathname, location.key, navigationType])
 
+  // Pure Android Hardware Back Button Polish
   useEffect(() => {
     const handleBackButton = async () => {
-      // 1. Check LIFO overlay stack (modals, drawers, popovers)
+      // 1. Check LIFO overlay stack (modals, drawers, popovers, pickers)
       if (backButtonManager.handleBack()) {
         return
       }
 
-      // 2. Hierarchical parent route navigation
+      // 2. Hierarchical parent route navigation if on a sub-route
       const parentRoute = getParentRoute(location.pathname)
       if (parentRoute) {
         navigate(parentRoute)
-      } else {
+        return
+      }
+
+      // 3. Root screen (/dashboard or /): 2-tap to exit
+      const now = Date.now()
+      if (now - lastBackPressRef.current < 2000) {
         await App.exitApp()
+      } else {
+        lastBackPressRef.current = now
+        hapticImpact('light')
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: locale === 'en' ? 'Exit App' : 'Keluar Aplikasi',
+              message: locale === 'en' ? 'Press back again to exit' : 'Tekan sekali lagi untuk keluar',
+              type: 'info',
+            },
+          }),
+        )
       }
     }
 
@@ -110,7 +133,36 @@ function AppShell() {
     return () => {
       listenerPromise.then((l) => l.remove())
     }
-  }, [location.pathname, navigate])
+  }, [location.pathname, navigate, locale])
+
+  // Native Status Bar Dynamic Color & Contrast Syncing
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const isDark = theme !== 'light' && theme !== 'nordic-light'
+    StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: isDark ? '#0b0f1a' : '#ffffff' }).catch(() => {})
+  }, [theme])
+
+  // Native Splash Screen Smooth Fade-Out once ready
+  useEffect(() => {
+    if (isLoaded && Capacitor.isNativePlatform()) {
+      SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {})
+    }
+  }, [isLoaded])
+
+  // Anti-Web Context Menu Suppression (Except editable fields)
+  useEffect(() => {
+    const handleContextMenu = (e) => {
+      const tag = e.target?.tagName
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable
+      if (!isInput) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('contextmenu', handleContextMenu)
+    return () => window.removeEventListener('contextmenu', handleContextMenu)
+  }, [])
 
   useEffect(() => {
     loadSettings()

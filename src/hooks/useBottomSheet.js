@@ -25,9 +25,9 @@ export default function useBottomSheet(configOrState = false) {
 
   const isControlled = controlledIsOpen !== undefined
   const [internalOpen, setInternalOpen] = useState(initialState)
-  const isOpen = isControlled ? Boolean(controlledIsOpen) : internalOpen
+  const isTargetOpen = isControlled ? Boolean(controlledIsOpen) : internalOpen
 
-  const [isVisible, setIsVisible] = useState(initialState || Boolean(controlledIsOpen))
+  const [isExiting, setIsExiting] = useState(false)
   const closeTimeoutRef = useRef(null)
 
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
@@ -43,24 +43,12 @@ export default function useBottomSheet(configOrState = false) {
     }
   }, [])
 
-  // Sync controlled isOpen prop to transition frame
-  useEffect(() => {
-    if (isControlled) {
-      if (closeTimeoutRef.current) {
-        window.clearTimeout(closeTimeoutRef.current)
-        closeTimeoutRef.current = null
-      }
-      const frame = window.requestAnimationFrame(() => {
-        setIsVisible(Boolean(controlledIsOpen))
-      })
-      return () => window.cancelAnimationFrame(frame)
-    }
-    return undefined
-  }, [isControlled, controlledIsOpen])
+  const isMounted = isTargetOpen || isExiting
+  const isVisible = isTargetOpen && !isExiting
 
   // Lock body scroll while sheet is open
   useEffect(() => {
-    if (!isOpen || !lockBodyScroll || typeof document === 'undefined') return undefined
+    if (!isMounted || !lockBodyScroll || typeof document === 'undefined') return undefined
     const { body, documentElement } = document
     const prevBodyOverflow = body.style.overflow
     const prevHtmlOverflow = documentElement.style.overflow
@@ -75,23 +63,24 @@ export default function useBottomSheet(configOrState = false) {
       documentElement.style.overflow = prevHtmlOverflow && prevHtmlOverflow !== 'hidden' ? prevHtmlOverflow : ''
       documentElement.style.overscrollBehavior = 'none'
     }
-  }, [isOpen, lockBodyScroll])
+  }, [isMounted, lockBodyScroll])
 
   const openSheet = useCallback(() => {
     if (closeTimeoutRef.current) {
       window.clearTimeout(closeTimeoutRef.current)
       closeTimeoutRef.current = null
     }
+    setIsExiting(false)
     if (!isControlled) {
       setInternalOpen(true)
     }
-    window.requestAnimationFrame(() => setIsVisible(true))
   }, [isControlled])
 
   const closeSheet = useCallback(() => {
-    setIsVisible(false)
     if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current)
+    setIsExiting(true)
     closeTimeoutRef.current = window.setTimeout(() => {
+      setIsExiting(false)
       if (!isControlled) {
         setInternalOpen(false)
       }
@@ -100,10 +89,10 @@ export default function useBottomSheet(configOrState = false) {
     }, motionDelay)
   }, [isControlled, motionDelay, onClose])
 
-  useBackButton(closeSheet, Boolean(isOpen && enableBackButton))
+  useBackButton(closeSheet, Boolean(isMounted && isVisible && enableBackButton))
 
   return {
-    isOpen,
+    isOpen: isMounted,
     isVisible,
     openSheet,
     closeSheet,

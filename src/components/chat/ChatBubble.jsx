@@ -15,8 +15,8 @@ function getCurrentTimeStr(timestamp) {
 export const UserBubble = memo(function UserBubble({ content, timestamp }) {
   const timeStr = getCurrentTimeStr(timestamp)
   return (
-    <div className="ft-swush-in flex flex-col items-end gap-1 max-w-[85%] self-end my-1">
-      <div className="rounded-2xl rounded-tr-xs bg-[var(--fg)] text-[var(--bg)] px-4 py-2.5 shadow-sm text-[13.5px] font-medium leading-relaxed break-words">
+    <div className="ft-swush-in flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[80%] self-end my-1 min-w-0">
+      <div className="rounded-2xl rounded-tr-xs bg-[var(--fg)] text-[var(--bg)] px-4 py-2.5 shadow-sm text-[13.5px] font-medium leading-relaxed break-words [overflow-wrap:anywhere]">
         {content}
       </div>
       <span className="text-[10px] font-semibold text-[var(--muted)]/60 px-1">
@@ -40,12 +40,12 @@ export const AiBubble = memo(function AiBubble({ content, timestamp, isStreaming
   if (!content && !embeddedWidget) return null
   const timeStr = getCurrentTimeStr(timestamp)
   return (
-    <div className={`ft-swush-in flex items-start gap-2.5 max-w-[92%] my-1.5 ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
+    <div className={`ft-swush-in flex items-start gap-2.5 max-w-[88%] sm:max-w-[85%] self-start my-1.5 min-w-0 ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
       <AiAvatarBadge />
       
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col gap-2 rounded-2xl rounded-tl-xs bg-[var(--field-bg)] border border-[var(--border)] p-4 shadow-xs">
         {content && (
-          <div className="ft-md-prose leading-relaxed text-[13.5px] text-[var(--fg)]">
+          <div className="ft-md-prose leading-relaxed text-[13.5px] text-[var(--fg)] break-words [overflow-wrap:anywhere]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content}
             </ReactMarkdown>
@@ -54,7 +54,7 @@ export const AiBubble = memo(function AiBubble({ content, timestamp, isStreaming
         )}
 
         {embeddedWidget && (
-          <div className="mt-1 pt-2 border-t border-[var(--border)]/40 w-full">
+          <div className="mt-1 pt-2 border-t border-[var(--border)]/40 w-full min-w-0 overflow-hidden">
             {embeddedWidget}
           </div>
         )}

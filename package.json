@@ -1,7 +1,7 @@
 {
   "name": "finansial-tracker",
   "private": true,
-  "version": "4.6.4",
+  "version": "4.6.5",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -18,7 +18,11 @@
     "@capacitor/android": "^8.4.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.5",
     "@capacitor/local-notifications": "^8.2.0",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "acorn": "^8.17.0",
     "acorn-jsx": "^5.3.2",
     "date-fns": "^4.1.0",
