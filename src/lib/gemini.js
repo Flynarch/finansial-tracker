@@ -53,13 +53,24 @@ function parseApiErrorMessage(errText, status) {
   return errText
 }
 
-export const GEMINI_MODELS = [
+export const FAST_TRANSACTION_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
-  'gemini-3.5-flash',
+  'gemini-2.5-flash-lite',
+]
+
+export const CHAT_ADVISOR_MODELS = [
+  'gemini-3.6-flash',
   'gemini-3.1-pro-preview',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-flash-lite-latest',
+]
+
+export const GEMINI_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-pro-preview',
 ]
 
 export async function testGeminiApiKey(customKey) {
@@ -785,7 +796,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
     }
     let lastError = null
 
-    for (const model of GEMINI_MODELS) {
+    for (const model of CHAT_ADVISOR_MODELS) {
       try {
         const cleanKey = encodeURIComponent(apiKey)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${cleanKey}&alt=sse`
@@ -1104,7 +1115,7 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
       throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
     }
     let lastError = null
-    for (const model of GEMINI_MODELS) {
+    for (const model of CHAT_ADVISOR_MODELS) {
       try {
         const cleanKey = encodeURIComponent(apiKey)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
@@ -1196,7 +1207,7 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
       throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
     }
     let lastError = null
-    for (const model of GEMINI_MODELS) {
+    for (const model of CHAT_ADVISOR_MODELS) {
       try {
         const cleanKey = encodeURIComponent(apiKey)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
@@ -1314,7 +1325,7 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
       throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
     }
     let lastError = null
-    for (const model of GEMINI_MODELS) {
+    for (const model of FAST_TRANSACTION_MODELS) {
       try {
         const cleanKey = encodeURIComponent(key)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
