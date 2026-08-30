@@ -731,7 +731,7 @@ export default function OnboardingFlow() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-slate-500/10 text-slate-400 flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-slate-500/15 text-slate-300 flex items-center justify-center shrink-0">
                         <Moon size={18} strokeWidth={2.5} />
                       </div>
                       <div>
@@ -762,7 +762,7 @@ export default function OnboardingFlow() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
                         <Sparkles size={18} strokeWidth={2.5} />
                       </div>
                       <div>

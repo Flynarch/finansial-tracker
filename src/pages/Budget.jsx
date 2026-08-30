@@ -191,7 +191,7 @@ function Budget() {
   }
 
   return (
-    <div className="bg-[var(--bg)] min-h-[100dvh] pb-24">
+    <div className="min-h-[100dvh] pb-24">
       <div
         className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
           isLeaving

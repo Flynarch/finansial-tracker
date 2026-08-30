@@ -154,7 +154,7 @@ export default function Dashboard() {
   }, [locale])
 
   return (
-    <div className="bg-[var(--bg)]">
+    <div>
       <div
         className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
           isEntering ? 'opacity-100' : 'opacity-0'

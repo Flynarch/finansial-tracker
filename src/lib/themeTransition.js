@@ -21,20 +21,20 @@ export function getThemeDetails(theme) {
       return {
         label: 'Midnight Sapphire',
         shortLabel: 'Midnight',
-        bgColor: '#090d16',
+        bgColor: '#060913',
       }
     case 'dark':
       return {
         label: 'Matte Dark',
         shortLabel: 'Matte Dark',
-        bgColor: '#191b1f',
+        bgColor: '#0f1218',
       }
     case 'light':
     default:
       return {
         label: 'Putih',
         shortLabel: 'Putih',
-        bgColor: '#f4f6f9',
+        bgColor: '#f5f7fb',
       }
   }
 }

@@ -325,41 +325,41 @@ img, svg, a, button {
     /* ── Typography ─────────────────────────────────────────────────────── */
     --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
 
-    /* ── Design tokens: dark — Matte Charcoal & Slate-Indigo Studio (matching user reference) ── */
-    --bg: #191b1f;
-    --bg-elevated: #20242b;
-    --panel: #23272f;
-    --panel-strong: #272c36;
-    --border: rgba(255, 255, 255, 0.07);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --fg: #f3f4f6;
-    --muted: #9ca3af;
-    --muted-2: #6b7280;
-    --accent: #4a688a;
-    --accent-strong: #3b5472;
-    --danger: #f87171;
-    --warning: #fbbf24;
+    /* ── Design tokens: dark — Velvet Slate & Matte Charcoal Studio (Monochrome / Cool Slate) ── */
+    --bg: #0f1218;
+    --bg-elevated: #151a23;
+    --panel: #19202c;
+    --panel-strong: #202736;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --fg: #f8fafc;
+    --muted: #94a3b8;
+    --muted-2: #64748b;
+    --accent: #475569;
+    --accent-strong: #334155;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
     --radius-sm: 0.625rem;
     --radius-md: 0.875rem;
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
-    --status-income: #6ee7b7;
-    --status-income-soft: rgba(110, 231, 183, 0.12);
-    --status-expense: #f87171;
-    --status-expense-soft: rgba(248, 113, 113, 0.12);
-    --income: #6ee7b7;
-    --income-tint: rgba(110, 231, 183, 0.12);
-    --expense: #f87171;
-    --expense-tint: rgba(248, 113, 113, 0.12);
-    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
-    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.2);
-    --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-    --shadow-hover: 0 8px 24px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-    --shadow-fab: 0 10px 25px rgba(0, 0, 0, 0.4);
-    --field-bg: #1c2027;
-    --field-border: rgba(255, 255, 255, 0.08);
-    --field-border-hover: rgba(255, 255, 255, 0.16);
-    --ring: rgba(91, 127, 255, 0.35);
+    --status-income: #10b981;
+    --status-income-soft: rgba(16, 185, 129, 0.12);
+    --status-expense: #f43f5e;
+    --status-expense-soft: rgba(244, 63, 94, 0.12);
+    --income: #10b981;
+    --income-tint: rgba(16, 185, 129, 0.12);
+    --expense: #f43f5e;
+    --expense-tint: rgba(244, 63, 94, 0.12);
+    --shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.25);
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    --shadow-hover: 0 6px 20px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    --shadow-fab: 0 12px 32px rgba(0, 0, 0, 0.4);
+    --field-bg: #161c28;
+    --field-border: rgba(255, 255, 255, 0.11);
+    --field-border-hover: rgba(255, 255, 255, 0.20);
+    --ring: rgba(71, 85, 105, 0.4);
     --motion-duration: 280ms;
     /* Smoother ease-out for page/tab/sheet transitions. */
     --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -374,56 +374,55 @@ img, svg, a, button {
     --glass-highlight: transparent;
 
     /* Chart colors */
-    --chart-ink: #f3f4f6;
-    --chart-ink-fill: rgba(243, 244, 246, 0.1);
-    --chart-gold: #fbbf24;
-    --chart-gold-fill: rgba(251, 191, 36, 0.14);
-    --chart-success: #6ee7b7;
-    --chart-success-fill: rgba(110, 231, 183, 0.14);
+    --chart-ink: #f8fafc;
+    --chart-ink-fill: rgba(248, 250, 252, 0.1);
+    --chart-gold: #f59e0b;
+    --chart-gold-fill: rgba(245, 158, 11, 0.14);
+    --chart-success: #10b981;
+    --chart-success-fill: rgba(16, 185, 129, 0.14);
 
     /* Mobile bottom navigation (follows theme) */
-    --nav-shell-fill: #191b1f;
+    --nav-shell-fill: #11151e;
     --nav-shell-stroke: rgba(255, 255, 255, 0.08);
     --nav-item-active: #ffffff;
-    --nav-item-inactive: #8b949e;
-    --nav-item-hover: #d1d5db;
-    --nav-fab-bg: #3d5675;
-    --nav-fab-fg: #ffffff;
-    --nav-fab-ring: rgba(91, 127, 255, 0.3);
+    --nav-item-inactive: #64748b;
+    --nav-item-hover: #94a3b8;
+    --nav-fab-bg: #334155;
+    --nav-fab-fg: #f8fafc;
+    --nav-fab-ring: rgba(71, 85, 105, 0.4);
 
     /* ── Skeleton / loading ──────────────────────────────────────────── */
     --skeleton-base: rgba(255, 255, 255, 0.04);
-    --skeleton-shine: rgba(255, 255, 255, 0.07);
+    --skeleton-shine: rgba(255, 255, 255, 0.08);
 
     /* ── Settings icon badge tokens ──────────────────────────────────── */
     --badge-bg: rgba(255, 255, 255, 0.08);
-    --badge-icon: #f3f4f6;
-    --badge-border: rgba(255, 255, 255, 0.1);
+    --badge-icon: #f8fafc;
+    --badge-border: rgba(255, 255, 255, 0.12);
 
     /* ── Earthy & Vibrant tones ───────────────────────────────────────── */
-    --earthy-green: #6ee7b7;
-    --earthy-green-soft: rgba(110, 231, 183, 0.12);
-    --earthy-terra: #f87171;
-    --earthy-terra-soft: rgba(248, 113, 113, 0.12);
+    --earthy-green: #10b981;
+    --earthy-green-soft: rgba(16, 185, 129, 0.12);
+    --earthy-terra: #f43f5e;
+    --earthy-terra-soft: rgba(244, 63, 94, 0.12);
     --earthy-green-dark: #059669;
     --earthy-terra-dark: #e11d48;
-    /* Earthy accent alternative (reserved for future switch) */
     --accent-alt: #6B7C5E;
     --accent-alt-strong: #576848;
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
-    --wallet-logo-bg: #272c36;
-    --wallet-logo-border: rgba(255, 255, 255, 0.06);
+    --wallet-logo-bg: #202736;
+    --wallet-logo-border: rgba(255, 255, 255, 0.08);
   }
 
-  /* ── Design tokens: midnight (Obsidian Navy Blue Studio) ─────────────── */
+  /* ── Design tokens: midnight (Obsidian Sapphire / Deep Cobalt Studio) ─── */
   [data-theme="midnight"] {
-    --bg: #090d16;
-    --bg-elevated: #0f1523;
-    --panel: #131b2e;
-    --panel-strong: #172138;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
+    --bg: #060913;
+    --bg-elevated: #0b1122;
+    --panel: #0f172a;
+    --panel-strong: #141f38;
+    --border: rgba(56, 189, 248, 0.14);
+    --border-strong: rgba(56, 189, 248, 0.26);
     --fg: #f8fafc;
     --muted: #94a3b8;
     --muted-2: #64748b;
@@ -436,22 +435,22 @@ img, svg, a, button {
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
     --status-income: #34d399;
-    --status-income-soft: rgba(52, 211, 153, 0.12);
+    --status-income-soft: rgba(52, 211, 153, 0.14);
     --status-expense: #fb7185;
-    --status-expense-soft: rgba(251, 113, 133, 0.12);
+    --status-expense-soft: rgba(251, 113, 133, 0.14);
     --income: #34d399;
-    --income-tint: rgba(52, 211, 153, 0.12);
+    --income-tint: rgba(52, 211, 153, 0.14);
     --expense: #fb7185;
-    --expense-tint: rgba(251, 113, 133, 0.12);
-    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
-    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
-    --shadow-hover: 0 10px 28px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
-    --shadow-fab: 0 14px 36px rgba(0, 0, 0, 0.5);
-    --field-bg: #0d1322;
-    --field-border: rgba(255, 255, 255, 0.09);
-    --field-border-hover: rgba(255, 255, 255, 0.18);
-    --ring: rgba(56, 189, 248, 0.4);
+    --expense-tint: rgba(251, 113, 133, 0.14);
+    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.55);
+    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(56, 189, 248, 0.1);
+    --shadow-hover: 0 12px 32px -4px rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(56, 189, 248, 0.18);
+    --shadow-fab: 0 14px 36px rgba(0, 0, 0, 0.6);
+    --field-bg: #0e162b;
+    --field-border: rgba(56, 189, 248, 0.18);
+    --field-border-hover: rgba(56, 189, 248, 0.32);
+    --ring: rgba(56, 189, 248, 0.35);
 
     /* Clean solid */
     --glass-bg: var(--panel);
@@ -469,22 +468,22 @@ img, svg, a, button {
     --chart-success-fill: rgba(52, 211, 153, 0.15);
 
     /* Mobile bottom navigation */
-    --nav-shell-fill: #0c1220;
-    --nav-shell-stroke: rgba(255, 255, 255, 0.1);
-    --nav-item-active: #f8fafc;
+    --nav-shell-fill: #080d1a;
+    --nav-shell-stroke: rgba(56, 189, 248, 0.12);
+    --nav-item-active: #38bdf8;
     --nav-item-inactive: #64748b;
     --nav-item-hover: #94a3b8;
     --nav-fab-bg: #38bdf8;
-    --nav-fab-fg: #090d16;
-    --nav-fab-ring: rgba(56, 189, 248, 0.35);
+    --nav-fab-fg: #060913;
+    --nav-fab-ring: rgba(56, 189, 248, 0.4);
 
-    --skeleton-base: rgba(255, 255, 255, 0.04);
-    --skeleton-shine: rgba(255, 255, 255, 0.08);
+    --skeleton-base: rgba(56, 189, 248, 0.05);
+    --skeleton-shine: rgba(56, 189, 248, 0.1);
 
     /* ── Settings icon badge tokens ──────────────────────────────────── */
-    --badge-bg: rgba(255, 255, 255, 0.08);
-    --badge-icon: #f8fafc;
-    --badge-border: rgba(255, 255, 255, 0.12);
+    --badge-bg: rgba(56, 189, 248, 0.1);
+    --badge-icon: #38bdf8;
+    --badge-border: rgba(56, 189, 248, 0.18);
 
     --earthy-green: #34d399;
     --earthy-green-soft: rgba(52, 211, 153, 0.14);
@@ -496,21 +495,21 @@ img, svg, a, button {
     --accent-alt-strong: #576848;
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
-    --wallet-logo-bg: #172138;
-    --wallet-logo-border: rgba(255, 255, 255, 0.08);
+    --wallet-logo-bg: #141f38;
+    --wallet-logo-border: rgba(56, 189, 248, 0.12);
   }
 
-  /* ── Design tokens: light ────────────────────────────────────────────── */
+  /* ── Design tokens: light (Apple Studio Alabaster / Crisp Minimalist) ─── */
   [data-theme="light"] {
-    --bg: #f4f6f9;
+    --bg: #f5f7fb;
     --bg-elevated: #ffffff;
     --panel: #ffffff;
     --panel-strong: #ffffff;
-    --border: rgba(15, 23, 42, 0.1);
-    --border-strong: rgba(15, 23, 42, 0.18);
+    --border: rgba(15, 23, 42, 0.06);
+    --border-strong: rgba(15, 23, 42, 0.12);
     --fg: #0f172a;
-    --muted: rgba(15, 23, 42, 0.55);
-    --muted-2: rgba(15, 23, 42, 0.50);
+    --muted: #64748b;
+    --muted-2: #94a3b8;
     --accent: #0f172a;
     --accent-strong: #1e293b;
     --danger: #e11d48;
@@ -520,22 +519,22 @@ img, svg, a, button {
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
     --status-income: #059669;
-    --status-income-soft: color-mix(in srgb, var(--status-income) 12%, transparent);
+    --status-income-soft: rgba(5, 150, 105, 0.10);
     --status-expense: #e11d48;
-    --status-expense-soft: color-mix(in srgb, var(--status-expense) 12%, transparent);
+    --status-expense-soft: rgba(225, 29, 72, 0.10);
     --income: #059669;
-    --income-tint: rgba(5, 150, 105, 0.12);
+    --income-tint: rgba(5, 150, 105, 0.10);
     --expense: #e11d48;
-    --expense-tint: rgba(225, 29, 72, 0.12);
-    --shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-    --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.04);
-    --shadow-card: 0 1px 4px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
-    --shadow-hover: 0 6px 20px rgba(15, 23, 42, 0.1);
-    --shadow-fab: 0 14px 30px rgba(15, 23, 42, 0.12), 0 6px 14px rgba(15, 23, 42, 0.09);
+    --expense-tint: rgba(225, 29, 72, 0.10);
+    --shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.02);
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+    --shadow-hover: 0 6px 16px rgba(15, 23, 42, 0.06);
+    --shadow-fab: 0 8px 24px rgba(15, 23, 42, 0.12);
     --field-bg: #f8fafc;
-    --field-border: rgba(15, 23, 42, 0.12);
-    --field-border-hover: rgba(15, 23, 42, 0.22);
-    --ring: rgba(15, 23, 42, 0.2);
+    --field-border: rgba(15, 23, 42, 0.08);
+    --field-border-hover: rgba(15, 23, 42, 0.16);
+    --ring: rgba(15, 23, 42, 0.15);
 
     /* Clean solid — light variant */
     --glass-bg: var(--panel);
@@ -549,31 +548,31 @@ img, svg, a, button {
     --chart-ink-fill: rgba(15, 23, 42, 0.10);
     --chart-gold: #d97706;
     --chart-gold-fill: rgba(217, 119, 6, 0.12);
-    --chart-success: #16a34a;
-    --chart-success-fill: rgba(22, 163, 74, 0.12);
+    --chart-success: #059669;
+    --chart-success-fill: rgba(5, 150, 105, 0.12);
 
-    --nav-shell-fill: #f8f8fb;
-    --nav-shell-stroke: rgba(15, 23, 42, 0.18);
+    --nav-shell-fill: #ffffff;
+    --nav-shell-stroke: rgba(15, 23, 42, 0.08);
     --nav-item-active: #0f172a;
     --nav-item-inactive: #64748b;
-    --nav-item-hover: #334155;
-    --nav-fab-bg: #111b3d;
+    --nav-item-hover: #1e293b;
+    --nav-fab-bg: #0f172a;
     --nav-fab-fg: #ffffff;
-    --nav-fab-ring: rgba(51, 64, 110, 0.45);
+    --nav-fab-ring: rgba(15, 23, 42, 0.25);
 
     --skeleton-base: rgba(15, 23, 42, 0.05);
     --skeleton-shine: rgba(15, 23, 42, 0.09);
 
     /* ── Settings icon badge tokens (light) ─────────────────────────── */
-    --badge-bg: #F1F2F4;
-    --badge-icon: #12172E;
-    --badge-border: rgba(18, 23, 46, 0.08);
+    --badge-bg: #f1f5f9;
+    --badge-icon: #0f172a;
+    --badge-border: rgba(15, 23, 42, 0.08);
 
     /* ── Earthy & Vibrant tones (light) ────────────────────────────── */
     --earthy-green: #059669;
-    --earthy-green-soft: color-mix(in srgb, #059669 12%, transparent);
+    --earthy-green-soft: rgba(5, 150, 105, 0.10);
     --earthy-terra: #e11d48;
-    --earthy-terra-soft: color-mix(in srgb, #e11d48 12%, transparent);
+    --earthy-terra-soft: rgba(225, 29, 72, 0.10);
     --earthy-green-dark: #047857;
     --earthy-terra-dark: #be123c;
     --accent-alt: #6B7C5E;
@@ -581,7 +580,7 @@ img, svg, a, button {
 
     /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
     --wallet-logo-bg: #ffffff;
-    --wallet-logo-border: rgba(15, 23, 42, 0.07);
+    --wallet-logo-border: rgba(15, 23, 42, 0.08);
   }
 
   * {
@@ -614,18 +613,10 @@ img, svg, a, button {
   button {
     font: inherit;
   }
-
-  /* Prevent mobile browsers and WebViews from zooming when focusing inputs while allowing hero inputs */
-  @media (max-width: 768px) {
-    input:not([type="checkbox"]):not([type="radio"]):not(.ft-hero-input),
-    select,
-    textarea {
-      font-size: 16px;
-    }
-  }
 }
 
-.ft-hero-input {
+/* Dedicated enlarged balance input exclusively for Add Wallet form */
+.ft-wallet-balance-input {
   font-size: clamp(28px, 7.5vw, 38px) !important;
   font-weight: 800 !important;
   line-height: 1.15 !important;
@@ -655,13 +646,46 @@ img, svg, a, button {
 
 /* ── Components ───────────────────────────────────────────────────────── */
 @layer components {
-  /* Let body's dark gradient show through; light theme keeps solid canvas */
+  /* App Shell container */
   .ft-app-shell {
-    background: var(--bg);
+    background: transparent;
+    position: relative;
   }
 
-  html:not([data-theme="light"]) .ft-app-shell {
-    background: transparent;
+  /* ── Modern App Ambient Glow & Background ──────────────────────────── */
+  .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      color-mix(in srgb, var(--panel-strong) 3%, transparent) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="midnight"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(56, 189, 248, 0.12) 0%,
+      rgba(14, 165, 233, 0.04) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="dark"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(71, 85, 105, 0.12) 0%,
+      rgba(51, 65, 85, 0.05) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="light"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(255, 255, 255, 0.6) 0%,
+      transparent 80%
+    );
   }
 
   /* ── Display typography (Outfit) ───────────────────────────────────── */
@@ -780,20 +804,20 @@ img, svg, a, button {
 
   /* ── Field ───────────────────────────────────────────────────────── */
   .ft-field {
-    @apply mt-1 w-full border px-3 py-2.5 text-sm outline-none transition-all duration-200;
+    @apply mt-1 w-full border px-3.5 py-2.5 text-sm outline-none transition-all duration-200;
     border-radius: var(--radius-md);
     background: var(--field-bg);
-    border-color: color-mix(in srgb, var(--field-border) 80%, transparent);
+    border-color: var(--field-border);
     color: var(--fg);
   }
 
   .ft-field:hover {
-    border-color: color-mix(in srgb, var(--field-border-hover) 85%, transparent);
+    border-color: var(--field-border-hover);
   }
 
   .ft-field:focus-visible {
-    border-color: color-mix(in srgb, var(--field-border-hover) 60%, var(--ring));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
   }
 
   /* ── Primary button ──────────────────────────────────────────────── */
@@ -1854,23 +1878,26 @@ img, svg, a, button {
 /* Midnight mode hero card */
 [data-theme="midnight"] .ft-hero-card {
   background:
-    linear-gradient(145deg, #182134 0%, #0f1a2e 40%, #0e1f2a 100%);
-  border-color: rgba(56, 189, 248, 0.16);
+    linear-gradient(145deg, #141e38 0%, #0f172a 50%, #0a1122 100%);
+  border-color: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 4px 20px -2px rgba(6, 9, 19, 0.7), inset 0 1px 0 0 rgba(56, 189, 248, 0.15);
 }
 
-/* Dark (Charcoal) mode hero card */
+/* Dark (Velvet Slate / Matte Charcoal) mode hero card */
 [data-theme="dark"] .ft-hero-card,
 :root:not([data-theme="light"]):not([data-theme="midnight"]) .ft-hero-card {
   background:
-    linear-gradient(145deg, #2b3444 0%, #242b38 60%, #1e2430 100%);
-  border-color: rgba(255, 255, 255, 0.08);
+    linear-gradient(145deg, #202736 0%, #1a202c 60%, #151a24 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Light mode gradient */
 [data-theme="light"] .ft-hero-card {
   background:
-    linear-gradient(145deg, #ffffff 0%, #f0f4f8 100%);
-  border-color: rgba(15, 23, 42, 0.1);
+    linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(15, 23, 42, 0.09);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05), inset 0 1px 0 0 #ffffff;
 }
 
 /* ── Mini Wallet Card (Horizontal Scroll Compact) ─────────────────────── */

@@ -54,13 +54,13 @@ export default function TagInput({
           onChange={(e) => onChangeTagInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('tx.tagsPlaceholder', 'Tambah label (contoh: liburan, kantor)...')}
-          className="flex-1 bg-[var(--field-bg)] rounded-xl py-2 px-3 text-xs font-semibold text-[var(--fg)] outline-none border border-[var(--border)] focus:border-[var(--accent)]"
+          className="flex-1 bg-[var(--field-bg)] rounded-xl py-2 px-3 text-xs font-semibold text-[var(--fg)] outline-none border border-[var(--field-border,var(--border))] hover:border-[var(--field-border-hover,var(--border-strong))] focus:border-[var(--accent)] transition-colors"
         />
         <button
           type="button"
           onClick={onAddTag}
           disabled={!tagInput.trim()}
-          className="px-3 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] disabled:opacity-40 cursor-pointer"
+          className="px-3 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-xs font-bold text-[var(--fg)] hover:border-[var(--field-border-hover,var(--border-strong))] hover:bg-[var(--panel)] disabled:opacity-40 cursor-pointer transition-all active:scale-95"
         >
           + Tag
         </button>

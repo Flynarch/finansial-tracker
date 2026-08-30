@@ -10,7 +10,7 @@
         try {
           var t = localStorage.getItem('ft_theme') || 'light';
           document.documentElement.setAttribute('data-theme', t);
-          var bg = t === 'light' ? '#f8fafc' : (t === 'midnight' ? '#090d16' : '#191b1f');
+          var bg = t === 'light' ? '#f5f7fb' : (t === 'midnight' ? '#060913' : '#0f1218');
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute('content', bg);
         } catch (e) {}

@@ -70,7 +70,7 @@ export function WalletSelectTrigger({
           ? `min-h-[42px] rounded-xl px-3 py-1.5 active:scale-[0.99] cursor-pointer ${
               error
                 ? 'border border-rose-500/35 bg-rose-500/[0.04]'
-                : 'border-none bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+                : 'border border-[var(--field-border,var(--border))] bg-[var(--field-bg)] hover:border-[var(--field-border-hover,var(--border-strong))]'
             }`
           : `min-h-[50px] rounded-2xl border bg-[var(--field-bg)] px-3.5 py-2.5 ${
               disabled

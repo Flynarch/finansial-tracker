@@ -168,7 +168,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="bg-[var(--field-bg)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-base font-black text-[var(--fg)] outline-none focus:border-[var(--accent)] w-full transition"
+                      className="bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] rounded-xl px-3 py-1.5 text-base font-black text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--ring)] w-full transition"
                       autoFocus
                       onBlur={() => setIsEditingName(false)}
                       onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
@@ -200,7 +200,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
               )}
 
               <div className="flex items-center gap-2 mt-1">
-                <span className="inline-block rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                <span className="inline-block rounded-md bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
                   {institution ? institution.type : t('wallets.customAccount', 'Akun Kustom')}
                 </span>
                 <span className="text-[11px] font-semibold text-[var(--muted)]">
@@ -222,7 +222,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
               {t('wallets.initialBalance', 'Saldo Awal')}
             </label>
 
-            <div className="flex items-center gap-2.5 py-2 px-3.5 rounded-2xl bg-[var(--field-bg)] border-2 border-[var(--border)] focus-within:border-[var(--accent)] transition-all">
+            <div className="flex items-center gap-2.5 py-2 px-3.5 rounded-2xl bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--ring)] transition-all shadow-inner">
               <span className="text-2xl sm:text-3xl font-extrabold text-[var(--muted)] select-none shrink-0 tabular-nums leading-none">
                 {getCurrencySymbol(currency)}
               </span>
@@ -245,7 +245,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                   lineHeight: '1.15',
                   height: '48px',
                 }}
-                className="ft-hero-input w-full bg-transparent font-extrabold text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight tabular-nums"
+                className="ft-wallet-balance-input w-full bg-transparent font-extrabold text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight tabular-nums"
               />
             </div>
             <p className="text-[11px] font-medium text-[var(--muted)] mt-2">

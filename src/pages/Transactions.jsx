@@ -355,7 +355,7 @@ function Transactions() {
   }
 
   return (
-    <div className="bg-[var(--bg)]">
+    <div>
       <div
         className={`ft-motion-page flex min-h-[calc(100svh_-_64px)] max-h-[calc(100svh_-_64px)] flex-col gap-2 overflow-hidden transform-gpu md:min-h-[calc(100vh_-_65px)] md:max-h-[calc(100vh_-_65px)] ${
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'

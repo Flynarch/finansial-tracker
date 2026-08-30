@@ -322,7 +322,7 @@ function TodoList() {
     }`
 
   return (
-    <div className="bg-[var(--bg)]">
+    <div>
       <div
         className={`ft-motion-page min-h-full space-y-4 transform-gpu pb-2 ${
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'

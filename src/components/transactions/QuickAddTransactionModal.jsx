@@ -382,7 +382,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       ? 'var(--income)'
       : txType === 'transfer'
       ? '#3b82f6'
-      : '#6366f1'
+      : 'var(--accent)'
 
   const handleSwapTransferWallets = useCallback(() => {
     setForm((prev) => {
@@ -728,7 +728,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
                     {t('addTx.date')}
                   </div>
-                  <div className="bg-[var(--field-bg)] rounded-xl px-0.5 h-[42px]">
+                  <div className="bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] rounded-xl px-0.5 h-[42px] hover:border-[var(--field-border-hover,var(--border-strong))] transition-colors">
                     <CustomDatePicker
                       value={form.date}
                       onChange={(val) => setForm((p) => ({ ...p, date: val }))}
@@ -818,13 +818,15 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                       onClick={openCategorySheet}
                       className={`group flex w-full h-[42px] min-h-[42px] items-center justify-between gap-2.5 rounded-xl px-3 py-1 text-left transition-all duration-200 focus-visible:outline-none active:scale-[0.99] cursor-pointer ${
                         categoryError
-                          ? 'border border-rose-500/35 bg-rose-500/[0.04]'
-                          : 'border-none bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+                          ? 'bg-rose-500/10 border-2 border-rose-500 text-rose-500'
+                          : form.category
+                          ? 'bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-[var(--fg)] hover:border-[var(--field-border-hover,var(--border-strong))]'
+                          : 'bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-[var(--muted)] hover:border-[var(--field-border-hover,var(--border-strong))]'
                       }`}
                     >
                       {form.category && form.category.trim() ? (
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className="h-7 w-7 rounded-full aspect-square flex items-center justify-center shrink-0 border-[0.5px] border-[var(--border)] bg-[var(--panel)] overflow-hidden shadow-2xs">
+                          <div className="h-7 w-7 rounded-full aspect-square flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--panel)] overflow-hidden shadow-2xs">
                             <CategoryIcon
                               icon={resolveParentIcon(form.category.split('/')[0])}
                               className="h-4 w-4 text-[var(--fg)]/80"
@@ -890,7 +892,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   }}
                   placeholder={t('addTx.notesPlaceholder')}
                   rows={1}
-                  className="w-full bg-[var(--field-bg)] rounded-xl border-none py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 focus:ring-1 focus:ring-[var(--border-strong)] transition-all resize-none"
+                  className="w-full bg-[var(--field-bg)] rounded-xl border border-[var(--field-border,var(--border))] py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 hover:border-[var(--field-border-hover,var(--border-strong))] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--ring)] transition-all resize-none"
                 />
               </div>
 

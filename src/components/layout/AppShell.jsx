@@ -28,6 +28,7 @@ import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 import useAuthDeepLink from '../../hooks/useAuthDeepLink'
 import { primeThemeTransition } from '../../lib/themeTransition'
+import AppBackground from './AppBackground'
 
 function AppShell() {
   useNotificationEngine()
@@ -284,6 +285,7 @@ function AppShell() {
   if (!hasCompletedOnboarding) {
     return (
       <div className="ft-app-shell min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+        <AppBackground />
         <OnboardingFlow />
       </div>
     )
@@ -291,6 +293,7 @@ function AppShell() {
 
   return (
     <div className="ft-app-shell min-h-screen text-[var(--fg)]">
+      <AppBackground />
       {(location.pathname === '/dashboard' || location.pathname === '/') && <Navbar />}
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
