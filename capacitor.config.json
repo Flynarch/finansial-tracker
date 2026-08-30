@@ -1,5 +1,5 @@
 {
-  "appId": "com.hmias.fintrack",
+  "appId": "com.fintrack.app",
   "appName": "FinTrack",
   "webDir": "dist",
   "android": {

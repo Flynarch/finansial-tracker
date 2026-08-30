@@ -7,10 +7,10 @@ const ROUTES_META = [
   { path: '/settings/categories', titleKey: 'settings.section.categories' },
   { path: '/settings/recurring', titleKey: 'settings.recurringTitle' },
   { path: '/settings/currency', titleKey: 'settings.fxRatesTitle' },
+  { path: '/settings/notifications', titleKey: 'settings.notifications.title' },
   { path: '/settings/ai', titleKey: 'settings.aiIntegration' },
   { path: '/settings/data', titleKey: 'settings.nav.data' },
   { path: '/settings/help', titleKey: 'settings.helpTitle' },
-  { path: '/settings/account', titleKey: 'settings.account.title' },
 ]
 
 export default function SettingsLayout() {

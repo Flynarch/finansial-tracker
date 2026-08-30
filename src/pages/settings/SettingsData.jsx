@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Download,
   UploadCloud,
@@ -22,6 +23,7 @@ import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
 
 export default function SettingsData() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
@@ -84,25 +86,14 @@ export default function SettingsData() {
       // 1. Clear all data tables in Dexie
       await Promise.all(db.tables.map((tbl) => tbl.clear().catch(() => {})))
 
-      // 2. Re-create a clean initial wallet with default currency so UI has a primary wallet ready
-      const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
-      await db.wallets.add({
-        name: 'Kas Utama',
-        institutionType: 'cash',
-        logoUrl: '/logos/wallets/cash.svg',
-        currency: defaultCurrency,
-        balance: 0,
-        createdAt: new Date().toISOString(),
-      }).catch(() => {})
-
-      // 3. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
+      // 2. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
       clearFinancialLocalStorage()
       resetExpenseCategoryCustomizations()
       resetIncomeCategoryCustomizations()
 
       setIsClearModalOpen(false)
       setResetConfirmText('')
-      setStatusMessage(t('settings.status.resetDone', 'Seluruh data finansial berhasil dibersihkan. Akun Anda tetap aktif.'))
+      navigate('/dashboard', { replace: true })
     } catch {
       setStatusMessage(t('common.error.saveFailed', 'Gagal membersihkan data.'))
     } finally {
@@ -153,10 +144,10 @@ export default function SettingsData() {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-base sm:text-lg font-black text-[var(--fg)] leading-tight">
-              Penyimpanan & Cadangan Lokal
+              {t('settings.data.storageHeroTitle', 'Penyimpanan & Cadangan Lokal')}
             </h3>
             <p className="text-xs font-medium text-[var(--muted)] mt-1">
-              Data tersimpan langsung di browser (IndexedDB) dengan enkripsi lokal
+              {t('settings.data.storageHeroSubtitle', 'Data tersimpan langsung di perangkat (IndexedDB) dengan enkripsi lokal')}
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { BiometricAuth, AndroidBiometryStrength } from '@aparajita/capacitor-biometric-auth'
+import useSettingsStore from '../store/useSettingsStore'
 
 export async function canUseBiometric() {
   if (Capacitor.isNativePlatform()) {
@@ -29,15 +30,22 @@ export async function canUseBiometric() {
 export async function authenticateBiometric() {
   if (Capacitor.isNativePlatform()) {
     try {
+      const locale = useSettingsStore.getState().locale || 'id'
+      const isEn = locale === 'en'
+
       // In @aparajita/capacitor-biometric-auth:
       // authenticate() returns Promise<void>. If successful, it resolves (returns undefined).
       // If failed or cancelled, it rejects/throws BiometryError.
       await BiometricAuth.authenticate({
-        reason: 'Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka FinTrack',
-        cancelTitle: 'Batal',
+        reason: isEn
+          ? 'Verify fingerprint, Face ID, or device passcode to unlock FinTrack'
+          : 'Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka FinTrack',
+        cancelTitle: isEn ? 'Cancel' : 'Batal',
         allowDeviceCredential: true, // Allows falling back to phone PIN/Pattern/Password
-        androidTitle: 'FinTrack Terkunci',
-        androidSubtitle: 'Gunakan sidik jari atau kunci layar HP Anda',
+        androidTitle: isEn ? 'FinTrack Locked' : 'FinTrack Terkunci',
+        androidSubtitle: isEn
+          ? 'Use your fingerprint or device screen lock'
+          : 'Gunakan sidik jari atau kunci layar HP Anda',
         androidBiometryStrength: AndroidBiometryStrength.weak,
       })
       // If we reach this line without throwing, authentication succeeded!

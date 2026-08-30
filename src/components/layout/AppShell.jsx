@@ -23,7 +23,6 @@ import BottomNav from './BottomNav'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import AiTriggerBar from '../chat/AiTriggerBar'
-import AiChatSheet from '../chat/AiChatSheet'
 import AiQuickLogModal from '../chat/AiQuickLogModal'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
@@ -58,15 +57,14 @@ function AppShell() {
     location.pathname.startsWith('/wallet/') ||
     location.pathname.startsWith('/wallets/') ||
     location.pathname.startsWith('/savings/') ||
-    location.pathname === '/add-account'
+    location.pathname === '/add-account' ||
+    location.pathname === '/ai-chat' ||
+    location.pathname === '/chat' ||
+    location.pathname === '/ai-finance'
 
-  // AI Chat & Quick Log states
-  const isChatOpen = useChatStore((state) => state.isOpen)
-  const setIsChatOpen = useChatStore((state) => state.setIsOpen)
+  // AI Quick Log states
   const isQuickLogOpen = useChatStore((state) => state.isQuickLogOpen)
   const openQuickLog = useChatStore((state) => state.openQuickLog)
-  const chatMessages = useChatStore((state) => state.messages)
-  const setChatMessages = useChatStore((state) => state.setMessages)
 
   useEffect(() => {
     const currentPath = location.pathname
@@ -296,19 +294,26 @@ function AppShell() {
       {(location.pathname === '/dashboard' || location.pathname === '/') && <Navbar />}
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
-        <main
-          className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
-            location.pathname.startsWith('/wallet/') || location.pathname === '/add-account'
-              ? 'px-0 pt-0 pb-8'
-              : isDetailPage
-              ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-8'
-              : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(6.5rem+env(safe-area-inset-bottom))]'
-          }`}
-        >
-          <div key={location.pathname} className="ft-page-transition">
-            <Outlet />
-          </div>
-        </main>
+        {location.pathname === '/ai-chat' || location.pathname === '/chat' || location.pathname === '/ai-finance' ? (
+          <Outlet />
+        ) : (
+          <main
+            className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
+              location.pathname.startsWith('/wallet/') ||
+              location.pathname.startsWith('/todos/') ||
+              location.pathname.startsWith('/savings/') ||
+              location.pathname === '/add-account'
+                ? 'px-0 pt-0 pb-12'
+                : isDetailPage
+                ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-12'
+                : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
+            }`}
+          >
+            <div key={location.pathname} className="ft-page-transition">
+              <Outlet />
+            </div>
+          </main>
+        )}
       </div>
       {!isDetailPage && <BottomNav />}
       <SpotlightTour />
@@ -317,18 +322,11 @@ function AppShell() {
       ) : null}
 
       <AiTriggerBar
-        isVisible={!isDetailPage && !isChatOpen && !isQuickLogOpen}
+        isVisible={!isDetailPage && !isQuickLogOpen}
         onOpen={openQuickLog}
       />
 
       <AiQuickLogModal />
-
-      <AiChatSheet
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        messages={chatMessages}
-        setMessages={setChatMessages}
-      />
 
       <InAppNotificationToast />
     </div>

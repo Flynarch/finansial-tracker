@@ -41,6 +41,7 @@ import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
 import AuthModal from '../../components/auth/AuthModal'
 import { currencyOptions } from './settingsConstants'
+import CurrencyFlag from '../../components/currency/CurrencyFlag'
 import {
   SettingsBentoTile,
   SettingsLinkRow,
@@ -529,7 +530,6 @@ export default function SettingsHome() {
         <SettingsLinkRow
           to="/settings/data"
           label={t('settings.nav.data', 'Data & Cadangan')}
-          subtitle={t('settings.nav.dataSubtitle', 'Ekspor & Impor Data, Cadangan Cloud')}
           icon={Database}
         />
       </SettingsSection>
@@ -583,16 +583,14 @@ export default function SettingsHome() {
                     : 'border-[var(--border)] bg-[var(--panel-strong)] hover:border-[var(--border-strong)]'
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] font-black text-sm text-[var(--fg)]">
-                    {info.symbol}
-                  </div>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <CurrencyFlag code={code} size={38} className="shadow-2xs" />
                   <div className="min-w-0">
                     <span className="block text-sm font-extrabold text-[var(--fg)] leading-tight">
                       {info.name}
                     </span>
                     <span className="block text-xs font-bold text-[var(--muted)] leading-tight mt-0.5">
-                      {info.code}
+                      {info.code} • {info.symbol}
                     </span>
                   </div>
                 </div>

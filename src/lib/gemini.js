@@ -6,25 +6,105 @@ import { sanitizeCategoryPath } from './categorySanitizer'
 import { db } from './db'
 import useSettingsStore from '../store/useSettingsStore'
 
-function getEffectiveApiKey() {
+const SYSTEM_DEFAULT_API_KEY = 'AQ.Ab8RN6IrZzPkqDABRQiTPfqO3Zv9pleyNKYBqTNwlIISs3wMQQ'
+
+export function getEffectiveApiKey() {
   try {
     const userKey = useSettingsStore.getState().geminiApiKey
     if (userKey && userKey.trim().length > 0) {
-      return userKey.trim()
+      return userKey.trim().replace(/^["']|["']$/g, '')
     }
   } catch {
     // ignore
   }
-  return import.meta.env.VITE_GEMINI_API_KEY || ''
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY || ''
+  if (envKey && envKey.trim().length > 0) {
+    return envKey.trim().replace(/^["']|["']$/g, '')
+  }
+  return SYSTEM_DEFAULT_API_KEY
 }
 
-const GEMINI_MODELS = [
+function parseApiErrorMessage(errText, status) {
+  if (status === 429) {
+    return 'Batas kuota harian atau kecepatan API tercapai (Rate Limit). Silakan tunggu beberapa saat lagi.'
+  }
+  if (status === 404) {
+    return 'Model tidak ditemukan untuk versi API ini.'
+  }
+  if (!errText) return 'Terjadi kendala saat menghubungi server AI.'
+  try {
+    const parsed = JSON.parse(errText)
+    if (parsed?.error?.message) {
+      const msg = parsed.error.message
+      if (
+        msg.includes('API key not valid') ||
+        msg.includes('API_KEY_INVALID') ||
+        msg.includes('API key expired') ||
+        msg.includes('OAuth 2 access token') ||
+        msg.includes('invalid authentication credentials')
+      ) {
+        return 'Kredensial API Key tidak valid. Silakan periksa kembali API Key Anda di menu Pengaturan > Integrasi AI.'
+      }
+      return msg
+    }
+  } catch {
+    // ignore
+  }
+  return errText
+}
+
+export const GEMINI_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro-preview',
   'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-pro',
   'gemini-2.0-flash',
-  'gemini-2.0-pro',
+  'gemini-1.5-flash',
 ]
+
+export async function testGeminiApiKey(customKey) {
+  const key = (customKey || getEffectiveApiKey() || '').trim().replace(/^["']|["']$/g, '')
+  if (!key) {
+    return { ok: false, message: 'API Key belum diisi.' }
+  }
+
+  let lastErrorMsg = ''
+  for (const model of GEMINI_MODELS) {
+    try {
+      const cleanKey = encodeURIComponent(key)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+          generationConfig: { maxOutputTokens: 5, temperature: 0.1 }
+        })
+      })
+
+      if (res.ok) {
+        return { ok: true, model, message: `Koneksi Berhasil! Model ${model} aktif dan siap digunakan.` }
+      }
+
+      const errText = await res.text()
+      const cleanMsg = parseApiErrorMessage(errText, res.status)
+      lastErrorMsg = cleanMsg
+
+      if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+        return { ok: false, message: cleanMsg }
+      }
+    } catch (err) {
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+        return { ok: false, message: 'Gagal terhubung ke server Google. Periksa koneksi internet Anda.' }
+      }
+      lastErrorMsg = err.message
+    }
+  }
+
+  return { ok: false, message: lastErrorMsg || 'Gagal menghubungi server Gemini. Pastikan API Key valid dari Google AI Studio.' }
+}
 
 export function buildCategoryContext(locale) {
   const expenseTree = getMergedExpenseTree()
@@ -699,22 +779,32 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   }
 
   const callApiStreamWithFallback = async (reqContents) => {
-    let lastError = null
     const apiKey = getEffectiveApiKey()
+    if (!apiKey || apiKey.trim().length === 0) {
+      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
+    }
+    let lastError = null
 
     for (const model of GEMINI_MODELS) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`
-        const res = await fetch(`${url}?key=${apiKey}&alt=sse`, {
+        const cleanKey = encodeURIComponent(apiKey)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${cleanKey}&alt=sse`
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
         })
         
         if (!res.ok) {
           const errText = await res.text()
           console.warn(`[${model}] API Error:`, errText)
-          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+          const cleanMsg = parseApiErrorMessage(errText, res.status)
+          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+            throw new Error(cleanMsg)
+          }
+          throw new Error(cleanMsg)
         }
         
         const reader = res.body.getReader()
@@ -1009,14 +1099,20 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
 `
 
   const callApiWithFallback = async (reqContents) => {
-    let lastError = null
     const apiKey = getEffectiveApiKey()
+    if (!apiKey || apiKey.trim().length === 0) {
+      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
+    }
+    let lastError = null
     for (const model of GEMINI_MODELS) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-        const res = await fetch(`${url}?key=${apiKey}`, {
+        const cleanKey = encodeURIComponent(apiKey)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ 
             contents: reqContents, 
             generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
@@ -1025,7 +1121,11 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
         
         if (!res.ok) {
           const errText = await res.text()
-          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+          const cleanMsg = parseApiErrorMessage(errText, res.status)
+          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+            throw new Error(cleanMsg)
+          }
+          throw new Error(cleanMsg)
         }
         
         const data = await res.json()
@@ -1033,6 +1133,9 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
         return { text }
       } catch (err) {
         lastError = err
+        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
+          throw err
+        }
       }
     }
     throw lastError
@@ -1049,6 +1152,11 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
 }
 
 export async function getSavingsPrediction(goalData, { locale = 'id', profileName = '' } = {}) {
+  const currentAmt = Number(goalData.currentAmount || 0)
+  const targetAmt = Number(goalData.targetAmount || 0)
+  const isGoalReached = currentAmt >= targetAmt
+  const remainingNeeded = Math.max(0, targetAmt - currentAmt)
+
   const prompt = `
 Anda adalah konsultan keuangan pribadi.
 Nama pengguna: ${profileName || 'Pengguna'}
@@ -1056,33 +1164,47 @@ Bahasa: ${locale === 'en' ? 'Inggris (English)' : 'Indonesia (Bahasa Indonesia)'
 
 Data Target Tabungan Pengguna:
 - Nama Target: ${goalData.name}
-- Dana Terkumpul: Rp ${goalData.currentAmount}
-- Target Dana: Rp ${goalData.targetAmount}
-- Sisa Kebutuhan: Rp ${goalData.targetAmount - goalData.currentAmount}
-- Rata-rata tabungan bulanan (estimasi): Rp ${goalData.avgSavings}
+- Dana Terkumpul: Rp ${currentAmt.toLocaleString('id-ID')}
+- Target Dana: Rp ${targetAmt.toLocaleString('id-ID')}
+- Sisa Kebutuhan: Rp ${remainingNeeded.toLocaleString('id-ID')}
+- Status Capaian: ${isGoalReached ? 'TARGET SUDAH 100% TERCAPAI' : 'Sedang Berjalan'}
+- Rata-rata tabungan bulanan (estimasi): Rp ${Number(goalData.avgSavings || 0).toLocaleString('id-ID')}
 - Tenggat Waktu (Opsional): ${goalData.deadline || 'Tidak ada'}
+
+PANDUAN KHUSUS:
+${
+  isGoalReached
+    ? '- KARENA TARGET SUDAH 100% TERCAPAI: Isi "predictedDate" dengan "Sudah Tercapai" (atau "Target Reached" jika bahasa Inggris), isi "isOnTrack": true, berikan 1 kalimat apresiasi & selamat di "summary", dan berikan 2 saran langkah finansial cerdas berikutnya (misal: mengamankan dana ke instrumen reksa dana/deposito, mengalokasikan ke pos dana darurat, atau merencanakan target tabungan baru) di "tips".'
+    : '- Berikan estimasi realistis kapan target tercapai berdasarkan rata-rata tabungan bulanan dan sisa kebutuhan.'
+}
 
 TUGAS ANDA:
 Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown block. Format JSON harus persis seperti ini:
 {
-  "predictedDate": "Bulan Tahun (contoh: Agustus 2026)",
-  "isOnTrack": true | false,
+  "predictedDate": "${isGoalReached ? 'Sudah Tercapai' : 'Bulan Tahun (contoh: Agustus 2026)'}",
+  "isOnTrack": true,
   "summary": "1 kalimat ringkasan tentang progres",
   "tips": [
-    "Saran akselerasi 1...",
-    "Saran akselerasi 2..."
+    "Saran praktis 1...",
+    "Saran praktis 2..."
   ]
 }
 `
   const callApiWithFallback = async (reqContents) => {
-    let lastError = null
     const apiKey = getEffectiveApiKey()
+    if (!apiKey || apiKey.trim().length === 0) {
+      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
+    }
+    let lastError = null
     for (const model of GEMINI_MODELS) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-        const res = await fetch(`${url}?key=${apiKey}`, {
+        const cleanKey = encodeURIComponent(apiKey)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ 
             contents: reqContents, 
             generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
@@ -1091,7 +1213,11 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
         
         if (!res.ok) {
           const errText = await res.text()
-          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+          const cleanMsg = parseApiErrorMessage(errText, res.status)
+          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+            throw new Error(cleanMsg)
+          }
+          throw new Error(cleanMsg)
         }
         
         const data = await res.json()
@@ -1099,6 +1225,9 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
         return { text }
       } catch (err) {
         lastError = err
+        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
+          throw err
+        }
       }
     }
     throw lastError
@@ -1180,14 +1309,20 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 `
 
   const callApiWithFallback = async (reqContents) => {
-    let lastError = null
     const key = getEffectiveApiKey()
+    if (!key || key.trim().length === 0) {
+      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
+    }
+    let lastError = null
     for (const model of GEMINI_MODELS) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-        const res = await fetch(`${url}?key=${key}`, {
+        const cleanKey = encodeURIComponent(key)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             contents: reqContents,
             generationConfig: {
@@ -1199,7 +1334,11 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 
         if (!res.ok) {
           const errText = await res.text()
-          throw new Error(res.status === 429 ? 'Rate limit' : 'API error: ' + errText)
+          const cleanMsg = parseApiErrorMessage(errText, res.status)
+          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+            throw new Error(cleanMsg)
+          }
+          throw new Error(cleanMsg)
         }
 
         const data = await res.json()
@@ -1207,6 +1346,9 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
         return { text }
       } catch (err) {
         lastError = err
+        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
+          throw err
+        }
       }
     }
     throw lastError

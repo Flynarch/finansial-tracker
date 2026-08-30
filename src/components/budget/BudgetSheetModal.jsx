@@ -137,6 +137,7 @@ export default function BudgetSheetModal({
   month,
   initialCategory = '',
   onSaved,
+  onDelete,
 }) {
   const { locale, t } = useTranslation()
   const [sheetError, setSheetError] = useState('')
@@ -370,22 +371,34 @@ export default function BudgetSheetModal({
           />
         </label>
 
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">
-          <Button
-            type="button"
-            className="min-h-[40px] px-4 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-            onClick={onClose}
-          >
-            {t('budget.cancel', 'Batal')}
-          </Button>
-          <Button
-            type="button"
-            onClick={save}
-            className="min-h-[40px] px-5 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-            disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
-          >
-            {t('budget.save', 'Simpan')}
-          </Button>
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border)]/40 mt-1">
+          {editingBudget && onDelete ? (
+            <button
+              type="button"
+              className="min-h-[40px] px-3.5 py-2 text-xs font-bold rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 active:scale-95 transition-all cursor-pointer"
+              onClick={() => onDelete(editingBudget)}
+            >
+              {t('budget.delete', 'Hapus')}
+            </button>
+          ) : <div />}
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              className="min-h-[40px] px-4 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              onClick={onClose}
+            >
+              {t('budget.cancel', 'Batal')}
+            </Button>
+            <Button
+              type="button"
+              onClick={save}
+              className="min-h-[40px] px-5 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
+            >
+              {t('budget.save', 'Simpan')}
+            </Button>
+          </div>
         </div>
       </div>
     </BottomSheet>

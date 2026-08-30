@@ -13,7 +13,7 @@ function Modal({
   showHeader = true,
   showCloseButton = true,
 }) {
-  const { isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { isMounted, isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const { t } = useTranslation()
 
   // Handle escape key
@@ -26,11 +26,11 @@ function Modal({
     return () => window.removeEventListener('keydown', handleEsc)
   }, [isOpen, closeSheet])
 
-  if (!isOpen && !isVisible) return null
+  if (!isMounted || typeof document === 'undefined') return null
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3.5 sm:p-6 bg-black/60 transition-opacity duration-260 ease-out ${
+      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-xs transition-opacity duration-260 ease-out ${
         isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
@@ -43,14 +43,13 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
-        className={`w-full ${maxWidth} max-h-[min(92dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl transform-gpu`}
+        className={`w-full ${maxWidth} max-h-[min(90dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl transform-gpu`}
         style={{
           boxShadow: 'var(--shadow-card)',
           transform: isVisible
-            ? 'scale(1) translate3d(0, 0, 0)'
-            : 'scale(0.94) translate3d(0, 8px, 0)',
-          opacity: isVisible ? 1 : 0,
-          transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out',
+            ? 'translate3d(0, 0, 0)'
+            : 'translate3d(0, 100%, 0)',
+          transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
         }}
         onWheel={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}

@@ -327,6 +327,7 @@ export default function OnboardingFlow() {
         return
       }
       setUsernameError('')
+      setProfileName(trimmed)
       if (editingUsernameFromStep4) {
         setEditingUsernameFromStep4(false)
         goTo(4)
@@ -334,7 +335,7 @@ export default function OnboardingFlow() {
       }
     }
     goTo(Math.min(step + 1, TOTAL_STEPS - 1))
-  }, [step, username, editingUsernameFromStep4, goTo, t])
+  }, [step, username, editingUsernameFromStep4, goTo, setProfileName, t])
 
   const handleBack = useCallback(() => {
     if (step === 1 && editingUsernameFromStep4) {

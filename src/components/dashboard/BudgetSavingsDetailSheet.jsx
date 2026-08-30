@@ -72,7 +72,9 @@ const BudgetParentCategoryItem = memo(function BudgetParentCategoryItem({
           className="flex w-[80%] items-center gap-2 px-3 text-left cursor-pointer"
           onClick={() => onSelectParent(parent.id)}
         >
-          <CategoryIcon icon={resolveExpenseParentIconKey(parent.id)} className="h-4 w-4 shrink-0" />
+          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)]">
+            <CategoryIcon icon={resolveExpenseParentIconKey(parent.id)} className="h-3.5 w-3.5 shrink-0" />
+          </div>
           <span className="min-w-0 flex-1 truncate">{parent?.names?.[lang] || parent?.id || ''}</span>
         </button>
 
@@ -339,7 +341,7 @@ export default function BudgetSavingsDetailSheet({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/65 backdrop-blur-sm cursor-pointer"
+        className="absolute inset-0 bg-black/65 backdrop-blur-xs cursor-pointer"
         onClick={closeSheet}
         aria-label={t('common.close', 'Tutup')}
       />
@@ -519,7 +521,9 @@ export default function BudgetSavingsDetailSheet({
                                   className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-3 text-xs"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <CategoryIcon icon={resolveTransactionIconKey(item.category, 'expense')} className="h-4 w-4 shrink-0 text-amber-500" />
+                                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                                      <CategoryIcon icon={resolveTransactionIconKey(item.category, 'expense')} className="h-4 w-4 shrink-0 text-amber-500" />
+                                    </div>
                                     <span className="font-extrabold text-[var(--fg)] truncate">{formatExpenseCategory(item.category, locale)}</span>
                                   </div>
                                   <span className="font-black tabular-nums text-amber-600 dark:text-amber-400 shrink-0">
@@ -547,7 +551,9 @@ export default function BudgetSavingsDetailSheet({
                                 className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
                               >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <CategoryIcon icon={resolveTransactionIconKey(row.category, 'expense')} className={`h-4 w-4 shrink-0 ${getCategoryColorClass(row.category)}`} />
+                                  <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${getCategoryColorClass(row.category)}`}>
+                                    <CategoryIcon icon={resolveTransactionIconKey(row.category, 'expense')} className="h-4 w-4 shrink-0" />
+                                  </div>
                                   <div className="min-w-0 flex-1">
                                     <p className="font-bold text-[var(--fg)] truncate text-xs">{formatExpenseCategory(row.category, locale)}</p>
                                     <p className="text-[10.5px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
@@ -651,7 +657,7 @@ export default function BudgetSavingsDetailSheet({
                                 className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
                               >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25">
+                                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/25">
                                     <Target className="h-4 w-4" />
                                   </div>
                                   <div className="min-w-0 flex-1">

@@ -68,8 +68,6 @@ export default function Dashboard() {
     comparePrevious,
     setComparePrevious,
     comparisonSummary,
-    showDetailedAnalytics,
-    setShowDetailedAnalytics,
     zoomTooltipDismissed,
     setZoomTooltipDismissed,
     computeRevenueValue,
@@ -115,21 +113,10 @@ export default function Dashboard() {
       setZoomRevenueRange(miniRevenueRange)
     }
     setZoomedChart(type)
-  }, [miniRevenueRange, setZoomRevenueRange])
-
-  useEffect(() => {
-    if (!zoomedChart) return undefined
-    let rId2
-    const rId1 = window.requestAnimationFrame(() => {
-      rId2 = window.requestAnimationFrame(() => {
-        setZoomVisible(true)
-      })
+    window.requestAnimationFrame(() => {
+      setZoomVisible(true)
     })
-    return () => {
-      window.cancelAnimationFrame(rId1)
-      if (rId2) window.cancelAnimationFrame(rId2)
-    }
-  }, [zoomedChart])
+  }, [miniRevenueRange, setZoomRevenueRange])
 
   useEffect(() => {
     if (!zoomedChart || typeof document === 'undefined') return undefined
@@ -282,8 +269,6 @@ export default function Dashboard() {
           zoomRevenueAxisTicks={zoomRevenueAxisTicks}
           formatAxisCurrency={formatAxisCurrency}
           rangedSummaryStats={rangedSummaryStats}
-          showDetailedAnalytics={showDetailedAnalytics}
-          setShowDetailedAnalytics={setShowDetailedAnalytics}
           zoomPeakAndFloor={zoomPeakAndFloor}
           assetBreakdownData={assetBreakdownData}
           zoomTooltipDismissed={zoomTooltipDismissed}

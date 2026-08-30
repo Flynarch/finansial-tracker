@@ -208,7 +208,9 @@ function ChangePhotoContent({
             </p>
             <p className="text-[10.5px] font-medium text-[var(--muted)] leading-tight">
               {previewPhoto
-                ? t('profile.photoCustomActive', 'Foto kustom aktif')
+                ? PRESET_AVATARS.some((p) => p.dataUrl === previewPhoto)
+                  ? `Persona ${PRESET_AVATARS.find((p) => p.dataUrl === previewPhoto)?.label.replace('Persona ', '')}`
+                  : t('profile.photoCustomActive', 'Foto kustom aktif')
                 : t('profile.photoDefaultInitials', 'Inisial nama (default)')}
             </p>
           </div>
@@ -324,13 +326,16 @@ function ChangePhotoContent({
 export default function ChangePhotoModal({
   isOpen,
   onClose,
-  currentPhoto = '',
+  currentPhoto: propCurrentPhoto,
   onSavePhoto,
   zIndex = 'z-50',
 }) {
   const { t } = useTranslation()
   const profileName = useSettingsStore((s) => s.profileName)
+  const storeProfilePhoto = useSettingsStore((s) => s.profilePhoto)
   const setProfilePhoto = useSettingsStore((s) => s.setProfilePhoto)
+
+  const effectivePhoto = propCurrentPhoto !== undefined ? propCurrentPhoto : (storeProfilePhoto || '')
 
   return (
     <Modal
@@ -342,8 +347,8 @@ export default function ChangePhotoModal({
     >
       {isOpen ? (
         <ChangePhotoContent
-          key={currentPhoto || 'default'}
-          currentPhoto={currentPhoto}
+          key={effectivePhoto || 'default'}
+          currentPhoto={effectivePhoto}
           profileName={profileName}
           onSavePhoto={onSavePhoto}
           setProfilePhoto={setProfilePhoto}

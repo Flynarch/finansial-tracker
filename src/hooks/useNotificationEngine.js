@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { db } from '../lib/db'
 import { format } from 'date-fns'
+import useSettingsStore from '../store/useSettingsStore'
 
 export default function useNotificationEngine() {
   const todos = useLiveQuery(() => db.todos.where('completed').equals(0).toArray())
@@ -9,14 +12,16 @@ export default function useNotificationEngine() {
   const intervalRef = useRef(null)
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
     }
 
     const checkReminders = async () => {
       const now = new Date()
       const currentTimeStr = format(now, 'HH:mm')
       const todayStr = format(now, 'yyyy-MM-dd')
+      const locale = useSettingsStore.getState().locale || 'id'
+      const isEn = locale === 'en'
 
       if (todos) {
         for (const todo of todos) {
@@ -26,18 +31,34 @@ export default function useNotificationEngine() {
               .toArray()
             
             if (existing.length === 0) {
+              const title = isEn ? 'Task Reminder' : 'Pengingat Tugas'
+              const message = isEn ? `Time for: ${todo.title}` : `Waktunya untuk: ${todo.title}`
+
               await db.notifications.add({
                 type: 'todo',
-                title: 'Pengingat Tugas',
-                message: `Waktunya untuk: ${todo.title}`,
+                title,
+                message,
                 read: false,
                 relatedId: `todo_${todo.id}`,
                 createdAt: now.toISOString()
               })
 
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Pengingat Tugas', {
-                  body: `Waktunya untuk: ${todo.title}`
+              if (Capacitor.isNativePlatform()) {
+                await LocalNotifications.schedule({
+                  notifications: [
+                    {
+                      id: Number(todo.id) ? Number(todo.id) + 88000 : Math.floor(Math.random() * 10000) + 88000,
+                      title: `FinTrack • ${title}`,
+                      body: message,
+                      extra: { route: `/todos/${todo.id}` },
+                      schedule: { at: new Date(Date.now() + 500) },
+                      smallIcon: 'ic_stat_icon_config_sample',
+                    }
+                  ]
+                }).catch(() => {})
+              } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, {
+                  body: message
                 })
               }
             }
@@ -55,18 +76,34 @@ export default function useNotificationEngine() {
                 .toArray()
                 
               if (existing.length === 0) {
+                const title = isEn ? 'Habit Reminder' : 'Pengingat Habit'
+                const message = isEn ? `Don't forget: ${habit.title}` : `Jangan lupa untuk: ${habit.title}`
+
                 await db.notifications.add({
                   type: 'habit',
-                  title: 'Pengingat Habit',
-                  message: `Jangan lupa untuk: ${habit.title}`,
+                  title,
+                  message,
                   read: false,
                   relatedId: `habit_${habit.id}`,
                   createdAt: now.toISOString()
                 })
   
-                if ('Notification' in window && Notification.permission === 'granted') {
-                  new Notification('Pengingat Habit', {
-                    body: `Jangan lupa untuk: ${habit.title}`
+                if (Capacitor.isNativePlatform()) {
+                  await LocalNotifications.schedule({
+                    notifications: [
+                      {
+                        id: Number(habit.id) ? Number(habit.id) + 77000 : Math.floor(Math.random() * 10000) + 77000,
+                        title: `FinTrack • ${title}`,
+                        body: message,
+                        extra: { route: '/todos' },
+                        schedule: { at: new Date(Date.now() + 500) },
+                        smallIcon: 'ic_stat_icon_config_sample',
+                      }
+                    ]
+                  }).catch(() => {})
+                } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                  new Notification(title, {
+                    body: message
                   })
                 }
               }

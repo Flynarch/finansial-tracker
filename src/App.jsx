@@ -27,12 +27,14 @@ const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
 const AddAccountPage = lazy(() => import('./pages/AddAccountPage'))
 const WalletDetailPage = lazy(() => import('./pages/WalletDetailPage'))
 const TodoDetailPage = lazy(() => import('./pages/TodoDetailPage'))
+const AiFinanceChat = lazy(() => import('./pages/AiFinanceChat'))
 
 function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
+          <Route path="/loading" element={<LoadingScreen isPreview />} />
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -50,6 +52,9 @@ function App() {
             <Route path="/wallet/add" element={<Navigate to="/add-account" replace />} />
             <Route path="/wallet/:id" element={<WalletDetailPage />} />
             <Route path="/todos/:id" element={<TodoDetailPage />} />
+            <Route path="/ai-chat" element={<AiFinanceChat />} />
+            <Route path="/chat" element={<Navigate to="/ai-chat" replace />} />
+            <Route path="/ai-finance" element={<Navigate to="/ai-chat" replace />} />
             <Route path="/settings" element={<SettingsLayout />}>
               <Route index element={<SettingsHome />} />
               <Route path="security" element={<SettingsSecurity />} />

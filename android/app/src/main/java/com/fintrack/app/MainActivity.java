@@ -11,6 +11,8 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         
         try {
+            WebView.setWebContentsDebuggingEnabled(true);
+            
             WebView webView = this.bridge.getWebView();
             if (webView != null) {
                 // Force GPU Hardware layer for 60fps smooth rendering

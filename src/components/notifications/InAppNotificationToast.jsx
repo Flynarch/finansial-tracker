@@ -103,7 +103,7 @@ export default function InAppNotificationToast() {
 
   return createPortal(
     <div
-      className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm transition-all duration-350 ease-out transform-gpu pointer-events-auto ${
+      className={`fixed top-[max(1.25rem,calc(env(safe-area-inset-top)+0.75rem))] left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm transition-all duration-350 ease-out transform-gpu pointer-events-auto ${
         isVisible
           ? 'translate-y-0 opacity-100 scale-100'
           : '-translate-y-10 opacity-0 scale-95 pointer-events-none'

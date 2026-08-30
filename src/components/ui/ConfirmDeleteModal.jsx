@@ -22,7 +22,7 @@ export default function ConfirmDeleteModal({
   const textCancel = cancelText || t('common.cancel')
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} zIndex="z-[60]">
       <div className="space-y-4 pt-1">
         <div className="flex gap-3 items-start p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-500">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-rose-500" />
@@ -34,7 +34,8 @@ export default function ConfirmDeleteModal({
         <div className="flex gap-2 pt-2">
           <Button
             type="button"
-            className="flex-1 bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] hover:bg-[var(--field-border)]"
+            variant="secondary"
+            className="flex-1 font-bold"
             onClick={onClose}
             disabled={isLoading}
           >

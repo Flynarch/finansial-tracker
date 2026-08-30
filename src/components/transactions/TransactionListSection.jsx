@@ -99,8 +99,11 @@ export const TransactionListSection = memo(function TransactionListSection({
 
   if (filteredTransactions.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6">
-        <EmptyState title={t('tx.emptyTitle')} description={t('tx.emptyDesc')} />
+      <div className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-6 shadow-xs my-auto">
+        <EmptyState
+          title={t('tx.emptyTitle', 'Belum Ada Transaksi')}
+          description={t('tx.emptyDesc', 'Catat pengeluaran atau pemasukan pertamamu untuk mulai memantau arus kas.')}
+        />
       </div>
     )
   }

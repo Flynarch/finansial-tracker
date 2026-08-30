@@ -3,7 +3,7 @@ function Badge({ children, tone = 'neutral' }) {
     neutral: 'border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)]',
     success: 'border ft-income-soft',
     danger: 'border ft-expense-soft',
-    gold: 'border border-amber-500/25 bg-amber-500/12 text-amber-400',
+    gold: 'border border-amber-500/25 bg-amber-500/12 text-amber-600 dark:text-amber-400',
   }
 
   return (

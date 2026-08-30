@@ -8,6 +8,7 @@ const STORAGE_KEY = 'ft_expense_category_custom_v1'
 export const EXPENSE_TREE = [
   {
     id: 'makanan',
+    icon: 'food',
     names: { id: 'Makanan', en: 'Food' },
     children: [
       { id: 'makan_siang', names: { id: 'Makan siang', en: 'Lunch' } },
@@ -21,6 +22,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'tagihan',
+    icon: 'zap',
     names: { id: 'Tagihan & Utilitas', en: 'Bills & Utilities' },
     children: [
       { id: 'listrik', names: { id: 'Listrik', en: 'Electricity' } },
@@ -30,10 +32,11 @@ export const EXPENSE_TREE = [
       { id: 'langganan', names: { id: 'Langganan (Netflix, dll)', en: 'Subscriptions' } },
       { id: 'asuransi', names: { id: 'Asuransi', en: 'Insurance' } },
       { id: 'cicilan', names: { id: 'Cicilan', en: 'Installments' } },
-    ]
+    ],
   },
   {
     id: 'kebutuhan_harian',
+    icon: 'shopping',
     names: { id: 'Kebutuhan Harian', en: 'Daily Needs' },
     children: [
       { id: 'belanja_bulanan', names: { id: 'Belanja Bulanan', en: 'Groceries' } },
@@ -45,6 +48,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'transportasi',
+    icon: 'transport',
     names: { id: 'Transportasi', en: 'Transport' },
     children: [
       { id: 'bensin', names: { id: 'Bensin', en: 'Fuel' } },
@@ -59,6 +63,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'kehidupan_sosial',
+    icon: 'people',
     names: { id: 'Kehidupan Sosial', en: 'Social Life' },
     children: [
       { id: 'kumpul_teman', names: { id: 'Nongkrong', en: 'Hangout' } },
@@ -71,6 +76,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'kultur',
+    icon: 'film',
     names: { id: 'Hiburan', en: 'Entertainment' },
     children: [
       { id: 'bioskop', names: { id: 'Bioskop', en: 'Movies / Cinema' } },
@@ -82,6 +88,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'pakaian',
+    icon: 'clothing',
     names: { id: 'Pakaian & Fashion', en: 'Clothing & Fashion' },
     children: [
       { id: 'baju', names: { id: 'Baju', en: 'Clothes' } },
@@ -92,6 +99,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'kecantikan',
+    icon: 'beauty',
     names: { id: 'Kecantikan & Perawatan', en: 'Beauty & Care' },
     children: [
       { id: 'skincare', names: { id: 'Skincare', en: 'Skincare' } },
@@ -102,6 +110,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'pendidikan',
+    icon: 'education',
     names: { id: 'Pendidikan', en: 'Education' },
     children: [
       { id: 'sekolah', names: { id: 'Sekolah / Kuliah', en: 'School / College' } },
@@ -112,6 +121,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'kesehatan',
+    icon: 'health',
     names: { id: 'Kesehatan', en: 'Health' },
     children: [
       { id: 'dokter', names: { id: 'Dokter', en: 'Doctor' } },
@@ -123,6 +133,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'investasi_pengeluaran',
+    icon: 'investment',
     names: { id: 'Investasi', en: 'Investment' },
     children: [
       { id: 'emas', names: { id: 'Emas', en: 'Gold' } },
@@ -135,6 +146,7 @@ export const EXPENSE_TREE = [
   },
   {
     id: 'lainnya_kategori',
+    icon: 'other',
     names: { id: 'Lainnya', en: 'Other' },
     children: [
       { id: 'umum', names: { id: 'Umum', en: 'General' } },
@@ -160,11 +172,11 @@ if (typeof window !== 'undefined') {
 
 function loadCustom() {
   if (cachedCustom !== null) return cachedCustom
-  if (typeof localStorage === 'undefined') return { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+  if (typeof localStorage === 'undefined') return { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+      cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
       return cachedCustom
     }
     const data = JSON.parse(raw)
@@ -174,10 +186,11 @@ function loadCustom() {
       colors: data.colors && typeof data.colors === 'object' ? data.colors : {},
       parents: Array.isArray(data.parents) ? data.parents : [],
       names: data.names && typeof data.names === 'object' ? data.names : {},
+      icons: data.icons && typeof data.icons === 'object' ? data.icons : {},
     }
     return cachedCustom
   } catch {
-    cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+    cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
     return cachedCustom
   }
 }
@@ -203,14 +216,32 @@ export function resetExpenseCategoryCustomizations() {
   notifyExpenseCategoryCustomChanged()
 }
 
+const DEFAULT_EXPENSE_COLORS = {
+  makanan: 'amber',
+  tagihan: 'sky',
+  kebutuhan_harian: 'emerald',
+  transportasi: 'indigo',
+  kehidupan_sosial: 'purple',
+  kultur: 'rose',
+  pakaian: 'teal',
+  kecantikan: 'rose',
+  pendidikan: 'indigo',
+  kesehatan: 'emerald',
+  investasi_pengeluaran: 'sky',
+  lainnya_kategori: 'slate',
+}
+
 /** Merged tree: defaults minus hidden subs, plus user-added subs per parent, custom parents, custom names & colors. */
 export function getMergedExpenseTree() {
-  const { hidden = {}, extras = {}, colors = {}, parents = [], names = {} } = loadCustom()
+  const { hidden = {}, extras = {}, colors = {}, parents = [], names = {}, icons = {} } = loadCustom()
   const baseTree = [...EXPENSE_TREE, ...parents]
   return baseTree
     .filter((parent) => parent.id !== 'investasi_pengeluaran')
     .map((parent) => {
       const parentName = names[parent.id] || parent.names
+      const parentIcon = icons[parent.id] || parent.icon || null
+      const defaultColor = DEFAULT_EXPENSE_COLORS[parent.id] || 'sky'
+      const parentColor = colors[parent.id] || defaultColor
       const children = [
         ...(parent.children || []).filter((c) => !(hidden[parent.id] || []).includes(c.id)),
         ...(extras[parent.id] || []),
@@ -219,13 +250,14 @@ export function getMergedExpenseTree() {
         return {
           ...child,
           names: childName,
-          color: colors[`${parent.id}/${child.id}`] || colors[parent.id] || null,
+          color: colors[`${parent.id}/${child.id}`] || parentColor,
         }
       })
       return {
         ...parent,
         names: parentName,
-        color: colors[parent.id] || null,
+        color: parentColor,
+        icon: parentIcon,
         children,
       }
     })
@@ -236,7 +268,7 @@ export function getExpenseCategoryColor(categoryId) {
   const custom = loadCustom()
   if (custom.colors[categoryId]) return custom.colors[categoryId]
   const [pid] = String(categoryId).split('/')
-  return custom.colors[pid] || null
+  return custom.colors[pid] || DEFAULT_EXPENSE_COLORS[pid] || null
 }
 
 export function setExpenseCategoryColor(categoryId, colorKey) {
@@ -246,6 +278,25 @@ export function setExpenseCategoryColor(categoryId, colorKey) {
     delete custom.colors[categoryId]
   } else {
     custom.colors[categoryId] = colorKey
+  }
+  saveCustom(custom)
+}
+
+export function getExpenseCategoryIcon(categoryId) {
+  if (!categoryId) return null
+  const custom = loadCustom()
+  if (custom.icons[categoryId]) return custom.icons[categoryId]
+  const [pid] = String(categoryId).split('/')
+  return custom.icons[pid] || null
+}
+
+export function setExpenseCategoryIcon(categoryId, iconKey) {
+  if (!categoryId) return
+  const custom = loadCustom()
+  if (!iconKey) {
+    delete custom.icons[categoryId]
+  } else {
+    custom.icons[categoryId] = iconKey
   }
   saveCustom(custom)
 }
@@ -260,7 +311,7 @@ export function updateExpenseCategoryName(parentId, childId, nameId, nameEn) {
   saveCustom(custom)
 }
 
-export function addExpenseParentCategory(nameId, nameEn, colorKey) {
+export function addExpenseParentCategory(nameId, nameEn, colorKey, iconKey) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
@@ -268,6 +319,7 @@ export function addExpenseParentCategory(nameId, nameEn, colorKey) {
   const id = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   custom.parents.push({ id, names: { id: trimmed, en }, children: [] })
   if (colorKey) custom.colors[id] = colorKey
+  if (iconKey) custom.icons[id] = iconKey
   saveCustom(custom)
   return id
 }

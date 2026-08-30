@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import useBottomSheet from '../hooks/useBottomSheet'
 import useBackButton from '../hooks/useBackButton'
 import BottomSheet from '../components/ui/BottomSheet'
 import EmptyState from '../components/ui/EmptyState'
@@ -19,13 +18,11 @@ import {
   toSafeNumber,
 } from '../lib/utils'
 import {
-  ChevronLeft,
+  ArrowLeft,
   Plus,
   Minus,
   History,
   Sparkles,
-  X,
-  Loader2,
   Lightbulb,
   Clock,
   CheckCircle2,
@@ -73,7 +70,9 @@ export default function SavingsDetail() {
     }
   }, [goalId])
 
-  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const openSheet = useCallback(() => setSheetOpen(true), [])
+  const closeSheet = useCallback(() => setSheetOpen(false), [])
   const [amountInput, setAmountInput] = useState('')
   const [dateInput, setDateInput] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notesInput, setNotesInput] = useState('')
@@ -91,7 +90,6 @@ export default function SavingsDetail() {
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false)
 
   useBackButton(() => setIsCelebrationModalOpen(false), Boolean(isCelebrationModalOpen))
-  useBackButton(() => setIsAiModalOpen(false), Boolean(isAiModalOpen))
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -256,10 +254,10 @@ export default function SavingsDetail() {
         const cleanJson = predictionRaw.replace(/```json/g, '').replace(/```/g, '').trim()
         setAiPrediction(JSON.parse(cleanJson))
       } catch {
-        setAiPrediction({ error: true, text: predictionRaw })
+        setAiPrediction({ error: true, text: predictionRaw || t('savings.aiError', 'Gagal memproses prediksi AI.') })
       }
     } catch (error) {
-      setAiPrediction({ error: true, text: 'Gagal mendapatkan prediksi AI: ' + error.message })
+      setAiPrediction({ error: true, text: error.message || t('savings.aiError', 'Gagal mendapatkan prediksi AI.') })
     } finally {
       setIsAiLoading(false)
     }
@@ -325,62 +323,60 @@ export default function SavingsDetail() {
   const currency = goal.currency || defaultCurrency
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--bg)] pb-28">
+    <div className="ft-page-enter min-h-[100dvh] bg-[var(--bg)] pb-28">
       {/* ── Top Header ── */}
-      <div className="flex items-center justify-between gap-3 pt-3 px-4 mb-4">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-colors cursor-pointer"
-            aria-label={t('common.back', 'Kembali')}
-          >
-            <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
-          </button>
-          <div className="min-w-0">
-            <h2 className="text-xl font-black tracking-tight text-[var(--fg)] truncate">{goal.name}</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-[var(--muted)]">
-                {goal.deadline ? `${t('savings.targetDatePrefix', 'Target')}: ${format(new Date(goal.deadline), 'dd MMM yyyy')}` : t('savings.noDeadline', 'Tanpa batas waktu')}
-              </span>
-              {daysLeft !== null && (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${
-                    isOverdue
-                      ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25'
-                      : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
-                  }`}
-                >
-                  <Clock className="h-2.5 w-2.5" />
-                  {deadlineText}
+      <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-3.5 sm:px-5">
+        <div className="mx-auto max-w-3xl py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
+              aria-label={t('common.back', 'Kembali')}
+            >
+              <ArrowLeft className="h-4.5 w-4.5" />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-xl font-black tracking-tight text-[var(--fg)] truncate">{goal.name}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-[var(--muted)]">
+                  {goal.deadline ? `${t('savings.targetDatePrefix', 'Target')}: ${format(new Date(goal.deadline), 'dd MMM yyyy')}` : t('savings.noDeadline', 'Tanpa batas waktu')}
                 </span>
-              )}
+                {daysLeft !== null && (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${
+                      isOverdue
+                        ? 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25'
+                        : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+                    }`}
+                  >
+                    <Clock className="h-2.5 w-2.5" />
+                    {deadlineText}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Pin Button */}
-          <button
-            type="button"
-            onClick={togglePin}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors cursor-pointer ${
-              goal.isPinned
-                ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
-            }`}
-            title={goal.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
-          >
-            <Star className="h-4 w-4" fill={goal.isPinned ? 'currentColor' : 'none'} />
-          </button>
-
-          <span className="rounded-full bg-[var(--earthy-green-soft)] border border-[var(--earthy-green)]/25 px-3 py-1 text-xs font-black text-[var(--earthy-green)] tabular-nums shadow-2xs">
-            {Math.round(pct)}%
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Pin Button */}
+            <button
+              type="button"
+              onClick={togglePin}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer active:scale-95 ${
+                goal.isPinned
+                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                  : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
+              }`}
+              title={goal.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
+            >
+              <Star className="h-4 w-4" fill={goal.isPinned ? 'currentColor' : 'none'} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4 px-4 ft-stagger-in">
+      <div className="mx-auto max-w-3xl space-y-4 px-3.5 pt-1 sm:px-5 ft-stagger-in">
         {/* ── CELEBRATION BANNER (If 100% or Completed) ── */}
         {isTargetComplete && (
           <div className="rounded-3xl border border-[var(--earthy-green)]/40 bg-[var(--earthy-green-soft)] p-4 text-[var(--earthy-green)] shadow-sm space-y-3">
@@ -413,37 +409,54 @@ export default function SavingsDetail() {
           </div>
         )}
 
-        {/* ── Compact & Aesthetic Hero Card ── */}
-        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-[var(--shadow-card)] space-y-4">
-          <div className="relative z-10 space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5 text-[var(--earthy-green)]" />
-              {t('savings.collectedSavings', 'Saldo Tabungan Terkumpul')}
-            </span>
-            <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-              {formatCurrency(current, currency)}
-            </p>
-            <p className="text-xs font-bold text-[var(--muted)] tabular-nums">
-              {t('savings.ofTarget', 'dari target')} <span className="text-[var(--fg)] font-black">{formatCurrency(target, currency)}</span>
-            </p>
+        {/* ── Spacious & Aesthetic Hero Card ── */}
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-4">
+          <div className="relative z-10 space-y-3">
+            {/* Top Row: Title + % badge */}
+            <div className="flex items-center justify-between gap-2 -mt-0.5">
+              <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+                <Target className="h-4 w-4 text-[var(--earthy-green)]" />
+                {t('savings.collectedSavings', 'Saldo Tabungan Terkumpul')}
+              </span>
+              <span className="rounded-full bg-[var(--earthy-green-soft)] border border-[var(--earthy-green)]/25 px-2.5 py-0.5 text-xs font-black text-[var(--earthy-green)] tabular-nums shadow-2xs">
+                {Math.round(pct)}%
+              </span>
+            </div>
+
+            {/* Middle Row: Inline Big Amount + Target */}
+            <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
+              <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
+                {formatCurrency(current, currency)}
+              </p>
+              <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
+                / {formatCurrency(target, currency)}
+              </span>
+            </div>
+
+            {/* Sub-row with clean divider */}
+            <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-xs font-bold tabular-nums">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[var(--muted)]">{t('savings.remainingShort', 'Sisa')}:</span>
+                <span className="font-black text-[var(--fg)]">{formatCurrency(remaining, currency)}</span>
+              </div>
+              <span className="text-[var(--earthy-green)] font-black">
+                {Math.round(pct)}% {t('savings.reached', 'Tercapai')}
+              </span>
+            </div>
           </div>
 
           {/* Clean Progress Bar */}
-          <div className="relative z-10 space-y-1.5">
-            <div className="h-3 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative">
+          <div className="relative z-10 pt-1">
+            <div className="h-2.5 w-full rounded-full bg-[var(--field-bg)] border border-[var(--border)]/40 overflow-hidden relative">
               <div
                 className="h-full rounded-full bg-[var(--earthy-green)] transition-all duration-700 ease-out"
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <div className="flex justify-between items-center text-xs font-bold text-[var(--muted)] tabular-nums">
-              <span>{t('savings.remainingShort', 'Sisa')}: <strong className="text-[var(--fg)]">{formatCurrency(remaining, currency)}</strong></span>
-              <span className="text-[var(--earthy-green)] font-black">{Math.round(pct)}% {t('savings.reached', 'Tercapai')}</span>
-            </div>
           </div>
         </div>
 
-        {/* ── Dual Action Buttons: Setor & Tarik ── */}
+        {/* ── Dual Action Buttons: Setor & Tarik (Clean & Modern Style) ── */}
         {!goal.isCompleted && (
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -455,10 +468,10 @@ export default function SavingsDetail() {
                 setNotesInput('')
                 openSheet()
               }}
-              className="flex items-center justify-center gap-2 bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)] text-white font-black py-3.5 px-4 rounded-2xl shadow-md transition active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--status-income)]/30 bg-[var(--status-income-soft)] py-2.5 px-4 text-xs font-black text-[var(--status-income)] hover:bg-[var(--status-income)]/20 transition active:scale-95 cursor-pointer shadow-2xs"
             >
-              <Plus size={16} strokeWidth={3} />
-              {t('savings.depositAction', 'Setor (Tambah)')}
+              <Plus className="h-4 w-4" strokeWidth={2.8} />
+              <span>{t('savings.deposit', 'Setor')}</span>
             </button>
 
             <button
@@ -470,10 +483,10 @@ export default function SavingsDetail() {
                 setNotesInput('')
                 openSheet()
               }}
-              className="flex items-center justify-center gap-2 bg-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-dark)] text-white font-black py-3.5 px-4 rounded-2xl shadow-md transition active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-4 text-xs font-black text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer shadow-2xs"
             >
-              <Minus size={16} strokeWidth={3} />
-              {t('savings.withdrawAction', 'Tarik (Kurangi)')}
+              <Minus className="h-4 w-4" strokeWidth={2.8} />
+              <span>{t('savings.withdraw', 'Tarik')}</span>
             </button>
           </div>
         )}
@@ -504,7 +517,7 @@ export default function SavingsDetail() {
           {!logs || logs.length === 0 ? (
             <EmptyState
               title={t('savings.emptyLogsTitle', 'Belum Ada Riwayat')}
-              description={t('savings.emptyLogsDesc', 'Tekan "Setor (Tambah)" untuk mulai menabung ke pos tabungan ini.')}
+              description={t('savings.emptyLogsDesc', 'Tekan "Setor" untuk mulai menabung ke pos tabungan ini.')}
             />
           ) : (
             <div className="space-y-4">
@@ -586,37 +599,56 @@ export default function SavingsDetail() {
       {/* ── Add/Withdraw Funds Bottom Sheet ── */}
       <BottomSheet isOpen={sheetOpen} onClose={closeSheet} showCloseButton={false}>
         <div className="space-y-4 pt-1">
-          {/* Tab Setor vs Tarik */}
-          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+          {/* Tab Setor vs Tarik (Animated Sliding Segment) */}
+          <div className="relative grid grid-cols-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1 select-none overflow-hidden">
+            {/* Sliding Pill Indicator */}
+            <div
+              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-out shadow-sm ${
+                fundActionType === 'withdraw'
+                  ? 'left-[calc(50%+2px)] bg-[var(--earthy-terra)]'
+                  : 'left-1 bg-[var(--earthy-green)]'
+              }`}
+            />
+
             <button
               type="button"
               onClick={() => setFundActionType('add')}
-              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
+              className={`relative z-10 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-colors duration-200 cursor-pointer ${
                 fundActionType === 'add'
-                  ? 'bg-[var(--earthy-green)] text-white shadow-xs scale-[1.01]'
+                  ? 'text-white'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
               }`}
             >
               <Plus size={14} strokeWidth={3} />
-              Setor (Tambah)
+              {t('savings.deposit', 'Setor')}
             </button>
             <button
               type="button"
               onClick={() => setFundActionType('withdraw')}
-              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
+              className={`relative z-10 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-colors duration-200 cursor-pointer ${
                 fundActionType === 'withdraw'
-                  ? 'bg-[var(--earthy-terra)] text-white shadow-xs scale-[1.01]'
+                  ? 'text-white'
                   : 'text-[var(--muted)] hover:text-[var(--fg)]'
               }`}
             >
               <Minus size={14} strokeWidth={3} />
-              Tarik (Kurangi)
+              {t('savings.withdraw', 'Tarik')}
             </button>
           </div>
 
-          {/* Amount Input */}
-          <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] mb-1">
+          {/* Amount Input with Subtle Dynamic Glowlight */}
+          <div
+            className={`relative rounded-2xl border p-4 text-center transition-all duration-300 ${
+              fundActionType === 'withdraw'
+                ? 'border-rose-500/40 bg-[color-mix(in_srgb,var(--earthy-terra)_6%,var(--field-bg))] shadow-[0_0_20px_-4px_rgba(244,63,94,0.22)]'
+                : 'border-emerald-500/40 bg-[color-mix(in_srgb,var(--earthy-green)_6%,var(--field-bg))] shadow-[0_0_20px_-4px_rgba(16,185,129,0.22)]'
+            }`}
+          >
+            <p
+              className={`text-[10px] font-extrabold uppercase tracking-wider mb-1 transition-colors duration-300 ${
+                fundActionType === 'withdraw' ? 'text-[var(--earthy-terra)]' : 'text-[var(--earthy-green)]'
+              }`}
+            >
               {fundActionType === 'withdraw' ? 'Jumlah Penarikan' : 'Jumlah Setoran'}
             </p>
             <input
@@ -805,88 +837,144 @@ export default function SavingsDetail() {
         </div>
       )}
 
-      {/* ── AI Prediction Modal ── */}
-      {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm ft-motion-overlay pt-16 sm:pt-4">
-          <div className="w-full max-w-lg bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-[var(--accent)]" />
-                <h3 className="font-bold text-[var(--fg)] text-base">Prediksi AI</h3>
-              </div>
-              <button
-                onClick={() => setIsAiModalOpen(false)}
-                className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--field-bg)] hover:text-[var(--fg)] transition cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      {/* ── AI Prediction Bottom Sheet ── */}
+      <BottomSheet
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        title={
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <div className="flex-1 overflow-y-auto p-5 ft-hide-scrollbar text-sm leading-relaxed text-[var(--fg)]">
-              {isAiLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-[var(--accent)]">
-                  <Loader2 className="h-8 w-8 animate-spin mb-3" />
-                  <p className="font-medium animate-pulse">AI sedang menghitung prediksi targetmu...</p>
-                </div>
-              ) : aiPrediction && !aiPrediction.error ? (
-                <div className="space-y-5">
-                  <div
-                    className={`p-4 rounded-2xl border ${
-                      aiPrediction.isOnTrack
-                        ? 'text-[var(--earthy-green)] bg-[var(--earthy-green-soft)] border-[var(--earthy-green)]/25'
-                        : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
-                    } flex gap-3 items-start`}
-                  >
-                    {aiPrediction.isOnTrack ? (
-                      <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-[var(--earthy-green)]" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <h4 className="font-bold text-sm uppercase tracking-wider mb-1">
-                        {aiPrediction.isOnTrack ? 'On Track' : 'Butuh Perhatian'}
-                      </h4>
-                      <p className="text-sm font-medium leading-relaxed opacity-90">{aiPrediction.summary}</p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-center">
-                    <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1">
-                      Estimasi Target Tercapai
-                    </p>
-                    <div className="flex items-center justify-center gap-2 text-xl font-black text-[var(--accent)]">
-                      <Clock className="h-5 w-5" />
-                      {aiPrediction.predictedDate}
-                    </div>
-                  </div>
-
-                  {aiPrediction.tips && aiPrediction.tips.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3 px-1 text-[var(--fg)]">
-                        <Lightbulb className="h-4 w-4 text-amber-500" />
-                        <h4 className="font-bold text-sm">Saran Akselerasi</h4>
-                      </div>
-                      <ul className="space-y-2">
-                        {aiPrediction.tips.map((tip, idx) => (
-                          <li key={idx} className="flex gap-3 bg-[var(--panel)] border border-[var(--border)] p-3 rounded-xl items-start">
-                            <span className="flex shrink-0 items-center justify-center h-5 w-5 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] text-xs font-bold mt-0.5">
-                              {idx + 1}
-                            </span>
-                            <span className="text-sm text-[var(--fg)] leading-relaxed">{tip}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-[var(--earthy-terra)] text-center py-6">
-                  {aiPrediction?.text || 'Terjadi kesalahan saat mengambil prediksi.'}
-                </div>
-              )}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-black text-[var(--fg)] truncate">
+                {t('savings.aiPredictionTitle', 'Prediksi AI & Tips Akselerasi')}
+              </h3>
+              <p className="text-[10.5px] font-bold text-[var(--muted)] truncate">
+                {goal.name} • {formatCurrency(current, currency)} / {formatCurrency(target, currency)}
+              </p>
             </div>
           </div>
+        }
+        showCloseButton={false}
+        showHandle={true}
+        maxWidth="sm:max-w-xl"
+        maxHeight="max-h-[min(90dvh,48rem)]"
+      >
+        <div className="space-y-4 pt-1 text-[var(--fg)]">
+
+          {isAiLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 text-[var(--accent)] space-y-3">
+              <div className="relative grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
+                <Sparkles className="h-7 w-7 animate-pulse text-[var(--accent)]" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-extrabold text-[var(--fg)]">{t('savings.aiCalculating', 'AI Sedang Menganalisis...')}</p>
+                <p className="text-xs font-medium text-[var(--muted)]">{t('savings.aiCalculatingDesc', 'Menghitung pola tabungan dan proyeksi tanggal pencapaian target.')}</p>
+              </div>
+            </div>
+          ) : aiPrediction && !aiPrediction.error ? (
+            <div className="space-y-3.5">
+              {/* Status Banner */}
+              <div
+                className={`p-4 rounded-2xl border ${
+                  aiPrediction.isOnTrack
+                    ? 'text-[var(--status-income)] bg-[var(--status-income-soft)] border-[var(--status-income)]/25'
+                    : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+                } flex gap-3 items-start`}
+              >
+                {aiPrediction.isOnTrack ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-[var(--status-income)]" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-extrabold text-xs uppercase tracking-wider mb-1">
+                    {aiPrediction.isOnTrack ? 'Target On-Track' : 'Perlu Tambahan Akselerasi'}
+                  </h4>
+                  <p className="text-xs font-semibold leading-relaxed opacity-90 text-[var(--fg)]">
+                    {aiPrediction.summary}
+                  </p>
+                </div>
+              </div>
+
+              {/* Estimation Card */}
+              <div className="p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-center space-y-1">
+                <p className="text-[10px] font-extrabold text-[var(--muted)] uppercase tracking-wider">
+                  {t('savings.predictedDateLabel', 'Estimasi Tanggal Target Tercapai')}
+                </p>
+                <div className="flex items-center justify-center gap-2 text-xl font-black text-[var(--accent)] tabular-nums">
+                  <Clock className="h-5 w-5" />
+                  <span>{aiPrediction.predictedDate}</span>
+                </div>
+              </div>
+
+              {/* Tips Section */}
+              {aiPrediction.tips && aiPrediction.tips.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center gap-1.5 px-1 text-[var(--fg)]">
+                    <Lightbulb className="h-4 w-4 text-amber-500" />
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--muted)]">
+                      {t('savings.accelerationTips', 'Saran & Tips Akselerasi')}
+                    </h4>
+                  </div>
+                  <div className="space-y-2">
+                    {aiPrediction.tips.map((tip, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 bg-[var(--field-bg)] border border-[var(--border)] p-3 rounded-2xl"
+                      >
+                        <span className="flex shrink-0 items-center justify-center h-5 w-5 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)] text-[10px] font-black mt-0.5 border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-[var(--fg)] leading-relaxed flex-1">
+                          {tip}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Action */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="w-full py-3 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] transition active:scale-[0.98] cursor-pointer"
+                >
+                  {t('common.close', 'Tutup')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 space-y-3 px-2">
+              <p className="text-xs font-semibold text-[var(--status-expense)] leading-relaxed">
+                {aiPrediction?.text || t('savings.aiError', 'Terjadi kendala saat memproses prediksi AI.')}
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleGetPrediction}
+                  className="px-4 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer"
+                >
+                  {t('common.retry', 'Coba Lagi')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAiModalOpen(false)
+                    navigate('/settings/ai')
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold shadow-xs hover:opacity-90 transition active:scale-95 cursor-pointer"
+                >
+                  {t('settings.aiIntegration', 'Pengaturan AI')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }

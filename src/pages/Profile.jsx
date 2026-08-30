@@ -147,6 +147,7 @@ function Profile() {
   const nameInputRef = useRef(null)
 
   const profileName = useSettingsStore((s) => s.profileName)
+  const profilePhoto = useSettingsStore((s) => s.profilePhoto)
   const setProfileName = useSettingsStore((s) => s.setProfileName)
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
@@ -200,6 +201,8 @@ function Profile() {
                 aria-label={t('profile.changePhoto')}
               >
                 <UserAvatar
+                  photo={profilePhoto}
+                  name={displayName}
                   size={88}
                   shape="circle"
                   className="w-[88px] h-[88px]"
@@ -225,18 +228,25 @@ function Profile() {
               </button>
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 mb-2 max-w-full">
-              <h1 className="truncate text-center text-xl font-black tracking-tight text-[var(--fg)]">
-                {displayName}
-              </h1>
+            <div className="flex items-center justify-center mb-2 w-full">
               <button
                 type="button"
                 onClick={openEditModal}
-                className="grid h-7 w-7 min-h-[36px] min-w-[36px] place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-90 cursor-pointer shrink-0"
+                className="group/name inline-flex items-center justify-center cursor-pointer max-w-full focus-visible:outline-none"
                 title={t('profile.editName')}
                 aria-label={t('profile.editName')}
               >
-                <Pencil size={13} strokeWidth={2.2} />
+                {/* Symmetrical Left Spacer matching Pencil Icon */}
+                <span className="w-6 h-6 shrink-0 pointer-events-none opacity-0" aria-hidden="true" />
+
+                <h1 className="px-1.5 truncate text-center text-xl font-black tracking-tight text-[var(--fg)] group-hover/name:text-[var(--accent)] transition-colors">
+                  {displayName}
+                </h1>
+
+                {/* Right Pencil Icon */}
+                <span className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] group-hover/name:text-[var(--accent)] group-hover/name:bg-[var(--field-bg)] transition-all shrink-0">
+                  <Pencil size={13} strokeWidth={2.2} />
+                </span>
               </button>
             </div>
 
@@ -352,12 +362,12 @@ function Profile() {
         </div>
       </div>
 
-      {/* ── Edit profile modal ── */}
-      <Modal isOpen={editOpen} title={t('profile.editModal.title')} onClose={() => setEditOpen(false)}>
-        <div className="space-y-4">
+      {/* ── Edit name modal ── */}
+      <Modal isOpen={editOpen} title={t('profile.editName', 'Ubah Nama')} onClose={() => setEditOpen(false)}>
+        <div className="space-y-4 pt-1">
           <div>
-            <label htmlFor="edit-profile-name" className="mb-1.5 block text-[13px] font-medium text-[var(--fg)]">
-              {t('profile.editModal.name')}
+            <label htmlFor="edit-profile-name" className="mb-1.5 block text-[13px] font-semibold text-[var(--fg)]">
+              {t('profile.editModal.name', 'Nama Lengkap')}
             </label>
             <input
               ref={nameInputRef}
@@ -366,32 +376,36 @@ function Profile() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProfile() }}
-              placeholder={t('profile.editModal.namePlaceholder')}
+              placeholder={t('profile.editModal.namePlaceholder', 'Masukkan nama Anda')}
               maxLength={40}
-              className="ft-field mt-0"
+              className="ft-field mt-0 font-medium"
             />
           </div>
-          <div className="flex gap-2.5">
+          <div className="flex gap-2.5 pt-1">
             <button
               type="button"
               onClick={handleSaveProfile}
               className="ft-btn-primary flex-1 py-2.5"
             >
-              {t('profile.editModal.save')}
+              {t('profile.editModal.save', 'Simpan')}
             </button>
             <button
               type="button"
               onClick={() => setEditOpen(false)}
               className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 text-[13px] font-semibold text-[var(--fg)] transition hover:bg-[color-mix(in_srgb,var(--field-bg)_90%,var(--accent))]"
             >
-              {t('profile.editModal.cancel')}
+              {t('profile.editModal.cancel', 'Batal')}
             </button>
           </div>
         </div>
       </Modal>
 
       {/* ── Change Photo Modal ── */}
-      <ChangePhotoModal isOpen={photoModalOpen} onClose={() => setPhotoModalOpen(false)} />
+      <ChangePhotoModal
+        isOpen={photoModalOpen}
+        onClose={() => setPhotoModalOpen(false)}
+        currentPhoto={profilePhoto}
+      />
 
       {/* ── Split Bill Modal ── */}
       <SplitBillModal isOpen={splitBillOpen} onClose={() => setSplitBillOpen(false)} />

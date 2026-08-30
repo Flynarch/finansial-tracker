@@ -10,7 +10,6 @@ import SavingsFundSheetModal from '../components/savings/SavingsFundSheetModal'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
 import {
   clampPercent,
@@ -61,7 +60,9 @@ function Savings() {
       return []
     }
   }, [], [])
-  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const openSheet = useCallback(() => setSheetOpen(true), [])
+  const closeSheet = useCallback(() => setSheetOpen(false), [])
   const [editingId, setEditingId] = useState(null)
   const [deletingGoal, setDeletingGoal] = useState(null)
   const [menuOpenId, setMenuOpenId] = useState(null)
@@ -126,6 +127,36 @@ function Savings() {
     () => processedGoals.filter((g) => g.isArchived).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
     [processedGoals]
   )
+
+  const [seenArchivedIds, setSeenArchivedIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem('fintrack_seen_archived_goal_ids')
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })
+
+  // Calculate unseen archived count
+  const unseenArchivedCount = useMemo(() => {
+    return archivedGoals.filter((g) => !seenArchivedIds.includes(String(g.id))).length
+  }, [archivedGoals, seenArchivedIds])
+
+  const handleOpenArchive = useCallback(() => {
+    if (archivedGoals.length > 0) {
+      const allCurrentArchivedIds = archivedGoals.map((g) => String(g.id))
+      setSeenArchivedIds((prev) => {
+        const merged = Array.from(new Set([...prev, ...allCurrentArchivedIds]))
+        try {
+          localStorage.setItem('fintrack_seen_archived_goal_ids', JSON.stringify(merged))
+        } catch {
+          // ignore
+        }
+        return merged
+      })
+    }
+    setSearchParams({ view: 'archive' })
+  }, [archivedGoals, setSearchParams])
 
   const displayedRows = showArchive ? archivedGoals : activeGoals
 
@@ -209,14 +240,14 @@ function Savings() {
               <>
                 <button
                   type="button"
-                  onClick={() => setSearchParams({ view: 'archive' })}
+                  onClick={handleOpenArchive}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs transition-all active:scale-95 cursor-pointer relative"
                   title={t('savings.openArchive', 'Buka Arsip Tabungan')}
                 >
                   <Archive className="h-4.5 w-4.5" />
-                  {archivedGoals.length > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--status-income)] text-[9px] font-black text-white shadow-2xs">
-                      {archivedGoals.length}
+                  {unseenArchivedCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--status-income)] text-[9px] font-black text-white shadow-2xs animate-fadeIn">
+                      {unseenArchivedCount}
                     </span>
                   )}
                 </button>

@@ -1,29 +1,26 @@
-import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
+﻿import { format, startOfMonth, subMonths } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Plus, TrendingUp, PieChart, Landmark } from 'lucide-react'
 import { db, computeAllWalletBalances } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
+import { aggregateMonthlyIncomeExpense, calculateDailyBurnRate } from '../lib/reportAnalytics'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useSettingsStore from '../store/useSettingsStore'
-import { exportTransactionsToCsv, printFinancialReport } from '../lib/exportReports'
+import { exportTransactionsToCsv } from '../lib/exportReports'
+import { triggerHaptic } from '../lib/haptics'
 
 import ReportHeader from '../components/reports/ReportHeader'
 import ReportKpiCards from '../components/reports/ReportKpiCards'
+import ReportSmartInsights from '../components/reports/ReportSmartInsights'
 import ReportBarChart from '../components/reports/ReportBarChart'
 import ReportDonutSection from '../components/reports/ReportDonutSection'
 import ReportNetWorthChart from '../components/reports/ReportNetWorthChart'
-
-function safeMonthKey(input) {
-  if (!input) return ''
-  try {
-    return format(parseISO(String(input)), 'yyyy-MM')
-  } catch {
-    return ''
-  }
-}
+import ReportStatementModal from '../components/reports/ReportStatementModal'
+import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
 
 export default function Reports() {
   const { t, locale } = useTranslation()
@@ -34,6 +31,8 @@ export default function Reports() {
   const [selectedDrilldownParent, setSelectedDrilldownParent] = useState(null)
   const [selectedWalletFilter, setSelectedWalletFilter] = useState('all')
   const [compactDonut, setCompactDonut] = useState(false)
+  const [isAddTxOpen, setIsAddTxOpen] = useState(false)
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState(false)
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD'))
 
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
@@ -62,8 +61,16 @@ export default function Reports() {
     return () => window.removeEventListener('resize', sync)
   }, [])
 
+  const effectiveMonthsCount = useMemo(() => {
+    if (rangeMonths === 'ytd') {
+      return new Date().getMonth() + 1
+    }
+    return Number(rangeMonths) || 6
+  }, [rangeMonths])
+
   const cutoffDate = useMemo(() => {
-    return format(startOfMonth(subMonths(new Date(), Math.max(rangeMonths, 12))), 'yyyy-MM-dd')
+    const months = typeof rangeMonths === 'number' ? rangeMonths : 12
+    return format(startOfMonth(subMonths(new Date(), Math.max(months, 12))), 'yyyy-MM-dd')
   }, [rangeMonths])
 
   const transactions = useLiveQuery(
@@ -71,8 +78,10 @@ export default function Reports() {
     [cutoffDate],
     []
   )
+  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], [])
   const investments = useLiveQuery(() => db.investments.toArray(), [], [])
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const loans = useLiveQuery(() => db.loans.toArray(), [], [])
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return []
@@ -82,37 +91,32 @@ export default function Reports() {
   }, [transactions, selectedWalletFilter])
 
   const monthlyIncomeExpense = useMemo(() => {
-    const monthMap = new Map()
-    for (let i = rangeMonths - 1; i >= 0; i -= 1) {
-      const month = subMonths(startOfMonth(new Date()), i)
-      const key = format(month, 'yyyy-MM')
-      monthMap.set(key, { month: format(month, 'MMM yy'), income: 0, expense: 0 })
-    }
-
-    filteredTransactions.forEach((tx) => {
-      const key = safeMonthKey(tx?.date)
-      if (!monthMap.has(key)) return
-      const row = monthMap.get(key)
-      let val = toSafeNumber(tx.amount)
-      if (tx.currency && tx.currency !== defaultCurrency && rates) {
-        val = convertCurrency(val, tx.currency, defaultCurrency, rates)
-      }
-      if (tx.type === 'income') row.income += val
-      if (tx.type === 'expense') row.expense += val
-    })
-    return [...monthMap.values()]
-  }, [rangeMonths, filteredTransactions, defaultCurrency, rates])
-
-  const loans = useLiveQuery(() => db.loans.toArray(), [], [])
+    return aggregateMonthlyIncomeExpense(
+      filteredTransactions,
+      effectiveMonthsCount,
+      defaultCurrency,
+      rates
+    )
+  }, [filteredTransactions, effectiveMonthsCount, defaultCurrency, rates])
 
   const netLoanPosition = useMemo(() => {
-    const active = (loans || []).filter((l) => l.status !== 'paid' && l.status !== 'forgiven' && toSafeNumber(l.remainingAmount ?? l.totalAmount) > 0)
+    const active = (loans || []).filter(
+      (l) => l.status !== 'paid' && l.status !== 'forgiven' && toSafeNumber(l.remainingAmount ?? l.totalAmount) > 0
+    )
     const debt = active
       .filter((l) => l.type === 'debt')
-      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
+      .reduce(
+        (s, l) =>
+          s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates),
+        0
+      )
     const rec = active
       .filter((l) => l.type === 'receivable')
-      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
+      .reduce(
+        (s, l) =>
+          s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount), l.currency || defaultCurrency, defaultCurrency, rates),
+        0
+      )
     return rec - debt
   }, [loans, defaultCurrency, rates])
 
@@ -120,9 +124,10 @@ export default function Reports() {
     const categoryMap = new Map()
     filteredTransactions.forEach((tx) => {
       if (tx.type !== 'expense') return
-      const itemsToProcess = tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0
-        ? tx.splitItems.map((si) => ({ category: si.category, amount: si.amount }))
-        : [{ category: tx.category, amount: tx.amount }]
+      const itemsToProcess =
+        tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0
+          ? tx.splitItems.map((si) => ({ category: si.category, amount: si.amount }))
+          : [{ category: tx.category, amount: tx.amount }]
 
       itemsToProcess.forEach((item) => {
         const parsed = parseExpenseCategoryPath(item.category)
@@ -140,7 +145,9 @@ export default function Reports() {
           const itemParent = parsed?.parentId || item.category || 'lainnya'
           if (itemParent !== selectedDrilldownParent) return
           key = parsed?.childId || 'utama'
-          label = parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] || (locale === 'en' ? 'Main / General' : 'Utama / Umum')
+          label =
+            parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] ||
+            (locale === 'en' ? 'Main / General' : 'Utama / Umum')
           isParent = false
           parentId = selectedDrilldownParent
         }
@@ -178,50 +185,66 @@ export default function Reports() {
       .sort((a, b) => b.value - a.value)
   }, [locale, filteredTransactions, defaultCurrency, rates])
 
-  const netWorthTrend = useMemo(() => {
-    const computedWallets = computeAllWalletBalances(wallets || [], transactions || [], rates)
-    const totalCash = computedWallets.reduce((sum, w) => {
+  const computedWallets = useMemo(
+    () => computeAllWalletBalances(wallets || [], allTransactionsForBalance || [], rates),
+    [wallets, allTransactionsForBalance, rates]
+  )
+
+  const totalCash = useMemo(() => {
+    return computedWallets.reduce((sum, w) => {
       return (
         sum +
         convertCurrency(
           toSafeNumber(w.currentBalance),
           w.currency || defaultCurrency,
           defaultCurrency,
-          rates,
+          rates
         )
       )
     }, 0)
-    const investmentValue = (investments || []).reduce(
+  }, [computedWallets, defaultCurrency, rates])
+
+  const investmentValue = useMemo(() => {
+    return (investments || []).reduce(
       (acc, row) =>
         acc +
         convertCurrency(
           toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
           row.purchaseCurrency || defaultCurrency,
           defaultCurrency,
-          rates,
+          rates
         ),
-      0,
+      0
     )
+  }, [investments, defaultCurrency, rates])
+
+  const netWorthTrend = useMemo(() => {
     const currentNetWorth = totalCash + investmentValue + netLoanPosition
     const totalNetFlow = monthlyIncomeExpense.reduce((sum, m) => sum + (m.income - m.expense), 0)
-    let runningNet = currentNetWorth - totalNetFlow
+    let accumulator = currentNetWorth - totalNetFlow
 
-    return monthlyIncomeExpense.map((monthData) => {
-      runningNet += monthData.income - monthData.expense
-      return {
+    const trend = []
+    for (const monthData of monthlyIncomeExpense) {
+      accumulator += monthData.income - monthData.expense
+      trend.push({
         month: monthData.month,
-        netWorth: runningNet,
-      }
-    })
-  }, [wallets, transactions, investments, netLoanPosition, monthlyIncomeExpense, defaultCurrency, rates])
+        netWorth: accumulator,
+      })
+    }
+    return trend
+  }, [totalCash, investmentValue, netLoanPosition, monthlyIncomeExpense])
 
   const thisMonth = monthlyIncomeExpense.at(-1) ?? { income: 0, expense: 0 }
   const previousMonth = monthlyIncomeExpense.at(-2) ?? { income: 0, expense: 0 }
   const totalExpense = expenseByCategory.reduce((acc, row) => acc + toSafeNumber(row.value), 0)
   const totalIncome = incomeByCategory.reduce((acc, row) => acc + toSafeNumber(row.value), 0)
+
   const averageExpense = monthlyIncomeExpense.length
     ? monthlyIncomeExpense.reduce((acc, row) => acc + toSafeNumber(row.expense), 0) / monthlyIncomeExpense.length
     : 0
+
+  const dailyBurnRate = calculateDailyBurnRate(totalExpense, effectiveMonthsCount * 30.4)
+  const topDominantCategory = expenseByCategory[0] || null
 
   const donutBase = donutKind === 'income' ? incomeByCategory : expenseByCategory
   const donutTotal = donutKind === 'income' ? totalIncome : totalExpense
@@ -241,7 +264,7 @@ export default function Reports() {
     const top = sorted.slice(0, 5)
     const others = sorted.slice(5).reduce((acc, row) => acc + toSafeNumber(row.value), 0)
     if (others > 0) {
-      top.push({ key: '__others__', label: t('reports.otherCategory'), value: others })
+      top.push({ key: '__others__', label: t('reports.otherCategory', 'Lainnya'), value: others })
     }
     return top
   }, [donutBase, selectedDrilldownParent, t])
@@ -251,74 +274,176 @@ export default function Reports() {
     return selectedDrilldownParent ? sorted : sorted.slice(0, 6)
   }, [expenseByCategory, selectedDrilldownParent])
 
-  const topIncomeCategories = useMemo(() => [...incomeByCategory].sort((a, b) => b.value - a.value).slice(0, 6), [incomeByCategory])
+  const topIncomeCategories = useMemo(
+    () => [...incomeByCategory].sort((a, b) => b.value - a.value).slice(0, 6),
+    [incomeByCategory]
+  )
+
+  const hasAnyTransactionsEver = (allTransactionsForBalance || []).length > 0
+
+  const statementCategories = useMemo(() => {
+    const source = donutKind === 'expense' ? expenseByCategory : incomeByCategory
+    return source.map((cat) => ({
+      name: cat.label || cat.key,
+      amount: toSafeNumber(cat.value),
+      percent: donutTotal > 0 ? Math.round((toSafeNumber(cat.value) / donutTotal) * 100) : 0,
+    }))
+  }, [donutKind, expenseByCategory, incomeByCategory, donutTotal])
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full pb-32 sm:pb-24">
       <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
+        className={`ft-motion-page min-h-full space-y-4 sm:space-y-5 transform-gpu ${
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* Header Section */}
+        {/* Header Section with Time Switcher and Action Pills */}
         <ReportHeader
           rangeMonths={rangeMonths}
           setRangeMonths={setRangeMonths}
           monthlyIncomeExpense={monthlyIncomeExpense}
           onExportCsv={() => exportTransactionsToCsv(filteredTransactions, wallets, defaultCurrency, locale)}
-          onPrintReport={() => {
-            const categories = (donutKind === 'expense' ? expenseByCategory : incomeByCategory).map((cat) => ({
-              name: cat.label || cat.key,
-              amount: toSafeNumber(cat.value),
-              percent: donutTotal > 0 ? Math.round((toSafeNumber(cat.value) / donutTotal) * 100) : 0,
-            }))
-            const profileName = useSettingsStore.getState().profileName || ''
-            printFinancialReport({
-              title: t('reports.statementTitle', 'Laporan Keuangan Resmi'),
-              periodName: `${rangeMonths} Bulan (${format(new Date(), 'MMMM yyyy')})`,
-              profileName,
-              totalIncome: thisMonth.income,
-              totalExpense: thisMonth.expense,
-              netSavings: thisMonth.income - thisMonth.expense,
-              categories,
-              transactions: filteredTransactions,
-              wallets,
-              defaultCurrency,
-              locale,
-            })
-          }}
+          onPrintReport={() => setIsStatementModalOpen(true)}
         />
 
-        {/* 2-Column KPI Cards */}
-        <ReportKpiCards thisMonth={thisMonth} previousMonth={previousMonth} />
+        {!hasAnyTransactionsEver ? (
+          /* Single Unified Premium Zero-State Hero Bento */
+          <div className="space-y-4">
+            <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-strong)] p-6 sm:p-8 text-center shadow-[var(--shadow-card)]">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,transparent)] shadow-sm mb-4">
+                <PieChart className="h-7 w-7 stroke-[2.2]" />
+              </div>
 
-        {/* Monthly Income vs Expense Bar Chart */}
-        <ReportBarChart
-          monthlyIncomeExpense={monthlyIncomeExpense}
+              <h2 className="text-lg sm:text-xl font-black tracking-tight text-[var(--fg)]">
+                {t('reports.zeroStateTitle', 'Belum Ada Riwayat Transaksi')}
+              </h2>
+              <p className="mt-1.5 text-xs sm:text-sm font-medium text-[var(--muted)] max-w-md mx-auto leading-relaxed">
+                {t(
+                  'reports.zeroStateDesc',
+                  'Laporan finansial komprehensif, analisis arus kas, distribusi kategori, dan grafik perkembangan kekayaan Anda akan otomatis tersusun begitu transaksi pertama dicatat.'
+                )}
+              </p>
+
+              <div className="mt-5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('medium')
+                    setIsAddTxOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3 text-xs sm:text-sm font-black text-white shadow-md hover:brightness-110 active:scale-95 transition cursor-pointer"
+                >
+                  <Plus className="h-4 w-4 stroke-[3]" />
+                  <span>{t('reports.recordFirstTx', 'Catat Transaksi Pertama')}</span>
+                </button>
+              </div>
+            </section>
+
+            {/* 3-Pillar Feature Showcase Bento */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-4 shadow-2xs">
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500/12 text-emerald-500 border border-emerald-500/20 mb-3">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <h3 className="text-xs font-black text-[var(--fg)]">
+                  {t('reports.featureCashflow', 'Arus Kas & Surplus Real-Time')}
+                </h3>
+                <p className="mt-1 text-[11px] font-medium text-[var(--muted)] leading-normal">
+                  {t('reports.featureCashflowDesc', 'Pantau rasio tabungan riil dan perbandingan pemasukan vs pengeluaran.')}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-4 shadow-2xs">
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20 mb-3">
+                  <PieChart className="h-4 w-4" />
+                </div>
+                <h3 className="text-xs font-black text-[var(--fg)]">
+                  {t('reports.featureCategories', 'Komposisi Belanja & Subkategori')}
+                </h3>
+                <p className="mt-1 text-[11px] font-medium text-[var(--muted)] leading-normal">
+                  {t('reports.featureCategoriesDesc', 'Telusuri pos belanja paling dominan dengan rincian subkategori mendalam.')}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-4 shadow-2xs">
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/12 text-amber-500 border border-amber-500/20 mb-3">
+                  <Landmark className="h-4 w-4" />
+                </div>
+                <h3 className="text-xs font-black text-[var(--fg)]">
+                  {t('reports.featureNetWorth', 'Evolusi Kekayaan Bersih 3 Pilar')}
+                </h3>
+                <p className="mt-1 text-[11px] font-medium text-[var(--muted)] leading-normal">
+                  {t('reports.featureNetWorthDesc', 'Akumulasi terpadu saldo kas dompet, kepemilikan aset investasi, dan posisi pinjaman.')}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Full Financial Reporting Suite */
+          <>
+            {/* Executive Cashflow Hero & Health Meter */}
+            <ReportKpiCards thisMonth={thisMonth} previousMonth={previousMonth} />
+
+            {/* Smart AI Financial Highlights & Burn Rate Strip */}
+            <ReportSmartInsights
+              topCategory={topDominantCategory}
+              totalExpense={totalExpense}
+              dailyBurnRate={dailyBurnRate}
+              thisMonthExpense={thisMonth.expense}
+              thisMonthIncome={thisMonth.income}
+              averageMonthlyExpense={averageExpense}
+            />
+
+            {/* Monthly Income vs Expense Bar Chart with Average Benchmark */}
+            <ReportBarChart monthlyIncomeExpense={monthlyIncomeExpense} />
+
+            {/* Donut Chart & Category Breakdown Hierarchy */}
+            <ReportDonutSection
+              donutKind={donutKind}
+              setDonutKind={setDonutKind}
+              selectedWalletFilter={selectedWalletFilter}
+              setSelectedWalletFilter={setSelectedWalletFilter}
+              wallets={wallets}
+              selectedDrilldownParent={selectedDrilldownParent}
+              setSelectedDrilldownParent={setSelectedDrilldownParent}
+              donutCenterTitle={donutCenterTitle}
+              donutData={donutData}
+              donutTotal={donutTotal}
+              activePieIdx={activePieIdx}
+              setActivePieIdx={setActivePieIdx}
+              topExpenseCategories={topExpenseCategories}
+              topIncomeCategories={topIncomeCategories}
+              compactDonut={compactDonut}
+            />
+
+            {/* Net Worth Trend & 3-Pillar Asset Composition */}
+            <ReportNetWorthChart
+              netWorthTrend={netWorthTrend}
+              totalCash={totalCash}
+              investmentValue={investmentValue}
+              netLoanPosition={netLoanPosition}
+            />
+          </>
+        )}
+
+        {/* Quick Add Transaction Modal triggered by CTA */}
+        <QuickAddTransactionModal
+          isOpen={isAddTxOpen}
+          onClose={() => setIsAddTxOpen(false)}
         />
 
-        {/* Donut Chart & Category Breakdown */}
-        <ReportDonutSection
-          donutKind={donutKind}
-          setDonutKind={setDonutKind}
-          selectedWalletFilter={selectedWalletFilter}
-          setSelectedWalletFilter={setSelectedWalletFilter}
+        {/* In-App Financial Statement Preview Modal */}
+        <ReportStatementModal
+          isOpen={isStatementModalOpen}
+          onClose={() => setIsStatementModalOpen(false)}
+          periodName={`${rangeMonths === 'ytd' ? 'YTD' : `${rangeMonths} Bulan`} (${format(new Date(), 'MMMM yyyy')})`}
+          totalIncome={thisMonth.income}
+          totalExpense={thisMonth.expense}
+          netSavings={thisMonth.income - thisMonth.expense}
+          categories={statementCategories}
+          transactions={filteredTransactions}
           wallets={wallets}
-          selectedDrilldownParent={selectedDrilldownParent}
-          setSelectedDrilldownParent={setSelectedDrilldownParent}
-          donutCenterTitle={donutCenterTitle}
-          donutData={donutData}
-          donutTotal={donutTotal}
-          activePieIdx={activePieIdx}
-          setActivePieIdx={setActivePieIdx}
-          topExpenseCategories={topExpenseCategories}
-          topIncomeCategories={topIncomeCategories}
-          averageExpense={averageExpense}
-          compactDonut={compactDonut}
         />
-
-        {/* Net Worth Trend Area Chart */}
-        <ReportNetWorthChart netWorthTrend={netWorthTrend} />
       </div>
     </div>
   )

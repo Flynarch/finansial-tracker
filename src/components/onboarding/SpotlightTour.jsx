@@ -18,27 +18,23 @@ import useTranslation from '../../hooks/useTranslation'
 
 function getVisibleElement(selector) {
   if (typeof document === 'undefined' || !selector) return null
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+  if (selector === '[data-tour="ai-chat-btn"]') {
+    if (isMobile) {
+      const mobilePill = document.querySelector('.ft-ai-bar, button[data-tour="ai-chat-btn"].ft-ai-bar')
+      if (mobilePill) return mobilePill
+    } else {
+      const desktopBtn = document.querySelector('nav [data-tour="ai-chat-btn"], header [data-tour="ai-chat-btn"]')
+      if (desktopBtn) return desktopBtn
+    }
+  }
+
   const elements = Array.from(document.querySelectorAll(selector))
   if (elements.length === 0) return null
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-
-  // If looking for ai-chat-btn, prefer the mobile floating AiTriggerBar on mobile, and Navbar icon on desktop
-  const sorted = elements.slice().sort((a, b) => {
-    const aIsAiBar = a.classList.contains('ft-ai-bar')
-    const bIsAiBar = b.classList.contains('ft-ai-bar')
-    if (isMobile) {
-      if (aIsAiBar && !bIsAiBar) return -1
-      if (!aIsAiBar && bIsAiBar) return 1
-    } else {
-      if (aIsAiBar && !bIsAiBar) return 1
-      if (!aIsAiBar && bIsAiBar) return -1
-    }
-    return 0
-  })
-
   return (
-    sorted.find((el) => {
+    elements.find((el) => {
       const rect = el.getBoundingClientRect()
       const style = window.getComputedStyle(el)
       return (
@@ -48,24 +44,24 @@ function getVisibleElement(selector) {
         style.visibility !== 'hidden'
       )
     }) ||
-    sorted[0] ||
+    elements[0] ||
     null
   )
 }
 
-function smoothScrollTo(targetY, duration = 300) {
+function smoothScrollTo(targetY, duration = 900) {
   if (typeof window === 'undefined') return
   const startY = window.scrollY || window.pageYOffset
   const diff = targetY - startY
   if (Math.abs(diff) < 2) return
 
   const startTime = performance.now()
-  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+  const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5)
 
   const step = (currentTime) => {
     const elapsed = currentTime - startTime
     const progress = Math.min(1, elapsed / duration)
-    const eased = easeOutCubic(progress)
+    const eased = easeOutQuint(progress)
     window.scrollTo(0, startY + diff * eased)
     if (progress < 1) {
       requestAnimationFrame(step)
@@ -333,10 +329,10 @@ export default function SpotlightTour() {
         }
       }
 
-      smoothScrollTo(targetScrollY, 300)
+      smoothScrollTo(targetScrollY, 900)
     }
 
-    startTrackingLoop(350)
+    startTrackingLoop(950)
 
     return () => {
       if (rafTrackingId.current) {
@@ -430,11 +426,11 @@ export default function SpotlightTour() {
           d={svgPath}
           fill="rgba(5, 8, 18, 0.72)"
           fillRule="evenodd"
-          className="transition-[d] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="transition-[d] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
 
-      {/* Subtle, ultra-clean elevated spotlight rim */}
+      {/* Clean borderless spotlight target hotspot */}
       {targetRect && (
         <div
           role="button"
@@ -444,15 +440,13 @@ export default function SpotlightTour() {
             handleNext()
           }}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleNext()}
-          className="pointer-events-auto absolute border border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/20 transition-[top,left,width,height,border-radius] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
+          className="pointer-events-auto absolute transition-[top,left,width,height,border-radius] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer focus:outline-none"
           style={{
             top: targetRect.top,
             left: targetRect.left,
             width: targetRect.width,
             height: targetRect.height,
             borderRadius: targetRect.radius || 20,
-            boxShadow:
-              '0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 8px 32px -4px rgba(0, 0, 0, 0.45)',
           }}
           title={t('tour.targetHint', 'Klik target untuk lanjut')}
           aria-label={t('tour.targetHint', 'Klik target untuk lanjut')}
@@ -461,7 +455,7 @@ export default function SpotlightTour() {
 
       {/* Floating Tooltip Card */}
       <div
-        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border-strong)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-[top,left,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
+        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border-strong)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-[top,left,width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
         style={{
           top: popoverPos.top,
           left: popoverPos.left,
@@ -472,19 +466,19 @@ export default function SpotlightTour() {
         {/* Dynamic Directional Pointer Arrow (Caret) */}
         {popoverPos.placement === 'bottom' && (
           <div
-            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'top' && (
           <div
-            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'right' && (
           <div
-            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[top] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ top: popoverPos.arrowTop }}
           />
         )}

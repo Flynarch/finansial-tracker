@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useState } from 'react'
+import { memo, useRef, useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -32,8 +32,6 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   zoomRevenueAxisTicks,
   formatAxisCurrency,
   rangedSummaryStats,
-  showDetailedAnalytics,
-  setShowDetailedAnalytics,
   zoomPeakAndFloor,
   assetBreakdownData,
   zoomTooltipDismissed,
@@ -46,6 +44,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 }) {
   const navigate = useNavigate()
   const zoomChartRef = useRef(null)
+
+  const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false)
+  const [prevZoomedChart, setPrevZoomedChart] = useState(zoomedChart)
+  if (prevZoomedChart !== zoomedChart) {
+    setPrevZoomedChart(zoomedChart)
+    setShowDetailedAnalytics(false)
+  }
 
   useBackButton(onCloseZoom, Boolean(zoomedChart))
 
@@ -68,6 +73,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
     }
   }, [setZoomTooltipDismissed])
 
+  const isZoomNetWorthEmpty = useMemo(() => {
+    if (!Array.isArray(zoomCombinedChartSeries) || zoomCombinedChartSeries.length === 0) return true
+    return zoomCombinedChartSeries.every((d) => !Number(d?.value) || Number(d?.value) === 0)
+  }, [zoomCombinedChartSeries])
+
   if (!zoomedChart || typeof document === 'undefined') return null
 
   const handleZoomChartTouchOrMove = () => {
@@ -86,6 +96,9 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
+  const hasGrowth = Boolean(
+    netWorthGrowth && (netWorthGrowth.net !== 0 || Math.round(netWorthGrowth.pct) !== 0)
+  )
 
   const handleTouchStart = (e) => {
     touchStartY.current = e.touches[0].clientY
@@ -124,7 +137,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
       <button
         type="button"
         onClick={onCloseZoom}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md cursor-pointer"
+        className="absolute inset-0 bg-black/60 backdrop-blur-xs cursor-pointer"
         aria-label={t('dashboard.zoom.close')}
       />
 
@@ -369,29 +382,31 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   {rangeTitleMap[zoomRevenueRange] || t('dashboard.totalPeriod', 'Total Periode')}
                 </p>
-                <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
                   <p className="text-[20px] sm:text-[26px] font-black tabular-nums leading-tight tracking-tight text-[var(--fg)]">
                     {formatCurrency(zoomRevenueValue, defaultCurrency, locale)}
                   </p>
-                  <span
-                    className={`inline-flex whitespace-nowrap shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-colors ${
-                      isNetPositive
-                        ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/20'
-                        : isNetNegative
-                        ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/20'
-                        : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
-                    }`}
-                  >
-                    {isNetPositive ? (
-                      <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[var(--status-income)]" strokeWidth={2.5} />
-                    ) : isNetNegative ? (
-                      <TrendingDown className="h-3.5 w-3.5 shrink-0 text-[var(--status-expense)]" strokeWidth={2.5} />
-                    ) : null}
-                    <span>
-                      {isNetPositive ? '+' : ''}
-                      {formatCurrency(netWorthGrowth.net, defaultCurrency, locale)} ({isNetPositive ? '+' : ''}{Math.round(netWorthGrowth.pct)}%)
+                  {hasGrowth && (
+                    <span
+                      className={`inline-flex whitespace-nowrap shrink-0 items-center self-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-colors leading-none ${
+                        isNetPositive
+                          ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/20'
+                          : isNetNegative
+                          ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border-[var(--status-expense)]/20'
+                          : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]'
+                      }`}
+                    >
+                      {isNetPositive ? (
+                        <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[var(--status-income)]" strokeWidth={2.5} />
+                      ) : isNetNegative ? (
+                        <TrendingDown className="h-3.5 w-3.5 shrink-0 text-[var(--status-expense)]" strokeWidth={2.5} />
+                      ) : null}
+                      <span className="leading-tight">
+                        {isNetPositive ? '+' : ''}
+                        {formatCurrency(netWorthGrowth.net, defaultCurrency, locale)} ({isNetPositive ? '+' : ''}{Math.round(netWorthGrowth.pct)}%)
+                      </span>
                     </span>
-                  </span>
+                  )}
                 </div>
 
                 {/* Comparison Summary Banner Container with Smooth Animated Expansion */}
@@ -487,20 +502,40 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
               </div>
 
               {/* — Chart Area — */}
-              <div
-                ref={zoomChartRef}
-                onTouchStart={handleZoomChartTouchOrMove}
-                className="h-56 w-full text-[var(--fg)]"
-              >
-                <ResponsiveContainer width="100%" height="100%" debounce={100}>
-                  <AreaChart
-                    data={zoomCombinedChartSeries}
-                    margin={{ top: 14, right: defaultCurrency === 'IDR' ? 44 : 40, bottom: 20, left: 4 }}
-                    onMouseMove={handleZoomChartTouchOrMove}
-                    onTouchStart={handleZoomChartTouchOrMove}
-                    onTouchMove={handleZoomChartTouchOrMove}
-                    onMouseLeave={() => setZoomTooltipDismissed?.(true)}
-                  >
+              {isZoomNetWorthEmpty ? (
+                <div className="h-56 w-full rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-4 text-center select-none">
+                  {/* Subtle background curved wave SVG */}
+                  <svg className="absolute inset-0 h-full w-full opacity-10 pointer-events-none stroke-[var(--accent)] fill-none" viewBox="0 0 300 100" preserveAspectRatio="none">
+                    <path d="M 0,80 Q 75,30 150,70 T 300,40" strokeWidth="2.5" strokeDasharray="6 6" />
+                  </svg>
+
+                  <div className="relative z-10 flex flex-col items-center gap-1.5 max-w-[280px]">
+                    <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
+                      <TrendingUp className="h-4 w-4 stroke-[2.5]" />
+                    </div>
+                    <p className="text-xs font-bold text-[var(--fg)] leading-tight">
+                      {t('dashboard.netWorthEmptyTitle', 'Belum Ada Pergerakan Aset')}
+                    </p>
+                    <p className="text-[11px] font-medium text-[var(--muted)] leading-relaxed">
+                      {t('dashboard.netWorthEmptyDesc', 'Grafik tren kekayaan otomatis tersusun begitu saldo dompet, investasi, atau transaksi mulai terisi.')}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  ref={zoomChartRef}
+                  onTouchStart={handleZoomChartTouchOrMove}
+                  className="h-56 w-full text-[var(--fg)]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={zoomCombinedChartSeries}
+                      margin={{ top: 14, right: defaultCurrency === 'IDR' ? 44 : 40, bottom: 20, left: 4 }}
+                      onMouseMove={handleZoomChartTouchOrMove}
+                      onTouchStart={handleZoomChartTouchOrMove}
+                      onTouchMove={handleZoomChartTouchOrMove}
+                      onMouseLeave={() => setZoomTooltipDismissed?.(true)}
+                    >
                     <defs>
                       <linearGradient id="nwGradZoom" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.38} />
@@ -542,7 +577,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       width={defaultCurrency === 'IDR' ? 44 : 38}
                     />
                     <Tooltip
-                      cursor={{ stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+                      cursor={{ stroke: 'var(--accent)', strokeWidth: 2, strokeDasharray: '3 3', strokeOpacity: 0.8 }}
                       content={(props) => {
                         if (zoomTooltipDismissed || !props.active || !props.payload || !props.payload.length) return null
                         const payloadItem = props.payload[0]?.payload || {}
@@ -562,7 +597,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                         const diff = hasPrev ? rawVal - prevVal : 0
 
                         return (
-                          <div className="pointer-events-none rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-xs shadow-xl text-[var(--fg)] min-w-[200px] space-y-1.5">
+                          <div className="pointer-events-none rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 text-xs shadow-xl text-[var(--fg)] min-w-[200px] space-y-1.5 animate-[ft-spring-dropdown_0.15s_ease-out_both]">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]/60 pb-1">
                               {labelStr}
                             </p>
@@ -607,10 +642,10 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                         strokeDasharray="4 4"
                         strokeWidth={2}
                         dot={false}
-                        activeDot={{ r: 4, strokeWidth: 1.5, stroke: 'var(--panel-strong)', fill: 'var(--muted)' }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--panel-strong)', fill: 'var(--muted)' }}
                         isAnimationActive={!reduceMotion}
-                        animationDuration={450}
-                        animationEasing="ease-out"
+                        animationDuration={600}
+                        animationEasing="cubic-bezier(0.25, 1, 0.5, 1)"
                       />
                     )}
                     <Area
@@ -620,14 +655,15 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       fill="url(#nwGradZoom)"
                       strokeWidth={2.5}
                       dot={false}
-                      activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--panel-strong)', fill: 'var(--accent)' }}
+                      activeDot={{ r: 6, strokeWidth: 2.5, stroke: 'var(--panel-strong)', fill: 'var(--accent)' }}
                       isAnimationActive={!reduceMotion}
-                      animationDuration={450}
-                      animationEasing="ease-out"
+                      animationDuration={600}
+                      animationEasing="cubic-bezier(0.25, 1, 0.5, 1)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            )}
 
               {/* — Contextual Summary Cards — */}
               <div className="mt-3.5 grid grid-cols-3 gap-2">

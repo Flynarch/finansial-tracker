@@ -25,13 +25,28 @@ export default function useBottomSheet(configOrState = false) {
 
   const isControlled = controlledIsOpen !== undefined
   const [internalOpen, setInternalOpen] = useState(initialState)
-  const isTargetOpen = isControlled ? Boolean(controlledIsOpen) : internalOpen
 
   const [isExiting, setIsExiting] = useState(false)
+  const [isClosingControlled, setIsClosingControlled] = useState(false)
   const closeTimeoutRef = useRef(null)
 
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const motionDelay = reduceMotion ? 0 : 220
+
+  const [prevControlledIsOpen, setPrevControlledIsOpen] = useState(controlledIsOpen)
+  if (isControlled && controlledIsOpen !== prevControlledIsOpen) {
+    setPrevControlledIsOpen(controlledIsOpen)
+    setIsExiting(false)
+    setIsClosingControlled(false)
+  }
+
+  // Clear timeout when controlled state changes
+  useEffect(() => {
+    if (controlledIsOpen && closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+  }, [controlledIsOpen])
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -43,8 +58,13 @@ export default function useBottomSheet(configOrState = false) {
     }
   }, [])
 
-  const isMounted = isTargetOpen || isExiting
-  const isVisible = isTargetOpen && !isExiting
+  const isMounted = isControlled
+    ? (Boolean(controlledIsOpen) || isExiting) && !isClosingControlled
+    : (internalOpen || isExiting)
+
+  const isVisible = isControlled
+    ? Boolean(controlledIsOpen) && !isExiting && !isClosingControlled
+    : internalOpen && !isExiting
 
   // Lock body scroll while sheet is open
   useEffect(() => {
@@ -71,6 +91,7 @@ export default function useBottomSheet(configOrState = false) {
       closeTimeoutRef.current = null
     }
     setIsExiting(false)
+    setIsClosingControlled(false)
     if (!isControlled) {
       setInternalOpen(true)
     }
@@ -81,7 +102,9 @@ export default function useBottomSheet(configOrState = false) {
     setIsExiting(true)
     closeTimeoutRef.current = window.setTimeout(() => {
       setIsExiting(false)
-      if (!isControlled) {
+      if (isControlled) {
+        setIsClosingControlled(true)
+      } else {
         setInternalOpen(false)
       }
       closeTimeoutRef.current = null
@@ -92,6 +115,7 @@ export default function useBottomSheet(configOrState = false) {
   useBackButton(closeSheet, Boolean(isMounted && isVisible && enableBackButton))
 
   return {
+    isMounted,
     isOpen: isMounted,
     isVisible,
     openSheet,
@@ -99,3 +123,4 @@ export default function useBottomSheet(configOrState = false) {
     motionDelay,
   }
 }
+

@@ -15,9 +15,8 @@ import { formatCurrency, toSafeNumber, clampPercent, FALLBACK_EXCHANGE_RATES } f
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { calculateBudgetSpent } from '../lib/budgetUtils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import useBottomSheet from '../hooks/useBottomSheet'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { ArrowLeft, Plus, Edit2, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
+import { ArrowLeft, Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
 import { isTxMatchingBudget } from '../lib/budgetUtils'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
 
@@ -52,9 +51,14 @@ function Budget() {
   }, [])
 
   const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
-  const { isOpen: sheetOpen, openSheet, closeSheet } = useBottomSheet(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingBudget, setDeletingBudget] = useState(null)
+  const openSheet = useCallback(() => setSheetOpen(true), [])
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false)
+    setEditingId(null)
+  }, [setEditingId])
   const { setSwipedId, getSwipeHandlers } = useSwipeAction()
 
   const budgets = useLiveQuery(async () => {
@@ -160,7 +164,7 @@ function Budget() {
     setSwipedId(null)
     setSelectedInitialCategory(typeof initialCat === 'string' ? initialCat : '')
     openSheet()
-  }, [openSheet, setSwipedId])
+  }, [openSheet, setSwipedId, setEditingId, setSelectedInitialCategory])
 
   const openEdit = (budget, e) => {
     e?.stopPropagation()
@@ -363,21 +367,29 @@ function Budget() {
                 return (
                   <div
                     key={b.id}
-                    className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${
-                      isDanger
-                        ? 'border-[var(--status-expense)]/30 bg-[var(--status-expense-soft)]'
-                        : isWarn
-                        ? 'border-[var(--warning)]/30 bg-[var(--warning)]/5'
-                        : 'border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)]'
-                    }`}
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] shadow-2xs select-none touch-pan-y"
                   >
-                    {/* Progressive Swipe Background (Habits Style) */}
-                    <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
+                    {/* Progressive Swipe Background (Revealed Action Slot) */}
+                    <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-2xl px-5 opacity-0 transition-colors duration-150 w-full" />
 
-                    <div className="relative z-10 p-4 sm:p-5" {...getSwipeHandlers(b.id, { onEdit: () => openEdit(b), onDelete: () => setDeletingBudget(b) })}>
+                    {/* Sliding Foreground Card with crisp divider border on right */}
+                    <div
+                      className={`relative z-10 rounded-2xl border-r border-[var(--border)]/70 p-4 sm:p-5 transition-[background-color,border-color] duration-200 shadow-2xs ${
+                        isDanger
+                          ? 'bg-[var(--status-expense-soft)] border-[var(--status-expense)]/30'
+                          : isWarn
+                          ? 'bg-[var(--warning)]/5 border-[var(--warning)]/30'
+                          : 'bg-[var(--panel-strong)]'
+                      }`}
+                      style={{ transform: 'translate3d(0px, 0px, 0px)' }}
+                      {...getSwipeHandlers(b.id, {
+                        onEdit: () => openEdit(b),
+                        onDelete: () => setDeletingBudget(b),
+                      })}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${colorClass}`}>
+                          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${colorClass}`}>
                             <CategoryIcon icon={iconKey} className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
@@ -393,14 +405,6 @@ function Budget() {
                           <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-black tabular-nums ${badgeClass}`}>
                             {Math.round(pct)}%
                           </span>
-                          <button
-                            type="button"
-                            onClick={(e) => openEdit(b, e)}
-                            className="min-h-[36px] min-w-[36px] flex items-center justify-center p-2 rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors active:scale-90 cursor-pointer"
-                            title={t('budget.edit')}
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
                         </div>
                       </div>
 
@@ -454,7 +458,7 @@ function Budget() {
                     className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-2xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorClass} shadow-xs`}>
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${colorClass} shadow-xs`}>
                         <CategoryIcon iconKey={iconKey} className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -490,18 +494,27 @@ function Budget() {
           editingBudget={budgets?.find((b) => b.id === editingId)}
           month={month}
           initialCategory={selectedInitialCategory}
+          onDelete={(budgetToDelete) => {
+            closeSheet()
+            setDeletingBudget(budgetToDelete)
+          }}
         />
         <ConfirmDeleteModal
           isOpen={!!deletingBudget}
           onClose={() => setDeletingBudget(null)}
           onConfirm={async () => {
             if (deletingBudget) {
-              await db.budgets.delete(deletingBudget.id)
+              try {
+                const targetId = Number(deletingBudget.id) || deletingBudget.id
+                await db.budgets.delete(targetId)
+              } catch {
+                await db.budgets.where('id').equals(deletingBudget.id).delete()
+              }
               setDeletingBudget(null)
             }
           }}
-          title={t('budget.delete')}
-          message={t('budget.deleteConfirm')}
+          title={t('budget.delete', 'Hapus Anggaran')}
+          message={t('budget.deleteConfirm', 'Hapus anggaran untuk kategori ini?')}
         />
       </div>
     </div>

@@ -11,8 +11,20 @@ function detectSystemLocale() {
   return 'id'
 }
 
+function getInitialTheme() {
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = window.localStorage.getItem('ft_theme')
+      if (cached && ['light', 'dark', 'midnight'].includes(cached)) return cached
+    } catch {
+      /* ignore */
+    }
+  }
+  return 'light'
+}
+
 const useSettingsStore = create((set, get) => ({
-  theme: 'light',
+  theme: getInitialTheme(),
   locale: detectSystemLocale(),
   defaultCurrency: 'IDR',
   defaultWalletId: null,
@@ -83,6 +95,14 @@ const useSettingsStore = create((set, get) => ({
   },
   setTheme: (theme) => {
     set({ theme })
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('ft_theme', theme)
+        document.documentElement.setAttribute('data-theme', theme)
+      }
+    } catch {
+      /* ignore */
+    }
     get().persist({ theme }).catch(() => {})
   },
   setDefaultCurrency: async (defaultCurrency) => {
@@ -244,8 +264,17 @@ const useSettingsStore = create((set, get) => ({
     const tourDone = record.hasCompletedSpotlightTour !== undefined
       ? Boolean(record.hasCompletedSpotlightTour)
       : onboardingDone
+    const loadedTheme = record.theme || 'light'
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('ft_theme', loadedTheme)
+        document.documentElement.setAttribute('data-theme', loadedTheme)
+      }
+    } catch {
+      /* ignore */
+    }
     set({
-      theme: record.theme || 'light',
+      theme: loadedTheme,
       locale: record.locale ? (record.locale === 'en' ? 'en' : 'id') : detectSystemLocale(),
       defaultCurrency: record.defaultCurrency || 'IDR',
       defaultWalletId: record.defaultWalletId ? Number(record.defaultWalletId) : null,

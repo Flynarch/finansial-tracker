@@ -8,6 +8,7 @@ const STORAGE_KEY = 'ft_income_category_custom_v1'
 export const INCOME_TREE = [
   {
     id: 'gaji',
+    icon: 'salary',
     names: { id: 'Gaji', en: 'Salary' },
     children: [
       { id: 'gaji_pokok', names: { id: 'Gaji Pokok', en: 'Basic Salary' } },
@@ -17,6 +18,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'uang_jajan',
+    icon: 'wallet',
     names: { id: 'Uang Jajan', en: 'Pocket Money' },
     children: [
       { id: 'uang_saku', names: { id: 'Uang Saku', en: 'Allowance' } },
@@ -25,6 +27,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'bonus',
+    icon: 'bonus',
     names: { id: 'Bonus & THR', en: 'Bonus & THR' },
     children: [
       { id: 'thr', names: { id: 'THR', en: 'Holiday Allowance' } },
@@ -35,6 +38,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'bisnis',
+    icon: 'briefcase',
     names: { id: 'Bisnis & Usaha', en: 'Business' },
     children: [
       { id: 'penjualan', names: { id: 'Penjualan', en: 'Sales' } },
@@ -45,6 +49,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'kas_kecil',
+    icon: 'transfer',
     names: { id: 'Kas Kecil & Piutang', en: 'Petty Cash & Debt' },
     children: [
       { id: 'bayar_utang', names: { id: 'Dibayar Utang (Piutang)', en: 'Debt Repayment' } },
@@ -54,6 +59,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'investasi',
+    icon: 'crypto',
     names: { id: 'Investasi', en: 'Investment' },
     children: [
       { id: 'dividen', names: { id: 'Dividen', en: 'Dividend' } },
@@ -65,6 +71,7 @@ export const INCOME_TREE = [
   },
   {
     id: 'lainnya',
+    icon: 'gift',
     names: { id: 'Lainnya', en: 'Other' },
     children: [
       { id: 'umum', names: { id: 'Umum', en: 'General' } },
@@ -103,11 +110,11 @@ function notifyChanged() {
 
 function loadCustom() {
   if (cachedCustom !== null) return cachedCustom
-  if (typeof localStorage === 'undefined') return { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+  if (typeof localStorage === 'undefined') return { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+      cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
       return cachedCustom
     }
     const data = JSON.parse(raw)
@@ -117,10 +124,11 @@ function loadCustom() {
       colors: data.colors && typeof data.colors === 'object' ? data.colors : {},
       parents: Array.isArray(data.parents) ? data.parents : [],
       names: data.names && typeof data.names === 'object' ? data.names : {},
+      icons: data.icons && typeof data.icons === 'object' ? data.icons : {},
     }
     return cachedCustom
   } catch {
-    cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {} }
+    cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
     return cachedCustom
   }
 }
@@ -139,13 +147,26 @@ export function resetIncomeCategoryCustomizations() {
   notifyChanged()
 }
 
+const DEFAULT_INCOME_COLORS = {
+  gaji: 'emerald',
+  uang_jajan: 'amber',
+  bonus: 'purple',
+  bisnis: 'indigo',
+  kas_kecil: 'teal',
+  investasi: 'sky',
+  lainnya: 'rose',
+}
+
 export function getMergedIncomeTree() {
-  const { hidden = {}, extras = {}, colors = {}, parents = [], names = {} } = loadCustom()
+  const { hidden = {}, extras = {}, colors = {}, parents = [], names = {}, icons = {} } = loadCustom()
   const baseTree = [...INCOME_TREE, ...parents]
   return baseTree
     .filter((parent) => parent.id !== 'investasi_pemasukan')
     .map((parent) => {
       const parentName = names[parent.id] || parent.names
+      const parentIcon = icons[parent.id] || parent.icon || null
+      const defaultColor = DEFAULT_INCOME_COLORS[parent.id] || 'emerald'
+      const parentColor = colors[parent.id] || defaultColor
       const children = [
         ...(parent.children || []).filter((c) => !(hidden[parent.id] || []).includes(c.id)),
         ...(extras[parent.id] || []),
@@ -154,13 +175,14 @@ export function getMergedIncomeTree() {
         return {
           ...child,
           names: childName,
-          color: colors[`${parent.id}/${child.id}`] || colors[parent.id] || null,
+          color: colors[`${parent.id}/${child.id}`] || parentColor,
         }
       })
       return {
         ...parent,
         names: parentName,
-        color: colors[parent.id] || null,
+        color: parentColor,
+        icon: parentIcon,
         children,
       }
     })
@@ -279,7 +301,7 @@ export function getIncomeCategoryColor(categoryId) {
   const custom = loadCustom()
   if (custom.colors[categoryId]) return custom.colors[categoryId]
   const [pid] = String(categoryId).split('/')
-  return custom.colors[pid] || null
+  return custom.colors[pid] || DEFAULT_INCOME_COLORS[pid] || null
 }
 
 export function setIncomeCategoryColor(categoryId, colorKey) {
@@ -289,6 +311,25 @@ export function setIncomeCategoryColor(categoryId, colorKey) {
     delete custom.colors[categoryId]
   } else {
     custom.colors[categoryId] = colorKey
+  }
+  saveCustom(custom)
+}
+
+export function getIncomeCategoryIcon(categoryId) {
+  if (!categoryId) return null
+  const custom = loadCustom()
+  if (custom.icons[categoryId]) return custom.icons[categoryId]
+  const [pid] = String(categoryId).split('/')
+  return custom.icons[pid] || null
+}
+
+export function setIncomeCategoryIcon(categoryId, iconKey) {
+  if (!categoryId) return
+  const custom = loadCustom()
+  if (!iconKey) {
+    delete custom.icons[categoryId]
+  } else {
+    custom.icons[categoryId] = iconKey
   }
   saveCustom(custom)
 }
@@ -303,7 +344,7 @@ export function updateIncomeCategoryName(parentId, childId, nameId, nameEn) {
   saveCustom(custom)
 }
 
-export function addIncomeParentCategory(nameId, nameEn, colorKey) {
+export function addIncomeParentCategory(nameId, nameEn, colorKey, iconKey) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
@@ -311,6 +352,7 @@ export function addIncomeParentCategory(nameId, nameEn, colorKey) {
   const id = `ip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   custom.parents.push({ id, names: { id: trimmed, en }, children: [] })
   if (colorKey) custom.colors[id] = colorKey
+  if (iconKey) custom.icons[id] = iconKey
   saveCustom(custom)
   return id
 }

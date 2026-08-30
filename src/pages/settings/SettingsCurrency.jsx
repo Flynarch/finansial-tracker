@@ -17,6 +17,7 @@ import {
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../../lib/api'
 import { currencyOptions } from './settingsConstants'
 import { SettingsSection } from './settingsComponents'
+import CurrencyFlag from '../../components/currency/CurrencyFlag'
 
 const SUPPORTED_CURRENCIES = [
   { code: 'IDR', name: 'Rupiah Indonesia', symbol: 'Rp', country: 'Indonesia' },
@@ -99,11 +100,11 @@ export default function SettingsCurrency() {
             </div>
             <div className="min-w-0">
               <h3 className="text-base sm:text-lg font-black text-[var(--fg)] leading-tight">
-                Kurs & Konversi Valuta Asing
+                {t('settings.currency.title', 'Kurs & Konversi Valuta Asing')}
               </h3>
               <p className="text-xs font-medium text-[var(--muted)] mt-1 flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                <span>Pembaruan real-time • {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span>{t('settings.currency.realtime', 'Pembaruan real-time')} • {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </p>
             </div>
           </div>
@@ -116,7 +117,7 @@ export default function SettingsCurrency() {
             title={t('currency.refreshRates', 'Segarkan Nilai Kurs')}
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin text-[var(--accent)]' : 'text-[var(--muted)]'}`} />
-            <span className="hidden sm:inline">{isLoading ? 'Memuat...' : 'Segarkan'}</span>
+            <span className="hidden sm:inline">{isLoading ? t('settings.currency.loading', 'Memuat...') : t('settings.currency.refresh', 'Segarkan')}</span>
           </button>
         </div>
 
@@ -140,14 +141,14 @@ export default function SettingsCurrency() {
 
       {/* Interactive Converter Calculator */}
       <SettingsSection
-        label="Kalkulator Konversi Kurs"
-        footnote="Kalkulasi menggunakan nilai tukar pasar valuta asing terkini."
+        label={t('settings.currency.calculatorSection', 'Kalkulator Konversi Kurs')}
+        footnote={t('settings.currency.calculatorFootnote', 'Kalkulasi menggunakan nilai tukar pasar valuta asing terkini.')}
       >
         <div className="ft-settings-cell space-y-4">
           {/* Source Input */}
           <div>
             <label className="block mb-1.5 text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              Dari (Mata Uang Asal)
+              {t('settings.currency.fromLabel', 'Dari (Mata Uang Asal)')}
             </label>
             <div className="flex items-center gap-2.5">
               <div className="relative flex-1">
@@ -189,7 +190,7 @@ export default function SettingsCurrency() {
           {/* Target Result */}
           <div>
             <label className="block mb-1.5 text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              Hasil Konversi
+              {t('settings.currency.resultLabel', 'Hasil Konversi')}
             </label>
             <div className="flex items-center gap-2.5">
               <div className="flex h-12 flex-1 items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 shadow-2xs">
@@ -213,7 +214,7 @@ export default function SettingsCurrency() {
 
           {/* Formula info */}
           <div className="pt-2 border-t border-[var(--border)]/60 flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
-            <span>Formula acuan saat ini:</span>
+            <span>{t('settings.currency.currentFormula', 'Formula acuan saat ini:')}</span>
             <span className="font-extrabold text-[var(--fg)] tabular-nums">
               1 {fromCurrency} = {formatCurrency(unitRate, toCurrency)}
             </span>
@@ -223,8 +224,8 @@ export default function SettingsCurrency() {
 
       {/* Default Currency Selection Card */}
       <SettingsSection
-        label="Mata Uang Utama Aplikasi"
-        footnote="Mata uang ini digunakan sebagai patokan utama pada dashboard, analitik, dan total saldo."
+        label={t('settings.currency.primarySection', 'Mata Uang Utama Aplikasi')}
+        footnote={t('settings.currency.primaryFootnote', 'Mata uang ini digunakan sebagai patokan utama pada dashboard, analitik, dan total saldo.')}
       >
         {currencyOptions.map((code) => {
           const item = SUPPORTED_CURRENCIES.find((c) => c.code === code) || {
@@ -243,15 +244,13 @@ export default function SettingsCurrency() {
               className="ft-settings-cell flex w-full cursor-pointer items-center justify-between gap-3 text-left transition hover:bg-[var(--field-bg)]/60"
             >
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] font-black text-sm text-[var(--fg)] shadow-2xs">
-                  {item.symbol}
-                </div>
+                <CurrencyFlag code={item.code} size={40} className="shadow-2xs" />
                 <div className="min-w-0">
                   <span className="block text-[14.5px] font-extrabold text-[var(--fg)] leading-tight">
                     {item.name}
                   </span>
                   <span className="block text-xs font-medium text-[var(--muted)] leading-tight mt-0.5">
-                    {item.code} • {item.country}
+                    {item.code} • {item.country} • <span className="font-bold text-[var(--fg)]">{item.symbol}</span>
                   </span>
                 </div>
               </div>
@@ -259,7 +258,7 @@ export default function SettingsCurrency() {
               {isSelected ? (
                 <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  Utama
+                  {t('settings.currency.primaryBadge', 'Utama')}
                 </span>
               ) : null}
             </button>

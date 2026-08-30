@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Edit2, Check, ChevronDown, XCircle } from 'lucide-react'
+import { ChevronLeft, Edit2, Check, ChevronRight } from 'lucide-react'
 import { createWallet } from '../../services/walletService'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -8,10 +8,13 @@ import useBackButton from '../../hooks/useBackButton'
 import { db } from '../../lib/db'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { formatMoneyInput, formatMoneyValueForInput, parseMoneyInput } from '../../lib/utils'
+import CurrencyFlag from '../currency/CurrencyFlag'
+import CurrencyPickerPage from '../currency/CurrencyPickerPage'
+import { getCurrencyName, getCurrencyCountry, getCurrencySymbol } from '../../data/currencies'
 
 export default function AddAccountForm({ institution, onBack, onSuccess }) {
   useBackButton(onBack, Boolean(onBack))
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const navigate = useNavigate()
 
   const initialCurrency =
@@ -28,6 +31,8 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const [name, setName] = useState(institution ? institution.name : t('wallets.newAccount', 'Akun Baru'))
   const [isEditingName, setIsEditingName] = useState(!institution)
   const [currency, setCurrency] = useState(initialCurrency)
+  const [isSelectingCurrency, setIsSelectingCurrency] = useState(false)
+  const balanceInputRef = useRef(null)
 
   const [displayBalance, setDisplayBalance] = useState('')
   const [rawBalance, setRawBalance] = useState(0)
@@ -38,11 +43,6 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
     const formatted = formatMoneyInput(e.target.value, currency)
     setDisplayBalance(formatted)
     setRawBalance(parseMoneyInput(formatted, currency))
-  }
-
-  const clearBalance = () => {
-    setDisplayBalance('')
-    setRawBalance(0)
   }
 
   const getInitials = (text) => (text ? text.substring(0, 2).toUpperCase() : '')
@@ -83,42 +83,68 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
     }
   }
 
+  if (isSelectingCurrency) {
+    return (
+      <CurrencyPickerPage
+        selectedCurrency={currency}
+        title={t('wallets.selectWalletCurrency', 'Pilih Mata Uang Dompet')}
+        onBack={() => setIsSelectingCurrency(false)}
+        onSelect={(newCurrency) => {
+          setCurrency(newCurrency)
+          setIsSelectingCurrency(false)
+          if (rawBalance > 0) {
+            const formatted = formatMoneyValueForInput(rawBalance, newCurrency)
+            setDisplayBalance(formatted)
+          }
+        }}
+      />
+    )
+  }
+
   return (
-    <div className="ft-page-enter min-h-screen flex flex-col bg-[var(--bg)]">
-      {/* ── Top Hero Header ────────────────────────────────────────────── */}
-      <div className="relative bg-[var(--panel-strong)] pt-5 pb-7 px-5 rounded-b-3xl shrink-0 border-b border-[var(--border)] shadow-xs z-10">
-        {/* Header Navigation */}
-        <div className="relative z-10 flex items-center justify-between mb-6">
+    <div className="ft-page-enter min-h-full flex flex-col bg-[var(--bg)]">
+      {/* ── Top App Bar Navigation ────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-[var(--panel-strong)]/90 backdrop-blur-xl border-b border-[var(--border)] shadow-xs">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer active:scale-95"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer active:scale-95 shrink-0"
             aria-label={t('common.back', 'Kembali')}
           >
             <ChevronLeft size={20} strokeWidth={2.2} />
           </button>
 
-          <span className="rounded-full bg-[var(--field-bg)] border border-[var(--border)] px-4 py-1 text-xs font-black text-[var(--fg)]">
-            {institution ? institution.name : t('wallets.customAccount', 'Akun Kustom')}
-          </span>
+          <div className="min-w-0 text-center flex-1">
+            <h1 className="text-base font-black text-[var(--fg)] leading-tight truncate">
+              {institution ? institution.name : t('wallets.newAccount', 'Akun Baru')}
+            </h1>
+            <p className="text-[11px] font-medium text-[var(--muted)] mt-0.5 truncate">
+              {institution ? t('wallets.configureWallet', 'Atur detail & saldo awal') : t('wallets.customAccount', 'Akun Kustom')}
+            </p>
+          </div>
 
-          <div className="w-9" />
+          <div className="w-9 shrink-0" />
         </div>
+      </div>
 
-        {/* Logo & Name Input */}
-        <div className="relative z-10 flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            {/* Logo Circle */}
-            <div className="w-14 h-14 rounded-full bg-[var(--wallet-logo-bg,var(--field-bg))] border-[0.5px] border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+      {/* ── Main Form Body ────────────────────────────────────────────── */}
+      <div className="flex-1 max-w-xl mx-auto w-full px-4 sm:px-6 pt-5 pb-36 space-y-5">
+        {/* ── Hero Account & Balance Card ─────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-card transition-all">
+          {/* Top Row: Account Identity */}
+          <div className="flex items-center gap-3.5 mb-6">
+            {/* Logo Avatar */}
+            <div className="w-13 h-13 rounded-2xl bg-[var(--wallet-logo-bg,var(--field-bg))] border border-[var(--wallet-logo-border,var(--border))] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
               {isCashInstitution ? (
                 <div className="w-full h-full flex items-center justify-center text-amber-500 p-2">
-                  <MoneyBagIcon size={30} strokeWidth={2.5} />
+                  <MoneyBagIcon size={26} strokeWidth={2.5} />
                 </div>
               ) : institution?.logoUrl ? (
                 <img
                   src={institution.logoUrl}
                   alt={name}
-                  className="w-full h-full object-cover rounded-full"
+                  className="w-full h-full object-cover"
                   onError={(e) => {
                     e.target.style.display = 'none'
                     if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
@@ -126,128 +152,158 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                 />
               ) : null}
               <div
-                className="w-full h-full flex items-center justify-center font-black text-lg text-[var(--fg)]"
+                className="w-full h-full flex items-center justify-center font-black text-base text-[var(--fg)]"
                 style={{ display: isCashInstitution || institution?.logoUrl ? 'none' : 'flex' }}
               >
                 {getInitials(name)}
               </div>
             </div>
 
-            {/* Name Editor: Only editable if custom account */}
-            {isCustomAccount ? (
-              isEditingName ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="bg-transparent border-b-2 border-[var(--fg)] text-[var(--fg)] font-black text-2xl w-48 text-center outline-none transition pb-0.5"
-                    autoFocus
-                    onBlur={() => setIsEditingName(false)}
-                    onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
-                  />
+            {/* Name & Type */}
+            <div className="min-w-0 flex-1">
+              {isCustomAccount ? (
+                isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="bg-[var(--field-bg)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-base font-black text-[var(--fg)] outline-none focus:border-[var(--accent)] w-full transition"
+                      autoFocus
+                      onBlur={() => setIsEditingName(false)}
+                      onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingName(false)}
+                      className="h-8 w-8 grid place-items-center bg-[var(--fg)] text-[var(--bg)] rounded-xl shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                    >
+                      <Check size={16} strokeWidth={3} />
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setIsEditingName(false)}
-                    className="p-1.5 bg-[var(--fg)] text-[var(--bg)] rounded-full shadow-xs cursor-pointer active:scale-95"
+                    onClick={() => setIsEditingName(true)}
+                    className="flex items-center gap-2 text-left group cursor-pointer"
                   >
-                    <Check size={16} strokeWidth={3} />
+                    <h2 className="text-lg font-black text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors truncate">
+                      {name}
+                    </h2>
+                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-[var(--field-bg)] text-[var(--muted)] group-hover:text-[var(--accent)] transition shrink-0">
+                      <Edit2 size={12} strokeWidth={2.2} />
+                    </span>
                   </button>
-                </div>
+                )
               ) : (
-                <div
-                  className="flex items-center gap-2 mt-1 cursor-pointer group"
-                  onClick={() => setIsEditingName(true)}
-                >
-                  <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight">{name}</h2>
-                  <div className="p-1 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] group-hover:bg-[var(--border)]/40 transition">
-                    <Edit2 size={13} className="text-[var(--fg)]" strokeWidth={2.2} />
-                  </div>
-                </div>
-              )
-            ) : (
-              <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight mt-1">{name}</h2>
-            )}
-          </div>
-        </div>
-      </div>
+                <h2 className="text-lg font-black text-[var(--fg)] truncate">{name}</h2>
+              )}
 
-      {/* ── Balance Input Section ────────────────────────────────────────── */}
-      <div className="flex-1 px-5 pt-6 pb-28">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Currency Select */}
-          <div className="space-y-2">
-            <label className="text-[11px] font-black text-[var(--muted)] uppercase tracking-wider pl-0.5">
-              {t('settings.currency', 'Mata Uang')}
-            </label>
-            <div className="relative">
-              <select
-                value={currency}
-                onChange={(e) => {
-                  const nextCurr = e.target.value
-                  setCurrency(nextCurr)
-                  if (rawBalance > 0) {
-                    const formatted = formatMoneyValueForInput(rawBalance, nextCurr)
-                    setDisplayBalance(formatted)
-                  }
-                }}
-                className="w-full bg-[var(--field-bg)] border border-[var(--border)] rounded-2xl py-3 pl-4 pr-10 text-sm font-bold text-[var(--fg)] appearance-none outline-none focus:border-[var(--fg)] transition cursor-pointer shadow-xs"
-              >
-                <option value="IDR">Indonesian Rupiah (IDR)</option>
-                <option value="USD">US Dollar (USD)</option>
-                <option value="EUR">Euro (EUR)</option>
-                <option value="SGD">Singapore Dollar (SGD)</option>
-                <option value="MYR">Malaysian Ringgit (MYR)</option>
-                <option value="JPY">Japanese Yen (JPY)</option>
-                <option value="GBP">British Pound (GBP)</option>
-                <option value="AUD">Australian Dollar (AUD)</option>
-              </select>
-              <ChevronDown size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-block rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                  {institution ? institution.type : t('wallets.customAccount', 'Akun Kustom')}
+                </span>
+                <span className="text-[11px] font-semibold text-[var(--muted)]">
+                  {getCurrencyName(currency, locale)}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Balance Input Box */}
-          <div className="space-y-2">
-            <label className="text-[11px] font-black text-[var(--muted)] uppercase tracking-wider pl-0.5">
+          {/* Divider */}
+          <div className="border-t border-[var(--border)]/60 my-4" />
+
+          {/* Amount Hero Input */}
+          <div
+            onClick={() => balanceInputRef.current?.focus()}
+            className="pt-1 cursor-text"
+          >
+            <label htmlFor="wallet-initial-balance" className="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider mb-2 select-none">
               {t('wallets.initialBalance', 'Saldo Awal')}
             </label>
-            <div className="relative flex items-center bg-[var(--panel-strong)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] rounded-2xl p-4 shadow-sm focus-within:border-[var(--fg)] transition">
-              <span className="pr-2 text-[var(--fg)] font-black text-2xl sm:text-3xl shrink-0 select-none">
-                {currency === 'IDR' ? 'Rp' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'JPY' ? '¥' : currency === 'SGD' ? 'S$' : currency === 'MYR' ? 'RM' : currency}
+
+            <div className="flex items-center gap-2.5 py-2 px-3.5 rounded-2xl bg-[var(--field-bg)] border-2 border-[var(--border)] focus-within:border-[var(--accent)] transition-all">
+              <span className="text-2xl sm:text-3xl font-extrabold text-[var(--muted)] select-none shrink-0 tabular-nums leading-none">
+                {getCurrencySymbol(currency)}
               </span>
               <input
+                ref={balanceInputRef}
+                id="wallet-initial-balance"
                 type="text"
                 inputMode="numeric"
                 value={displayBalance}
                 onChange={handleBalanceChange}
+                onFocus={(e) => {
+                  setTimeout(() => {
+                    e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }, 150)
+                }}
                 placeholder="0"
-                className="w-full bg-transparent font-black text-3xl sm:text-4xl text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight tabular-nums"
+                style={{
+                  fontSize: 'clamp(28px, 7.5vw, 38px)',
+                  fontWeight: 800,
+                  lineHeight: '1.15',
+                  height: '48px',
+                }}
+                className="ft-hero-input w-full bg-transparent font-extrabold text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)] tracking-tight tabular-nums"
               />
-              {displayBalance && (
-                <button
-                  type="button"
-                  onClick={clearBalance}
-                  className="text-[var(--muted)] hover:text-[var(--fg)] transition p-1 cursor-pointer"
-                  title={t('common.clear', 'Hapus')}
-                >
-                  <XCircle size={20} />
-                </button>
-              )}
             </div>
+            <p className="text-[11px] font-medium text-[var(--muted)] mt-2">
+              {t('wallets.initialBalanceHint', 'Masukkan saldo yang saat ini Anda miliki di rekening/dompet ini')}
+            </p>
           </div>
-        </form>
+        </div>
+
+        {/* ── Configuration Settings Group ────────────────────────────── */}
+        <div className="space-y-2">
+          <span className="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider pl-1 select-none">
+            {t('settings.walletPreferences', 'Pengaturan Rekening')}
+          </span>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] overflow-hidden shadow-card divide-y divide-[var(--border)]/60">
+            {/* Currency Selector Row */}
+            <button
+              type="button"
+              onClick={() => setIsSelectingCurrency(true)}
+              className="w-full flex items-center justify-between p-4 bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition-all cursor-pointer text-left active:scale-[0.99] group"
+            >
+              <div className="flex items-center gap-3.5 min-w-0">
+                <CurrencyFlag code={currency} size={36} className="shadow-2xs" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors truncate">
+                      {getCurrencyName(currency, locale)}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--field-bg)] border border-[var(--border)] text-[10px] font-black text-[var(--fg)] shrink-0">
+                      {currency}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-[var(--muted)] mt-0.5 truncate">
+                    {getCurrencyCountry(currency, locale)} • <span className="font-extrabold text-[var(--fg)]">{getCurrencySymbol(currency)}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[var(--muted)] group-hover:text-[var(--accent)] transition-colors shrink-0 pl-2">
+                <span className="text-xs font-bold">{t('common.change', 'Ubah')}</span>
+                <ChevronRight size={16} strokeWidth={2.5} />
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* ── Fixed Bottom CTA ────────────────────────────────────────────── */}
-      <div className="p-4 bg-[var(--bg)] border-t border-[var(--border)] mt-auto sticky bottom-0 z-40">
-        <button
-          type="submit"
-          onClick={handleSubmit}
-          disabled={!isFormValid}
-          className="w-full py-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-sm shadow-md transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-        >
-          {t('wallets.saveNewAccount', 'Simpan Akun Baru')}
-        </button>
+      {/* ── Bottom Fixed Action Button ─────────────────────────────────── */}
+      <div className="p-4 bg-[var(--panel-strong)] border-t border-[var(--border)] mt-auto sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg">
+        <div className="max-w-xl mx-auto w-full">
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={!isFormValid}
+            className="w-full py-4 rounded-2xl bg-[var(--fg)] text-[var(--bg)] font-black text-sm shadow-md transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          >
+            {t('wallets.saveNewAccount', 'Simpan Akun Baru')}
+          </button>
+        </div>
       </div>
     </div>
   )

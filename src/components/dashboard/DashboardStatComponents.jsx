@@ -1,6 +1,7 @@
 import { memo, useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { TrendingUp } from 'lucide-react'
 import { clampPercent } from './DashboardChartHelpers'
 
 /** Compact progress bar used in MetricCard */
@@ -61,6 +62,7 @@ export const MiniChartCard = memo(function MiniChartCard({
   showRightAxis = false, rightAxisTickFormatter, rightAxisWidth = 56,
   rightAxisTicks, animate = false,
   animationDuration = 900, animationEasing = 'ease',
+  emptyTitle, emptyDesc,
 }) {
   const [scrubbedPoint, setScrubbedPoint] = useState(null)
   const reactId = useId()
@@ -97,6 +99,11 @@ export const MiniChartCard = memo(function MiniChartCard({
     setScrubbedPoint(null)
   }
 
+  const isEmptyData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return true
+    return data.every((d) => !Number(d?.value) || Number(d?.value) === 0)
+  }, [data])
+
   return (
     <div
       onClick={onOpen}
@@ -105,18 +112,20 @@ export const MiniChartCard = memo(function MiniChartCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold tracking-wide text-[var(--muted)]">{title}</p>
-          <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-            <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">
-              {scrubbedPoint ? scrubbedPoint.value : value}
-            </p>
-            {scrubbedPoint?.time ? (
-              <span className="text-[10.5px] font-semibold text-[var(--accent)] bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 rounded-md truncate">
-                {scrubbedPoint.time}
-              </span>
-            ) : trendBadge ? (
-              <div className="shrink-0">{trendBadge}</div>
-            ) : null}
-          </div>
+          {!isEmptyData && (
+            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+              <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">
+                {scrubbedPoint ? scrubbedPoint.value : value}
+              </p>
+              {scrubbedPoint?.time ? (
+                <span className="inline-flex whitespace-nowrap shrink-0 items-center self-center rounded-full text-[10.5px] font-semibold text-[var(--accent)] bg-[var(--field-bg)] border border-[var(--border)] px-2 py-0.5 truncate leading-none">
+                  {scrubbedPoint.time}
+                </span>
+              ) : trendBadge ? (
+                <div className="shrink-0 inline-flex items-center self-center">{trendBadge}</div>
+              ) : null}
+            </div>
+          )}
         </div>
         {rangeLabel ? (
           <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--muted)]">
@@ -125,65 +134,86 @@ export const MiniChartCard = memo(function MiniChartCard({
         ) : null}
       </div>
 
-      <div className={`mt-3 ${showXAxisDate ? 'h-32' : 'h-28'} w-full`}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={data}
-            margin={{ top: 6, right: showRightAxis ? 4 : 8, bottom: showXAxisDate ? 4 : 0, left: 8 }}
-            onMouseMove={handleChartMove}
-            onTouchMove={handleChartMove}
-            onMouseLeave={handleChartLeave}
-            onTouchEnd={handleChartLeave}
-          >
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={stroke || 'var(--accent)'} stopOpacity={0.30} />
-                <stop offset="100%" stopColor={stroke || 'var(--accent)'} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            {showXAxisDate ? (
-              <XAxis
-                dataKey={xKey}
-                type={xKey === 'time' ? 'number' : 'category'}
-                scale={xKey === 'time' ? 'time' : 'auto'}
-                domain={xKey === 'time' ? ['dataMin', 'dataMax'] : undefined}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--muted)', fontSize: 10 }}
-                dy={0}
-                tickFormatter={(val) => {
-                  if (xKey === 'day') return val
-                  if (!val || !Number.isFinite(val)) return ''
-                  if (rangeId === '1d') return format(new Date(val), 'HH:mm')
-                  if (rangeId === 'all') return format(new Date(val), 'MMM yy')
-                  if (rangeId === '1y' || rangeId === 'ytd') return format(new Date(val), 'MMM')
-                  return format(new Date(val), 'dd MMM')
-                }}
-                interval="preserveStartEnd"
-                minTickGap={24}
+      {isEmptyData ? (
+        <div className="mt-2.5 h-36 sm:h-40 w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-3 text-center transition-colors hover:border-[var(--border-strong)]">
+          {/* Subtle background curved wave SVG */}
+          <svg className="absolute inset-0 h-full w-full opacity-10 pointer-events-none stroke-[var(--accent)] fill-none" viewBox="0 0 300 100" preserveAspectRatio="none">
+            <path d="M 0,80 Q 75,30 150,70 T 300,40" strokeWidth="2.5" strokeDasharray="6 6" />
+          </svg>
+
+          <div className="relative z-10 flex flex-col items-center gap-1.5 max-w-[280px]">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
+              <TrendingUp className="h-4 w-4 stroke-[2.5]" />
+            </div>
+            <p className="text-xs font-bold text-[var(--fg)] leading-tight">
+              {emptyTitle || (tMini ? tMini('dashboard.netWorthEmptyTitle', 'Belum Ada Pergerakan Aset') : 'Belum Ada Pergerakan Aset')}
+            </p>
+            <p className="text-[10.5px] font-medium text-[var(--muted)] leading-normal line-clamp-2">
+              {emptyDesc || (tMini ? tMini('dashboard.netWorthEmptyDesc', 'Grafik tren kekayaan otomatis tersusun begitu saldo dompet atau investasi mulai terisi.') : 'Grafik tren kekayaan otomatis tersusun begitu saldo dompet atau investasi mulai terisi.')}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className={`mt-3 ${showXAxisDate ? 'h-32' : 'h-28'} w-full`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 6, right: showRightAxis ? 4 : 8, bottom: showXAxisDate ? 4 : 0, left: 8 }}
+              onMouseMove={handleChartMove}
+              onTouchMove={handleChartMove}
+              onMouseLeave={handleChartLeave}
+              onTouchEnd={handleChartLeave}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={stroke || 'var(--accent)'} stopOpacity={0.30} />
+                  <stop offset="100%" stopColor={stroke || 'var(--accent)'} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              {showXAxisDate ? (
+                <XAxis
+                  dataKey={xKey}
+                  type={xKey === 'time' ? 'number' : 'category'}
+                  scale={xKey === 'time' ? 'time' : 'auto'}
+                  domain={xKey === 'time' ? ['dataMin', 'dataMax'] : undefined}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                  dy={0}
+                  tickFormatter={(val) => {
+                    if (xKey === 'day') return val
+                    if (!val || !Number.isFinite(val)) return ''
+                    if (rangeId === '1d') return format(new Date(val), 'HH:mm')
+                    if (rangeId === 'all') return format(new Date(val), 'MMM yy')
+                    if (rangeId === '1y' || rangeId === 'ytd') return format(new Date(val), 'MMM')
+                    return format(new Date(val), 'dd MMM')
+                  }}
+                  interval="preserveStartEnd"
+                  minTickGap={24}
+                />
+              ) : (
+                <XAxis dataKey={xKey} hide />
+              )}
+              {showRightAxis ? (
+                <YAxis
+                  domain={yDomain} orientation="right" stroke="var(--muted)"
+                  tickFormatter={rightAxisTickFormatter} ticks={rightAxisTicks}
+                  interval="preserveStartEnd" tickCount={rightAxisTicks ? undefined : 3}
+                  width={rightAxisWidth} axisLine={false} tickLine={false} fontSize={11}
+                />
+              ) : (
+                <YAxis hide domain={yDomain} />
+              )}
+              <Area
+                type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill={`url(#${gradientId})`}
+                strokeWidth={2} dot={false}
+                isAnimationActive={animate} animationBegin={24}
+                animationDuration={animationDuration} animationEasing={animationEasing}
               />
-            ) : (
-              <XAxis dataKey={xKey} hide />
-            )}
-            {showRightAxis ? (
-              <YAxis
-                domain={yDomain} orientation="right" stroke="var(--muted)"
-                tickFormatter={rightAxisTickFormatter} ticks={rightAxisTicks}
-                interval="preserveStartEnd" tickCount={rightAxisTicks ? undefined : 3}
-                width={rightAxisWidth} axisLine={false} tickLine={false} fontSize={11}
-              />
-            ) : (
-              <YAxis hide domain={yDomain} />
-            )}
-            <Area
-              type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill={`url(#${gradientId})`}
-              strokeWidth={2} dot={false}
-              isAnimationActive={animate} animationBegin={24}
-              animationDuration={animationDuration} animationEasing={animationEasing}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {lowHighText ? (
         <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums">

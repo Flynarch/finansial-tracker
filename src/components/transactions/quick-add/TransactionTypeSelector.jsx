@@ -16,10 +16,10 @@ export default function TransactionTypeSelector({ txType, onSelectType }) {
     <div className="relative flex items-center rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)] select-none">
       {/* Animated Sliding Indicator Pill */}
       <div
-        className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm pointer-events-none"
+        className="absolute top-1 bottom-1 left-1 rounded-xl transition-all duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm pointer-events-none transform-gpu will-change-transform"
         style={{
           width: 'calc((100% - 8px) / 3)',
-          left: `calc(4px + ${typeIndex} * ((100% - 8px) / 3))`,
+          transform: `translate3d(${typeIndex * 100}%, 0, 0)`,
           backgroundColor:
             txType === 'expense'
               ? 'var(--expense)'

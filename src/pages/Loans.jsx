@@ -9,7 +9,6 @@ import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useLoanStore from '../store/useLoanStore'
-import useBottomSheet from '../hooks/useBottomSheet'
 import useBackButton from '../hooks/useBackButton'
 import useSwipeAction from '../hooks/useSwipeAction'
 import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
@@ -105,7 +104,9 @@ export default function Loans() {
   const deleteLoan = useLoanStore((s) => s.deleteLoan)
   const updateLoan = useLoanStore((s) => s.updateLoan)
 
-  const { isOpen: isSheetOpen, openSheet, closeSheet } = useBottomSheet(false)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const openSheet = useCallback(() => setIsSheetOpen(true), [])
+  const closeSheet = useCallback(() => setIsSheetOpen(false), [])
   const [editingLoan, setEditingLoan] = useState(null)
   const [deletingLoan, setDeletingLoan] = useState(null)
 
@@ -284,9 +285,6 @@ export default function Loans() {
               <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">
                 {t('loans.title')}
               </h1>
-              <p className="text-xs font-bold text-[var(--muted)]">
-                {t('loans.subtitle')}
-              </p>
             </div>
           </div>
 
@@ -520,14 +518,14 @@ export default function Loans() {
                 return (
                   <div
                     key={item.id}
-                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:border-[var(--border-strong)] transition-all"
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] select-none transition-all"
                   >
-                    {/* Progressive Swipe Background (Habits Style) */}
-                    <div className="absolute inset-0 z-0 flex items-center justify-end rounded-2xl px-5 opacity-0 transition-colors duration-200" />
+                    {/* Progressive Swipe Background (Revealed Action Slot) */}
+                    <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-2xl px-5 opacity-0 transition-colors duration-150 w-full" />
 
                     {/* Swipable Compact Card Content (Front Layer) */}
                     <article
-                      className="loan-entry relative z-10 bg-[var(--panel-strong)] p-3.5 space-y-2.5 touch-pan-y cursor-pointer"
+                      className="loan-entry relative z-10 bg-[var(--panel-strong)] border-r border-[var(--border)]/70 p-3.5 space-y-2.5 touch-pan-y cursor-pointer"
                       onClick={(e) => {
                         if (isSwiped) {
                           openEdit(item, e)
@@ -719,10 +717,10 @@ export default function Loans() {
                                 type="button"
                                 onClick={(e) => openForgiveModal(item, e)}
                                 className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-purple-500 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                                title={t('loans.action.forgive', 'Ikhlaskan')}
+                                title={isDebt ? t('loans.action.forgiveDebt', 'Diikhlaskan') : t('loans.action.forgive', 'Ikhlaskan')}
                               >
                                 <HeartHandshake className="h-3 w-3" />
-                                <span>{t('loans.action.forgive', 'Ikhlaskan')}</span>
+                                <span>{isDebt ? t('loans.action.forgiveDebt', 'Diikhlaskan') : t('loans.action.forgive', 'Ikhlaskan')}</span>
                               </button>
                               <button
                                 type="button"

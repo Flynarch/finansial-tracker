@@ -19,7 +19,7 @@
       <stop offset="100%" stop-color="#D97706"/>
     </linearGradient>
   </defs>
-  <rect width="80" height="80" rx="22" fill="#0F172A"/>
+  <rect width="80" height="80" rx="22" fill="#FEF3C7"/>
   <path d="M28 17C25 12 22 10 30 10C34 10 36 14 40 14C44 14 46 10 50 10C58 10 55 12 52 17C50 22 30 22 28 17Z" fill="url(#top)" stroke="#92400E" stroke-width="1.5"/>
   <rect x="25" y="23" width="30" height="5.5" rx="2.75" fill="url(#rope)" stroke="#7F1D1D" stroke-width="1"/>
   <path d="M31 29L28 36M35 29L34 37" stroke="#991B1B" stroke-width="2.2" stroke-linecap="round"/>

@@ -105,7 +105,6 @@ export function useDashboardData() {
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   const [comparePrevious, setComparePrevious] = useState(false)
-  const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false)
   const [zoomTooltipDismissed, setZoomTooltipDismissed] = useState(false)
 
   useEffect(() => {
@@ -1107,8 +1106,6 @@ export function useDashboardData() {
     comparePrevious,
     setComparePrevious,
     comparisonSummary,
-    showDetailedAnalytics,
-    setShowDetailedAnalytics,
     zoomTooltipDismissed,
     setZoomTooltipDismissed,
     isCoarsePointer,

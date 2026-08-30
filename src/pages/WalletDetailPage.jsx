@@ -12,7 +12,6 @@ import {
   Check,
   X,
   Wallet as WalletIcon,
-  Archive,
   Download,
   Edit2,
   Eye,
@@ -23,7 +22,7 @@ import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService'
-import { deleteWallet, archiveWallet, unarchiveWallet, updateWallet } from '../services/walletService'
+import { deleteWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
 import useSwipeAction from '../hooks/useSwipeAction'
 import Modal from '../components/ui/Modal'
@@ -158,18 +157,6 @@ export default function WalletDetailPage() {
     }
   }
 
-  const handleToggleArchive = async () => {
-    try {
-      if (wallet?.isArchived) {
-        await unarchiveWallet(walletId)
-      } else {
-        await archiveWallet(walletId)
-      }
-      setIsActionMenuOpen(false)
-    } catch (err) {
-      console.error('Failed to toggle archive', err)
-    }
-  }
 
   const handleExportWalletCsv = () => {
     const csvContent = toTransactionsCsv(allTransactions || [])
@@ -756,28 +743,6 @@ export default function WalletDetailPage() {
             </div>
           </button>
 
-          {/* Action 4: Archive / Unarchive */}
-          <button
-            type="button"
-            onClick={handleToggleArchive}
-            className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[var(--field-bg)] text-[var(--muted)] flex items-center justify-center">
-                <Archive size={18} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[var(--fg)]">
-                  {wallet?.isArchived ? t('wallets.unarchive', 'Buka Arsip Dompet') : t('wallets.archive', 'Arsipkan Dompet')}
-                </p>
-                <p className="text-[10px] text-[var(--muted)]">
-                  {wallet?.isArchived
-                    ? t('wallets.unarchiveDesc', 'Kembalikan dompet ke daftar aktif')
-                    : t('wallets.archiveDesc', 'Sembunyikan dompet dari daftar transaksi aktif')}
-                </p>
-              </div>
-            </div>
-          </button>
 
           {/* Action 5: Delete Wallet */}
           <button
@@ -828,8 +793,8 @@ export default function WalletDetailPage() {
           <p className="text-[13px] leading-relaxed text-[var(--muted)] mb-4">
             {t('wallets.adjustBalanceDesc', 'Masukkan nominal saldo riil Anda. Sistem otomatis membuat transaksi penyesuaian untuk selisihnya.')}
           </p>
-          <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] focus-within:border-[var(--accent)] transition-colors mb-5">
-            <span className="pl-4 text-[var(--muted)] font-bold text-sm select-none">
+          <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] focus-within:border-[var(--accent)] transition-colors mb-5 px-4 py-1">
+            <span className="pr-2 text-[var(--muted)] font-black text-lg select-none">
               {(wallet?.currency || defaultCurrency) === 'IDR' ? 'Rp' : (wallet?.currency || defaultCurrency) === 'USD' ? '$' : wallet?.currency || defaultCurrency}
             </span>
             <input
@@ -837,7 +802,10 @@ export default function WalletDetailPage() {
               inputMode="numeric"
               value={newBalanceRaw}
               onChange={(e) => setNewBalanceRaw(formatMoneyInput(e.target.value, wallet?.currency || defaultCurrency))}
-              className="w-full bg-transparent py-3.5 pl-3 pr-4 font-black text-xl text-[var(--fg)] outline-none"
+              onFocus={(e) => {
+                setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120)
+              }}
+              className="w-full bg-transparent py-3 pl-1 pr-2 font-black text-2xl text-[var(--fg)] outline-none tabular-nums"
               autoFocus
             />
           </div>

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Sparkles, X, Mic, MicOff, Image as ImageIcon, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
+import { Sparkles, X, Mic, MicOff, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { parseTransactionFromText } from '../../lib/gemini'
@@ -15,6 +16,8 @@ import AiDigitalReceipt from './AiDigitalReceipt'
 import AiIntentSwitchDialog from './AiIntentSwitchDialog'
 import ReceiptScanModePicker from './ReceiptScanModePicker'
 import VoiceVisualizer from './VoiceVisualizer'
+import MediaSourcePickerModal from './MediaSourcePickerModal'
+import { triggerHaptic } from '../../lib/haptics'
 
 const CURRENCY_SAMPLE_TEMPLATES = {
   IDR: {
@@ -274,6 +277,7 @@ function generateSampleChips(userWallets = [], currency = 'IDR', locale = 'id') 
 }
 
 export default function AiQuickLogModal() {
+  const navigate = useNavigate()
   const isOpen = useChatStore((s) => s.isQuickLogOpen)
   const closeQuickLog = useChatStore((s) => s.closeQuickLog)
   const switchToFullChat = useChatStore((s) => s.switchToFullChat)
@@ -339,6 +343,7 @@ export default function AiQuickLogModal() {
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
+  const [showMediaSourcePicker, setShowMediaSourcePicker] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
@@ -395,9 +400,7 @@ export default function AiQuickLogModal() {
 
     if (isOpen) {
       frameId = requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsAnimatingIn(true)
-        })
+        setIsAnimatingIn(true)
       })
     } else {
       if (recognitionRef.current) {
@@ -437,6 +440,10 @@ export default function AiQuickLogModal() {
   }, [isOpen, closeQuickLog])
 
   useBackButton(() => {
+    if (showMediaSourcePicker) {
+      setShowMediaSourcePicker(false)
+      return
+    }
     if (modalMode === 'scan_mode') {
       setModalMode('input')
       setSelectedImage(null)
@@ -734,6 +741,8 @@ function isObviousNonTransaction(text) {
 
   const handleSwitchToChat = (prompt) => {
     switchToFullChat(prompt || lastSubmittedPrompt)
+    closeQuickLog()
+    navigate('/ai-chat')
   }
 
   if (!shouldRender) return null
@@ -766,7 +775,7 @@ function isObviousNonTransaction(text) {
             ? 'none'
             : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
         }}
-        className={`absolute inset-x-0 bottom-0 ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
+        className={`absolute left-0 right-0 bottom-0 w-full ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
       >
         {/* Top Drag Handle & Header (Fixed stable dimensions to prevent mobile jumping) */}
         <div
@@ -796,7 +805,11 @@ function isObviousNonTransaction(text) {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => switchToFullChat(inputValue)}
+                onClick={() => {
+                  switchToFullChat(inputValue)
+                  closeQuickLog()
+                  navigate('/ai-chat')
+                }}
                 title={t('aiChat.title', 'Buka AI Finance Chat')}
                 className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer flex items-center gap-1"
                 aria-label={t('aiChat.title', 'Buka AI Finance Chat')}
@@ -904,39 +917,18 @@ function isObviousNonTransaction(text) {
                       {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </button>
 
-                    {/* Camera Instant Snapshot Button */}
-                    <input
-                      type="file"
-                      ref={cameraInputRef}
-                      onChange={handleImageSelect}
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                    />
+                    {/* Unified Camera / Gallery Media Button */}
                     <button
                       type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                      onClick={() => {
+                        triggerHaptic('light')
+                        setShowMediaSourcePicker(true)
+                      }}
                       className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                      title={t('aiQuickLog.camera', 'Foto Struk Fisik (Kamera)')}
+                      title={t('aiChat.media.title', 'Lampirkan Foto atau Struk')}
+                      aria-label={t('aiChat.media.title', 'Lampirkan Foto atau Struk')}
                     >
                       <Camera className="h-4 w-4" />
-                    </button>
-
-                    {/* Image / Struk Upload Gallery Button */}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageSelect}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer"
-                      title={t('aiQuickLog.gallery', 'Pilih Struk dari Galeri')}
-                    >
-                      <ImageIcon className="h-4 w-4" />
                     </button>
                   </div>
 
@@ -996,6 +988,32 @@ function isObviousNonTransaction(text) {
             </div>
           )}
 
+          {/* Hidden File Inputs for Camera and Gallery */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            accept="image/*"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handleImageSelect}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
+
+          {/* Media Source Picker Modal (Camera vs Gallery) */}
+          <MediaSourcePickerModal
+            isOpen={showMediaSourcePicker}
+            onClose={() => setShowMediaSourcePicker(false)}
+            onSelectCamera={() => cameraInputRef.current?.click()}
+            onSelectGallery={() => fileInputRef.current?.click()}
+            locale={locale}
+          />
+
           {/* MODE 1.5: Receipt Scan Mode Picker */}
           {modalMode === 'scan_mode' && (
             <ReceiptScanModePicker
@@ -1011,7 +1029,7 @@ function isObviousNonTransaction(text) {
                 setModalMode('input')
               }}
               onChangeImage={() => {
-                cameraInputRef.current?.click()
+                setShowMediaSourcePicker(true)
               }}
             />
           )}

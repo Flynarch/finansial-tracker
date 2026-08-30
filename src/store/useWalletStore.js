@@ -3,8 +3,6 @@ import {
   createWallet,
   updateWallet,
   deleteWallet,
-  archiveWallet,
-  unarchiveWallet,
 } from '../services/walletService'
 
 const useWalletStore = create(() => ({
@@ -20,14 +18,6 @@ const useWalletStore = create(() => ({
 
   deleteWallet: async (id) => {
     return await deleteWallet(id)
-  },
-
-  archiveWallet: async (id) => {
-    return await archiveWallet(id)
-  },
-
-  unarchiveWallet: async (id) => {
-    return await unarchiveWallet(id)
   },
 }))
 

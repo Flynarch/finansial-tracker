@@ -34,6 +34,14 @@ function NavIcon({ name, isActive }) {
           <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" strokeLinecap="round" />
         </svg>
       )
+    case 'handcoins':
+      return (
+        <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>
+          <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.7-2.9l-3.7 2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="18" cy="5" r="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
     case 'chart':
       return (
         <svg viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth={sw}>

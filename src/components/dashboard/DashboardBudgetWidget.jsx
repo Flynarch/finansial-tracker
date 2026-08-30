@@ -230,7 +230,7 @@ export const DashboardBudgetWidget = memo(function DashboardBudgetWidget({
                               className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 text-xs cursor-pointer hover:border-[var(--border-strong)] transition-all"
                             >
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${colorClass}`}>
+                                <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${colorClass}`}>
                                   <CategoryIcon iconKey={iconKey} className="h-3.5 w-3.5" />
                                 </div>
                                 <div className="min-w-0 flex-1">

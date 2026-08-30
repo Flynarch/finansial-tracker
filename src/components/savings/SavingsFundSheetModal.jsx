@@ -127,37 +127,56 @@ export default function SavingsFundSheetModal({
       maxWidth="max-w-md"
     >
       <div className="space-y-4 pt-1">
-        {/* Tab Setor vs Tarik */}
-        <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1">
+        {/* Tab Setor vs Tarik (Animated Sliding Segment) */}
+        <div className="relative grid grid-cols-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1 select-none overflow-hidden">
+          {/* Sliding Pill Indicator */}
+          <div
+            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-out shadow-sm ${
+              fundActionType === 'withdraw'
+                ? 'left-[calc(50%+2px)] bg-[var(--earthy-terra)]'
+                : 'left-1 bg-[var(--earthy-green)]'
+            }`}
+          />
+
           <button
             type="button"
             onClick={() => setFundActionType('add')}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
+            className={`relative z-10 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-colors duration-200 cursor-pointer ${
               fundActionType === 'add'
-                ? 'bg-[var(--earthy-green)] text-white shadow-sm scale-[1.02]'
+                ? 'text-white'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
             <Plus size={14} strokeWidth={3} />
-            Setor (Tambah)
+            {t('savings.deposit', 'Setor')}
           </button>
           <button
             type="button"
             onClick={() => setFundActionType('withdraw')}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-all cursor-pointer ${
+            className={`relative z-10 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition-colors duration-200 cursor-pointer ${
               fundActionType === 'withdraw'
-                ? 'bg-[var(--earthy-terra)] text-white shadow-sm scale-[1.02]'
+                ? 'text-white'
                 : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
             <Minus size={14} strokeWidth={3} />
-            Tarik (Kurangi)
+            {t('savings.withdraw', 'Tarik')}
           </button>
         </div>
 
-        {/* Amount Input */}
-        <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] mb-1">
+        {/* Amount Input with Subtle Dynamic Glowlight */}
+        <div
+          className={`relative rounded-2xl border p-4 text-center transition-all duration-300 ${
+            fundActionType === 'withdraw'
+              ? 'border-rose-500/40 bg-[color-mix(in_srgb,var(--earthy-terra)_6%,var(--field-bg))] shadow-[0_0_20px_-4px_rgba(244,63,94,0.22)]'
+              : 'border-emerald-500/40 bg-[color-mix(in_srgb,var(--earthy-green)_6%,var(--field-bg))] shadow-[0_0_20px_-4px_rgba(16,185,129,0.22)]'
+          }`}
+        >
+          <p
+            className={`text-[10px] font-extrabold uppercase tracking-wider mb-1 transition-colors duration-300 ${
+              fundActionType === 'withdraw' ? 'text-[var(--earthy-terra)]' : 'text-[var(--earthy-green)]'
+            }`}
+          >
             {fundActionType === 'withdraw' ? 'Jumlah Penarikan' : 'Jumlah Setoran'}
           </p>
           <input

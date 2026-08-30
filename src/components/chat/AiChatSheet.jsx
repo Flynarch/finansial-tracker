@@ -862,7 +862,7 @@ export default function AiChatSheet({ isOpen, onClose, messages, setMessages }) 
       
       <div 
         ref={chatSheetRef}
-        className={`ft-chat-sheet ${isAnimatingIn ? 'ft-chat-sheet--open' : ''}`}
+        className={`ft-chat-sheet fixed left-0 right-0 bottom-0 w-full max-w-2xl mx-auto ${isAnimatingIn ? 'ft-chat-sheet--open' : ''}`}
       >
         <div className="ft-chat-drag-handle" />
 

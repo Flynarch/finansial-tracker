@@ -121,13 +121,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     <div
       key={transaction.id}
       data-transaction-id={transaction.id}
-      className="relative overflow-hidden bg-[var(--panel-strong)] hover:bg-[var(--field-bg)]/60 transition-colors"
+      className="relative overflow-hidden bg-[var(--field-bg)] select-none"
     >
       {/* Progressive Swipe Background */}
-      <div className="absolute inset-0 z-0 flex items-center justify-end px-5 opacity-0 transition-colors duration-200" />
+      <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end px-5 opacity-0 transition-colors duration-150 w-full" />
 
       <article
-        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 transition-colors ${
+        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 bg-[var(--panel-strong)] border-r border-[var(--border)]/60 transition-colors ${
           highlightedTransactionId === String(transaction.id)
             ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/50'
             : ''

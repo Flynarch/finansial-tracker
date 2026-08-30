@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Printer, Sparkles, FileSpreadsheet, Check } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -7,9 +8,11 @@ import { formatCurrency } from '../../lib/utils'
 import { triggerHaptic } from '../../lib/haptics'
 
 const RANGE_OPTIONS = [
+  { id: 1, label: '1M' },
   { id: 3, label: '3M' },
   { id: 6, label: '6M' },
-  { id: 12, label: '12M' },
+  { id: 'ytd', label: 'YTD' },
+  { id: 12, label: '1Y' },
 ]
 
 export default function ReportHeader({
@@ -19,31 +22,21 @@ export default function ReportHeader({
   onExportCsv,
   onPrintReport,
 }) {
+  const navigate = useNavigate()
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [csvExported, setCsvExported] = useState(false)
 
   const handleOpenAiChat = () => {
-    triggerHaptic('light')
-    const store = useChatStore.getState()
+    triggerHaptic('medium')
     const latestData = monthlyIncomeExpense?.at(-1) || { income: 0, expense: 0, month: '' }
-    const prevData = monthlyIncomeExpense?.at(-2) || { income: 0, expense: 0, month: '' }
-
-    store.addMessage({
-      id: Date.now(),
-      role: 'system',
-      type: 'hidden',
-      content: `[KONTEKS LAPORAN FINANSIAL: User sedang melihat Laporan Finansial rentang ${rangeMonths} bulan.\n` +
-        `- Bulan ini (${latestData.month}): Pemasukan ${formatCurrency(latestData.income, defaultCurrency)}, Pengeluaran ${formatCurrency(latestData.expense, defaultCurrency)}\n` +
-        `- Bulan lalu (${prevData.month}): Pemasukan ${formatCurrency(prevData.income, defaultCurrency)}, Pengeluaran ${formatCurrency(prevData.expense, defaultCurrency)}\n` +
-        `Bantu berikan analisis mendalam, perbandingan, dan saran penghematan konkret!]`,
-    })
 
     const promptText = locale === 'en'
-      ? 'Please analyze my financial report for this month. What can I optimize or save more on?'
-      : 'Tolong analisis laporan keuangan saya bulan ini. Apa yang bisa saya optimalkan atau hemat lagi?'
+      ? `Please analyze my financial report (${rangeMonths} period). This month income is ${formatCurrency(latestData.income, defaultCurrency)} and expense is ${formatCurrency(latestData.expense, defaultCurrency)}. What are your key insights and saving recommendations?`
+      : `Tolong analisis laporan keuangan saya (rentang ${rangeMonths}). Bulan ini pemasukan ${formatCurrency(latestData.income, defaultCurrency)} dan pengeluaran ${formatCurrency(latestData.expense, defaultCurrency)}. Apa saran penghematan dan optimasi terbaik untuk saya?`
 
-    store.openWithPrompt(promptText)
+    useChatStore.getState().openWithPrompt(promptText)
+    navigate('/ai-chat')
   }
 
   const handleCsvClick = () => {
@@ -52,7 +45,26 @@ export default function ReportHeader({
       const ok = onExportCsv()
       if (ok) {
         setCsvExported(true)
-        setTimeout(() => setCsvExported(false), 2000)
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: t('reports.csvExportSuccess', 'Ekspor CSV Berhasil'),
+              message: t('reports.csvExportSuccessDesc', 'Laporan data transaksi berhasil diunduh.'),
+              type: 'success',
+            },
+          })
+        )
+        setTimeout(() => setCsvExported(false), 2500)
+      } else {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: t('reports.csvExportEmpty', 'Tidak Ada Transaksi'),
+              message: t('reports.csvExportEmptyDesc', 'Tidak ada data transaksi pada rentang waktu ini untuk diekspor.'),
+              type: 'warning',
+            },
+          })
+        )
       }
     }
   }
@@ -67,73 +79,85 @@ export default function ReportHeader({
   }
 
   return (
-    <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-      <div className="relative p-4 sm:p-5">
-        {/* Top Row: Title + Action Buttons */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl">{t('reports.title')}</h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-[var(--muted)] line-clamp-2">{t('reports.subtitle')}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {/* CSV Export Button */}
-            <button
-              type="button"
-              onClick={handleCsvClick}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
-              title={t('reports.csvTitle', 'Ekspor Laporan Transaksi ke CSV/Excel')}
-            >
-              {csvExported ? (
-                <Check className="h-3.5 w-3.5 text-emerald-500" />
-              ) : (
-                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
-              )}
-              <span>{csvExported ? 'Unduh...' : 'CSV'}</span>
-            </button>
-
-            {/* AI Analysis Button */}
-            <button
-              type="button"
-              onClick={handleOpenAiChat}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel-strong))] px-2.5 py-1.5 text-xs font-bold text-[var(--accent)] shadow-xs transition hover:bg-[color-mix(in_srgb,var(--accent)_20%,var(--panel-strong))] active:scale-95 cursor-pointer"
-              title={t('reports.aiTitle', 'Analisis Laporan dengan AI')}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>AI</span>
-            </button>
-
-            {/* PDF / Print Export */}
-            <button
-              type="button"
-              onClick={handlePrintClick}
-              className="no-print inline-flex items-center gap-1.5 rounded-xl border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--field-bg)] px-2.5 py-1.5 text-xs font-bold text-[var(--fg)] shadow-xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
-              title={t('reports.pdfTitle', 'Cetak Laporan / Simpan PDF')}
-            >
-              <Printer className="h-3.5 w-3.5 text-[var(--accent)]" />
-              <span>Cetak</span>
-            </button>
-          </div>
+    <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-[var(--shadow-card)]">
+      {/* Top Row: Title + Action Pill Buttons */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--fg)]">
+            {t('reports.title', 'Laporan Finansial')}
+          </h1>
+          <p className="mt-0.5 text-xs sm:text-sm font-medium text-[var(--muted)]">
+            {t('reports.subtitle', 'Performa bulanan, arus kas, dan komposisi kekayaan bersih')}
+          </p>
         </div>
 
-        {/* Range Picker -- inline row below subtitle */}
-        <div className="no-print mt-3 inline-flex rounded-xl border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] p-1 backdrop-blur-md">
-          {RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => {
-                triggerHaptic('light')
-                setRangeMonths(opt.id)
-              }}
-              className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-bold tracking-wide transition cursor-pointer ${
-                rangeMonths === opt.id
-                  ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--border)]'
-                  : 'text-[var(--muted)] hover:text-[var(--fg)]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* Action Buttons Bar with Unified Outlined Pill Styling */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* CSV Export */}
+          <button
+            type="button"
+            onClick={handleCsvClick}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] shadow-2xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
+            title={t('reports.csvTitle', 'Ekspor Laporan Transaksi ke CSV/Excel')}
+          >
+            {csvExported ? (
+              <Check className="h-3.5 w-3.5 text-emerald-500 stroke-[3]" />
+            ) : (
+              <FileSpreadsheet className="h-3.5 w-3.5 text-[var(--muted)]" />
+            )}
+            <span>{csvExported ? 'Diunduh' : 'CSV'}</span>
+          </button>
+
+          {/* AI Advisor Button */}
+          <button
+            type="button"
+            onClick={handleOpenAiChat}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] shadow-2xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
+            title={t('reports.aiTitle', 'Analisis Laporan dengan AI')}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />
+            <span>AI Advisor</span>
+          </button>
+
+          {/* PDF / Print Statement */}
+          <button
+            type="button"
+            onClick={handlePrintClick}
+            className="no-print inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 text-xs font-bold text-[var(--fg)] shadow-2xs transition hover:bg-[var(--panel)] active:scale-95 cursor-pointer"
+            title={t('reports.pdfTitle', 'Cetak Laporan / Simpan PDF')}
+          >
+            <Printer className="h-3.5 w-3.5 text-[var(--muted)]" />
+            <span>PDF</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Horizon Horizon Selector (1M / 3M / 6M / YTD / 1Y) */}
+      <div className="no-print mt-4 flex items-center justify-between border-t border-[var(--border)]/60 pt-3">
+        <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
+          {t('reports.timeHorizon', 'Rentang Waktu')}:
+        </span>
+        <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 shadow-2xs overflow-x-auto max-w-full">
+          {RANGE_OPTIONS.map((opt) => {
+            const isSelected = rangeMonths === opt.id
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light')
+                  setRangeMonths(opt.id)
+                }}
+                className={`rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-black transition cursor-pointer shrink-0 ${
+                  isSelected
+                    ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs ring-1 ring-[var(--border)]'
+                    : 'text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
       </div>
     </section>

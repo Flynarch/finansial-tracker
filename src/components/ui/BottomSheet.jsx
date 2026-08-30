@@ -16,7 +16,7 @@ export default function BottomSheet({
   closeAriaLabel,
 }) {
   const { t } = useTranslation()
-  const { isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const defaultCloseLabel = closeAriaLabel || t('common.close', 'Tutup')
 
   const [dragOffset, setDragOffset] = useState(0)
@@ -59,7 +59,7 @@ export default function BottomSheet({
     touchStartY.current = 0
   }, [dragOffset, closeSheet])
 
-  if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
+  if (!isMounted || typeof document === 'undefined') return null
 
   return createPortal(
     <div

@@ -4,7 +4,6 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
-import useChatStore from '../../store/useChatStore'
 import UserAvatar from '../ui/UserAvatar'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -158,7 +157,7 @@ function Navbar() {
           <button
             type="button"
             data-tour="ai-chat-btn"
-            onClick={() => useChatStore.getState().setIsOpen(true)}
+            onClick={() => navigate('/ai-chat')}
             aria-label={t('aiChat.title', 'Konsultasi AI Chat')}
             title={t('aiChat.title', 'Konsultasi AI Chat')}
             className="relative inline-flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--field-bg)] active:scale-[0.92] shadow-2xs transition-all duration-150 cursor-pointer"

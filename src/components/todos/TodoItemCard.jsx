@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { ChevronRight, Check, Clock } from 'lucide-react'
-import { priorityClass } from './TodoMeta'
+import { priorityClass, TODO_CATEGORY_META } from './TodoMeta'
 
 const updateBgVisual = (bgEl, mode) => {
   if (!bgEl || bgEl.dataset.swipeMode === mode) return
@@ -54,14 +54,17 @@ export const TodoItemCard = memo(function TodoItemCard({
   const status = dueStatus(todo.dueDate)
   const dueBadgeCls = dueBadgeClass(status)
 
+  const catMeta = TODO_CATEGORY_META[todo.category] || TODO_CATEGORY_META.lainnya
+  const CatIcon = catMeta.icon
+
   return (
     <li key={todo.id}>
-      <div className="relative">
+      <div className="relative group">
         {/* Progressive Swipe Background */}
-        <div className="absolute inset-0 z-0 flex items-center justify-between rounded-[1.25rem] px-5 opacity-0 transition-colors duration-200" />
+        <div className="absolute inset-0 z-0 flex items-center justify-between rounded-2xl px-5 opacity-0 transition-colors duration-200" />
 
         <div
-          className={`relative z-10 flex h-full touch-pan-y flex-col justify-between rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-3 shadow-xs transition-colors ${doneStyle} ${dimCompleted} ${
+          className={`relative z-10 flex h-full touch-pan-y flex-col justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs transition-all ${doneStyle} ${dimCompleted} ${
             status?.borderClass || ''
           }`}
           style={{
@@ -157,31 +160,31 @@ export const TodoItemCard = memo(function TodoItemCard({
             updateBgVisual(bgEl, 'none')
           }}
         >
-          <div className="flex items-start gap-2.5">
-            {/* Round completion checkbox button with expanded touch target */}
+          <div className="flex items-center gap-3">
+            {/* Square completion checkbox button centered vertically */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 toggleCardComplete(todo.id, todo.completed)
               }}
-              className="mt-0 flex h-9 w-9 min-h-[36px] min-w-[36px] shrink-0 items-center justify-center -m-1.5 p-1.5 rounded-full cursor-pointer group/check"
+              className="flex h-9 w-9 min-h-[36px] min-w-[36px] shrink-0 items-center justify-center -m-1 p-1 rounded-xl cursor-pointer group/check self-center"
               aria-label={todo.completed ? t('todos.unmarkComplete') : t('todos.markComplete')}
             >
               <div
-                className={`flex h-5 w-5 items-center justify-center rounded-full border transition active:scale-90 ${
+                className={`flex h-5.5 w-5.5 items-center justify-center rounded-md border-2 transition-transform duration-200 active:scale-85 ${
                   todo.completed
-                    ? 'border-[var(--status-income)] bg-[var(--status-income)] text-white'
-                    : 'border-[var(--border-strong)] bg-transparent group-hover/check:border-[var(--status-income)]/50'
+                    ? 'border-[var(--status-income)] bg-[var(--status-income)] text-white shadow-2xs'
+                    : 'border-[var(--border-strong)] bg-[var(--field-bg)] group-hover/check:border-[var(--status-income)]/60'
                 }`}
               >
-                {todo.completed && <Check className="h-3 w-3" strokeWidth={3} />}
+                {todo.completed && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
               </div>
             </button>
 
             {/* Todo Info & Title */}
             <div
-              className="flex-1 min-w-0 cursor-pointer"
+              className="flex-1 min-w-0 cursor-pointer py-0.5"
               onClick={() => {
                 if (ignoreNextClickRef.current) {
                   ignoreNextClickRef.current = false
@@ -190,49 +193,63 @@ export const TodoItemCard = memo(function TodoItemCard({
                 openDetail(todo.id)
               }}
             >
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Eyebrow Meta Row (Category & Priority above Title) */}
+              {(todo.category || todo.priority) && (
+                <div className="mb-1 flex items-center gap-1.5 flex-wrap">
+                  {todo.category && (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold ${catMeta.bg} ${catMeta.color} border border-current/15`}>
+                      <CatIcon size={9.5} className="shrink-0" />
+                      <span>{t(`todo.cat.${todo.category}`)}</span>
+                    </span>
+                  )}
+
+                  {todo.priority && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)]">
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${priorityClass(todo.priority)}`} />
+                      <span>{t(`todo.priority.${todo.priority}`)}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Title */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span
-                  className={`text-xs sm:text-sm font-bold text-[var(--fg)] tracking-tight leading-snug break-words ${
+                  className={`text-[17px] sm:text-lg font-black text-[var(--fg)] tracking-tight leading-snug break-words ${
                     todo.completed ? 'line-through text-[var(--muted)]' : ''
                   }`}
                 >
                   {todo.title}
                 </span>
-
-                {/* Priority dot indicator */}
-                <span
-                  className={`h-2 w-2 rounded-full shrink-0 ${priorityClass(todo.priority)}`}
-                  title={`Priority: ${todo.priority || 'normal'}`}
-                />
               </div>
 
               {/* Sub-progress bar if subtasks exist */}
               {showProg && (
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 rounded-full bg-[var(--field-bg)] overflow-hidden">
+                <div className="mt-2 flex items-center gap-2.5">
+                  <div className="h-1.5 flex-1 rounded-full bg-[var(--field-bg)] border border-[var(--border)] overflow-hidden relative">
                     <div
-                      className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
-                      style={{ width: `${((subProgress.done || 0) / subProgress.total) * 100}%` }}
+                      className="h-full bg-[var(--status-income)] transition-all duration-300 rounded-full"
+                      style={{ width: `${Math.round(((subProgress.done || 0) / subProgress.total) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-bold text-[var(--muted)] shrink-0">
-                    {subProgress.done || 0}/{subProgress.total}
+                  <span className="text-[11px] font-bold text-[var(--muted)] shrink-0 tabular-nums">
+                    {subProgress.done || 0}/{subProgress.total} ({Math.round(((subProgress.done || 0) / subProgress.total) * 100)}%)
                   </span>
                 </div>
               )}
 
-              {/* Due Date & Reminder Badge */}
+              {/* Due Date & Reminder Badge (Bottom) */}
               {todo.dueDate && (
-                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${dueBadgeCls}`}>
-                    {status?.label || todo.dueDate}
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${dueBadgeCls}`}>
+                    <span>{status?.label || todo.dueDate}</span>
+                    {todo.reminderTime && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] opacity-80">
+                        <Clock size={9} className="shrink-0" />
+                        <span>{todo.reminderTime}</span>
+                      </span>
+                    )}
                   </span>
-                  {todo.reminderTime && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--muted)] font-medium">
-                      <Clock size={10} className="shrink-0 text-[var(--muted)]" />
-                      <span>{todo.reminderTime}</span>
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -241,7 +258,7 @@ export const TodoItemCard = memo(function TodoItemCard({
             <button
               type="button"
               onClick={() => openDetail(todo.id)}
-              className="rounded-lg p-1 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition shrink-0 cursor-pointer"
+              className="rounded-xl p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors shrink-0 cursor-pointer self-center"
               aria-label={t('common.details', 'Detail')}
             >
               <ChevronRight className="h-4 w-4" />

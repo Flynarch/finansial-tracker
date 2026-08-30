@@ -132,6 +132,8 @@ export default function LoanForgiveModal({
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>{t('common.processing', 'Memproses...')}</span>
               </span>
+            ) : isDebt ? (
+              t('loans.forgive.confirmBtnDebt', 'Tandai Diikhlaskan')
             ) : (
               t('loans.forgive.confirmBtn', 'Ikhlaskan Pinjaman')
             )}

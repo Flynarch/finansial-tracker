@@ -78,35 +78,3 @@ export async function downloadLatestBackupJson(uid) {
     return null
   }
 }
-
-export async function uploadToDropbox(accessToken, jsonString) {
-  const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify({
-        path: '/fintrack-backup.json',
-        mode: 'overwrite',
-        mute: true,
-      }),
-    },
-    body: jsonString,
-  })
-  if (!response.ok) throw new Error('Dropbox upload failed')
-  return response.json()
-}
-
-export async function downloadFromDropbox(accessToken) {
-  const response = await fetch('https://content.dropboxapi.com/2/files/download', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Dropbox-API-Arg': JSON.stringify({
-        path: '/fintrack-backup.json',
-      }),
-    },
-  })
-  if (!response.ok) throw new Error('Dropbox download failed')
-  return response.json()
-}

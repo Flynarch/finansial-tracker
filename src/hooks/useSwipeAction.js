@@ -56,16 +56,16 @@ export function updateSwipeBgVisual(bgEl, mode, { editLabel = 'Edit', deleteLabe
   
   const previousMode = bgEl.dataset.swipeMode
   bgEl.dataset.swipeMode = mode
-  bgEl.classList.remove('opacity-0', 'opacity-100', 'bg-rose-500/15', 'text-rose-500', 'bg-sky-500/15', 'text-sky-500')
+  bgEl.classList.remove('opacity-0', 'opacity-100', 'bg-rose-500/20', 'text-rose-500', 'bg-rose-500/15', 'bg-sky-500/20', 'text-sky-500', 'bg-sky-500/15')
 
   if (mode === 'delete') {
     if (previousMode !== 'delete') triggerHaptic(15)
-    bgEl.classList.add('opacity-100', 'bg-rose-500/15', 'text-rose-500')
-    bgEl.innerHTML = `<div class="flex items-center gap-1.5 font-extrabold text-xs transform transition-transform duration-200 scale-100"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg><span>${deleteLabel}</span></div>`
+    bgEl.classList.add('opacity-100', 'bg-rose-500/20', 'text-rose-500')
+    bgEl.innerHTML = `<div class="flex items-center gap-1.5 font-black text-xs transform transition-transform duration-200 scale-100"><svg viewBox="0 0 24 24" class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg><span>${deleteLabel}</span></div>`
   } else if (mode === 'edit') {
     if (previousMode !== 'edit') triggerHaptic(10)
-    bgEl.classList.add('opacity-100', 'bg-sky-500/15', 'text-sky-500')
-    bgEl.innerHTML = `<div class="flex items-center gap-1.5 font-extrabold text-xs transform transition-transform duration-200 scale-100"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>${editLabel}</span></div>`
+    bgEl.classList.add('opacity-100', 'bg-sky-500/20', 'text-sky-500')
+    bgEl.innerHTML = `<div class="flex items-center gap-1.5 font-black text-xs transform transition-transform duration-200 scale-100"><svg viewBox="0 0 24 24" class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>${editLabel}</span></div>`
   } else {
     bgEl.classList.add('opacity-0')
     bgEl.innerHTML = ''

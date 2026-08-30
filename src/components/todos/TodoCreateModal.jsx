@@ -134,7 +134,7 @@ export default function TodoCreateModal({
         <div className="pt-3 flex justify-end gap-2 border-t border-[var(--border)]">
           <Button
             type="button"
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
+            variant="secondary"
             onClick={onClose}
           >
             {t('common.close')}

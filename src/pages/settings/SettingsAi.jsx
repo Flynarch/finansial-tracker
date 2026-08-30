@@ -5,14 +5,18 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  AlertCircle,
   ExternalLink,
   Receipt,
   Tag,
   MessageSquare,
+  Activity,
+  Loader2,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { SettingsSection } from './settingsComponents'
+import { testGeminiApiKey } from '../../lib/gemini'
 
 export default function SettingsAi() {
   const { t } = useTranslation()
@@ -22,6 +26,8 @@ export default function SettingsAi() {
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || '')
   const [showKey, setShowKey] = useState(false)
   const [keyStatusMessage, setKeyStatusMessage] = useState('')
+  const [isTestingKey, setIsTestingKey] = useState(false)
+  const [testResult, setTestResult] = useState(null)
   const [prevGeminiApiKey, setPrevGeminiApiKey] = useState(geminiApiKey)
 
   if (prevGeminiApiKey !== geminiApiKey) {
@@ -30,14 +36,37 @@ export default function SettingsAi() {
   }
 
   const handleSaveApiKey = async (e) => {
-    e.preventDefault()
-    await setGeminiApiKey(apiKeyInput.trim())
+    if (e) e.preventDefault()
+    const cleanKey = apiKeyInput.trim().replace(/^["']|["']$/g, '')
+    await setGeminiApiKey(cleanKey)
     setKeyStatusMessage(t('settings.apiKeySaved', 'API Key Gemini berhasil disimpan!'))
     setTimeout(() => setKeyStatusMessage(''), 3500)
   }
 
+  const handleTestApiKey = async () => {
+    const cleanKey = apiKeyInput.trim().replace(/^["']|["']$/g, '')
+    if (!cleanKey) {
+      setTestResult({ ok: false, message: 'Silakan masukkan API Key terlebih dahulu sebelum mengetes.' })
+      return
+    }
+    setIsTestingKey(true)
+    setTestResult(null)
+    try {
+      const res = await testGeminiApiKey(cleanKey)
+      setTestResult(res)
+      if (res.ok) {
+        await setGeminiApiKey(cleanKey)
+      }
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message || 'Gagal mengetes API Key.' })
+    } finally {
+      setIsTestingKey(false)
+    }
+  }
+
   const handleClearApiKey = async () => {
     setApiKeyInput('')
+    setTestResult(null)
     await setGeminiApiKey('')
     setKeyStatusMessage(t('settings.apiKeyCleared', 'API Key dikembalikan ke kuota bawaan sistem.'))
     setTimeout(() => setKeyStatusMessage(''), 3500)
@@ -115,20 +144,52 @@ export default function SettingsAi() {
                 </button>
               </div>
             </div>
+            {/* Live Test Connection Result */}
+            {testResult && (
+              <div
+                className={`p-3.5 rounded-2xl border text-xs font-bold flex items-start gap-2.5 ${
+                  testResult.ok
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {testResult.ok ? (
+                  <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-emerald-500 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-4.5 w-4.5 shrink-0 text-rose-500 mt-0.5" />
+                )}
+                <span className="leading-relaxed flex-1">{testResult.message}</span>
+              </div>
+            )}
 
-            <div className="flex items-center gap-3 pt-1">
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
               <button
                 type="submit"
-                className="flex-1 h-12 rounded-2xl bg-[var(--fg)] py-3 px-4 text-sm font-black text-[var(--bg)] transition hover:opacity-90 active:scale-95 cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                className="flex-1 min-w-[140px] h-12 rounded-2xl bg-[var(--fg)] py-3 px-4 text-xs sm:text-sm font-black text-[var(--bg)] transition hover:opacity-90 active:scale-95 cursor-pointer shadow-xs flex items-center justify-center gap-2"
               >
-                <Sparkles className="h-4.5 w-4.5" />
-                <span>{t('settings.saveApiKey', 'Simpan API Key')}</span>
+                <Sparkles className="h-4 w-4" />
+                <span>{t('settings.saveApiKey', 'Simpan')}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={handleTestApiKey}
+                disabled={isTestingKey}
+                className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-4 text-xs sm:text-sm font-bold text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer shadow-2xs flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isTestingKey ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+                ) : (
+                  <Activity className="h-4 w-4 text-[var(--accent)]" />
+                )}
+                <span>{isTestingKey ? t('common.loading', 'Mengetes...') : t('settings.testApiKey', 'Tes Koneksi')}</span>
+              </button>
+
               {geminiApiKey ? (
                 <button
                   type="button"
                   onClick={handleClearApiKey}
-                  className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-4 text-sm font-bold text-[var(--muted)] hover:text-[var(--fg)] transition active:scale-95 cursor-pointer shadow-2xs"
+                  className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-3.5 text-xs font-bold text-[var(--muted)] hover:text-rose-500 hover:border-rose-500/30 transition active:scale-95 cursor-pointer shadow-2xs"
                 >
                   {t('settings.resetApiKey', 'Reset')}
                 </button>

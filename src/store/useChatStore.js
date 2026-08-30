@@ -5,7 +5,14 @@ const useChatStore = create((set) => ({
   isQuickLogOpen: false,
   messages: [],
   initialInput: '',
+  backgroundTexture: typeof window !== 'undefined' ? (localStorage.getItem('ft_chat_bg_texture') || 'paper') : 'paper',
   
+  // Background texture action
+  setBackgroundTexture: (texture) => {
+    if (typeof window !== 'undefined') localStorage.setItem('ft_chat_bg_texture', texture)
+    set({ backgroundTexture: texture })
+  },
+
   // Full Chat actions
   setIsOpen: (isOpen) => set({ isOpen }),
   closeChat: () => set({ isOpen: false }),

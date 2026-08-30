@@ -31,7 +31,9 @@ export function escapeCsv(str) {
  * and standard RFC 4180 parsers.
  */
 export function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR') {
-  if (!transactions || transactions.length === 0) return false
+  if (!transactions || transactions.length === 0) {
+    return false
+  }
 
   const walletMap = new Map()
   if (Array.isArray(wallets)) {
@@ -83,13 +85,14 @@ export function exportTransactionsToCsv(transactions = [], wallets = [], default
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
 
   return true
 }
 
 /**
  * Generates an ultra-crisp, printable & downloadable Monthly PDF Financial Statement.
+ * Works seamlessly across Web and Android WebView via invisible iframe fallback.
  */
 export function generateMonthlyPdfStatement({
   title = 'Laporan Keuangan Bulanan',
@@ -104,7 +107,27 @@ export function generateMonthlyPdfStatement({
   defaultCurrency = 'IDR',
   locale = 'id',
 }) {
-  const printWindow = window.open('', '_blank', 'width=900,height=1000')
+  let printWindow = null
+  let iframe = null
+
+  try {
+    printWindow = window.open('', '_blank', 'width=900,height=1000')
+  } catch {
+    printWindow = null
+  }
+
+  if (!printWindow) {
+    iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+    printWindow = iframe.contentWindow
+  }
+
   if (!printWindow) return false
 
   const formattedIncome = formatCurrency(totalIncome, defaultCurrency, locale)
@@ -377,7 +400,10 @@ export function generateMonthlyPdfStatement({
       <script>
         window.onload = function() {
           setTimeout(function() {
-            window.print();
+            try {
+              window.focus();
+              window.print();
+            } catch(e) {}
           }, 300);
         };
       </script>
@@ -388,6 +414,23 @@ export function generateMonthlyPdfStatement({
   printWindow.document.open()
   printWindow.document.write(html)
   printWindow.document.close()
+
+  if (iframe) {
+    setTimeout(() => {
+      try {
+        printWindow.focus()
+        printWindow.print()
+      } catch {
+        /* ignore */
+      }
+      setTimeout(() => {
+        if (iframe && iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe)
+        }
+      }, 4000)
+    }, 400)
+  }
+
   return true
 }
 

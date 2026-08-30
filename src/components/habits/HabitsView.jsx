@@ -78,11 +78,11 @@ const HabitItemCard = memo(function HabitItemCard({
   return (
     <li key={habit.id} className="group relative overflow-hidden rounded-[1.25rem]">
       {/* Progressive Swipe Background */}
-      <div className="absolute inset-0 z-0 flex items-center justify-end rounded-[1.25rem] px-5 opacity-0 transition-colors duration-200" />
+      <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-[1.25rem] px-5 opacity-0 transition-colors duration-150 w-full" />
 
       {/* Foreground Card */}
       <div
-        className="relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer"
+        className="relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] border-r-[var(--border)]/80 bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer"
         onClick={() => {
           if (ignoreNextClickRef.current) {
             ignoreNextClickRef.current = false
