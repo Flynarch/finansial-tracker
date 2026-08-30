@@ -790,35 +790,37 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   }
 
   const callApiStreamWithFallback = async (reqContents) => {
-    const apiKey = getEffectiveApiKey()
-    if (!apiKey || apiKey.trim().length === 0) {
-      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
-    }
+    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+    const keysToTry = []
+    if (userKey && userKey.length > 5) keysToTry.push(userKey)
+    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+
     let lastError = null
 
-    for (const model of CHAT_ADVISOR_MODELS) {
-      try {
-        const cleanKey = encodeURIComponent(apiKey)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${cleanKey}&alt=sse`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
-        })
-        
-        if (!res.ok) {
-          const errText = await res.text()
-          console.warn(`[${model}] API Error:`, errText)
-          const cleanMsg = parseApiErrorMessage(errText, res.status)
-          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
-            throw new Error(cleanMsg)
+    for (const key of keysToTry) {
+      for (const model of CHAT_ADVISOR_MODELS) {
+        try {
+          const cleanKey = encodeURIComponent(key)
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${cleanKey}&alt=sse`
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
+          })
+          
+          if (!res.ok) {
+            const errText = await res.text()
+            console.warn(`[${model}] API Error:`, errText)
+            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            lastError = new Error(cleanMsg)
+            continue
           }
-          throw new Error(cleanMsg)
-        }
-        
-        const reader = res.body.getReader()
+          
+          const reader = res.body.getReader()
         const decoder = new TextDecoder("utf-8")
         let fullText = ""
         let functionCall = null
@@ -874,9 +876,10 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
     }
+    }
     
-    // If all models failed or loop broken
-    throw lastError
+    // If all keys and models failed
+    throw lastError || new Error('Gagal menghubungi asisten AI.')
   }
 
   try {
@@ -1110,46 +1113,46 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
 `
 
   const callApiWithFallback = async (reqContents) => {
-    const apiKey = getEffectiveApiKey()
-    if (!apiKey || apiKey.trim().length === 0) {
-      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
-    }
+    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+    const keysToTry = []
+    if (userKey && userKey.length > 5) keysToTry.push(userKey)
+    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+
     let lastError = null
-    for (const model of CHAT_ADVISOR_MODELS) {
-      try {
-        const cleanKey = encodeURIComponent(apiKey)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            contents: reqContents, 
-            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+    for (const key of keysToTry) {
+      for (const model of CHAT_ADVISOR_MODELS) {
+        try {
+          const cleanKey = encodeURIComponent(key)
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              contents: reqContents, 
+              generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+            })
           })
-        })
-        
-        if (!res.ok) {
-          const errText = await res.text()
-          const cleanMsg = parseApiErrorMessage(errText, res.status)
-          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
-            throw new Error(cleanMsg)
+          
+          if (!res.ok) {
+            const errText = await res.text()
+            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            lastError = new Error(cleanMsg)
+            continue
           }
-          throw new Error(cleanMsg)
-        }
-        
-        const data = await res.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        return { text }
-      } catch (err) {
-        lastError = err
-        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
-          throw err
+          
+          const data = await res.json()
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          return { text }
+        } catch (err) {
+          lastError = err
         }
       }
     }
-    throw lastError
+    throw lastError || new Error('Gagal mendapatkan respon AI.')
   }
 
   try {
@@ -1202,46 +1205,46 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
 }
 `
   const callApiWithFallback = async (reqContents) => {
-    const apiKey = getEffectiveApiKey()
-    if (!apiKey || apiKey.trim().length === 0) {
-      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
-    }
+    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+    const keysToTry = []
+    if (userKey && userKey.length > 5) keysToTry.push(userKey)
+    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+
     let lastError = null
-    for (const model of CHAT_ADVISOR_MODELS) {
-      try {
-        const cleanKey = encodeURIComponent(apiKey)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            contents: reqContents, 
-            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+    for (const key of keysToTry) {
+      for (const model of CHAT_ADVISOR_MODELS) {
+        try {
+          const cleanKey = encodeURIComponent(key)
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              contents: reqContents, 
+              generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } 
+            })
           })
-        })
-        
-        if (!res.ok) {
-          const errText = await res.text()
-          const cleanMsg = parseApiErrorMessage(errText, res.status)
-          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
-            throw new Error(cleanMsg)
+          
+          if (!res.ok) {
+            const errText = await res.text()
+            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            lastError = new Error(cleanMsg)
+            continue
           }
-          throw new Error(cleanMsg)
-        }
-        
-        const data = await res.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        return { text }
-      } catch (err) {
-        lastError = err
-        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
-          throw err
+          
+          const data = await res.json()
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          return { text }
+        } catch (err) {
+          lastError = err
         }
       }
     }
-    throw lastError
+    throw lastError || new Error('Gagal mendapatkan prediksi tabungan AI.')
   }
 
   try {
@@ -1320,49 +1323,49 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 `
 
   const callApiWithFallback = async (reqContents) => {
-    const key = getEffectiveApiKey()
-    if (!key || key.trim().length === 0) {
-      throw new Error('API Key Gemini belum diatur. Silakan masukkan API Key di menu Pengaturan > Integrasi AI.')
-    }
+    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+    const keysToTry = []
+    if (userKey && userKey.length > 5) keysToTry.push(userKey)
+    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+
     let lastError = null
-    for (const model of FAST_TRANSACTION_MODELS) {
-      try {
-        const cleanKey = encodeURIComponent(key)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: reqContents,
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: 'application/json',
+    for (const key of keysToTry) {
+      for (const model of FAST_TRANSACTION_MODELS) {
+        try {
+          const cleanKey = encodeURIComponent(key)
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-          }),
-        })
+            body: JSON.stringify({
+              contents: reqContents,
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: 'application/json',
+              },
+            }),
+          })
 
-        if (!res.ok) {
-          const errText = await res.text()
-          const cleanMsg = parseApiErrorMessage(errText, res.status)
-          if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
-            throw new Error(cleanMsg)
+          if (!res.ok) {
+            const errText = await res.text()
+            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            lastError = new Error(cleanMsg)
+            continue
           }
-          throw new Error(cleanMsg)
-        }
 
-        const data = await res.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        return { text }
-      } catch (err) {
-        lastError = err
-        if (err.message?.includes('API Key') || err.message?.includes('API key')) {
-          throw err
+          const data = await res.json()
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          return { text }
+        } catch (err) {
+          lastError = err
         }
       }
     }
-    throw lastError
+    throw lastError || new Error('Gagal mengekstrak data struk dengan AI.')
   }
 
   try {

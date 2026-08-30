@@ -1086,6 +1086,7 @@ export default {
     'settings.addIncomeCategoryTitle': 'Add Primary Income Category',
     'settings.addSubcategory': 'Add Subcategory',
     'settings.addSubcategoryTitle': 'Add New Subcategory',
+    'settings.ai.defaultKeyOk': 'System Default AI Connection Successful! Model active and ready to use.',
     'settings.aiIntegration': 'AI Assistant Integration',
     'settings.aiKeyFree': 'Get a free API Key at',
     'settings.aiKeyStatus': 'AI API Key Status',

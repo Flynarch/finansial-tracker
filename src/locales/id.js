@@ -1086,6 +1086,7 @@ export default {
     'settings.addIncomeCategoryTitle': 'Tambah Kategori Utama Pemasukan',
     'settings.addSubcategory': 'Tambah Subkategori',
     'settings.addSubcategoryTitle': 'Tambah Subkategori Baru',
+    'settings.ai.defaultKeyOk': 'Koneksi AI Bawaan Sistem Berhasil! Model aktif dan siap digunakan.',
     'settings.aiIntegration': 'Integrasi Asisten AI',
     'settings.aiKeyFree': 'Dapatkan API Key gratis di',
     'settings.aiKeyStatus': 'Status API Key AI',

@@ -16,7 +16,7 @@ import {
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { SettingsSection } from './settingsComponents'
-import { testGeminiApiKey } from '../../lib/gemini'
+import { testGeminiApiKey, getEffectiveApiKey } from '../../lib/gemini'
 
 export default function SettingsAi() {
   const { t } = useTranslation()
@@ -45,16 +45,17 @@ export default function SettingsAi() {
 
   const handleTestApiKey = async () => {
     const cleanKey = apiKeyInput.trim().replace(/^["']|["']$/g, '')
-    if (!cleanKey) {
-      setTestResult({ ok: false, message: 'Silakan masukkan API Key terlebih dahulu sebelum mengetes.' })
-      return
-    }
+    const keyToTest = cleanKey || getEffectiveApiKey()
     setIsTestingKey(true)
     setTestResult(null)
     try {
-      const res = await testGeminiApiKey(cleanKey)
-      setTestResult(res)
-      if (res.ok) {
+      const res = await testGeminiApiKey(keyToTest)
+      if (res.ok && !cleanKey) {
+        setTestResult({ ok: true, message: t('settings.ai.defaultKeyOk', 'Koneksi AI Bawaan Sistem Berhasil! Model aktif dan siap digunakan.') })
+      } else {
+        setTestResult(res)
+      }
+      if (res.ok && cleanKey) {
         await setGeminiApiKey(cleanKey)
       }
     } catch (err) {
