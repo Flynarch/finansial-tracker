@@ -325,7 +325,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const closeCategorySheet = useCallback(() => {
     setCategorySheetEnter(false)
-    window.setTimeout(() => setCategorySheetOpen(false), 280)
+    window.setTimeout(() => setCategorySheetOpen(false), 240)
   }, [])
 
   const openCategorySheet = () => {

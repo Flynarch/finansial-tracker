@@ -145,15 +145,15 @@ export default function AmountInput({
               handleCommitCalc()
             }}
             required
-            placeholder={t('addTx.amountPlaceholderCalc', '0 (misal: 25k + 15k)')}
-            className={`w-full min-w-0 bg-transparent py-0 font-extrabold outline-none tracking-tight leading-none transition-all ${
-              amount ? (hasError ? 'text-rose-500 dark:text-rose-400' : 'text-[var(--fg)]') : 'text-[var(--muted-2)]/50 font-medium'
+            placeholder="0"
+            className={`w-full min-w-0 bg-transparent py-0 font-bold outline-none tracking-tight leading-none transition-all ${
+              amount ? (hasError ? 'text-rose-500 dark:text-rose-400' : 'text-[var(--fg)]') : 'text-[var(--muted-2)]/50 font-normal'
             } ${
-              String(amount || '').length > 11
-                ? 'text-xl sm:text-2xl'
+              String(amount || '').length > 12
+                ? 'text-lg sm:text-xl'
                 : String(amount || '').length > 7
-                ? 'text-2xl sm:text-3xl'
-                : 'text-3xl sm:text-4xl'
+                ? 'text-xl sm:text-2xl'
+                : 'text-2xl sm:text-3xl'
             }`}
           />
 
@@ -182,6 +182,13 @@ export default function AmountInput({
           transform: isAmountFocused || hasError ? 'scaleX(1)' : 'scaleX(0.98)',
         }}
       />
+
+      {/* Subtle compact example hint */}
+      {!amount && !calcEvaluation.hasExpression && (
+        <p className="mt-1.5 text-[11px] text-[var(--muted)] font-medium tracking-tight">
+          {t('addTx.amountExampleHint', 'Contoh: 25k, 1.5jt, atau 50k + 20k')}
+        </p>
+      )}
     </div>
   )
 }

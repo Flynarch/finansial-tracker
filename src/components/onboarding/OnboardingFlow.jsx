@@ -245,26 +245,98 @@ export default function OnboardingFlow() {
     }
   }
 
+  /* ── Process Google Login (Smart Skip Onboarding for Existing Accounts) ── */
+  const processGoogleLoginUser = async (user) => {
+    if (!user?.uid) return
+    await setAuthUser(user)
+    if (user.displayName) {
+      setUsername(user.displayName)
+    }
+    if (user.photoURL) {
+      setProfilePhoto(user.photoURL)
+    }
+
+    const uid = user.uid
+    const userBackupKey = `ft_user_backup_${uid}`
+    const rawLocal = localStorage.getItem(userBackupKey)
+
+    // 1. If user has a local backup saved, restore it and skip onboarding
+    if (rawLocal) {
+      try {
+        const data = JSON.parse(rawLocal)
+        await importAllDataFromJsonPayload(data)
+      } catch {
+        /* ignore */
+      }
+      await completeOnboarding()
+      clearProgress()
+      try {
+        localStorage.setItem('ft_onboarding_seen_v1', '1')
+      } catch {
+        /* ignore */
+      }
+      navigate('/dashboard', { replace: true })
+      return
+    }
+
+    // 2. Check if local database already contains wallets or transactions
+    try {
+      const walletCount = await db.wallets.count()
+      const txCount = await db.transactions.count()
+      if (walletCount > 0 || txCount > 0) {
+        await completeOnboarding()
+        clearProgress()
+        try {
+          localStorage.setItem('ft_onboarding_seen_v1', '1')
+        } catch {
+          /* ignore */
+        }
+        navigate('/dashboard', { replace: true })
+        return
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 3. Check if cloud backup exists in Firebase Storage
+    try {
+      const cloudData = await Promise.race([
+        downloadLatestBackupJson(uid),
+        new Promise((resolve) => setTimeout(() => resolve(null), 1800)),
+      ]).catch(() => null)
+
+      if (cloudData) {
+        await importAllDataFromJsonPayload(cloudData)
+        await completeOnboarding()
+        clearProgress()
+        try {
+          localStorage.setItem('ft_onboarding_seen_v1', '1')
+        } catch {
+          /* ignore */
+        }
+        navigate('/dashboard', { replace: true })
+        return
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 4. Truly brand new user without previous data -> proceed to onboarding setup
+    goTo(1)
+  }
+
   /* ── Google One Tap on Onboarding Screen ───────────────────────── */
   useEffect(() => {
     if (step !== 0 || hasCompleted) return
     promptGoogleOneTap({
       onSuccess: async (user) => {
-        await setAuthUser(user)
-        if (user.displayName) {
-          setUsername(user.displayName)
-        }
-        if (user.photoURL) {
-          setProfilePhoto(user.photoURL)
-        }
-        restoreUserSnapshot(user.uid, true).catch(() => {})
-        goTo(1)
+        await processGoogleLoginUser(user)
       },
       onError: (msg) => {
         if (msg) setGoogleError(msg)
       },
     })
-  }, [step, hasCompleted, setAuthUser, setProfilePhoto, goTo])
+  }, [step, hasCompleted, setAuthUser, setProfilePhoto, goTo, completeOnboarding, clearProgress, navigate])
 
   /* ── Google Sign In Handler ────────────────────────────────────── */
   const handleGoogleSignIn = async () => {
@@ -273,16 +345,7 @@ export default function OnboardingFlow() {
     try {
       const res = await signInWithGoogle()
       if (res.success && res.user) {
-        await setAuthUser(res.user)
-        if (res.user.displayName) {
-          setUsername(res.user.displayName)
-        }
-        if (res.user.photoURL) {
-          setProfilePhoto(res.user.photoURL)
-        }
-        // Run cloud restore asynchronously in background
-        restoreUserSnapshot(res.user.uid, true).catch(() => {})
-        goTo(1)
+        await processGoogleLoginUser(res.user)
       } else if (!res.cancelled) {
         setGoogleError(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google'))
       }

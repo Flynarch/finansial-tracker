@@ -3,6 +3,7 @@ import CategoryIcon from '../../ui/CategoryIcon'
 import Button from '../../ui/Button'
 import { getCategoryToneClass } from '../../../lib/categoryIcon'
 import useTranslation from '../../../hooks/useTranslation'
+import { triggerHaptic } from '../../../lib/haptics'
 import {
   addExpenseParentCategory,
   addExpenseSubcategory,
@@ -107,14 +108,17 @@ export default function CategorySheet({
     <div className="fixed inset-0 z-[100] flex flex-col justify-end pointer-events-auto" role="presentation">
       <button
         type="button"
-        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ease-out ${
+        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-240 ease-out ${
           isEnter ? 'opacity-100' : 'opacity-0'
         }`}
         aria-label={t('addTx.closeSheet', 'Tutup')}
-        onClick={onClose}
+        onClick={() => {
+          triggerHaptic('light')
+          onClose()
+        }}
       />
       <div
-        className="relative flex max-h-[min(88vh,36rem)] w-full flex-col rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu"
+        className="relative flex max-h-[min(88vh,36rem)] w-full flex-col rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu will-change-transform"
         style={{
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
           transform: isEnter
@@ -122,7 +126,7 @@ export default function CategorySheet({
             : 'translate3d(0, 100%, 0)',
           transition: isDragging
             ? 'none'
-            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+            : 'transform 240ms cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       >
         <div
@@ -346,10 +350,11 @@ export default function CategorySheet({
                         <button
                           type="button"
                           onClick={() => {
+                            triggerHaptic('selection')
                             onSelectCategory(path)
                             onClose()
                           }}
-                          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left text-[13px] transition ${
+                          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left text-[13px] transition active:scale-[0.98] ${
                             picked
                               ? 'border border-[var(--fg)]/60 bg-[color-mix(in_srgb,var(--fg)_6%,var(--field-bg))] font-semibold text-[var(--fg)] shadow-2xs'
                               : 'border border-transparent hover:bg-[var(--field-bg)] font-medium text-[var(--fg)]'
