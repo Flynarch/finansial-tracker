@@ -18,6 +18,7 @@ import {
 import { executeThemeTransition } from '../../lib/themeTransition'
 import { importAllDataFromJsonPayload } from '../../lib/backup'
 import { downloadLatestBackupJson } from '../../lib/cloudBackup'
+import { APP_DISPLAY_VERSION } from '../../lib/version'
 import {
   Plus,
   Check,
@@ -444,7 +445,7 @@ export default function OnboardingFlow() {
                   <div>
                     <h1 className="font-black text-lg tracking-tight text-[var(--fg)]">FinTrack</h1>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                      v4.6.4 • Personal Finance
+                      {APP_DISPLAY_VERSION} • Personal Finance
                     </p>
                   </div>
                 </div>

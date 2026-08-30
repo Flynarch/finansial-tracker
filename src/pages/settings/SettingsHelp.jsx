@@ -23,6 +23,7 @@ import {
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { triggerHaptic } from '../../lib/haptics'
+import { APP_DISPLAY_VERSION } from '../../lib/version'
 import { SettingsSection, SettingsSearchInput } from './settingsComponents'
 
 const FAQ_CATEGORIES = [
@@ -367,7 +368,7 @@ export default function SettingsHelp() {
             </h4>
           </div>
           <p className="text-[11px] text-[var(--muted)] font-medium">
-            {t('help.contactCardSubtitle', 'FinTrack v4.6.4 • Native Android & Offline-First')}
+            {t('help.contactCardSubtitle', `FinTrack ${APP_DISPLAY_VERSION} • Native Android & Offline-First`)}
           </p>
         </div>
       </div>

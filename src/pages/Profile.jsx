@@ -9,6 +9,7 @@ import SplitBillModal from '../components/split-bill/SplitBillModal'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { db } from '../lib/db'
+import { APP_VERSION } from '../lib/version'
 
 /* ─── stat mini-icons ─── */
 function StatIcon({ name }) {
@@ -356,7 +357,7 @@ function Profile() {
         <div className="flex items-center justify-center gap-3 pt-6 pb-2">
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
           <div className="text-center text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
-            {t('profile.version', { value: '4.6.4' })}
+            {t('profile.version', { value: APP_VERSION })}
           </div>
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
         </div>
