@@ -238,13 +238,14 @@ export default function AuthModal({
       const res = await signInWithGoogle()
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user, Boolean(res.isNewUser))
+        // Run cloud data restore asynchronously in background
+        restoreUserBackup(res.user, Boolean(res.isNewUser)).catch(() => {})
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
         setTimeout(() => {
           onSuccess?.(res.user)
           onClose?.()
-        }, 800)
+        }, 250)
       } else if (!res.cancelled) {
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google.'))

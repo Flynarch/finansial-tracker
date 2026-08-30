@@ -231,7 +231,10 @@ export default function OnboardingFlow() {
     }
     if (isGoogle) {
       try {
-        const cloudData = await downloadLatestBackupJson(uid)
+        const cloudData = await Promise.race([
+          downloadLatestBackupJson(uid),
+          new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
+        ]).catch(() => null)
         if (cloudData) {
           await importAllDataFromJsonPayload(cloudData)
         }
@@ -246,7 +249,6 @@ export default function OnboardingFlow() {
     if (step !== 0 || hasCompleted) return
     promptGoogleOneTap({
       onSuccess: async (user) => {
-        await restoreUserSnapshot(user.uid, true)
         await setAuthUser(user)
         if (user.displayName) {
           setUsername(user.displayName)
@@ -254,6 +256,7 @@ export default function OnboardingFlow() {
         if (user.photoURL) {
           setProfilePhoto(user.photoURL)
         }
+        restoreUserSnapshot(user.uid, true).catch(() => {})
         goTo(1)
       },
       onError: (msg) => {
@@ -269,7 +272,6 @@ export default function OnboardingFlow() {
     try {
       const res = await signInWithGoogle()
       if (res.success && res.user) {
-        await restoreUserSnapshot(res.user.uid, true)
         await setAuthUser(res.user)
         if (res.user.displayName) {
           setUsername(res.user.displayName)
@@ -277,6 +279,8 @@ export default function OnboardingFlow() {
         if (res.user.photoURL) {
           setProfilePhoto(res.user.photoURL)
         }
+        // Run cloud restore asynchronously in background
+        restoreUserSnapshot(res.user.uid, true).catch(() => {})
         goTo(1)
       } else if (!res.cancelled) {
         setGoogleError(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google'))
