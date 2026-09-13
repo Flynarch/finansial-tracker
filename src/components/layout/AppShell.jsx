@@ -15,6 +15,7 @@ import {
 } from '../../lib/smartNotifications'
 import { syncNotificationQueue } from '../../lib/notificationIngestion'
 import { prefetchCriticalRoutes } from '../../lib/routePrefetcher'
+import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -245,6 +246,21 @@ function AppShell() {
       }
     }
     runAutomation()
+  }, [])
+
+  useEffect(() => {
+    scheduleNativeWidgetSync(150)
+    let appStateListener = null
+    if (Capacitor.isNativePlatform()) {
+      appStateListener = App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          scheduleNativeWidgetSync(150)
+        }
+      })
+    }
+    return () => {
+      appStateListener?.then?.((h) => h?.remove?.()).catch(() => {})
+    }
   }, [])
 
   useEffect(() => {

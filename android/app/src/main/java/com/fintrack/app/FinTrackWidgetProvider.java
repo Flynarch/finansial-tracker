@@ -18,6 +18,7 @@ import android.net.Uri;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
+import java.util.Locale;
 
 public class FinTrackWidgetProvider extends AppWidgetProvider {
 
@@ -33,28 +34,99 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (ACTION_UPDATE_WIDGET.equals(intent.getAction())) {
+        String action = intent != null ? intent.getAction() : null;
+        if (ACTION_UPDATE_WIDGET.equals(action)
+                || Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
             ComponentName thisWidget = new ComponentName(context, FinTrackWidgetProvider.class);
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
-            onUpdate(context, appWidgetManager, appWidgetIds);
+            if (appWidgetIds != null && appWidgetIds.length > 0) {
+                onUpdate(context, appWidgetManager, appWidgetIds);
+            }
+        }
+    }
+
+    private static String getSafeString(SharedPreferences prefs, String key, String defaultVal) {
+        try {
+            if (!prefs.contains(key)) return defaultVal;
+            Object val = prefs.getAll().get(key);
+            if (val == null) return defaultVal;
+            if (val instanceof Number) {
+                long lVal = ((Number) val).longValue();
+                return String.format(Locale.getDefault(), "Rp %,d", lVal).replace(',', '.');
+            }
+            return String.valueOf(val);
+        } catch (Exception e) {
+            return defaultVal;
         }
     }
 
     public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
         SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
         
-        String balance = prefs.getString("fintrack_widget_balance", "Rp 0");
-        String income = prefs.getString("fintrack_widget_income", "Masuk: Rp 0");
-        String expense = prefs.getString("fintrack_widget_expense", "Keluar: Rp 0");
-        String period = prefs.getString("fintrack_widget_period", "Bulan Ini");
-        String sparklineJson = prefs.getString("fintrack_widget_sparkline", "[]");
+        String balance = getSafeString(prefs, "fintrack_widget_balance", null);
+        if (balance == null || balance.trim().isEmpty() || "Rp 0".equals(balance)) {
+            String fallback = getSafeString(prefs, "total_net_worth", null);
+            if (fallback == null || fallback.trim().isEmpty()) {
+                fallback = getSafeString(prefs, "wallet_balance", "Rp 0");
+            }
+            if (fallback != null && !fallback.trim().isEmpty()) {
+                balance = fallback;
+            }
+        }
+        if (balance == null || balance.trim().isEmpty()) {
+            balance = "Rp 0";
+        }
 
+        String income = getSafeString(prefs, "fintrack_widget_income", null);
+        if (income == null || income.trim().isEmpty() || "Masuk: Rp 0".equals(income)) {
+            String fallback = getSafeString(prefs, "month_income", null);
+            if (fallback == null || fallback.trim().isEmpty()) {
+                fallback = getSafeString(prefs, "income", "Masuk: Rp 0");
+            }
+            if (fallback != null && !fallback.trim().isEmpty()) {
+                income = fallback;
+            }
+        }
+        if (income == null || income.trim().isEmpty()) {
+            income = "Masuk: Rp 0";
+        }
+
+        String expense = getSafeString(prefs, "fintrack_widget_expense", null);
+        if (expense == null || expense.trim().isEmpty() || "Keluar: Rp 0".equals(expense)) {
+            String fallback = getSafeString(prefs, "month_expense", null);
+            if (fallback == null || fallback.trim().isEmpty()) {
+                fallback = getSafeString(prefs, "expense", "Keluar: Rp 0");
+            }
+            if (fallback != null && !fallback.trim().isEmpty()) {
+                expense = fallback;
+            }
+        }
+        if (expense == null || expense.trim().isEmpty()) {
+            expense = "Keluar: Rp 0";
+        }
+
+        String period = getSafeString(prefs, "fintrack_widget_period", null);
+        if (period == null || period.trim().isEmpty()) {
+            period = getSafeString(prefs, "period", "Bulan Ini");
+        }
+
+        String sparklineJson = getSafeString(prefs, "fintrack_widget_sparkline", null);
+        if (sparklineJson == null || sparklineJson.trim().isEmpty() || "[]".equals(sparklineJson)) {
+            sparklineJson = getSafeString(prefs, "sparklineData", "[]");
+        }
+
+        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson);
+    }
+
+    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
+                                      String balance, String income, String expense, String period, String sparklineJson) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_fintrack_balance);
-        views.setTextViewText(R.id.widget_total_balance, balance);
-        views.setTextViewText(R.id.widget_income_text, income);
-        views.setTextViewText(R.id.widget_expense_text, expense);
-        views.setTextViewText(R.id.widget_period_label, period);
+        views.setTextViewText(R.id.widget_total_balance, balance != null ? balance : "Rp 0");
+        views.setTextViewText(R.id.widget_income_text, income != null ? income : "Masuk: Rp 0");
+        views.setTextViewText(R.id.widget_expense_text, expense != null ? expense : "Keluar: Rp 0");
+        views.setTextViewText(R.id.widget_period_label, period != null ? period : "Bulan Ini");
 
         // Render trend sparkline
         Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson);
@@ -79,6 +151,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         // Click on + Catat button opens app directly with fintrack://quick-add
         Intent quickAddIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("fintrack://quick-add"));
         quickAddIntent.setClass(context, MainActivity.class);
+        quickAddIntent.setPackage(context.getPackageName());
         quickAddIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pendingQuickAddIntent = PendingIntent.getActivity(
                 context,
@@ -111,7 +184,8 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             float maxVal = -Float.MAX_VALUE;
 
             for (int i = 0; i < len; i++) {
-                values[i] = (float) arr.optDouble(i, 0.0);
+                double d = arr.optDouble(i, 0.0);
+                values[i] = (Double.isNaN(d) || Double.isInfinite(d)) ? 0f : (float) d;
                 if (values[i] < minVal) minVal = values[i];
                 if (values[i] > maxVal) maxVal = values[i];
             }

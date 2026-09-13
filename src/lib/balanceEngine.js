@@ -1,4 +1,5 @@
 import { db, computeWalletBalance, computeAllWalletBalances } from './db'
+import { scheduleNativeWidgetSync } from './nativeWidgetSync'
 
 /**
  * In-memory balance cache to avoid redundant recalculation
@@ -111,6 +112,7 @@ export async function invalidateWalletBalance(walletIds) {
       // Ignore
     }
   }
+  scheduleNativeWidgetSync()
 }
 
 /**
@@ -125,6 +127,7 @@ export async function invalidateAllBalances() {
   } catch {
     // Ignore
   }
+  scheduleNativeWidgetSync()
 }
 
 /**

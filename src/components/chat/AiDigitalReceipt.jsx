@@ -221,9 +221,23 @@ export default function AiDigitalReceipt({
 
   // Format creation timestamp
   const dateLocaleObj = locale === 'id' ? idLocale : enUS
-  const firstTxDate = singleTx.date ? new Date(singleTx.date) : new Date()
-  const formattedTime = singleTx.time || format(new Date(), 'HH:mm')
-  const receiptDate = `${format(firstTxDate, 'EEEE, d MMMM yyyy', { locale: dateLocaleObj })} • ${formattedTime}`
+  const formattedTime = txList[0]?.time || singleTx.time || format(new Date(), 'HH:mm')
+
+  const uniqueDates = Array.from(new Set(txList.map((t) => t.date).filter(Boolean)))
+  const receiptDate = (() => {
+    if (uniqueDates.length === 1) {
+      const d = new Date(uniqueDates[0] + 'T12:00:00')
+      return `${format(d, 'EEEE, d MMMM yyyy', { locale: dateLocaleObj })} • ${formattedTime}`
+    }
+    if (uniqueDates.length > 1) {
+      uniqueDates.sort()
+      const dFirst = new Date(uniqueDates[0] + 'T12:00:00')
+      const dLast = new Date(uniqueDates[uniqueDates.length - 1] + 'T12:00:00')
+      return `${format(dFirst, 'd MMM', { locale: dateLocaleObj })} - ${format(dLast, 'd MMM yyyy', { locale: dateLocaleObj })}`
+    }
+    const firstTxDate = singleTx.date ? new Date(singleTx.date + 'T12:00:00') : new Date()
+    return `${format(firstTxDate, 'EEEE, d MMMM yyyy', { locale: dateLocaleObj })} • ${formattedTime}`
+  })()
 
   // Undone State View
   if (isUndone) {
@@ -498,6 +512,11 @@ export default function AiDigitalReceipt({
                           <span className="font-semibold text-[var(--accent)]">
                             {labels.main || tx.category}
                           </span>
+                          {tx.date ? (
+                            <span className="font-bold text-[var(--fg)] shrink-0">
+                              • {format(new Date(tx.date + 'T12:00:00'), 'EEE, d MMM', { locale: dateLocaleObj })}
+                            </span>
+                          ) : null}
                           {walletObj ? (
                             <span className="font-medium text-[var(--muted)] shrink-0 flex items-center gap-1">
                               • {walletLogo ? <img src={walletLogo} alt="" className="h-3 w-3 rounded-full object-cover inline" /> : null}

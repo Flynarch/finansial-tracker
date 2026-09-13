@@ -161,13 +161,14 @@ export function sanitizeCategoryPath(input, type = 'expense') {
       const cNameId = (child.names?.id || '').toLowerCase()
       const cNameEn = (child.names?.en || '').toLowerCase()
 
-      if (
-        cIdLower === lower ||
-        cNameId === lower ||
-        cNameEn === lower ||
-        lower.includes(cNameId) ||
-        (cNameId && cNameId.includes(lower))
-      ) {
+      if (cIdLower === 'air' && (lower.includes('conditioner') || lower.includes('fryer'))) {
+        continue
+      }
+
+      const isExact = cIdLower === lower || cNameId === lower || cNameEn === lower
+      const matchesWordBoundary = (name) => name && name.length >= 4 && new RegExp(`\\b${name}\\b`, 'i').test(lower)
+
+      if (isExact || matchesWordBoundary(cNameId) || matchesWordBoundary(cNameEn) || matchesWordBoundary(cIdLower)) {
         return `${parent.id}/${child.id}`
       }
     }
@@ -185,23 +186,23 @@ export function sanitizeCategoryPath(input, type = 'expense') {
 
   // Transportation
   if (lower.includes('bensin') || lower.includes('pertamax') || lower.includes('pertalite') || lower.includes('bbm') || lower.includes('shell') || lower.includes('fuel') || lower.includes('solar')) return 'transportasi/bensin'
-  if (lower.includes('gojek') || lower.includes('grab') || lower.includes('ojol') || lower.includes('maxim') || lower.includes('goride') || lower.includes('gocar') || lower.includes('grabcar')) return 'transportasi/ojol'
+  if (lower.includes('gojek') || lower.includes('grab') || lower.includes('ojol') || lower.includes('maxim') || lower.includes('goride') || lower.includes('gocar') || lower.includes('grabcar') || lower.includes('indrive')) return 'transportasi/ojol'
   if (lower.includes('parkir') || lower.includes('parking') || lower.includes('karcis parkir')) return 'transportasi/parkir'
-  if (lower.includes('tol') || lower.includes('e-toll') || lower.includes('etoll') || lower.includes('kartu tol')) return 'transportasi/tol'
+  if (/\b(tol|e-toll|etoll|kartu tol)\b/i.test(lower)) return 'transportasi/tol'
   if (lower.includes('kereta') || lower.includes('krl') || lower.includes('mrt') || lower.includes('lrt') || lower.includes('kai') || lower.includes('commuter')) return 'transportasi/kereta'
-  if (lower.includes('bis') || lower.includes('bus') || lower.includes('transjakarta') || lower.includes('tj') || lower.includes('damri')) return 'transportasi/bis'
+  if (/\b(bis|bus|transjakarta|tj|damri)\b/i.test(lower)) return 'transportasi/bis'
   if (lower.includes('taksi') || lower.includes('taxi') || lower.includes('bluebird')) return 'transportasi/taksi'
   if (lower.includes('servis') || lower.includes('bengkel') || lower.includes('ganti oli') || lower.includes('tambal ban') || lower.includes('cuci motor') || lower.includes('cuci mobil')) return 'transportasi/servis_kendaraan'
   if (lower.includes('transport')) return 'transportasi/bensin'
 
   // Bills & Utilities
   if (lower.includes('listrik') || lower.includes('pln') || lower.includes('token listrik') || lower.includes('token pln')) return 'tagihan/listrik'
-  if (lower.includes('air') || lower.includes('pdam')) return 'tagihan/air'
+  if (/\b(air|pdam)\b/i.test(lower) && !lower.includes('conditioner') && !lower.includes('fryer')) return 'tagihan/air'
   if (lower.includes('wifi') || lower.includes('indihome') || lower.includes('biznet') || lower.includes('myrepublic') || lower.includes('firstmedia') || lower.includes('internet')) return 'tagihan/internet'
   if (lower.includes('pulsa') || lower.includes('kuota') || lower.includes('paket data') || lower.includes('telkomsel') || lower.includes('indosat') || lower.includes('xl') || lower.includes('tri') || lower.includes('smartfren')) return 'tagihan/paket_data'
   if (lower.includes('netflix') || lower.includes('spotify') || lower.includes('youtube') || lower.includes('disney') || lower.includes('apple') || lower.includes('langganan') || lower.includes('subscription')) return 'tagihan/langganan'
   if (lower.includes('asuransi') || lower.includes('bpjs')) return 'tagihan/asuransi'
-  if (lower.includes('cicilan') || lower.includes('paylater') || lower.includes('kredivo') || lower.includes('spaylater') || lower.includes('angsuran') || lower.includes('kredit') || lower.includes('kosan') || lower.includes('kos') || lower.includes('kontrakan')) return 'tagihan/cicilan'
+  if (lower.includes('cicilan') || lower.includes('paylater') || lower.includes('kredivo') || lower.includes('spaylater') || lower.includes('angsuran') || lower.includes('kredit') || /\b(kosan|kos|kontrakan)\b/i.test(lower)) return 'tagihan/cicilan'
 
   // Daily Needs & Groceries
   if (lower.includes('supermarket') || lower.includes('indomaret') || lower.includes('alfamart') || lower.includes('grocer') || lower.includes('sayur') || lower.includes('beras') || lower.includes('minyak') || lower.includes('pasar') || lower.includes('belanja bulanan')) return 'kebutuhan_harian/belanja_bulanan'
@@ -216,7 +217,7 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('kencan') || lower.includes('date') || lower.includes('dating') || lower.includes('jalan sama doi')) return 'kehidupan_sosial/kencan'
   if (lower.includes('sedekah') || lower.includes('zakat') || lower.includes('infaq') || lower.includes('donasi') || lower.includes('amal')) return 'kehidupan_sosial/amal_donasi'
   if (lower.includes('kondangan') || lower.includes('hadiah nikah') || lower.includes('amplop')) return 'kehidupan_sosial/kondangan'
-  if (lower.includes('iuran') || lower.includes('iuran rt') || lower.includes('kas')) return 'kehidupan_sosial/iuran'
+  if (lower.includes('iuran') || lower.includes('iuran rt') || /\bkas\b/i.test(lower)) return 'kehidupan_sosial/iuran'
 
   // Entertainment / Kultur
   if (lower.includes('bioskop') || lower.includes('cinema') || lower.includes('xxi') || lower.includes('cgv') || lower.includes('film') || lower.includes('nonton')) return 'kultur/bioskop'
@@ -229,7 +230,7 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('baju') || lower.includes('kaos') || lower.includes('kemeja') || lower.includes('jaket') || lower.includes('hoodie')) return 'pakaian/baju'
   if (lower.includes('celana') || lower.includes('jeans') || lower.includes('rok')) return 'pakaian/celana'
   if (lower.includes('sepatu') || lower.includes('sandal') || lower.includes('sneakers')) return 'pakaian/sepatu'
-  if (lower.includes('aksesoris') || lower.includes('jam tangan') || lower.includes('topi') || lower.includes('tas') || lower.includes('fashion') || lower.includes('belanja')) return 'pakaian/aksesoris_pakaian'
+  if (lower.includes('aksesoris') || lower.includes('jam tangan') || lower.includes('topi') || /\b(tas|ransel)\b/i.test(lower) || lower.includes('fashion') || lower.includes('belanja')) return 'pakaian/aksesoris_pakaian'
 
   // Beauty & Care
   if (lower.includes('skincare') || lower.includes('sunscreen') || lower.includes('serum') || lower.includes('toner') || lower.includes('moisturizer')) return 'kecantikan/skincare'

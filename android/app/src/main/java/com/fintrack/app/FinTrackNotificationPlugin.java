@@ -1,5 +1,6 @@
 package com.fintrack.app;
 
+import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -188,24 +189,73 @@ public class FinTrackNotificationPlugin extends Plugin {
     public void updateWidgetData(PluginCall call) {
         Context context = getContext();
         try {
-            String balance = call.getString("balance", "Rp 0");
-            String income = call.getString("income", "Masuk: Rp 0");
-            String expense = call.getString("expense", "Keluar: Rp 0");
+            // Support multiple possible key names
+            String balance = call.getString("balance");
+            if (balance == null || balance.trim().isEmpty()) balance = call.getString("totalBalance");
+            if (balance == null || balance.trim().isEmpty()) balance = call.getString("total_net_worth");
+            if (balance == null || balance.trim().isEmpty()) balance = call.getString("wallet_balance", "Rp 0");
+
+            String income = call.getString("income");
+            if (income == null || income.trim().isEmpty()) income = call.getString("monthIncome", "Masuk: Rp 0");
+            if (!income.startsWith("Masuk:") && !income.startsWith("In:")) {
+                income = "Masuk: " + income;
+            }
+
+            String expense = call.getString("expense");
+            if (expense == null || expense.trim().isEmpty()) expense = call.getString("monthExpense", "Keluar: Rp 0");
+            if (!expense.startsWith("Keluar:") && !expense.startsWith("Out:")) {
+                expense = "Keluar: " + expense;
+            }
+
             String period = call.getString("period", "Bulan Ini");
-            String sparklineData = call.getString("sparklineData", "[]");
+
+            String sparklineData = call.getString("sparklineData");
+            if (sparklineData == null || sparklineData.trim().isEmpty()) {
+                JSArray arr = call.getArray("sparklinePoints");
+                if (arr != null) {
+                    sparklineData = arr.toString();
+                } else {
+                    arr = call.getArray("sparklineData");
+                    sparklineData = arr != null ? arr.toString() : "[]";
+                }
+            }
 
             SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
             prefs.edit()
                 .putString("fintrack_widget_balance", balance)
+                .putString("total_net_worth", balance)
+                .putString("wallet_balance", balance)
                 .putString("fintrack_widget_income", income)
+                .putString("month_income", income)
+                .putString("income", income)
                 .putString("fintrack_widget_expense", expense)
+                .putString("month_expense", expense)
+                .putString("expense", expense)
                 .putString("fintrack_widget_period", period)
+                .putString("period", period)
                 .putString("fintrack_widget_sparkline", sparklineData)
-                .apply();
+                .putString("sparklineData", sparklineData)
+                .commit();
 
+            // Direct in-process update to all active widget instances
+            AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+            ComponentName thisWidget = new ComponentName(context, FinTrackWidgetProvider.class);
+            int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
+            if (appWidgetIds != null && appWidgetIds.length > 0) {
+                for (int appWidgetId : appWidgetIds) {
+                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData);
+                }
+            }
+
+            // Broadcast update intents for system launchers
             Intent updateIntent = new Intent(context, FinTrackWidgetProvider.class);
-            updateIntent.setAction(FinTrackWidgetProvider.ACTION_UPDATE_WIDGET);
+            updateIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+            updateIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
             context.sendBroadcast(updateIntent);
+
+            Intent customIntent = new Intent(context, FinTrackWidgetProvider.class);
+            customIntent.setAction(FinTrackWidgetProvider.ACTION_UPDATE_WIDGET);
+            context.sendBroadcast(customIntent);
 
             JSObject ret = new JSObject();
             ret.put("success", true);

@@ -4,10 +4,11 @@ import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions, getMonthSummaryForPrompt } from './aiDatabaseQueries'
 import { sanitizeCategoryPath } from './categorySanitizer'
 import { db, computeAllWalletBalances } from './db'
-import { formatCurrency, convertCurrency, isExcludeAnalyticsTx, toSafeNumber, FALLBACK_EXCHANGE_RATES } from './utils'
+import { convertCurrency, isExcludeAnalyticsTx, toSafeNumber, FALLBACK_EXCHANGE_RATES } from './utils'
 import { getCachedCurrencyRates } from './api'
 import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from './budgetUtils'
 import useSettingsStore from '../store/useSettingsStore'
+import { parseIndonesianFinancialText, extractMerchantAndCategory } from './ai/indonesianFinanceNlp'
 
 export function getEffectiveApiKey() {
   try {
@@ -391,92 +392,11 @@ const getTools = () => ([
 
 /**
  * Zero-latency Fast-Path NLP heuristic parser for short Indonesian / casual transactions.
- * Handles instant patterns like "bakso 20k", "kopi 25rb bca", "gaji 5jt", "bensin 30k" in 0ms!
+ * Handles instant patterns like "bakso 20k", "kopi 25rb bca", "gaji 5jt", "bensin 30k" as well
+ * as multi-day transactions ("sabtu dan jumwt masing-masing 10k buat maxim") in 0ms!
  */
-export function parseShortTransactionFast(userText, wallets = [], defaultCurrency = 'IDR') {
-  if (!userText || typeof userText !== 'string') return null
-  const trimmed = userText.trim()
-  if (!trimmed || trimmed.length > 90) return null
-
-  // Clean noise prefixes: "beli bakso 20k", "catat kopi 25rb"
-  const clean = trimmed
-    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|terima|makan|minum)\s+/i, '')
-    .trim()
-
-  // Match pattern: [item name] [amount with suffix or numbers] [optional wallet/notes]
-  const match = clean.match(/^([a-zA-Z0-9\s\-_]+?)\s+(?:sebesar\s+|rp\.?\s*|\$\s*|€\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)(?:\s+(.*))?$/i)
-  if (!match) return null
-
-  const rawItem = match[1].trim()
-  const rawAmt = match[2].trim()
-  const rawTail = (match[3] || '').trim()
-
-  if (!rawItem || rawItem.length < 2 || !rawAmt) return null
-
-  // Convert amount string to integer
-  let numericAmt = 0
-  const lowerAmt = rawAmt.toLowerCase()
-  if (lowerAmt.endsWith('k') || lowerAmt.endsWith('rb') || lowerAmt.endsWith('ribu')) {
-    const numPart = parseFloat(lowerAmt.replace(/(k|rb|ribu)/g, '').replace(',', '.'))
-    if (!isNaN(numPart)) numericAmt = Math.round(numPart * 1000)
-  } else if (lowerAmt.endsWith('jt') || lowerAmt.endsWith('juta') || lowerAmt.endsWith('m')) {
-    const numPart = parseFloat(lowerAmt.replace(/(jt|juta|m)/g, '').replace(',', '.'))
-    if (!isNaN(numPart)) numericAmt = Math.round(numPart * 1000000)
-  } else {
-    const cleanDigits = lowerAmt.replace(/[^0-9]/g, '')
-    numericAmt = parseInt(cleanDigits, 10) || 0
-  }
-
-  if (numericAmt <= 0) return null
-
-  // Determine transaction type: income vs expense
-  const lowerItem = rawItem.toLowerCase()
-  const isIncome = /gaji|salary|sangu|uang saku|uang jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan/i.test(lowerItem)
-  const txType = isIncome ? 'income' : 'expense'
-
-  // Categorize
-  const categoryPath = sanitizeCategoryPath(rawItem, txType)
-
-  // Resolve wallet if specified in notes or tail
-  let resolvedWalletId = wallets[0]?.id || ''
-  const searchTail = (rawTail + ' ' + rawItem).toLowerCase()
-  for (const w of wallets) {
-    const wName = String(w.name || '').toLowerCase()
-    if (searchTail.includes(wName) || (wName.includes('cash') && searchTail.includes('tunai'))) {
-      resolvedWalletId = w.id
-      break
-    }
-  }
-
-  const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const currentTime = format(new Date(), 'HH:mm')
-  const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
-  const txCurrency = matchedWallet?.currency || defaultCurrency
-
-  const capitalizedItem = rawItem.charAt(0).toUpperCase() + rawItem.slice(1)
-
-  return {
-    type: 'transactions',
-    action: 'create',
-    transactions: [
-      {
-        type: txType,
-        amount: numericAmt,
-        category: categoryPath,
-        currency: txCurrency,
-        walletId: resolvedWalletId,
-        date: todayStr,
-        time: currentTime,
-        merchant: txType === 'expense' ? capitalizedItem : undefined,
-        notes: capitalizedItem + (rawTail ? ` (${rawTail})` : ''),
-      },
-    ],
-    merchant: txType === 'expense' ? capitalizedItem : undefined,
-    currency: txCurrency,
-    text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${capitalizedItem} sebesar ${formatCurrency(numericAmt, txCurrency)}.`,
-    chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
-    isInstant: true,
-  }
+export function parseShortTransactionFast(userText, wallets = [], defaultCurrency = 'IDR', referenceDate = new Date()) {
+  return parseIndonesianFinancialText(userText, wallets, defaultCurrency, referenceDate)
 }
 
 export async function calculateDirectFinancialHealth({
@@ -618,10 +538,17 @@ export async function parseTransactionFromText(userMessage, context) {
   } = context
 
   // Fast-Path NLP heuristic: instant match for simple text like "bakso 20k", "kopi 25rb", "gaji 5jt"
-  if (!imageData && (!previousMessages || previousMessages.length === 0)) {
-    const fastTx = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
-    if (fastTx) {
-      return fastTx
+  // Also matches multi-day patterns instantly without network overhead even during active conversation
+  if (!imageData) {
+    const isMultiDay =
+      /\b(masing-masing|tiap\s+hari|setiap\s+hari|per\s+hari)\b/i.test(userMessage) ||
+      (/\b(sabtu|jumat|senin|selasa|rabu|kamis|minggu)\b/i.test(userMessage) &&
+        /(\bdan\b|\bsama\b|\bserta\b|&|,)/.test(userMessage))
+    if (!previousMessages || previousMessages.length === 0 || isMultiDay) {
+      const fastTx = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
+      if (fastTx) {
+        return fastTx
+      }
     }
   }
 
@@ -789,11 +716,17 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
    - SELALU konversikan nominal ke angka bulat (integer) murni pada field 'amount' tanpa koma atau titik.
 
 2. PENALARAN WAKTU & TANGGAL RELATIF (Acuan Hari Ini: ${today}):
+   - Hari ini adalah tanggal: ${today}.
    - "hari ini", "tadi pagi", "tadi siang", "barusan" = tanggal ${today}.
    - "kemarin", "semalam", "tadi malam" = 1 hari sebelum ${today}.
    - "kemarin lusa", "2 hari lalu" = 2 hari sebelum ${today}.
    - "lusa" = 2 hari setelah ${today}.
    - "3 hari lalu", "minggu lalu hari senin", dsb = hitung tanggal yang tepat relatif terhadap ${today}.
+   - PENGENALAN NAMA HARI LOKAL & TYPO TYPOGRAFI:
+     * Kenali nama hari Indonesia & typo umum: "senin" / "senen", "selasa", "rabu", "kamis", "jumat" / "jum'at" / "jumwt" / "jmt", "sabtu" / "sbtu", "minggu" / "mnggu" / "ahad".
+     * "hwri" / "hri" = typo dari kata "hari". "kmrn" / "kemaren" = kemarin.
+     * SELALU hitung tanggal hari tersebut ke masa lalu terdekat relatif terhadap tanggal hari ini (${today})!
+       Contoh: Jika hari ini adalah Senin 14 September 2026, maka "sabtu" adalah 12 September 2026, dan "jumat" / "jumwt" adalah 11 September 2026!
    - SELALU isi properti 'date' dalam format standar YYYY-MM-DD.
 
 3. PENCATATAN TRANSAKSI (PEMASUKAN, PENGELUARAN, TRANSFER):
@@ -807,8 +740,22 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
      * JIKA user tidak menyebutkan dompet: Otomatis pilih dompet yang saldonya mencukupi atau dompet pertama.
    - TRANSFER ANTAR DOMPET:
      * Gunakan type: "transfer" dengan 'walletId' (sumber) dan 'targetWalletId' (tujuan) saat user memindahkan saldo (misal: "transfer 100rb dari BCA ke GoPay", "tarik tunai 50rb dari Mandiri").
-   - MULTI-TRANSAKSI / KALIMAT MAJEMUK:
-     * JIKA user menyebutkan BANYAK transaksi sekaligus dalam 1 pesan (misal: "Gaji 5jt BCA, bayar kosan 1.5jt Cash, sama jajan kopi 25rb GoPay"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
+   - MULTI-HARI & MULTI-TRANSAKSI (ATURAN MUTLAK):
+     * JIKA user menyebutkan pengeluaran untuk beberapa hari atau kata "masing-masing" / "tiap hari" (misal: "kemarin hari sabtu dan jumwt masing masing hwri habisin 10k buat maxim", "sabtu 20rb minggu 30rb buat bensin"):
+       WAJIB pecah menjadi BEBERAPA OBJEK TRANSAKSI TERPISAH di dalam array 'transactions'!
+       Contoh untuk input di atas dengan acuan Senin 14 September 2026:
+       1) Transaksi 1: date = "2026-09-12" (Sabtu), amount = 10000, category = "transportasi/ojol", merchant = "Maxim", notes = "Maxim"
+       2) Transaksi 2: date = "2026-09-11" (Jumat), amount = 10000, category = "transportasi/ojol", merchant = "Maxim", notes = "Maxim"
+       DILARANG KERAS menggabungkannya menjadi 1 transaksi atau hanya mencatat 1 hari saja!
+     * JIKA user menyebutkan BANYAK item sekaligus dalam 1 pesan (misal: "Gaji 5jt BCA, bayar kosan 1.5jt Cash, sama jajan kopi 25rb GoPay"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
+   - EKSTRAKSI MERCHANT & KATEGORI LAYANAN RIDE-HAILING / OJOL:
+     * Layanan ride-hailing / taksi online:
+       - "maxim" -> merchant = "Maxim", category = "transportasi/ojol".
+       - "gojek" / "goride" / "gocar" -> merchant = "Gojek", category = "transportasi/ojol".
+       - "grab" / "grabbike" / "grabcar" -> merchant = "Grab", category = "transportasi/ojol".
+       - "indrive" -> merchant = "inDrive", category = "transportasi/ojol".
+       - "bluebird" -> merchant = "Bluebird", category = "transportasi/taksi".
+     * DILARANG KERAS mengisi properti 'merchant' dengan kalimat mentah pengguna (seperti "Kemarin hari sabtu...")! Properti 'merchant' HANYA BOLEH diisi nama merek/toko bersih (misal: "Maxim", "Indomaret", "Starbucks").
     - POLA SINGKAT NAMA BARANG/MAKANAN + NOMINAL (CONTOH: "bakso 20k", "kopi 25rb", "nasgor 15k", "bensin 30k"):
       * INI ADALAH TRANSAKSI PENGELUARAN LENGKAP (EXPENSE).
       * WAJIB LANGSUNG PANGGIL 'record_transactions' dengan type: "expense", amount yang sesuai, dan kategori yang cocok.
@@ -1103,7 +1050,18 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       
       if (fnCall.name === 'record_transactions') {
         const defaultWalletId = wallets[0]?.id || 1
-        const extractedMerchant = fnCall.args.merchantName || fnCall.args.transactions?.[0]?.merchant || ''
+        const userExtraction = extractMerchantAndCategory(userMessage || '')
+        let extractedMerchant = fnCall.args.merchantName || fnCall.args.transactions?.[0]?.merchant || ''
+        if (extractedMerchant) {
+          const cleanExtraction = extractMerchantAndCategory(extractedMerchant)
+          if (cleanExtraction.merchant) {
+            extractedMerchant = cleanExtraction.merchant
+          } else if (extractedMerchant.length > 25 || /\b(kemarin|hari|habisin|beli|buat|untuk|masing)\b/i.test(extractedMerchant)) {
+            extractedMerchant = userExtraction.merchant || ''
+          }
+        } else if (userExtraction.merchant) {
+          extractedMerchant = userExtraction.merchant
+        }
         const overallCurrency = fnCall.args.currency
         
         const txs = fnCall.args.transactions?.map(t => {
@@ -1129,11 +1087,33 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           const detectedCurrency = t.currency || overallCurrency
           const txCurrency = detectedCurrency || resolvedWallet?.currency || defaultCurrency
           
+          let itemMerchant = t.merchant || extractedMerchant || undefined
+          if (itemMerchant) {
+            const cleanExtraction = extractMerchantAndCategory(itemMerchant)
+            if (cleanExtraction.merchant) {
+              itemMerchant = cleanExtraction.merchant
+            } else if (itemMerchant.length > 25 || /\b(kemarin|hari|habisin|beli|buat|untuk|masing)\b/i.test(itemMerchant)) {
+              itemMerchant = extractedMerchant || userExtraction.merchant || undefined
+            }
+          }
+
+          let cleanNotes = t.notes || itemMerchant || ''
+          if (cleanNotes && (cleanNotes.length > 30 || /\b(kemarin|hari|habisin|masing)\b/i.test(cleanNotes))) {
+            cleanNotes = itemMerchant || cleanNotes
+          }
+
+          let cleanCat = sanitizeCategoryPath(t.category, t.type)
+          const combinedStr = `${t.notes || ''} ${itemMerchant || ''} ${t.category || ''} ${userMessage || ''}`.toLowerCase()
+          if (/\b(maxim|gojek|grab|indrive|ojol|goride|gocar|grabbike|grabcar)\b/i.test(combinedStr)) {
+            cleanCat = 'transportasi/ojol'
+          }
+
           return {
             ...t,
-            category: sanitizeCategoryPath(t.category, t.type),
+            category: cleanCat,
             currency: txCurrency,
-            merchant: t.merchant || extractedMerchant || undefined,
+            merchant: itemMerchant,
+            notes: cleanNotes,
             walletId: resolvedWalletId,
             items: Array.isArray(t.items) && t.items.length > 0 ? t.items : undefined,
             subtotal: typeof t.subtotal === 'number' ? t.subtotal : undefined,

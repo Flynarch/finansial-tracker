@@ -117,6 +117,12 @@ const useSettingsStore = create((set, get) => ({
   setDefaultCurrency: async (defaultCurrency) => {
     set({ defaultCurrency })
     await get().persist({ defaultCurrency })
+    try {
+      const { scheduleNativeWidgetSync } = await import('../lib/nativeWidgetSync')
+      scheduleNativeWidgetSync(100)
+    } catch {
+      /* ignore */
+    }
   },
   setDefaultWalletId: async (defaultWalletId) => {
     const next = defaultWalletId ? Number(defaultWalletId) : null

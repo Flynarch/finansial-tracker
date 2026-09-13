@@ -118,6 +118,14 @@ export function useAuthDeepLink() {
     // 1. Capacitor Native Android Deep Link Listener
     let nativeListener = null
     if (Capacitor.isNativePlatform()) {
+      App.getLaunchUrl()
+        .then((launchUrl) => {
+          if (launchUrl?.url) {
+            handleAuthUrl(launchUrl.url)
+          }
+        })
+        .catch(() => {})
+
       nativeListener = App.addListener('appUrlOpen', (data) => {
         if (data?.url) {
           handleAuthUrl(data.url)

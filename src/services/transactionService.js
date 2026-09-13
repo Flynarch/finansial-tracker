@@ -8,6 +8,7 @@ import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
 import useSettingsStore from '../store/useSettingsStore'
 import { getBudgetPeriodDateRange, calculateBudgetSpent } from '../lib/budgetUtils'
+import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 
 /**
  * Creates a new transaction and handles post-creation side effects (e.g. budget alerts).
@@ -171,6 +172,7 @@ export async function createTransaction(payload) {
     }
   }
 
+  scheduleNativeWidgetSync()
   return createdId
 }
 
@@ -354,6 +356,7 @@ export async function updateTransaction(id, fields) {
     void invalidateWalletBalance(affectedWallets)
   }
 
+  scheduleNativeWidgetSync()
   return 1
 }
 
@@ -458,4 +461,6 @@ export async function deleteTransaction(id) {
   if (affectedWallets.length > 0) {
     void invalidateWalletBalance(affectedWallets)
   }
+
+  scheduleNativeWidgetSync()
 }
