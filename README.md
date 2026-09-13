@@ -109,9 +109,12 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 - **Status Bar Icon Integration**: Persistent or scheduled local alarms notify users of due dates and upcoming recurring obligations.
 
 ### 4. Google Gemini AI Perception Engine & Conversational Advisor
+- **Dual-Model AI Architecture**: Employs ultra-fast `gemini-2.5-flash-lite` for instantaneous natural language parsing and multimodal receipt OCR, paired with deep analytical `gemini-2.5-flash` for conversational financial chat, debt strategies, and financial health diagnostics.
 - **Multimodal Receipt OCR**: Upload or capture physical paper receipts to automatically extract merchant name, transaction date, line items, and grand total using Google Gemini Vision.
 - **Natural Language Quick-Log**: Type plain language prompts (*e.g., "Paid 45k for fuel via Mandiri"*) to instantly populate categorized records.
 - **Financial Intelligence Chat**: Conversational AI advisor analyzes historical spending trends, identifies budget leaks, and suggests savings optimizations.
+- **Double-Entry Ledger Integration**: AI-driven savings deposits create authenticated ledger debit transactions against user wallets, ensuring Net Worth remains mathematically balanced.
+- **Multi-Key & Built-in Key Resiliency**: Seamlessly falls back to built-in system API keys with an interactive diagnostics card in Settings to test and verify AI connectivity.
 - **Itemized Digital Receipts**: Formatted, shareable digital receipt view with itemized tax, tip, and line-item breakdown.
 
 ### 5. Multi-Wallet & Multi-Currency Asset Portfolio
@@ -122,7 +125,7 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 
 ### 6. Dynamic Budgets & Spending Threshold Alerts
 - **Category Threshold Monitoring**: Set monthly spending limits per category with progress bars and dynamic warning thresholds (80% Caution, 100% Exceeded).
-- **Custom Budget Cycles**: Configurable monthly budget cycle start day (e.g., matching salary paydays on the 25th or 1st).
+- **Payday-Aware Budget Cycles**: Configurable monthly budget cycle start day (e.g., matching salary paydays on the 25th or 1st) with robust date-range boundary filtering that preserves month-end transactions and month-over-month deltas.
 - **Overspending Warnings**: Proactive visual and notification alerts when expenditures approach or exceed planned budgets.
 
 ### 7. Group Split-Bill Calculator & Itemized Receipts
@@ -144,6 +147,7 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 ### 10. Financial Statements, Balance Sheet & PDF Export Engine
 - **Income Statement (P&L)**: Granular aggregation of total revenues, operating expenses, net savings rate, and daily burn rate across custom date windows.
 - **Balance Sheet (Neraca Keuangan)**: Formal asset, liability, and equity classification proving accounting equilibrium (`Assets = Liabilities + Net Worth`).
+- **Split-Transaction Integrity**: Unpacks multi-item split transactions with individual line-item analytics exclusion evaluation, preventing internal transfers or mixed categories from corrupting ledger statements.
 - **Two-Tier Category Breakdown**: Interactive donut charts with drill-down capability into secondary subcategories and parent groups.
 - **Export Formats**: Generate publication-ready PDF financial reports with clean typography or export raw transaction data to CSV for spreadsheet analysis.
 
@@ -311,7 +315,7 @@ The compiled APK will be located at `android/app/build/outputs/apk/debug/app-deb
 To ensure zero regressions and maintain enterprise-grade reliability, all changes must pass the sequential verification pipeline:
 
 ```bash
-# 1. Run unit test suite (134 unit tests across 21 test files)
+# 1. Run unit test suite (257 unit tests across 30 test files)
 npm test
 
 # 2. Run code style and syntax linter
