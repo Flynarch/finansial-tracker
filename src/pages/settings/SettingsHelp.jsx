@@ -368,7 +368,7 @@ export default function SettingsHelp() {
             </h4>
           </div>
           <p className="text-[11px] text-[var(--muted)] font-medium">
-            {t('help.contactCardSubtitle', `FinTrack ${APP_DISPLAY_VERSION} • Native Android & Offline-First`)}
+            {t('help.contactCardSubtitle', { version: APP_DISPLAY_VERSION })}
           </p>
         </div>
       </div>
