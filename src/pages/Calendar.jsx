@@ -8,6 +8,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css'
 import '../styles/react-big-calendar-overrides.css'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
+import PageHeader from '../components/ui/PageHeader'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
@@ -19,7 +20,8 @@ import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/
 import { formatExpenseCategory } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
 import { formatCurrency, formatMoneyInput, getMoneyInputCaret, parseMoneyInput, toSafeNumber } from '../lib/utils'
-import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Trash2, ChevronRight, ChevronLeft, CheckCircle2, Circle } from 'lucide-react'
 
 const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 
@@ -126,6 +128,7 @@ function EmptyMonthEvent() {
 
 function Calendar() {
   const { t, locale } = useTranslation()
+  const navigate = useNavigate()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const [isEntering, setIsEntering] = useState(false)
@@ -151,7 +154,7 @@ function Calendar() {
   const [importantForm, setImportantForm] = useState({
     title: '',
     type: 'reminder',
-    color: '#f59e0b',
+    color: 'var(--accent)',
   })
 
   const calStart = useMemo(() => format(startOfMonth(subMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
@@ -172,6 +175,11 @@ function Calendar() {
     [calStart, calEnd],
     []
   )
+  const todos = useLiveQuery(
+    () => db.todos.where('dueDate').between(calStart, calEnd, true, true).toArray(),
+    [calStart, calEnd],
+    []
+  )
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
   const selectedWallet = useMemo(
@@ -189,7 +197,12 @@ function Calendar() {
       end: toLocalDate(tx.date),
       allDay: true,
       type: tx.type,
-      color: tx.type === 'income' ? 'var(--status-income)' : 'var(--status-expense)',
+      color:
+        tx.type === 'income'
+          ? 'var(--status-income)'
+          : tx.type === 'transfer'
+            ? 'var(--accent)'
+            : 'var(--status-expense)',
       raw: tx,
     }))
     const customEvents = (importantEvents || []).map((event) => ({
@@ -215,11 +228,23 @@ function Calendar() {
       end: toLocalDate(loan.dueDate),
       allDay: true,
       type: 'loan',
-      color: loan.type === 'debt' ? '#ef4444' : '#3b82f6',
+      color: loan.type === 'debt' ? 'var(--status-expense)' : 'var(--accent)',
       raw: loan,
     }))
-    return [...txEvents, ...customEvents, ...loanEvents]
-  }, [importantEvents, loans, transactions, t])
+    const todoEvents = (todos || []).map((todo) => ({
+      id: `todo-${todo.id}`,
+      source: 'todo',
+      sourceId: todo.id,
+      title: `To-Do: ${todo.title}`,
+      start: toLocalDate(todo.dueDate),
+      end: toLocalDate(todo.dueDate),
+      allDay: true,
+      type: 'todo',
+      color: todo.completed ? 'var(--status-income)' : 'var(--accent)',
+      raw: todo,
+    }))
+    return [...txEvents, ...customEvents, ...loanEvents, ...todoEvents]
+  }, [importantEvents, loans, todos, transactions, t])
 
   const indicators = useMemo(() => {
     const map = new Map()
@@ -246,9 +271,14 @@ function Calendar() {
       const prev = map.get(l.dueDate) || { income: 0, expense: 0, reminder: 0 }
       map.set(l.dueDate, { ...prev, reminder: prev.reminder + 1 })
     })
+    ;(todos || []).forEach((td) => {
+      if (!td?.dueDate) return
+      const prev = map.get(td.dueDate) || { income: 0, expense: 0, reminder: 0 }
+      map.set(td.dueDate, { ...prev, reminder: prev.reminder + 1 })
+    })
     bump(toDateOnlyString(selectedDate), {})
     return map
-  }, [importantEvents, loans, selectedDate, transactions])
+  }, [importantEvents, loans, todos, selectedDate, transactions])
 
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)
@@ -256,8 +286,9 @@ function Calendar() {
       transactions: (transactions || []).filter((tx) => tx.date === target),
       events: (importantEvents || []).filter((event) => event.date === target),
       loans: (loans || []).filter((loan) => loan.dueDate === target),
+      todos: (todos || []).filter((todo) => todo.dueDate === target),
     }
-  }, [importantEvents, loans, selectedDate, transactions])
+  }, [importantEvents, loans, todos, selectedDate, transactions])
 
   const [txSubmitError, setTxSubmitError] = useState('')
 
@@ -308,13 +339,13 @@ function Calendar() {
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* ── Premium Header ── */}
-      <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
-        <div className="relative p-5">
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] sm:text-2xl">{t('calendar.title')}</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">{t('calendar.subtitle')}</p>
-        </div>
-      </section>
+        {/* Header */}
+        <PageHeader
+          title={t('calendar.title')}
+          subtitle={t('calendar.subtitle')}
+          titlePosition="left"
+          className="pt-2 !mb-0"
+        />
 
       {/* ── Premium Calendar Wrapper ── */}
       <div className="overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[var(--shadow-card)] sm:p-5">
@@ -487,12 +518,16 @@ function Calendar() {
                       {dayItems.loans.map((loan) => (
                         <div
                           key={`loan-${loan.id}`}
-                          className="flex items-center justify-between gap-3 rounded-[1rem] border border-blue-500/30 bg-blue-500/10 px-4 py-3"
+                          className={`flex items-center justify-between gap-3 rounded-[1rem] border px-4 py-3 ${
+                            loan.type === 'debt'
+                              ? 'border-[var(--status-expense)]/30 bg-[var(--status-expense)]/10'
+                              : 'border-[var(--status-income)]/30 bg-[var(--status-income)]/10'
+                          }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <span
                               className={`h-3 w-3 shrink-0 rounded-full ring-2 ring-[color-mix(in_srgb,var(--bg)_10%,transparent)] shadow-sm ${
-                                loan.type === 'debt' ? 'bg-rose-500' : 'bg-blue-500'
+                                loan.type === 'debt' ? 'bg-[var(--status-expense)]' : 'bg-[var(--status-income)]'
                               }`}
                               aria-hidden="true"
                             />
@@ -526,7 +561,7 @@ function Calendar() {
                           <button
                             type="button"
                             onClick={() => db.calendarEvents.delete(event.id)}
-                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer shrink-0"
+                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--status-expense)] hover:bg-[var(--status-expense)]/10 transition cursor-pointer shrink-0"
                             title={t('calendar.deleteAgenda', 'Hapus Agenda')}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -534,6 +569,79 @@ function Calendar() {
                         </div>
                       ))}
                     </>
+                  )}
+                </div>
+              </section>
+
+              {/* To-Do Tasks List */}
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--muted-2)]">
+                    {t('calendar.todos', 'Tugas & To-Do')}
+                  </h4>
+                  {dayItems.todos.length > 0 && (
+                    <span className="text-[11px] font-semibold text-[var(--muted)]">
+                      {dayItems.todos.filter((td) => td.completed).length}/{dayItems.todos.length}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {dayItems.todos.length === 0 ? (
+                    <EmptyState title={t('calendar.noTodos', 'Tidak ada tugas to-do pada tanggal ini.')} />
+                  ) : (
+                    dayItems.todos.map((todo) => (
+                      <div
+                        key={`todo-${todo.id}`}
+                        className={`flex items-center justify-between gap-3 rounded-[1rem] border p-3 transition ${
+                          todo.completed
+                            ? 'border-[color-mix(in_srgb,var(--border)_30%,transparent)] bg-[color-mix(in_srgb,var(--field-bg)_40%,transparent)] opacity-60'
+                            : 'border-[color-mix(in_srgb,var(--border)_60%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_80%,transparent)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await db.todos.update(todo.id, { completed: !todo.completed })
+                            }}
+                            className="text-[var(--accent)] hover:scale-110 active:scale-95 transition shrink-0 cursor-pointer"
+                            aria-label={todo.title}
+                          >
+                            {todo.completed ? (
+                              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-[var(--muted)]" />
+                            )}
+                          </button>
+                          <div
+                            className="min-w-0 flex-1 cursor-pointer"
+                            onClick={() => {
+                              setIsDayModalOpen(false)
+                              navigate(`/todos/${todo.id}`)
+                            }}
+                          >
+                            <p className={`truncate text-sm font-bold ${todo.completed ? 'line-through text-[var(--muted)]' : 'text-[var(--fg)]'}`}>
+                              {todo.title}
+                            </p>
+                            <p className="truncate text-xs text-[var(--muted)]">
+                              {todo.category || 'General'}
+                              {todo.reminderTime ? ` • ${todo.reminderTime}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDayModalOpen(false)
+                            navigate(`/todos/${todo.id}`)
+                          }}
+                          className="p-1 text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer shrink-0"
+                          aria-label={t('common.details', 'Detail')}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))
                   )}
                 </div>
               </section>
@@ -546,7 +654,7 @@ function Calendar() {
                   {t('calendar.addTransaction')}
                 </h5>
                 {txSubmitError && (
-                  <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-[ft-fade-in_0.2s_ease-out]">
+                  <div className="mb-3 rounded-xl border border-[var(--status-expense)]/30 bg-[var(--status-expense)]/10 p-3 text-xs font-semibold text-[var(--status-expense)] animate-[ft-fade-in_0.2s_ease-out]">
                     {txSubmitError}
                   </div>
                 )}

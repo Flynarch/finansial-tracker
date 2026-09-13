@@ -9,19 +9,20 @@ import { db } from '../../lib/db'
 import useLoanStore from '../../store/useLoanStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import { getLocalDateString } from '../../lib/dateUtils'
 import {
   formatCurrency,
   formatMoneyInput,
   formatMoneyValueForInput,
   getMoneyInputCaret,
   parseMoneyInput,
+  toSafeNumber,
 } from '../../lib/utils'
 import {
   HandCoins,
   Receipt,
   Calculator,
   ChevronDown,
-  Lock,
   Tag,
   User,
   Wallet,
@@ -33,7 +34,8 @@ import {
 export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, defaultType = 'debt', onSaved }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
-  const { addLoan, updateLoan } = useLoanStore()
+  const addLoan = useLoanStore((state) => state.addLoan)
+  const updateLoan = useLoanStore((state) => state.updateLoan)
   const [sheetError, setSheetError] = useState('')
   const [walletModalOpen, setWalletModalOpen] = useState(false)
   const [showSimulator, setShowSimulator] = useState(false)
@@ -47,7 +49,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     title: '',
     totalAmount: '',
     dueDate: '',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: getLocalDateString(),
     notes: '',
     walletId: '',
     currency: defaultCurrency,
@@ -70,13 +72,14 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     if (isOpen) {
       setSheetError('')
       if (editingLoan) {
+        const initialPrincipal = editingLoan.principalAmount ?? editingLoan.totalAmount
         setForm({
           type: editingLoan.type || defaultType,
           personName: editingLoan.personName || '',
           title: editingLoan.title || '',
-          totalAmount: formatMoneyValueForInput(editingLoan.totalAmount, editingLoan.currency || defaultCurrency),
+          totalAmount: formatMoneyValueForInput(initialPrincipal, editingLoan.currency || defaultCurrency),
           dueDate: editingLoan.dueDate || '',
-          startDate: editingLoan.startDate || new Date().toISOString().split('T')[0],
+          startDate: editingLoan.startDate || getLocalDateString(),
           notes: editingLoan.notes || '',
           walletId: editingLoan.walletId ? String(editingLoan.walletId) : '',
           currency: editingLoan.currency || defaultCurrency,
@@ -92,7 +95,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
           title: '',
           totalAmount: '',
           dueDate: '',
-          startDate: new Date().toISOString().split('T')[0],
+          startDate: getLocalDateString(),
           notes: '',
           walletId: firstW ? String(firstW.id) : '',
           currency: firstW?.currency || defaultCurrency,
@@ -105,7 +108,6 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   }
 
   const handleTotalAmountChange = (e) => {
-    if (hasPaymentsRecorded) return
     const el = e.target
     const nextFormatted = formatMoneyInput(el.value, form.currency)
     const caretPos = getMoneyInputCaret(el.value, nextFormatted, el.selectionStart ?? el.value.length, form.currency)
@@ -114,7 +116,6 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   }
 
   const clearAmount = () => {
-    if (hasPaymentsRecorded) return
     setForm((prev) => ({ ...prev, totalAmount: '' }))
     totalAmountInputRef.current?.focus()
   }
@@ -156,6 +157,20 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       setSheetError(t('loans.error.amountPositive', 'Nominal harus lebih dari 0.'))
       return
     }
+
+    const annualRateNum = form.interestRate ? parseFloat(form.interestRate) : 0
+    const tenorNum = form.tenorMonths ? parseInt(form.tenorMonths, 10) : 0
+    const isAmortized = annualRateNum > 0 && tenorNum > 0 && previewMonthlyPayment > 0
+    const totalRepayment = isAmortized ? previewMonthlyPayment * tenorNum : total
+    const effectivePrincipal = total
+
+    if (editingLoan) {
+      const alreadyPaid = toSafeNumber(editingLoan.totalAmount) - toSafeNumber(editingLoan.remainingAmount)
+      if (totalRepayment < alreadyPaid) {
+        setSheetError(t('loans.error.totalLessThanPaid', 'Nominal total tidak boleh kurang dari jumlah yang telah dibayarkan.'))
+        return
+      }
+    }
     if (!form.walletId) {
       setSheetError(t('loans.error.walletRequired', 'Dompet / akun transaksi wajib dipilih.'))
       return
@@ -165,17 +180,16 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       type: form.type,
       personName: form.personName.trim(),
       title: form.title.trim(),
-      totalAmount: total,
-      remainingAmount: editingLoan
-        ? Math.min(editingLoan.remainingAmount, total)
-        : total,
+      totalAmount: totalRepayment,
+      principalAmount: effectivePrincipal,
+      remainingAmount: editingLoan ? undefined : totalRepayment,
       dueDate: form.dueDate || null,
-      startDate: form.startDate || new Date().toISOString().split('T')[0],
+      startDate: form.startDate || getLocalDateString(),
       notes: form.notes.trim(),
       walletId: Number(form.walletId),
       currency: form.currency,
-      interestRate: form.interestRate ? parseFloat(form.interestRate) : 0,
-      tenorMonths: form.tenorMonths ? parseInt(form.tenorMonths, 10) : 0,
+      interestRate: annualRateNum,
+      tenorMonths: tenorNum,
       monthlyPayment: previewMonthlyPayment > 0 ? previewMonthlyPayment : null,
       status: editingLoan ? editingLoan.status : 'active',
     }
@@ -259,11 +273,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
               <span>{t('loans.modal.amount', 'Nominal Pinjaman')}</span>
               <span className="text-rose-500">*</span>
             </span>
-            {hasPaymentsRecorded ? (
-              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded">
-                <Lock className="h-2.5 w-2.5" /> {t('loans.modal.locked', 'Terkunci')}
-              </span>
-            ) : numericAmount > 0 ? (
+            {numericAmount > 0 ? (
               <button
                 type="button"
                 onClick={clearAmount}
@@ -309,10 +319,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
                 ref={totalAmountInputRef}
                 type="text"
                 inputMode="numeric"
-                disabled={hasPaymentsRecorded}
-                className={`w-full bg-transparent border-0 py-0 text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/40 ${
-                  hasPaymentsRecorded ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
+                className="w-full bg-transparent border-0 py-0 text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/40"
                 placeholder="0"
                 value={form.totalAmount}
                 onChange={handleTotalAmountChange}

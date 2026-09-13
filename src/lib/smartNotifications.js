@@ -80,6 +80,45 @@ export async function requestNotificationPermission() {
     }
   } catch {
     /* ignore */
+    return false
+  }
+  return false
+}
+
+/**
+ * Sends an immediate test notification using Capacitor LocalNotifications on Android/iOS,
+ * or browser Web Notification on desktop.
+ */
+export async function sendTestNotification() {
+  try {
+    const permOk = await requestNotificationPermission()
+    if (!permOk) return false
+
+    await initNotificationChannels()
+
+    if (Capacitor.isNativePlatform()) {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 90000) + 10000,
+            title: 'FinTrack • Pengingat Finansial',
+            body: 'Notifikasi uji coba berhasil! FinTrack siap mengingatkan pencatatan keuangan Anda.',
+            channelId: NOTIFICATION_CHANNELS.DAILY_REMINDER,
+            schedule: { at: new Date(Date.now() + 300) },
+            smallIcon: 'ic_stat_fintrack',
+            iconColor: '#6366f1',
+          },
+        ],
+      })
+      return true
+    } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('FinTrack • Pengingat Finansial', {
+        body: 'Notifikasi uji coba berhasil! FinTrack siap mengingatkan pencatatan keuangan Anda.',
+      })
+      return true
+    }
+  } catch (err) {
+    console.warn('sendTestNotification error:', err)
   }
   return false
 }
@@ -134,13 +173,14 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
             title,
             body,
             channelId: NOTIFICATION_CHANNELS.DAILY_REMINDER,
-            extra: { route: '/transactions' },
+            extra: { route: 'fintrack://quick-add' },
             schedule: {
               at: triggerDate,
               every: 'day',
               allowWhileIdle: true,
             },
-            smallIcon: 'ic_stat_icon_config_sample',
+            smallIcon: 'ic_stat_fintrack',
+            iconColor: '#10b981',
           },
         ],
       })
@@ -249,7 +289,8 @@ async function sendInstantBudgetNotification({ id, title, body, route = '/budget
             channelId: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
             extra: { route },
             schedule: { at: new Date(Date.now() + 500) },
-            smallIcon: 'ic_stat_icon_config_sample',
+            smallIcon: 'ic_stat_fintrack',
+            iconColor: '#10b981',
           },
         ],
       })

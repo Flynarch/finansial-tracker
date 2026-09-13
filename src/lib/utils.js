@@ -1,3 +1,5 @@
+import { format } from 'date-fns'
+
 /** When live FX fetch fails: 1 USD = currency rates (approximate fallback). */
 export const FALLBACK_EXCHANGE_RATES = Object.freeze({
   USD: 1,
@@ -113,10 +115,12 @@ export function formatMoneyInput(value, currency = 'IDR') {
 }
 
 export function parseMoneyInput(value, currency = 'IDR') {
-  const raw = String(value ?? '')
+  const raw = String(value ?? '').trim()
   if (!raw) return 0
+  const isNegative = raw.startsWith('-')
   if (currency === 'IDR') {
-    return toSafeNumber(raw.replace(/[^\d]/g, ''))
+    const num = toSafeNumber(raw.replace(/[^\d]/g, ''))
+    return isNegative ? -num : num
   }
 
   const normalized = raw.replace(/\./g, '').replace(',', '.')
@@ -220,11 +224,66 @@ export const LOAN_CATEGORIES = Object.freeze([
 
 export function isExcludeAnalyticsTx(tx) {
   if (!tx) return false
-  if (tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
+  if (tx.isExcludeAnalyticsTx || tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
+  if (tx.isPendingReview === true || tx.isPendingReview === 1) return true
   if (Array.isArray(tx.tags) && (tx.tags.includes('exclude_analytics') || tx.tags.includes('excludeFromAnalytics'))) return true
   if (tx.type === 'balance_adjustment') return true
   if (tx.loanId != null || tx.splitBillId != null) return true
   if (LOAN_CATEGORIES.includes(tx.category)) return true
+  if (['tabungan', 'cairkan_tabungan'].includes(tx.category)) return true
+  if (typeof tx.category === 'string') {
+    if (tx.category === 'investasi_pengeluaran' || tx.category.startsWith('investasi_pengeluaran/')) return true
+    if (tx.category === 'investasi_penjualan' || tx.category.startsWith('investasi_penjualan/')) return true
+    // Investment liquidation gross proceeds excluded from analytics, preserving dividend & interest yield
+    if (
+      tx.type === 'income' &&
+      (tx.category === 'investasi' || tx.category.startsWith('investasi/')) &&
+      !tx.category.includes('dividen') &&
+      !tx.category.includes('bunga')
+    ) {
+      return true
+    }
+    if (
+      typeof tx.notes === 'string' &&
+      (tx.notes.startsWith('Sell ') || tx.notes.startsWith('Buy ')) &&
+      (tx.category === 'investasi' || tx.category.startsWith('investasi/'))
+    ) {
+      return true
+    }
+  }
   return false
+}
+
+export function safeFormatDate(val, formatPattern = 'dd MMM yyyy', options = {}) {
+  if (!val) return ''
+  try {
+    let d
+    if (typeof val === 'number') {
+      d = new Date(val)
+    } else if (typeof val === 'string') {
+      const trimmed = val.trim()
+      if (!trimmed) return ''
+      if (/^\d{11,15}$/.test(trimmed)) {
+        d = new Date(Number(trimmed))
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        const [y, m, day] = trimmed.split('-').map(Number)
+        d = new Date(y, m - 1, day)
+        if (d.getFullYear() !== y || d.getMonth() !== m - 1 || d.getDate() !== day) {
+          return ''
+        }
+      } else {
+        d = new Date(trimmed)
+      }
+    } else if (val instanceof Date) {
+      d = val
+    } else {
+      return ''
+    }
+
+    if (isNaN(d.getTime())) return ''
+    return format(d, formatPattern, options)
+  } catch {
+    return ''
+  }
 }
 

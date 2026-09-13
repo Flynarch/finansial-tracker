@@ -153,7 +153,14 @@ export function aggregateMonthlyIncomeExpense(
     })
   }
 
-  const validTxs = (transactions || []).filter((tx) => !isExcludeAnalyticsTx(tx))
+  const validTxs = (transactions || []).filter((tx) => {
+    if (tx.isPendingReview === true || tx.isPendingReview === 1) return false
+    if (!tx.isSplit) {
+      if (tx.isExcludeAnalyticsTx || tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return false
+      if (isExcludeAnalyticsTx(tx)) return false
+    }
+    return true
+  })
 
   validTxs.forEach((tx) => {
     if (!tx?.date) return
@@ -165,8 +172,32 @@ export function aggregateMonthlyIncomeExpense(
     }
     if (!monthMap.has(key)) return
     const row = monthMap.get(key)
+
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      tx.splitItems.forEach((si) => {
+        const itemTx = {
+          ...tx,
+          ...si,
+          category: si.category || tx.category,
+          isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+          isExcludeAnalyticsTx: false,
+        }
+        if (isExcludeAnalyticsTx(itemTx)) return
+        let val = toSafeNumber(si.amount)
+        if (tx.currency && tx.currency !== defaultCurrency) {
+          val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+        }
+        const itemType = si.type || tx.type
+        if (itemType === 'income') row.income += val
+        if (itemType === 'expense') row.expense += val
+      })
+      return
+    }
+
+    if (isExcludeAnalyticsTx(tx)) return
     let val = toSafeNumber(tx.amount)
-    if (tx.currency && tx.currency !== defaultCurrency && rates) {
+    if (tx.currency && tx.currency !== defaultCurrency) {
       val = convertCurrency(val, tx.currency, defaultCurrency, rates)
     }
     if (tx.type === 'income') row.income += val
@@ -184,8 +215,8 @@ export function aggregateMonthlyIncomeExpense(
  * @param {Array} investments
  * @param {Array} loans
  * @param {Object} rates
- * @param {string} defaultCurrency
- * @returns {{ totalCash: number, investmentValue: number, netLoanPosition: number, totalNetWorth: number }}
+ * @param {Array} [savings]
+ * @returns {{ totalCash: number, investmentValue: number, netLoanPosition: number, totalSavings: number, totalNetWorth: number }}
  */
 export function calculateNetWorthSummary(
   wallets = [],
@@ -193,7 +224,8 @@ export function calculateNetWorthSummary(
   investments = [],
   loans = [],
   rates = null,
-  defaultCurrency = 'IDR'
+  defaultCurrency = 'IDR',
+  savings = []
 ) {
   const computedWallets = computeAllWalletBalances(wallets || [], allTransactions || [], rates)
   const totalCash = computedWallets.reduce((sum, w) => {
@@ -250,12 +282,22 @@ export function calculateNetWorthSummary(
       0
     )
   const netLoanPosition = rec - debt
-  const totalNetWorth = totalCash + investmentValue + netLoanPosition
+
+  const totalSavings = (savings || [])
+    .filter((g) => !g.isArchived)
+    .reduce((sum, g) => {
+      const amt = toSafeNumber(g.currentAmount)
+      if (amt <= 0) return sum
+      return sum + convertCurrency(amt, g.currency || defaultCurrency, defaultCurrency, rates)
+    }, 0)
+
+  const totalNetWorth = totalCash + investmentValue + netLoanPosition + totalSavings
 
   return {
     totalCash,
     investmentValue,
     netLoanPosition,
+    totalSavings,
     totalNetWorth,
   }
 }

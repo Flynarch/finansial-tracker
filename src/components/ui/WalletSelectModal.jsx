@@ -2,7 +2,8 @@ import { useMemo, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, computeAllWalletBalances } from '../../lib/db'
+import { db } from '../../lib/db'
+import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { Wallet, Check, Search, X, Plus, ChevronDown } from 'lucide-react'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from './MoneyBagIcon'
@@ -150,14 +151,21 @@ export default function WalletSelectModal({
   const hideBalance = useSettingsStore((state) => state.hideBalance)
   const [search, setSearch] = useState('')
 
-  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
-  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [], [])
   const rates = useMemo(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }, [])
+  const computedDbWallets = useLiveQuery(
+    async () => {
+      const raw = await db.wallets.toArray()
+      if (!raw || raw.length === 0) return []
+      return await getAllWalletBalances(raw, rates)
+    },
+    [rates],
+    []
+  )
 
   const enrichedWallets = useMemo(() => {
-    const rawWallets = propWallets && propWallets.length > 0 ? propWallets : (dbWallets || [])
-    return computeAllWalletBalances(rawWallets, allTransactions || [], rates)
-  }, [propWallets, dbWallets, allTransactions, rates])
+    if (propWallets && propWallets.length > 0) return propWallets
+    return computedDbWallets || []
+  }, [propWallets, computedDbWallets])
 
   const activeWallets = useMemo(() => {
     return (enrichedWallets || []).filter((w) => !w.isArchived)

@@ -8,9 +8,12 @@
  *
  * @param {string} input - Raw user input string
  * @param {string} [currency='IDR'] - Currency code
+ * @param {object} [options={}] - Options object
+ * @param {boolean} [options.allowNegative=false] - Whether negative results are permitted
  * @returns {{ isValid: boolean, result: number|null, hasExpression: boolean }}
  */
-export function evaluateExpression(input, currency = 'IDR') {
+export function evaluateExpression(input, currency = 'IDR', options = {}) {
+  const { allowNegative = false } = options
   if (!input || typeof input !== 'string') {
     return { isValid: false, result: null, hasExpression: false }
   }
@@ -27,22 +30,20 @@ export function evaluateExpression(input, currency = 'IDR') {
     // Remove spaces
     .replace(/\s+/g, '')
 
-  // If currency is IDR or string contains thousand dot patterns (e.g. 50.000 or 1.500.000),
-  // strip thousand dots before evaluating
-  if (currency === 'IDR' || /\d+\.\d{3}(?:\.\d{3})*/.test(sanitized)) {
+  // If currency is IDR, strip thousand dots before evaluating
+  if (currency === 'IDR') {
     // Replace dots that are thousand separators (followed by 3 digits)
     sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
     // If multiple thousand dots exist (e.g. 1.000.000 -> 1000000)
     while (/(\d+)\.(\d{3})(?=\D|$|\.)/.test(sanitized)) {
       sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
     }
+    // Replace decimal comma with dot
+    sanitized = sanitized.replace(/,(\d+)/g, '.$1')
   }
 
-  // Preprocess Indonesian shorthands:
-  // e.g. 2,5jt or 2.5jt -> 2.5 * 1000000
-  // e.g. 50k or 50rb -> 50 * 1000
+  // Expand shorthand suffixes to numbers
   sanitized = sanitized
-    .replace(/,/g, '.') // Convert decimal commas to dots
     .replace(/([0-9.]+)\s*(jt|juta|m(?:illion)?)(?!\w)/gi, '($1*1000000)')
     .replace(/([0-9.]+)\s*(k|rb|ribu)(?!\w)/gi, '($1*1000)')
     .replace(/([0-9.]+)\s*(b|milyar|billion)(?!\w)/gi, '($1*1000000000)')
@@ -58,9 +59,10 @@ export function evaluateExpression(input, currency = 'IDR') {
     const rawResult = fn()
 
     if (typeof rawResult === 'number' && Number.isFinite(rawResult) && !Number.isNaN(rawResult)) {
+      const rounded = Math.round(rawResult * 100) / 100
       return {
         isValid: true,
-        result: Math.max(0, Math.round(rawResult * 100) / 100),
+        result: allowNegative ? rounded : Math.max(0, rounded),
         hasExpression,
       }
     }

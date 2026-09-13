@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useBackButton from '../hooks/useBackButton'
@@ -9,6 +10,7 @@ import BottomSheet from '../components/ui/BottomSheet'
 import EmptyState from '../components/ui/EmptyState'
 import CustomDatePicker from '../components/ui/CustomDatePicker'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
+import PageHeader from '../components/ui/PageHeader'
 import {
   clampPercent,
   formatCurrency,
@@ -16,9 +18,9 @@ import {
   getMoneyInputCaret,
   parseMoneyInput,
   toSafeNumber,
+  safeFormatDate,
 } from '../lib/utils'
 import {
-  ArrowLeft,
   Plus,
   Minus,
   History,
@@ -90,6 +92,10 @@ export default function SavingsDetail() {
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false)
 
   useBackButton(() => setIsCelebrationModalOpen(false), Boolean(isCelebrationModalOpen))
+  useBackButton(() => setCashoutWalletModalOpen(false), Boolean(cashoutWalletModalOpen))
+  useBackButton(() => setWalletModalOpen(false), Boolean(walletModalOpen))
+  useBackButton(() => setIsCashoutSheetOpen(false), Boolean(isCashoutSheetOpen))
+  useBackButton(() => setIsAiModalOpen(false), Boolean(isAiModalOpen))
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -131,41 +137,52 @@ export default function SavingsDetail() {
       ? Math.max(0, currentGoalAmt - val)
       : currentGoalAmt + val
 
-    await db.goals.update(goalId, { currentAmount: newGoalAmount })
-
-    const walletIdNum = Number(selectedWalletId)
-    let walletObj = null
-    if (walletIdNum) {
-      walletObj = await db.wallets.get(walletIdNum)
-    }
-
     const now = new Date()
     const selectedDate = new Date(`${dateInput}T00:00:00`)
     selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
     const formattedDate = format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
+    const walletIdNum = Number(selectedWalletId)
 
-    const logPayload = {
-      goalId,
-      amount: isWithdraw ? -val : val,
-      notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
-      date: formattedDate,
-    }
-    if (walletObj) {
-      logPayload.walletName = walletObj.name
-    }
-    await db.goalLogs.add(logPayload)
+    await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
+      await db.goals.update(goalId, { currentAmount: newGoalAmount })
+
+      let walletObj = null
+      if (walletIdNum) {
+        walletObj = await db.wallets.get(walletIdNum)
+      }
+
+      let createdTxId = null
+      if (walletIdNum) {
+        createdTxId = await db.transactions.add({
+          date: dateInput,
+          amount: val,
+          type: isWithdraw ? 'income' : 'expense',
+          category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
+          notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+          currency: goal.currency || defaultCurrency,
+          walletId: walletIdNum,
+          goalId: goal.id,
+          createdAt: Date.now(),
+          isExcludeFromAnalytics: true,
+          excludeFromAnalytics: true,
+        })
+      }
+
+      const logPayload = {
+        goalId,
+        amount: isWithdraw ? -val : val,
+        notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
+        date: formattedDate,
+        transactionId: createdTxId || null,
+      }
+      if (walletObj) {
+        logPayload.walletName = walletObj.name
+      }
+      await db.goalLogs.add(logPayload)
+    })
 
     if (walletIdNum) {
-      await db.transactions.add({
-        date: dateInput,
-        amount: val,
-        type: isWithdraw ? 'income' : 'expense',
-        category: 'tabungan',
-        notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
-        currency: goal.currency || defaultCurrency,
-        walletId: walletIdNum,
-        createdAt: Date.now(),
-      })
+      void invalidateWalletBalance([walletIdNum])
     }
 
     const targetAmt = Number(goal?.targetAmount || 0)
@@ -189,35 +206,44 @@ export default function SavingsDetail() {
 
     const cashoutAmount = Number(goal.currentAmount || 0)
 
-    // 1. Update Goal
-    await db.goals.update(goalId, {
-      currentAmount: 0,
-      isCompleted: true,
-      status: 'completed',
-    })
-
-    // 2. Add Income Transaction to Wallet (computeWalletBalance dynamically reflects this)
     const now = new Date()
     const formattedDate = format(now, 'yyyy-MM-dd HH:mm:ss')
-    await db.transactions.add({
-      date: format(now, 'yyyy-MM-dd'),
-      amount: cashoutAmount,
-      type: 'income',
-      category: 'cairkan_tabungan',
-      notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
-      currency: goal.currency || defaultCurrency,
-      walletId: walletIdNum,
-      createdAt: Date.now(),
+
+    await db.transaction('rw', [db.goals, db.transactions, db.goalLogs, db.wallets], async () => {
+      // 1. Update Goal
+      await db.goals.update(goalId, {
+        currentAmount: 0,
+        isCompleted: true,
+        status: 'completed',
+      })
+
+      // 2. Add Income Transaction to Wallet
+      const cashoutTxId = await db.transactions.add({
+        date: format(now, 'yyyy-MM-dd'),
+        amount: cashoutAmount,
+        type: 'income',
+        category: 'cairkan_tabungan',
+        notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
+        currency: goal.currency || defaultCurrency,
+        walletId: walletIdNum,
+        goalId: Number(goalId),
+        createdAt: Date.now(),
+        isExcludeFromAnalytics: true,
+        excludeFromAnalytics: true,
+      })
+
+      // 3. Add Log Entry
+      await db.goalLogs.add({
+        goalId,
+        amount: -cashoutAmount,
+        notes: `Pencairan Tabungan ke ${walletObj.name}`,
+        date: formattedDate,
+        walletName: walletObj.name,
+        transactionId: cashoutTxId || null,
+      })
     })
 
-    // 4. Add Log Entry
-    await db.goalLogs.add({
-      goalId,
-      amount: -cashoutAmount,
-      notes: `Pencairan Tabungan ke ${walletObj.name}`,
-      date: formattedDate,
-      walletName: walletObj.name,
-    })
+    void invalidateWalletBalance([walletIdNum])
 
     setIsCashoutSheetOpen(false)
     setIsCelebrationModalOpen(false)
@@ -309,14 +335,21 @@ export default function SavingsDetail() {
   let daysLeft = null
   let isOverdue = false
   if (goal.deadline) {
-    daysLeft = differenceInDays(new Date(goal.deadline), new Date())
-    if (daysLeft < 0) {
-      deadlineText = t('savings.overdue', 'Lewat Tenggat')
-      isOverdue = true
-    } else if (daysLeft === 0) {
-      deadlineText = t('savings.dueToday', 'Jatuh Tempo Hari Ini')
-    } else {
-      deadlineText = t('savings.daysLeft', { count: daysLeft }, `${daysLeft} Hari Lagi`)
+    try {
+      const dObj = new Date(goal.deadline)
+      if (!isNaN(dObj.getTime())) {
+        daysLeft = differenceInDays(dObj, new Date())
+        if (daysLeft < 0) {
+          deadlineText = t('savings.overdue', 'Lewat Tenggat')
+          isOverdue = true
+        } else if (daysLeft === 0) {
+          deadlineText = t('savings.dueToday', 'Jatuh Tempo Hari Ini')
+        } else {
+          deadlineText = t('savings.daysLeft', { count: daysLeft }, `${daysLeft} Hari Lagi`)
+        }
+      }
+    } catch {
+      daysLeft = null
     }
   }
 
@@ -326,21 +359,16 @@ export default function SavingsDetail() {
     <div className="ft-page-enter min-h-[100dvh] bg-[var(--bg)] pb-28">
       {/* ── Top Header ── */}
       <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-3.5 sm:px-5">
-        <div className="mx-auto max-w-3xl py-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
-              aria-label={t('common.back', 'Kembali')}
-            >
-              <ArrowLeft className="h-4.5 w-4.5" />
-            </button>
-            <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-[var(--fg)] truncate">{goal.name}</h2>
-              <div className="flex items-center gap-2 flex-wrap">
+        <div className="mx-auto max-w-3xl pt-2">
+          <PageHeader
+            titlePosition="left"
+            title={goal.name}
+            backAriaLabel={t('common.back', 'Kembali')}
+            onBack={() => navigate(-1)}
+            subtitle={
+              <span className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-semibold text-[var(--muted)]">
-                  {goal.deadline ? `${t('savings.targetDatePrefix', 'Target')}: ${format(new Date(goal.deadline), 'dd MMM yyyy')}` : t('savings.noDeadline', 'Tanpa batas waktu')}
+                  {goal.deadline ? `${t('savings.targetDatePrefix', 'Target')}: ${safeFormatDate(goal.deadline, 'dd MMM yyyy')}` : t('savings.noDeadline', 'Tanpa batas waktu')}
                 </span>
                 {daysLeft !== null && (
                   <span
@@ -354,25 +382,24 @@ export default function SavingsDetail() {
                     {deadlineText}
                   </span>
                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {/* Pin Button */}
-            <button
-              type="button"
-              onClick={togglePin}
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer active:scale-95 ${
-                goal.isPinned
-                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                  : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
-              }`}
-              title={goal.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
-            >
-              <Star className="h-4 w-4" fill={goal.isPinned ? 'currentColor' : 'none'} />
-            </button>
-          </div>
+              </span>
+            }
+            rightAction={
+              <button
+                type="button"
+                onClick={togglePin}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer active:scale-95 ${
+                  goal.isPinned
+                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                    : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
+                }`}
+                title={goal.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
+                aria-label={goal.isPinned ? t('savings.unpin', 'Lepas Pin') : t('savings.pin', 'Pin Target')}
+              >
+                <Star className="h-4 w-4" fill={goal.isPinned ? 'currentColor' : 'none'} />
+              </button>
+            }
+          />
         </div>
       </div>
 
@@ -649,7 +676,7 @@ export default function SavingsDetail() {
                 fundActionType === 'withdraw' ? 'text-[var(--earthy-terra)]' : 'text-[var(--earthy-green)]'
               }`}
             >
-              {fundActionType === 'withdraw' ? 'Jumlah Penarikan' : 'Jumlah Setoran'}
+              {fundActionType === 'withdraw' ? t('savings.withdrawAmount', 'Jumlah Penarikan') : t('savings.depositAmount', 'Jumlah Setoran')}
             </p>
             <input
               ref={inputRef}
@@ -802,7 +829,7 @@ export default function SavingsDetail() {
                 {formatCurrency(goal.targetAmount, currency)}
               </p>
               <p className="mt-2 text-xs font-semibold text-[var(--muted)] leading-relaxed">
-                Kamu telah berhasil menabung seluruh target nominal! Pilih bagaimana kamu ingin menyimpan pencapaian ini:
+                {t('savings.celebrationDesc', 'Kamu telah berhasil menabung seluruh target nominal! Pilih bagaimana kamu ingin menyimpan pencapaian ini:')}
               </p>
             </div>
 
@@ -817,7 +844,7 @@ export default function SavingsDetail() {
                 className="w-full py-3.5 rounded-2xl font-black text-xs text-white bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)] shadow-md transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wider"
               >
                 <Wallet className="h-4 w-4" />
-                Cairkan Dana ke Dompet
+                {t('savings.disburseToWallet', 'Cairkan Dana ke Dompet')}
               </button>
 
               <button
@@ -830,7 +857,7 @@ export default function SavingsDetail() {
                 className="w-full py-3 rounded-2xl font-extrabold text-xs text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)] transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
               >
                 <Check className="h-4 w-4 text-[var(--earthy-green)]" />
-                Tandai Selesai & Masukkan Arsip
+                {t('savings.markCompletedAndArchive', 'Tandai Selesai & Masukkan Arsip')}
               </button>
             </div>
           </div>
@@ -935,17 +962,6 @@ export default function SavingsDetail() {
                   </div>
                 </div>
               )}
-
-              {/* Bottom Action */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAiModalOpen(false)}
-                  className="w-full py-3 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] transition active:scale-[0.98] cursor-pointer"
-                >
-                  {t('common.close', 'Tutup')}
-                </button>
-              </div>
             </div>
           ) : (
             <div className="text-center py-6 space-y-3 px-2">

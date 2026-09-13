@@ -332,6 +332,56 @@ db.version(18).stores({
   walletBalanceCache: 'walletId',
 })
 
+// Version 19: added splitBillId index to transactions table for Split Bill parent transaction lookup
+db.version(19).stores({
+  transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, isSplit, *tags, splitBillId, [date+type], [walletId+date], createdAt',
+  investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
+  investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
+  budgets: '++id, category, limit, month',
+  goals: '++id, name, targetAmount, currentAmount, deadline, currency',
+  calendarEvents: '++id, date, title, type, color',
+  recurringTransactions:
+    '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
+  settings: 'key',
+  todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
+  sub_tasks: '++id, todoId, label, checked',
+  habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
+  habitLogs: '++id, habitId, date',
+  ideas: '++id, type, content, color, x, y, createdAt',
+  board_links: '++id, sourceId, targetId',
+  notifications: '++id, type, title, message, read, relatedId, createdAt',
+  goalLogs: '++id, goalId, amount, date',
+  wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
+  loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
+  loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
+  walletBalanceCache: 'walletId',
+})
+
+// Version 20: added goalId index to transactions table for optimized savings goal transactions lookup
+db.version(20).stores({
+  transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, goalId, isSplit, *tags, splitBillId, [date+type], [walletId+date], createdAt',
+  investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
+  investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
+  budgets: '++id, category, limit, month',
+  goals: '++id, name, targetAmount, currentAmount, deadline, currency',
+  calendarEvents: '++id, date, title, type, color',
+  recurringTransactions:
+    '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
+  settings: 'key',
+  todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
+  sub_tasks: '++id, todoId, label, checked',
+  habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
+  habitLogs: '++id, habitId, date',
+  ideas: '++id, type, content, color, x, y, createdAt',
+  board_links: '++id, sourceId, targetId',
+  notifications: '++id, type, title, message, read, relatedId, createdAt',
+  goalLogs: '++id, goalId, amount, date',
+  wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
+  loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
+  loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
+  walletBalanceCache: 'walletId',
+})
+
 // Auto-migrate legacy wallet names (e.g. "Uang Tunai (Cash)" -> "Cash")
 db.on('ready', async () => {
   try {
@@ -362,33 +412,52 @@ db.on('ready', async () => {
  * Compute the current balance of a single wallet given its initial balance and transaction list.
  * Single source of truth formula for computing a wallet's current balance.
  */
-export function computeWalletBalance(wallet, transactions = [], rates = null) {
+export function computeWalletBalance(wallet, transactions = [], rates = null, allWallets = []) {
   if (!wallet) return 0
   let bal = Number(wallet.balance) || 0
   const walletIdStr = String(wallet.id)
   const walletCurrency = wallet.currency || 'IDR'
+  const txList = Array.isArray(transactions) ? transactions : []
 
-  for (const tx of transactions) {
+  const walletCurrencyMap = new Map()
+  if (Array.isArray(allWallets)) {
+    for (const w of allWallets) {
+      if (w?.id != null) walletCurrencyMap.set(String(w.id), w.currency || 'IDR')
+    }
+  }
+
+  for (const tx of txList) {
+    if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1) continue
     const amount = Number(tx.amount) || 0
-    const txCurrency = tx.currency || walletCurrency
-    const converted =
-      txCurrency === walletCurrency
-        ? amount
-        : convertCurrency(amount, txCurrency, walletCurrency, rates || {})
 
     if (String(tx.walletId) === walletIdStr) {
+      const txCurrency = tx.currency || walletCurrency
+      const converted =
+        txCurrency === walletCurrency
+          ? amount
+          : convertCurrency(amount, txCurrency, walletCurrency, rates || {})
+
       if (tx.type === 'income') bal += converted
       else if (tx.type === 'expense') bal -= converted
       else if (tx.type === 'transfer') bal -= converted
       else if (tx.type === 'balance_adjustment') bal += converted
     }
-    if (String(tx.targetWalletId) === walletIdStr) {
-      if (tx.type === 'transfer') {
-        bal += converted
-      }
+
+    if (String(tx.targetWalletId) === walletIdStr && tx.type === 'transfer') {
+      const sourceCurrency =
+        tx.currency ||
+        (tx.walletId != null ? walletCurrencyMap.get(String(tx.walletId)) : null) ||
+        walletCurrency
+      const converted =
+        tx.targetAmount != null && Number(tx.targetAmount) > 0
+          ? Number(tx.targetAmount)
+          : sourceCurrency === walletCurrency
+          ? amount
+          : convertCurrency(amount, sourceCurrency, walletCurrency, rates || {})
+      bal += converted
     }
   }
-  return bal
+  return Math.round(bal * 100) / 100
 }
 
 /**
@@ -396,8 +465,10 @@ export function computeWalletBalance(wallet, transactions = [], rates = null) {
  * Returns a List of wallets with currentBalance property attached.
  */
 export function computeAllWalletBalances(wallets = [], transactions = [], rates = null) {
+  if (!Array.isArray(wallets) || wallets.length === 0) return []
   const balanceMap = new Map()
   const currencyMap = new Map()
+  const txList = Array.isArray(transactions) ? transactions : []
 
   for (const w of wallets) {
     const idKey = String(w.id)
@@ -405,7 +476,8 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
     currencyMap.set(idKey, w.currency || 'IDR')
   }
 
-  for (const tx of transactions) {
+  for (const tx of txList) {
+    if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1) continue
     const amount = Number(tx.amount) || 0
     const wId = tx.walletId != null ? String(tx.walletId) : null
     const tId = tx.targetWalletId != null ? String(tx.targetWalletId) : null
@@ -429,11 +501,13 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
       }
     }
 
-    if (tId && balanceMap.has(tId)) {
+    if (tx.type === 'transfer' && tId && balanceMap.has(tId)) {
       const targetCurrency = currencyMap.get(tId) || 'IDR'
       const txCurrency = tx.currency || (wId ? currencyMap.get(wId) : targetCurrency) || targetCurrency
       const converted =
-        txCurrency === targetCurrency
+        tx.targetAmount != null && Number(tx.targetAmount) > 0
+          ? Number(tx.targetAmount)
+          : txCurrency === targetCurrency
           ? amount
           : convertCurrency(amount, txCurrency, targetCurrency, rates || {})
       balanceMap.set(tId, balanceMap.get(tId) + converted)
@@ -442,31 +516,6 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
 
   return wallets.map((w) => ({
     ...w,
-    currentBalance: balanceMap.get(String(w.id)) ?? (Number(w.balance) || 0),
+    currentBalance: Math.round(((balanceMap.get(String(w.id)) ?? (Number(w.balance) || 0))) * 100) / 100,
   }))
-}
-
-export async function getWalletCurrentBalance(walletId) {
-  const wallet = await db.wallets.get(walletId)
-  if (!wallet) return 0
-
-  const [sourceTxs, targetTxs] = await Promise.all([
-    db.transactions.where('walletId').equals(walletId).toArray(),
-    db.transactions.where('targetWalletId').equals(walletId).toArray(),
-  ])
-
-  const txMap = new Map()
-  sourceTxs.forEach((tx) => txMap.set(tx.id, tx))
-  targetTxs.forEach((tx) => txMap.set(tx.id, tx))
-  const allTxs = Array.from(txMap.values())
-
-  return computeWalletBalance(wallet, allTxs)
-}
-
-export async function getAllWalletBalances() {
-  const [wallets, allTxs] = await Promise.all([
-    db.wallets.toArray(),
-    db.transactions.toArray(),
-  ])
-  return computeAllWalletBalances(wallets, allTxs)
 }

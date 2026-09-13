@@ -240,7 +240,7 @@ export default function SettingsAi() {
         </div>
 
         <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-card flex items-start gap-3.5">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-2xs">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--status-transfer-soft)] text-[var(--status-transfer)] border border-[var(--status-transfer)]/20 shadow-2xs">
             <Receipt className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -252,7 +252,7 @@ export default function SettingsAi() {
         </div>
 
         <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-card flex items-start gap-3.5">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-2xs">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/20 shadow-2xs">
             <Tag className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">

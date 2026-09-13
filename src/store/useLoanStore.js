@@ -1,15 +1,15 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { getLocalDateString } from '../lib/dateUtils'
 
-const useLoanStore = create((set) => ({
+const useLoanStore = create(() => ({
   loans: [],
   loanPayments: [],
 
-  setLoans: (loans) => set({ loans }),
-  setLoanPayments: (loanPayments) => set({ loanPayments }),
-
   addLoan: async (loanData) => {
     const total = Number(loanData.totalAmount) || 0
+    const principal = loanData.principalAmount !== undefined ? Number(loanData.principalAmount) : total
     if (!loanData.walletId) {
       throw new Error('Dompet / akun wajib dipilih untuk pencatatan pinjaman.')
     }
@@ -21,42 +21,50 @@ const useLoanStore = create((set) => ({
       personName: loanData.personName || '',
       title: loanData.title || '',
       totalAmount: total,
-      remainingAmount: total,
+      principalAmount: principal,
+      remainingAmount: loanData.remainingAmount !== undefined ? Number(loanData.remainingAmount) : total,
       currency: loanData.currency || 'IDR',
       dueDate: loanData.dueDate || null,
-      startDate: loanData.startDate || new Date().toISOString().split('T')[0],
+      startDate: loanData.startDate || getLocalDateString(),
       status: 'active',
       notes: loanData.notes || '',
       walletId,
+      interestRate: loanData.interestRate || 0,
+      tenorMonths: loanData.tenorMonths || 0,
+      monthlyPayment: loanData.monthlyPayment || null,
       initialTransactionId: null,
       paymentTransactionIds: [],
       createdAt: Date.now(),
     }
 
-    const loanId = await db.loans.add(newLoan)
+    let loanId = null
+    await db.transaction('rw', [db.loans, db.transactions], async () => {
+      loanId = await db.loans.add(newLoan)
 
-    // Generate initial transaction in ledger for mandatory walletId
-    const isDebt = type === 'debt'
-    const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
-    const txType = isDebt ? 'income' : 'expense'
-    const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
+      // Generate initial transaction in ledger for mandatory walletId (disbursement uses principal amount)
+      const isDebt = type === 'debt'
+      const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
+      const txType = isDebt ? 'income' : 'expense'
+      const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
 
-    const initialTxId = await db.transactions.add({
-      date: loanData.startDate || new Date().toISOString().split('T')[0],
-      type: txType,
-      category: txCategory,
-      amount: total,
-      currency: loanData.currency || 'IDR',
-      notes: txNotes,
-      walletId,
-      loanId,
-      isExcludeFromAnalytics: true,
-      excludeFromAnalytics: true,
-      createdAt: Date.now(),
+      const initialTxId = await db.transactions.add({
+        date: loanData.startDate || getLocalDateString(),
+        type: txType,
+        category: txCategory,
+        amount: principal,
+        currency: loanData.currency || 'IDR',
+        notes: txNotes,
+        walletId,
+        loanId,
+        isExcludeFromAnalytics: true,
+        excludeFromAnalytics: true,
+        createdAt: Date.now(),
+      })
+
+      await db.loans.update(loanId, { initialTransactionId: initialTxId })
     })
 
-    await db.loans.update(loanId, { initialTransactionId: initialTxId })
-
+    void invalidateWalletBalance([walletId])
     return loanId
   },
 
@@ -65,32 +73,115 @@ const useLoanStore = create((set) => ({
     if (!existing) return
 
     const total = loanData.totalAmount !== undefined ? Number(loanData.totalAmount) : existing.totalAmount
+    const principal = loanData.principalAmount !== undefined
+      ? Number(loanData.principalAmount)
+      : (existing.principalAmount !== undefined ? Number(existing.principalAmount) : total)
     const diffTotal = total - existing.totalAmount
-    const newRemaining = Math.max(0, existing.remainingAmount + diffTotal)
-    const newStatus = newRemaining <= 0 ? 'paid' : (loanData.status || existing.status)
-
+    const rawRemaining = loanData.remainingAmount !== undefined
+      ? Number(loanData.remainingAmount)
+      : existing.remainingAmount + diffTotal
+    let newRemaining = Math.max(0, rawRemaining)
+    newRemaining = Math.round(newRemaining * 100) / 100
     const isNowPaid = newRemaining <= 0
+    const wasPaidReopened = !isNowPaid && existing.status === 'paid'
+    const newStatus = isNowPaid ? 'paid' : (wasPaidReopened ? 'active' : (loanData.status || existing.status))
+
     const updated = {
       ...existing,
       ...loanData,
       totalAmount: total,
+      principalAmount: principal,
       remainingAmount: newRemaining,
       status: newStatus,
-      ...(isNowPaid && !existing.paidDate ? { paidDate: loanData.paidDate || new Date().toISOString().split('T')[0], paidAt: Date.now() } : {}),
+      ...(isNowPaid && !existing.paidDate ? { paidDate: loanData.paidDate || getLocalDateString(), paidAt: Date.now() } : {}),
+      ...(wasPaidReopened ? { paidDate: null, paidAt: null } : {}),
     }
 
-    await db.loans.put(updated)
+    const affectedWallets = []
+    await db.transaction('rw', [db.loans, db.transactions], async () => {
+      await db.loans.put(updated)
 
-    // Update initial transaction amount in db.transactions if linked and total changed
-    if (existing.initialTransactionId && diffTotal !== 0) {
-      await db.transactions.update(existing.initialTransactionId, {
-        amount: total,
-      })
+      // Update initial transaction in db.transactions if linked
+      if (existing.initialTransactionId) {
+        const txUpdates = {}
+        if (existing.splitBillId) {
+          if (diffTotal !== 0) {
+            const initTx = await db.transactions.get(existing.initialTransactionId)
+            if (initTx) {
+              txUpdates.amount = Math.max(0, (Number(initTx.amount) || 0) + diffTotal)
+            }
+          }
+        } else {
+          const oldPrincipal = existing.principalAmount !== undefined ? existing.principalAmount : existing.totalAmount
+          if (principal !== oldPrincipal) {
+            txUpdates.amount = principal
+          }
+        }
+        if (loanData.walletId && Number(loanData.walletId) !== Number(existing.walletId)) {
+          txUpdates.walletId = Number(loanData.walletId)
+          if (existing.walletId) affectedWallets.push(Number(existing.walletId))
+          affectedWallets.push(Number(loanData.walletId))
+        } else if (diffTotal !== 0 && existing.walletId) {
+          affectedWallets.push(Number(existing.walletId))
+        }
+        if (loanData.startDate && loanData.startDate !== existing.startDate) {
+          txUpdates.date = loanData.startDate
+        }
+        if (loanData.currency && loanData.currency !== existing.currency) {
+          txUpdates.currency = loanData.currency
+        }
+        if (!existing.splitBillId && (loanData.title !== undefined || loanData.personName !== undefined)) {
+          const isDebt = existing.type === 'debt'
+          const title = loanData.title ?? existing.title
+          const person = loanData.personName ?? existing.personName
+          txUpdates.notes = isDebt ? `Pinjaman Diterima: ${title} dari ${person}` : `Pinjaman Diberikan: ${title} ke ${person}`
+        }
+        if (Object.keys(txUpdates).length > 0) {
+          await db.transactions.update(existing.initialTransactionId, txUpdates)
+        }
+      }
+    })
+
+    if (affectedWallets.length > 0) {
+      void invalidateWalletBalance(affectedWallets)
     }
   },
 
   deleteLoan: async (id) => {
+    const loan = await db.loans.get(id)
+    if (!loan) return
+    const affectedWallets = new Set()
+    if (loan.walletId) affectedWallets.add(Number(loan.walletId))
+
     await db.transaction('rw', db.loans, db.loanPayments, db.transactions, async () => {
+      // Split Bill Bi-Directional Ledger Sync
+      if (loan.splitBillId) {
+        const siblingLoans = await db.loans
+          .where('splitBillId')
+          .equals(loan.splitBillId)
+          .filter((l) => l.id !== id)
+          .toArray()
+
+        let friendsTx = null
+        if (loan.initialTransactionId) {
+          friendsTx = await db.transactions.get(loan.initialTransactionId)
+        }
+        if (!friendsTx) {
+          friendsTx = await db.transactions.filter((t) => t.splitBillId === loan.splitBillId).first()
+        }
+
+        if (friendsTx) {
+          if (friendsTx.walletId) affectedWallets.add(Number(friendsTx.walletId))
+          if (siblingLoans.length > 0) {
+            const loanDeduction = Number(loan.totalAmount) || 0
+            const nextAmount = Math.max(0, (Number(friendsTx.amount) || 0) - loanDeduction)
+            await db.transactions.update(friendsTx.id, { amount: nextAmount })
+          } else {
+            await db.transactions.delete(friendsTx.id)
+          }
+        }
+      }
+
       // Delete loan
       await db.loans.delete(id)
 
@@ -100,13 +191,18 @@ const useLoanStore = create((set) => ({
         await db.loanPayments.where('loanId').equals(id).delete()
       }
 
-      // Cascade delete linked transactions in ledger
+      // Unlink linked transactions in ledger instead of destroying them to preserve historical balances
       const linkedTxs = await db.transactions.where('loanId').equals(id).toArray()
       if (linkedTxs.length > 0) {
-        const txIds = linkedTxs.map((t) => t.id)
-        await db.transactions.bulkDelete(txIds)
+        for (const t of linkedTxs) {
+          await db.transactions.update(t.id, { loanId: null })
+        }
       }
     })
+
+    if (affectedWallets.size > 0) {
+      void invalidateWalletBalance(Array.from(affectedWallets))
+    }
   },
 
   recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null) => {
@@ -115,40 +211,43 @@ const useLoanStore = create((set) => ({
 
     const payAmt = Number(amount) || 0
     if (payAmt <= 0) throw new Error('Nominal pembayaran harus lebih dari 0.')
-    if (payAmt > loan.remainingAmount) {
+    const roundedLoanRemaining = Math.round((Number(loan.remainingAmount) || 0) * 100) / 100
+    const roundedPayAmt = Math.round(payAmt * 100) / 100
+    if (roundedPayAmt > roundedLoanRemaining) {
       throw new Error(`Nominal pembayaran tidak boleh melebihi sisa tagihan (${loan.remainingAmount}).`)
     }
 
-    const newRemaining = Math.max(0, loan.remainingAmount - payAmt)
+    let newRemaining = Math.max(0, loan.remainingAmount - payAmt)
+    newRemaining = Math.round(newRemaining * 100) / 100
     const newStatus = newRemaining <= 0 ? 'paid' : 'partially_paid'
-    const payDate = date || new Date().toISOString().split('T')[0]
+    const payDate = date || getLocalDateString()
 
     let generatedTxId = null
     const effectiveWalletId = paymentWalletId || loan.walletId
 
-    // Generate transaction in ledger if loan has connected walletId
-    if (effectiveWalletId) {
-      const isDebt = loan.type === 'debt'
-      const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
-      const txType = isDebt ? 'expense' : 'income' // Debt payment reduces wallet cash; Receivable receipt increases wallet cash
-      const txNotes = notes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
+    await db.transaction('rw', db.transactions, db.loans, db.loanPayments, async () => {
+      // Generate transaction in ledger if loan has connected walletId
+      if (effectiveWalletId) {
+        const isDebt = loan.type === 'debt'
+        const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
+        const txType = isDebt ? 'expense' : 'income' // Debt payment reduces wallet cash; Receivable receipt increases wallet cash
+        const txNotes = notes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
 
-      generatedTxId = await db.transactions.add({
-        date: payDate,
-        type: txType,
-        category: txCategory,
-        amount: payAmt,
-        currency: loan.currency || 'IDR',
-        notes: txNotes,
-        walletId: Number(effectiveWalletId),
-        loanId,
-        isExcludeFromAnalytics: true,
-        excludeFromAnalytics: true,
-        createdAt: Date.now(),
-      })
-    }
+        generatedTxId = await db.transactions.add({
+          date: payDate,
+          type: txType,
+          category: txCategory,
+          amount: payAmt,
+          currency: loan.currency || 'IDR',
+          notes: txNotes,
+          walletId: Number(effectiveWalletId),
+          loanId,
+          isExcludeFromAnalytics: true,
+          excludeFromAnalytics: true,
+          createdAt: Date.now(),
+        })
+      }
 
-    await db.transaction('rw', db.loans, db.loanPayments, async () => {
       await db.loanPayments.add({
         loanId,
         amount: payAmt,
@@ -169,6 +268,10 @@ const useLoanStore = create((set) => ({
         ...(isNowPaid ? { paidDate: payDate, paidAt: Date.now() } : {}),
       })
     })
+
+    if (effectiveWalletId) {
+      void invalidateWalletBalance([Number(effectiveWalletId)])
+    }
   },
 
   forgiveLoan: async (loanId, notes = '') => {
@@ -180,7 +283,7 @@ const useLoanStore = create((set) => ({
       throw new Error('Pinjaman ini sudah lunas / tidak memiliki sisa tagihan.')
     }
 
-    const forgiveDate = new Date().toISOString().split('T')[0]
+    const forgiveDate = getLocalDateString()
     const forgiveNoteText = notes.trim() || 'Diikhlaskan / Pemutihan'
 
     await db.transaction('rw', db.loans, db.loanPayments, async () => {
@@ -197,11 +300,16 @@ const useLoanStore = create((set) => ({
       await db.loans.update(loanId, {
         remainingAmount: 0,
         status: 'forgiven',
+        forgivenDate: forgiveDate || getLocalDateString(),
         forgivenAt: Date.now(),
         forgivenAmount: remaining,
         forgivenNotes: forgiveNoteText,
       })
     })
+
+    if (loan.walletId) {
+      void invalidateWalletBalance([Number(loan.walletId)])
+    }
   },
 }))
 

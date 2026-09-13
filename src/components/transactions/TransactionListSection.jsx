@@ -56,6 +56,9 @@ export const TransactionListSection = memo(function TransactionListSection({
   highlightedTransactionId,
   openEditTransaction,
   deleteTransaction,
+  onDelete,
+  onViewDetail,
+  onPreviewReceipt,
   onDuplicate,
   setSwipedTransactionId,
   getSwipeHandlers,
@@ -69,8 +72,6 @@ export const TransactionListSection = memo(function TransactionListSection({
   formatCurrency,
   convertCurrency,
   rates,
-  setApiError,
-  setApiErrorTone,
   allWallets,
   newestTransactionId,
 }) {
@@ -158,6 +159,9 @@ export const TransactionListSection = memo(function TransactionListSection({
                         highlightedTransactionId={highlightedTransactionId}
                         openEditTransaction={openEditTransaction}
                         deleteTransaction={deleteTransaction}
+                        onDelete={onDelete}
+                        onViewDetail={onViewDetail}
+                        onPreviewReceipt={onPreviewReceipt}
                         onDuplicate={onDuplicate}
                         setSwipedTransactionId={setSwipedTransactionId}
                         getSwipeHandlers={getSwipeHandlers}
@@ -171,10 +175,11 @@ export const TransactionListSection = memo(function TransactionListSection({
                         formatCurrency={formatCurrency}
                         convertCurrency={convertCurrency}
                         rates={rates}
-                        setApiError={setApiError}
-                        setApiErrorTone={setApiErrorTone}
                         wallets={allWallets}
                         newestTransactionId={newestTransactionId}
+                        isBulkMode={isBulkMode}
+                        isSelected={selectedTxIds.has(transaction.id)}
+                        onToggleSelect={() => toggleSelectTx(transaction.id)}
                       />
                     </div>
                   </div>

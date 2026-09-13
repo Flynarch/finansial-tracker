@@ -47,6 +47,7 @@ export default function SettingsRecurring() {
     frequency: 'monthly',
     nextDate: format(new Date(), 'yyyy-MM-dd'),
     walletId: defaultWalletId || '',
+    autoExecute: true,
   })
 
   // Edit modal state
@@ -61,6 +62,7 @@ export default function SettingsRecurring() {
     frequency: 'monthly',
     nextDate: format(new Date(), 'yyyy-MM-dd'),
     walletId: '',
+    autoExecute: true,
   })
 
   // Pickers state for add form
@@ -110,12 +112,16 @@ export default function SettingsRecurring() {
     const targetWalletId = recurringForm.walletId || defaultWalletId || wallets?.[0]?.id || ''
     if (!recurringForm.title || numericAmount <= 0) return
 
+    const parsedAnchor = parseInt(String(recurringForm.nextDate || '').split('-')[2], 10) || new Date().getDate()
+
     await db.recurringTransactions.add({
       ...recurringForm,
+      anchorDay: parsedAnchor,
       walletId: targetWalletId,
       amount: numericAmount,
       currency: recurringForm.currency || defaultCurrency,
       enabled: 1,
+      autoExecute: recurringForm.autoExecute !== false,
       createdAt: new Date().toISOString(),
     })
 
@@ -129,6 +135,7 @@ export default function SettingsRecurring() {
       frequency: 'monthly',
       nextDate: format(new Date(), 'yyyy-MM-dd'),
       walletId: defaultWalletId || wallets?.[0]?.id || '',
+      autoExecute: true,
     })
   }
 
@@ -144,6 +151,7 @@ export default function SettingsRecurring() {
       frequency: item.frequency || 'monthly',
       nextDate: item.nextDate || format(new Date(), 'yyyy-MM-dd'),
       walletId: item.walletId || defaultWalletId || wallets?.[0]?.id || '',
+      autoExecute: item.autoExecute !== false,
     })
   }
 
@@ -153,9 +161,13 @@ export default function SettingsRecurring() {
     const numericAmount = parseMoneyInput(editForm.amount, editForm.currency)
     if (!editForm.title || numericAmount <= 0) return
 
+    const parsedAnchor = parseInt(String(editForm.nextDate || '').split('-')[2], 10) || 1
+
     await db.recurringTransactions.update(editingItem.id, {
       ...editForm,
       amount: numericAmount,
+      anchorDay: parsedAnchor,
+      autoExecute: editForm.autoExecute !== false,
     })
 
     setEditingItem(null)
@@ -343,6 +355,36 @@ export default function SettingsRecurring() {
             </div>
           </div>
 
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.recurring.executionMode', 'Metode Pencatatan')}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRecurringForm((prev) => ({ ...prev, autoExecute: true }))}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer text-center ${
+                  recurringForm.autoExecute !== false
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-extrabold shadow-2xs'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {t('settings.recurring.autoDebit', 'Otomatis Potong Saldo')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecurringForm((prev) => ({ ...prev, autoExecute: false }))}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer text-center ${
+                  recurringForm.autoExecute === false
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-extrabold shadow-2xs'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {t('settings.recurring.reminderOnly', 'Hanya Pengingat')}
+              </button>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={!recurringForm.title || !parseMoneyInput(recurringForm.amount, recurringForm.currency)}
@@ -411,6 +453,15 @@ export default function SettingsRecurring() {
                           <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-1.5 py-0.5 border border-[var(--border)] text-[10px] font-bold uppercase text-[var(--muted)]">
                             {recurringFrequencyLabel(item.frequency)}
                           </span>
+                          {item.autoExecute !== false ? (
+                            <span className="inline-flex items-center rounded-md bg-[var(--status-transfer-soft)] border border-[var(--status-transfer)]/30 px-1.5 py-0.5 text-[9px] font-extrabold text-[var(--status-transfer)] uppercase">
+                              Auto-Debit
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-md bg-slate-500/15 border border-slate-500/20 px-1.5 py-0.5 text-[9px] font-bold text-[var(--muted)] uppercase">
+                              {t('settings.recurring.reminderBadge', 'Pengingat')}
+                            </span>
+                          )}
                           {!isEnabled && (
                             <span className="rounded-md bg-slate-500/15 border border-slate-500/20 px-1.5 py-0.5 text-[9px] font-bold text-[var(--muted)]">
                               {t('settings.inactive', 'Nonaktif')}
@@ -629,6 +680,36 @@ export default function SettingsRecurring() {
               onChange={(val) => setEditForm((prev) => ({ ...prev, nextDate: val }))}
               title={t('calendar.selectDate', 'Pilih Tanggal')}
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+              {t('settings.recurring.executionMode', 'Metode Pencatatan')}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setEditForm((prev) => ({ ...prev, autoExecute: true }))}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer text-center ${
+                  editForm.autoExecute !== false
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-extrabold shadow-2xs'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {t('settings.recurring.autoDebit', 'Otomatis Potong Saldo')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditForm((prev) => ({ ...prev, autoExecute: false }))}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer text-center ${
+                  editForm.autoExecute === false
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-extrabold shadow-2xs'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {t('settings.recurring.reminderOnly', 'Hanya Pengingat')}
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-2.5 pt-2">

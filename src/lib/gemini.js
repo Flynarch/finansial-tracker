@@ -3,10 +3,11 @@ import { getMergedExpenseTree } from './expenseCategories'
 import { getMergedIncomeTree } from './incomeCategories'
 import { queryTransactions, getMonthSummaryForPrompt } from './aiDatabaseQueries'
 import { sanitizeCategoryPath } from './categorySanitizer'
-import { db } from './db'
+import { db, computeAllWalletBalances } from './db'
+import { formatCurrency, convertCurrency, isExcludeAnalyticsTx, toSafeNumber, FALLBACK_EXCHANGE_RATES } from './utils'
+import { getCachedCurrencyRates } from './api'
+import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from './budgetUtils'
 import useSettingsStore from '../store/useSettingsStore'
-
-const SYSTEM_DEFAULT_API_KEY = 'AQ.Ab8RN6IrZzPkqDABRQiTPfqO3Zv9pleyNKYBqTNwlIISs3wMQQ'
 
 export function getEffectiveApiKey() {
   try {
@@ -21,7 +22,7 @@ export function getEffectiveApiKey() {
   if (envKey && envKey.trim().length > 0) {
     return envKey.trim().replace(/^["']|["']$/g, '')
   }
-  return SYSTEM_DEFAULT_API_KEY
+  return ''
 }
 
 function parseApiErrorMessage(errText, status) {
@@ -54,23 +55,21 @@ function parseApiErrorMessage(errText, status) {
 }
 
 export const FAST_TRANSACTION_MODELS = [
-  'gemini-flash-lite-latest',
   'gemini-3.5-flash-lite',
-  'gemini-3.6-flash',
-  'gemini-2.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
 ]
 
 export const CHAT_ADVISOR_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.1-pro-preview',
-  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
 ]
 
 export const GEMINI_MODELS = [
-  'gemini-flash-lite-latest',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-pro-preview',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
 ]
 
 export async function testGeminiApiKey(customKey) {
@@ -82,12 +81,12 @@ export async function testGeminiApiKey(customKey) {
   let lastErrorMsg = ''
   for (const model of GEMINI_MODELS) {
     try {
-      const cleanKey = encodeURIComponent(key)
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': key.trim(),
         },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
@@ -188,38 +187,42 @@ const getTools = () => ([
       },
       {
         name: "update_transaction",
-        description: "Ubah transaksi masa lalu. Panggil ini JIKA user minta mengubah data (misal: 'ubah transaksi kopi tadi jadi 30rb').",
+        description: "Ubah/edit transaksi masa lalu. Panggil ini JIKA user minta mengubah data transaksi (misal: 'ubah transaksi tadi yang ke dana kategorinya jadi makanan', 'ganti nominal kopi tadi jadi 30rb', 'pindahkan transaksi indomaret ke BCA').",
         parameters: {
           type: "OBJECT",
           properties: {
-            searchQuery: { type: "STRING", description: "Kata kunci untuk mencari transaksi yang dimaksud (misal: 'kopi')." },
+            transactionId: { type: "NUMBER", description: "ID transaksi dari daftar transaksi jika diketahui." },
+            searchQuery: { type: "STRING", description: "Kata kunci untuk mencari transaksi yang dimaksud (misal: 'dana', 'kopi', 'terakhir')." },
             updatedFields: {
               type: "OBJECT",
               properties: {
-                amount: { type: "NUMBER" },
-                category: { type: "STRING" },
-                notes: { type: "STRING" },
-                date: { type: "STRING" }
+                amount: { type: "NUMBER", description: "Nominal baru." },
+                category: { type: "STRING", description: "ID Kategori baru (format parentId/childId)." },
+                notes: { type: "STRING", description: "Catatan baru." },
+                date: { type: "STRING", description: "Tanggal baru (YYYY-MM-DD)." },
+                walletId: { type: "NUMBER", description: "ID Dompet baru jika ingin memindahkan dompet transaksi." },
+                targetWalletId: { type: "NUMBER", description: "ID Dompet tujuan baru (untuk transfer)." },
+                type: { type: "STRING", enum: ["income", "expense", "transfer"] }
               }
             },
-            replyMessage: { type: "STRING" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
+            replyMessage: { type: "STRING", description: "Pesan konfirmasi perubahan yang ramah." },
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
-          required: ["searchQuery", "updatedFields"]
+          required: ["updatedFields"]
         }
       },
       {
         name: "delete_transaction",
-        description: "Hapus transaksi masa lalu. Panggil ini JIKA user minta menghapus data (misal: 'hapus transaksi makan siang kemarin').",
+        description: "Hapus transaksi masa lalu. Panggil ini JIKA user minta menghapus data (misal: 'hapus transaksi makan siang tadi').",
         parameters: {
           type: "OBJECT",
           properties: {
-            searchQuery: { type: "STRING", description: "Kata kunci transaksi (misal: 'makan siang')." },
+            transactionId: { type: "NUMBER", description: "ID transaksi jika diketahui." },
+            searchQuery: { type: "STRING", description: "Kata kunci transaksi (misal: 'makan siang', 'terakhir')." },
             date: { type: "STRING", description: "Tanggal transaksi jika disebutkan (YYYY-MM-DD)." },
             replyMessage: { type: "STRING" },
-            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks (misal: 'Lihat laporan', 'Catat 10rb lagi'). WAJIB DIISI!" }
-          },
-          required: ["searchQuery"]
+            suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
+          }
         }
       },
       {
@@ -275,17 +278,17 @@ const getTools = () => ([
       },
       {
         name: "manage_budget",
-        description: "Kelola (buat/update) Budget/Anggaran bulanan.",
+        description: "Kelola (buat/update/cek status) Budget/Anggaran bulanan. Panggil tool ini juga saat pengguna menanyakan status anggaran/apakah sudah limit/bagaimana budget saat ini.",
         parameters: {
           type: "OBJECT",
           properties: {
-            action: { type: "STRING", enum: ["create", "update"], description: "create/update budget" },
-            category: { type: "STRING", description: "Kategori budget (misal: 'Makanan')" },
-            limit: { type: "NUMBER", description: "Batas nominal budget (angka)" },
+            action: { type: "STRING", enum: ["create", "update", "status"], description: "create/update/status budget" },
+            category: { type: "STRING", description: "Kategori budget (misal: 'Makanan', 'Transportasi', 'Semua')" },
+            limit: { type: "NUMBER", description: "Batas nominal budget (angka). Jika action=status dan tidak diubah, isi 0." },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
-          required: ["action", "category", "limit"]
+          required: ["action", "category"]
         }
       },
       {
@@ -297,6 +300,7 @@ const getTools = () => ([
             action: { type: "STRING", enum: ["create", "add_funds"], description: "create untuk target baru, add_funds untuk mengisi tabungan/menambah saldo" },
             name: { type: "STRING", description: "Nama tabungan/goal (misal: 'Beli Laptop')" },
             amount: { type: "NUMBER", description: "Target dana (jika create) atau Jumlah uang yang ditambahkan (jika add_funds)" },
+            walletId: { type: "NUMBER", description: "ID dompet (wallet) sumber dana yang digunakan untuk setor tabungan (opsional)." },
             replyMessage: { type: "STRING", description: "Pesan balasan untuk user" },
             suggestedChips: { type: "ARRAY", items: { type: "STRING" }, description: "Berikan 2-4 rekomendasi aksi/pertanyaan selanjutnya untuk user berdasarkan konteks. WAJIB DIISI!" }
           },
@@ -385,8 +389,241 @@ const getTools = () => ([
   }
 ])
 
+/**
+ * Zero-latency Fast-Path NLP heuristic parser for short Indonesian / casual transactions.
+ * Handles instant patterns like "bakso 20k", "kopi 25rb bca", "gaji 5jt", "bensin 30k" in 0ms!
+ */
+export function parseShortTransactionFast(userText, wallets = [], defaultCurrency = 'IDR') {
+  if (!userText || typeof userText !== 'string') return null
+  const trimmed = userText.trim()
+  if (!trimmed || trimmed.length > 90) return null
+
+  // Clean noise prefixes: "beli bakso 20k", "catat kopi 25rb"
+  const clean = trimmed
+    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|terima|makan|minum)\s+/i, '')
+    .trim()
+
+  // Match pattern: [item name] [amount with suffix or numbers] [optional wallet/notes]
+  const match = clean.match(/^([a-zA-Z0-9\s\-_]+?)\s+(?:sebesar\s+|rp\.?\s*|\$\s*|€\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)(?:\s+(.*))?$/i)
+  if (!match) return null
+
+  const rawItem = match[1].trim()
+  const rawAmt = match[2].trim()
+  const rawTail = (match[3] || '').trim()
+
+  if (!rawItem || rawItem.length < 2 || !rawAmt) return null
+
+  // Convert amount string to integer
+  let numericAmt = 0
+  const lowerAmt = rawAmt.toLowerCase()
+  if (lowerAmt.endsWith('k') || lowerAmt.endsWith('rb') || lowerAmt.endsWith('ribu')) {
+    const numPart = parseFloat(lowerAmt.replace(/(k|rb|ribu)/g, '').replace(',', '.'))
+    if (!isNaN(numPart)) numericAmt = Math.round(numPart * 1000)
+  } else if (lowerAmt.endsWith('jt') || lowerAmt.endsWith('juta') || lowerAmt.endsWith('m')) {
+    const numPart = parseFloat(lowerAmt.replace(/(jt|juta|m)/g, '').replace(',', '.'))
+    if (!isNaN(numPart)) numericAmt = Math.round(numPart * 1000000)
+  } else {
+    const cleanDigits = lowerAmt.replace(/[^0-9]/g, '')
+    numericAmt = parseInt(cleanDigits, 10) || 0
+  }
+
+  if (numericAmt <= 0) return null
+
+  // Determine transaction type: income vs expense
+  const lowerItem = rawItem.toLowerCase()
+  const isIncome = /gaji|salary|sangu|uang saku|uang jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan/i.test(lowerItem)
+  const txType = isIncome ? 'income' : 'expense'
+
+  // Categorize
+  const categoryPath = sanitizeCategoryPath(rawItem, txType)
+
+  // Resolve wallet if specified in notes or tail
+  let resolvedWalletId = wallets[0]?.id || ''
+  const searchTail = (rawTail + ' ' + rawItem).toLowerCase()
+  for (const w of wallets) {
+    const wName = String(w.name || '').toLowerCase()
+    if (searchTail.includes(wName) || (wName.includes('cash') && searchTail.includes('tunai'))) {
+      resolvedWalletId = w.id
+      break
+    }
+  }
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const currentTime = format(new Date(), 'HH:mm')
+  const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
+  const txCurrency = matchedWallet?.currency || defaultCurrency
+
+  const capitalizedItem = rawItem.charAt(0).toUpperCase() + rawItem.slice(1)
+
+  return {
+    type: 'transactions',
+    action: 'create',
+    transactions: [
+      {
+        type: txType,
+        amount: numericAmt,
+        category: categoryPath,
+        currency: txCurrency,
+        walletId: resolvedWalletId,
+        date: todayStr,
+        time: currentTime,
+        merchant: txType === 'expense' ? capitalizedItem : undefined,
+        notes: capitalizedItem + (rawTail ? ` (${rawTail})` : ''),
+      },
+    ],
+    merchant: txType === 'expense' ? capitalizedItem : undefined,
+    currency: txCurrency,
+    text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${capitalizedItem} sebesar ${formatCurrency(numericAmt, txCurrency)}.`,
+    chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+    isInstant: true,
+  }
+}
+
+export async function calculateDirectFinancialHealth({
+  defaultCurrency = 'IDR',
+  locale = 'id',
+  rates = null,
+  replyMessage = '',
+  suggestedChips = null,
+  referenceDate = null,
+} = {}) {
+  const activeRates = rates || getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+  const allWallets = await db.wallets.toArray()
+  const txs = await db.transactions.toArray()
+  const loans = await db.loans.toArray()
+
+  const computedWallets = computeAllWalletBalances(allWallets, txs, activeRates)
+  const totalCash = computedWallets
+    .filter((w) => !w.isArchived)
+    .reduce((acc, w) => {
+      const bal = toSafeNumber(w.currentBalance ?? w.balance ?? 0)
+      return acc + convertCurrency(bal, w.currency || defaultCurrency, defaultCurrency, activeRates)
+    }, 0)
+
+  const now = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
+  const budgetCycleStartDay = useSettingsStore.getState().budgetCycleStartDay || 1
+  const currentMonthKey = getCurrentBudgetMonthKey(now, budgetCycleStartDay)
+  const period = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
+
+  let monthlyIncome = 0
+  let monthlyExpense = 0
+
+  txs.forEach((t) => {
+    const txDate = (t?.date || '').slice(0, 10)
+    if (!txDate || txDate < period.startDate || txDate > period.endDate) return
+
+    if (t.isSplit && Array.isArray(t.splitItems) && t.splitItems.length > 0) {
+      t.splitItems.forEach((si) => {
+        const itemTx = {
+          ...t,
+          ...si,
+          category: si.category || t.category,
+          isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+          isExcludeAnalyticsTx: false,
+        }
+        if (isExcludeAnalyticsTx(itemTx)) return
+        const amt = convertCurrency(toSafeNumber(si.amount), t.currency || defaultCurrency, defaultCurrency, activeRates)
+        const itemType = si.type || t.type
+        if (itemType === 'income') monthlyIncome += amt
+        if (itemType === 'expense') monthlyExpense += amt
+      })
+      return
+    }
+
+    if (isExcludeAnalyticsTx(t)) return
+    const amt = convertCurrency(toSafeNumber(t.amount), t.currency || defaultCurrency, defaultCurrency, activeRates)
+    if (t.type === 'income') monthlyIncome += amt
+    if (t.type === 'expense') monthlyExpense += amt
+  })
+
+  const activeLoans = loans.filter((l) => !l.isArchived && l.status !== 'paid' && l.status !== 'forgiven')
+
+  const totalDebt = activeLoans
+    .filter((l) => l.type === 'debt')
+    .reduce((acc, l) => {
+      const raw = toSafeNumber(l.remainingAmount ?? l.totalAmount ?? l.amount ?? 0)
+      return acc + convertCurrency(raw, l.currency || defaultCurrency, defaultCurrency, activeRates)
+    }, 0)
+
+  const totalReceivable = activeLoans
+    .filter((l) => l.type === 'receivable')
+    .reduce((acc, l) => {
+      const raw = toSafeNumber(l.remainingAmount ?? l.totalAmount ?? l.amount ?? 0)
+      return acc + convertCurrency(raw, l.currency || defaultCurrency, defaultCurrency, activeRates)
+    }, 0)
+
+  const savingsRatio = monthlyIncome > 0 ? Math.max(0, ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100) : 0
+  const dti = monthlyIncome > 0 ? (totalDebt / monthlyIncome) * 100 : (totalDebt > 0 ? 100 : 0)
+  const emergencyMonths = monthlyExpense > 0 ? (totalCash / monthlyExpense) : (totalCash > 0 ? 12 : 0)
+
+  let score = 50
+  if (savingsRatio >= 20) score += 20
+  else if (savingsRatio >= 10) score += 10
+  else if (savingsRatio < 0) score -= 20
+
+  if (dti <= 30) score += 15
+  else if (dti > 50) score -= 15
+
+  if (emergencyMonths >= 6) score += 15
+  else if (emergencyMonths >= 3) score += 10
+  else if (emergencyMonths < 1) score -= 10
+
+  score = Math.max(10, Math.min(100, Math.round(score)))
+
+  const isEn = String(locale || '').toLowerCase().startsWith('en')
+  let rating
+  if (score >= 85) rating = isEn ? 'Excellent' : 'Sangat Sehat'
+  else if (score >= 70) rating = isEn ? 'Healthy' : 'Sehat'
+  else if (score >= 50) rating = isEn ? 'Fair' : 'Cukup'
+  else if (score >= 35) rating = isEn ? 'Needs Attention' : 'Perlu Perhatian'
+  else rating = isEn ? 'Critical' : 'Kritis'
+
+  const defaultText = isEn
+    ? `Here is your Financial Health Score evaluation: ${score}/100 (${rating}).`
+    : `Berikut adalah evaluasi Skor Kesehatan Finansial Anda: ${score}/100 (${rating}).`
+  const defaultChips = isEn
+    ? ['How to improve score?', 'Analyze spending', 'Emergency fund advice']
+    : ['Bagaimana cara menaikkan skor?', 'Analisis pengeluaranku', 'Rekomendasi dana darurat']
+
+  return {
+    type: 'financial_health',
+    score,
+    rating,
+    metrics: {
+      savingsRatio: Math.round(savingsRatio),
+      dti: Math.round(dti),
+      emergencyMonths: Number(emergencyMonths.toFixed(1)),
+      totalCash,
+      monthlyIncome,
+      monthlyExpense,
+      totalDebt,
+      totalReceivable,
+    },
+    text: replyMessage || defaultText,
+    chips: Array.isArray(suggestedChips) && suggestedChips.length > 0 ? suggestedChips : defaultChips,
+  }
+}
+
 export async function parseTransactionFromText(userMessage, context) {
-  const { locale = 'id', defaultCurrency = 'IDR', previousMessages = [], imageData = null, wallets = [], onStream = null, scanMode = 'all' } = context
+  const {
+    locale = 'id',
+    defaultCurrency = 'IDR',
+    previousMessages = [],
+    imageData = null,
+    wallets = [],
+    onStream = null,
+    scanMode = 'all',
+    rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
+  } = context
+
+  // Fast-Path NLP heuristic: instant match for simple text like "bakso 20k", "kopi 25rb", "gaji 5jt"
+  if (!imageData && (!previousMessages || previousMessages.length === 0)) {
+    const fastTx = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
+    if (fastTx) {
+      return fastTx
+    }
+  }
 
   const normUserText = String(userMessage || '').toLowerCase()
 
@@ -398,63 +635,7 @@ export async function parseTransactionFromText(userMessage, context) {
     normUserText.includes('financial health') ||
     normUserText.includes('evaluasi keuangan')
   ) {
-    // Direct financial health calculator
-    const allWallets = await db.wallets.toArray()
-    const txs = await db.transactions.toArray()
-    const loans = await db.loans.toArray()
-
-    const totalCash = allWallets.filter((w) => !w.isArchived).reduce((acc, w) => acc + Number(w.balance || 0), 0)
-    const now = new Date()
-    const currentMonthKey = format(now, 'yyyy-MM')
-    const currentMonthTxs = txs.filter((t) => t.date && t.date.startsWith(currentMonthKey))
-    const monthlyIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0)
-    const monthlyExpense = currentMonthTxs.filter((t) => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount || 0), 0)
-
-    const totalDebt = loans.filter((l) => l.type === 'debt' && l.status !== 'paid').reduce((acc, l) => acc + Number(l.remainingAmount || 0), 0)
-    const totalReceivable = loans.filter((l) => l.type === 'receivable' && l.status !== 'paid').reduce((acc, l) => acc + Number(l.remainingAmount || 0), 0)
-
-    const savingsRatio = monthlyIncome > 0 ? Math.max(0, ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100) : 0
-    const dti = monthlyIncome > 0 ? (totalDebt / monthlyIncome) * 100 : (totalDebt > 0 ? 100 : 0)
-    const emergencyMonths = monthlyExpense > 0 ? (totalCash / monthlyExpense) : (totalCash > 0 ? 12 : 0)
-
-    let score = 50
-    if (savingsRatio >= 20) score += 20
-    else if (savingsRatio >= 10) score += 10
-    else if (savingsRatio < 0) score -= 20
-
-    if (dti <= 30) score += 15
-    else if (dti > 50) score -= 15
-
-    if (emergencyMonths >= 6) score += 15
-    else if (emergencyMonths >= 3) score += 10
-    else if (emergencyMonths < 1) score -= 10
-
-    score = Math.max(10, Math.min(100, Math.round(score)))
-
-    let rating
-    if (score >= 85) rating = 'Sangat Sehat'
-    else if (score >= 70) rating = 'Sehat'
-    else if (score >= 50) rating = 'Cukup'
-    else if (score >= 35) rating = 'Perlu Perhatian'
-    else rating = 'Kritis'
-
-    return {
-      type: 'financial_health',
-      score,
-      rating,
-      metrics: {
-        savingsRatio: Math.round(savingsRatio),
-        dti: Math.round(dti),
-        emergencyMonths: Number(emergencyMonths.toFixed(1)),
-        totalCash,
-        monthlyIncome,
-        monthlyExpense,
-        totalDebt,
-        totalReceivable,
-      },
-      text: `Berikut adalah evaluasi Skor Kesehatan Finansial Anda: ${score}/100 (${rating}).`,
-      chips: ["Bagaimana cara menaikkan skor?", "Analisis pengeluaranku", "Rekomendasi dana darurat"]
-    }
+    return await calculateDirectFinancialHealth({ defaultCurrency, locale, rates })
   }
 
   if (
@@ -472,9 +653,13 @@ export async function parseTransactionFromText(userMessage, context) {
     normUserText.includes('piutang saya')
   ) {
     const loans = await db.loans.toArray()
-    const activeLoans = loans.filter((l) => l.status !== 'paid' && (l.remainingAmount ?? l.totalAmount) > 0)
-    const totalDebt = activeLoans.filter((l) => l.type === 'debt').reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount), 0)
-    const totalReceivable = activeLoans.filter((l) => l.type === 'receivable').reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount), 0)
+    const activeLoans = loans.filter((l) => l.status !== 'paid' && l.status !== 'forgiven' && toSafeNumber(l.remainingAmount ?? l.totalAmount ?? l.amount) > 0)
+    const totalDebt = activeLoans
+      .filter((l) => l.type === 'debt')
+      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount ?? l.amount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
+    const totalReceivable = activeLoans
+      .filter((l) => l.type === 'receivable')
+      .reduce((s, l) => s + convertCurrency(toSafeNumber(l.remainingAmount ?? l.totalAmount ?? l.amount), l.currency || defaultCurrency, defaultCurrency, rates), 0)
     const activeCount = activeLoans.length
 
     let textMsg = `Berikut ringkasan **Utang & Piutang** Anda saat ini:\n\n- **Total Piutang (Tagihan Anda)**: **Rp ${totalReceivable.toLocaleString('id-ID')}**\n- **Total Hutang (Kewajiban Anda)**: **Rp ${totalDebt.toLocaleString('id-ID')}**\n- **Pinjaman Aktif**: **${activeCount} item**`
@@ -499,7 +684,7 @@ export async function parseTransactionFromText(userMessage, context) {
     normUserText.includes('tabungan saya saat ini')
   ) {
     const goals = await db.goals.toArray()
-    const activeGoals = goals.filter((g) => g.status !== 'archived')
+    const activeGoals = goals.filter((g) => !g.isArchived && !g.isCompleted && g.status !== 'archived')
     if (activeGoals.length > 0) {
       const totalTarget = activeGoals.reduce((s, g) => s + (g.targetAmount || 0), 0)
       const totalCurrent = activeGoals.reduce((s, g) => s + (g.currentAmount || 0), 0)
@@ -507,7 +692,8 @@ export async function parseTransactionFromText(userMessage, context) {
       let textMsg = `Berikut progres **Target Tabungan** Anda:\n\n- **Total Terkumpul**: **Rp ${totalCurrent.toLocaleString('id-ID')}** / Rp ${totalTarget.toLocaleString('id-ID')} (${pct}%)\n- **Jumlah Target**: **${activeGoals.length} tujuan**\n\nRincian Target Tabungan:\n`
       textMsg += activeGoals.map(g => {
         const p = g.targetAmount > 0 ? Math.min(100, Math.round(((g.currentAmount || 0) / g.targetAmount) * 100)) : 0
-        return `- **${g.title}**: **Rp ${(g.currentAmount || 0).toLocaleString('id-ID')}** / Rp ${(g.targetAmount || 0).toLocaleString('id-ID')} (${p}%)`
+        const goalName = g.name || g.title || 'Tabungan'
+        return `- **${goalName}**: **Rp ${(g.currentAmount || 0).toLocaleString('id-ID')}** / Rp ${(g.targetAmount || 0).toLocaleString('id-ID')} (${p}%)`
       }).join('\n')
       return {
         type: 'text',
@@ -559,13 +745,25 @@ export async function parseTransactionFromText(userMessage, context) {
     return { error: true, message: 'Koneksi internet terputus. AI membutuhkan koneksi internet untuk bekerja.' }
   }
 
-  const apiKey = getEffectiveApiKey()
-  if (!apiKey) return { error: true, message: 'API Key Gemini belum diset.' }
-
   const now = new Date()
   const today = format(now, 'yyyy-MM-dd')
   const currentTime = format(now, 'HH:mm')
   const monthSummary = await getMonthSummaryForPrompt()
+
+  const recentTxs = await db.transactions
+    .orderBy('date')
+    .reverse()
+    .limit(15)
+    .toArray()
+
+  const walletMap = new Map(wallets.map((w) => [w.id, w.name]))
+  const recentTxsContext = recentTxs
+    .map((tx) => {
+      const wName = walletMap.get(tx.walletId) || (tx.walletId ? `Wallet #${tx.walletId}` : 'Tanpa Dompet')
+      const targetWName = tx.targetWalletId ? ` -> ${walletMap.get(tx.targetWalletId) || `Wallet #${tx.targetWalletId}`}` : ''
+      return `- [ID: ${tx.id}] ${tx.date} | ${tx.type === 'income' ? 'Pemasukan' : tx.type === 'expense' ? 'Pengeluaran' : 'Transfer'} ${tx.currency || defaultCurrency} ${Number(tx.amount || 0).toLocaleString('id-ID')} | Kategori: ${tx.category || 'Lainnya'} | Dompet: ${wName}${targetWName} | Catatan: "${tx.notes || '-'}"`
+    })
+    .join('\n')
 
   const sysPrompt = `Kamu adalah AI Financial Companion FinTrack yang sangat cerdas, responsif, dan empathic (Proactive Smart Advisor).
 Hari ini adalah tanggal: ${today} dan waktu saat ini adalah jam ${currentTime} (Waktu Lokal).
@@ -611,23 +809,33 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
      * Gunakan type: "transfer" dengan 'walletId' (sumber) dan 'targetWalletId' (tujuan) saat user memindahkan saldo (misal: "transfer 100rb dari BCA ke GoPay", "tarik tunai 50rb dari Mandiri").
    - MULTI-TRANSAKSI / KALIMAT MAJEMUK:
      * JIKA user menyebutkan BANYAK transaksi sekaligus dalam 1 pesan (misal: "Gaji 5jt BCA, bayar kosan 1.5jt Cash, sama jajan kopi 25rb GoPay"), PANGGIL 'record_transactions' dengan array 'transactions' berisi SEMUA items tersebut!
-   - JIKA user menyebutkan transaksi TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan" atau "Dapat gaji"), JANGAN panggil fungsi! Tanyalah nominalnya dengan ramah: "Berapa nominalnya?".
-   - Panggil 'record_transactions' LANGSUNG jika nama/kategori & nominal sudah ada!
+    - POLA SINGKAT NAMA BARANG/MAKANAN + NOMINAL (CONTOH: "bakso 20k", "kopi 25rb", "nasgor 15k", "bensin 30k"):
+      * INI ADALAH TRANSAKSI PENGELUARAN LENGKAP (EXPENSE).
+      * WAJIB LANGSUNG PANGGIL 'record_transactions' dengan type: "expense", amount yang sesuai, dan kategori yang cocok.
+      * DILARANG KERAS MEMBALAS DENGAN TEKS PERCAKAPAN BIASA ATAU BERTANYA ULANG!
+    - JIKA user menyebutkan transaksi TAPI TIDAK menyebutkan nominal harganya (misal: "Beli makan" atau "Dapat gaji"), JANGAN panggil fungsi! Tanyalah nominalnya dengan ramah: "Berapa nominalnya?".
+    - Panggil 'record_transactions' LANGSUNG jika nama/kategori & nominal sudah ada!
 
-4. INTENT TRIGGER QUICK CHIPS:
+4. PENGELOLAAN & EDIT TRANSAKSI MASA LALU (update_transaction & delete_transaction):
+   - JIKA user meminta mengedit, mengubah kategori, mengubah nominal, atau memindahkan dompet transaksi yang baru saja terjadi atau transaksi sebelumnya (misal: "transaksi tadi yang masuk ke dana tolong di edit kategori nya jadi makanan", "ubah transaksi kopi tadi jadi 30rb", "ganti dompet transaksi indomaret ke BCA"):
+     * Temukan ID transaksi yang sesuai dari DAFTAR 15 TRANSAKSI TERAKHIR di bawah.
+     * Panggil tool 'update_transaction' dengan 'transactionId' tersebut, serta isi 'updatedFields' yang diubah (seperti 'category', 'amount', 'walletId', 'notes', 'date').
+   - JIKA user meminta menghapus transaksi (misal: "hapus transaksi makan siang tadi"), panggil 'delete_transaction' dengan 'transactionId' yang sesuai.
+
+5. INTENT TRIGGER QUICK CHIPS:
    - JIKA user mengirim kalimat intent umum seperti "Saya ingin mencatat pengeluaran baru" / "I want to record a new expense", JANGAN PANGGIL FUNGSI! Berikan balasan ramah menanyakan detail: "Pengeluaran apa yang ingin Anda catat? Sebutkan nama pengeluaran, nominal (contoh: **Rp 25.000**), dan dompet yang digunakan." Lalu WAJIB sertakan format: <chips>Beli kopi 25rb BCA|Makan siang 35rb Cash|Bensin 50rb Mandiri</chips>.
    - JIKA user mengirim "Saya ingin membuat tugas baru" / "I want to create a new task", JANGAN PANGGIL FUNGSI! Jawab: "Tugas apa yang ingin Anda buat? Sebutkan nama tugas, deskripsi, kategori, atau sub-tugasnya." Lalu WAJIB sertakan format: <chips>Belanja bulanan: susu, beras, minyak|Bayar listrik tagihan|Laporan kantor pekerjaan</chips>.
    - JIKA user mengirim "Saya ingin menganalisis keuangan" / "I want to analyze my finances", PANGGIL 'query_database' (renderChart: true) atau jawab ramah dengan format: <chips>Total pengeluaran bulan ini|Pengeluaran kategori terbesar|Sisa anggaran bulanan</chips>.
    - JIKA user mengirim "Saya ingin membuat target tabungan" / "I want to create a savings goal", JANGAN PANGGIL FUNGSI! Jawab: "Target tabungan apa yang ingin Anda wujudkan? Sebutkan nama tujuan dan target nominalnya." Lalu WAJIB sertakan format: <chips>Beli Laptop 10 juta|Dana darurat 5 juta|Liburan 3 juta</chips>.
    - JIKA user mengirim "Saya ingin membuat habit harian" / "I want to create a daily habit", JANGAN PANGGIL FUNGSI! Jawab: "Habit harian apa yang ingin Anda bangun? Sebutkan nama kebiasaan dan jadwal pengingatnya." Lalu WAJIB sertakan format: <chips>Lari pagi jam 06:00|Baca buku jam 21:00|Minum air 8 gelas</chips>.
 
-5. TO-DO, HABIT, & LANGGANAN BARU:
+6. TO-DO, HABIT, & LANGGANAN BARU:
    - Jika membuat To-Do: pecah langkah-langkah besar ke array 'subTasks', tentukan priority (high/medium/low), dueDate, dan kategori yang pas.
    - Jika membuat Habit: tentukan frequencyType, color, dan reminderTime.
    - Jika membuat Tagihan Berulang: tentukan frequency (monthly/yearly/weekly), amount, dan category.
    - Jika informasi penting kurang, bertanyalah. Jika sudah lengkap, LANGSUNG panggil fungsi create!
 
-5.B. UTANG & PIUTANG (WAJIB TERHUBUNG KE DOMPET/WALLET):
+7. UTANG & PIUTANG (WAJIB TERHUBUNG KE DOMPET/WALLET):
    - SETIAP UTANG (HUTANG) ATAU PIUTANG WAJIB TERHUBUNG KE DOMPET (WALLET). OPSI TANPA WALLET TELAH DIHAPUS.
    - PENCATATAN UTANG / PIUTANG BARU:
      * JIKA user ingin mencatat utang atau piutang baru (misal: "Catat utang ke Budi 500rb", "Pinjam uang ke Rina 200rb", "Pinjamkan uang 1jt ke Andi"):
@@ -641,7 +849,7 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
      * Saat user ingin bayar cicilan hutang atau terima pelunasan piutang:
        - Panggil 'manage_loans' (action='pay' atau action='mark_paid') dan tentukan 'walletId'.
 
-6. DISKUSI, TANYA JAWAB, FINANCIAL ADVICE & PERBANDINGAN:
+8. DISKUSI, TANYA JAWAB, FINANCIAL ADVICE & PERBANDINGAN:
    - PERBANDINGAN BULANAN (misal: "Bandingkan dengan bulan lalu", "apakah bulan ini lebih hemat?"):
      * JANGAN panggil fungsi dengan renderChart: true kecuali user secara eksplisit meminta gambar grafik.
      * Gunakan data dari RINGKASAN REAL-TIME PENGGUNA di atas untuk menyajikan analisis perbandingan terstruktur:
@@ -663,7 +871,10 @@ PROACTIVE ADVISOR & GAYA KOMUNIKASI:
 - Bila transaksi dicatat pada dompet tertentu, gunakan mata uang (currency) yang sesuai dengan dompet tersebut.
 
 Daftar Dompet (Wallets):
-${wallets.length > 0 ? wallets.map(w => `- ID: ${w.id} | Nama: ${w.name} | Mata Uang: ${w.currency || defaultCurrency} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
+${wallets.length > 0 ? wallets.map((w) => `- ID: ${w.id} | Nama: ${w.name} | Mata Uang: ${w.currency || defaultCurrency} | Saldo: ${w.currentBalance}`).join('\n') : 'Belum ada dompet.'}
+
+DAFTAR 15 TRANSAKSI TERAKHIR PENGGUNA:
+${recentTxsContext || 'Belum ada transaksi sebelumnya.'}
 
 Daftar Kategori:
 ${buildCategoryContext(locale)}`
@@ -795,19 +1006,21 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
     const keysToTry = []
     if (userKey && userKey.length > 5) keysToTry.push(userKey)
     if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
-    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+    if (keysToTry.length === 0) {
+      throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
+    }
 
     let lastError = null
 
     for (const key of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
-          const cleanKey = encodeURIComponent(key)
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${cleanKey}&alt=sse`
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
           const res = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'x-goog-api-key': key.trim(),
             },
             body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
           })
@@ -941,11 +1154,27 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       }
       
       if (fnCall.name === 'update_transaction') {
-         return { type: 'transactions', action: 'update', searchQuery: fnCall.args.searchQuery, updatedFields: fnCall.args.updatedFields, text: fnCall.args.replyMessage || "Siap mengubah transaksi.", chips: fnCall.args.suggestedChips }
+         return {
+           type: 'transactions',
+           action: 'update',
+           transactionId: fnCall.args.transactionId,
+           searchQuery: fnCall.args.searchQuery,
+           updatedFields: fnCall.args.updatedFields,
+           text: fnCall.args.replyMessage || "Transaksi berhasil diperbarui.",
+           chips: fnCall.args.suggestedChips,
+         }
       }
       
       if (fnCall.name === 'delete_transaction') {
-         return { type: 'transactions', action: 'delete', searchQuery: fnCall.args.searchQuery, date: fnCall.args.date, text: fnCall.args.replyMessage || "Siap menghapus transaksi.", chips: fnCall.args.suggestedChips }
+         return {
+           type: 'transactions',
+           action: 'delete',
+           transactionId: fnCall.args.transactionId,
+           searchQuery: fnCall.args.searchQuery,
+           date: fnCall.args.date,
+           text: fnCall.args.replyMessage || "Transaksi telah dihapus.",
+           chips: fnCall.args.suggestedChips,
+         }
       }
       
       if (fnCall.name === 'manage_habit') {
@@ -961,7 +1190,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       }
 
       if (fnCall.name === 'manage_savings') {
-        return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, text: fnCall.args.replyMessage || "Memproses tabungan...", chips: fnCall.args.suggestedChips }
+        return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, walletId: fnCall.args.walletId, text: fnCall.args.replyMessage || "Memproses tabungan...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnCall.name === 'manage_recurring') {
@@ -1001,6 +1230,16 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           text: fnCall.args.replyMessage || "Memproses catat pinjaman...",
           chips: fnCall.args.suggestedChips
         }
+      }
+      
+      if (fnCall.name === 'calculate_financial_health') {
+        return await calculateDirectFinancialHealth({
+          defaultCurrency,
+          locale,
+          rates,
+          replyMessage: fnCall.args?.replyMessage,
+          suggestedChips: fnCall.args?.suggestedChips,
+        })
       }
       
       if (fnCall.name === 'query_database') {
@@ -1118,18 +1357,20 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
     const keysToTry = []
     if (userKey && userKey.length > 5) keysToTry.push(userKey)
     if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
-    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+    if (keysToTry.length === 0) {
+      throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
+    }
 
     let lastError = null
     for (const key of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
-          const cleanKey = encodeURIComponent(key)
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
           const res = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'x-goog-api-key': key.trim(),
             },
             body: JSON.stringify({ 
               contents: reqContents, 
@@ -1210,18 +1451,20 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
     const keysToTry = []
     if (userKey && userKey.length > 5) keysToTry.push(userKey)
     if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
-    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+    if (keysToTry.length === 0) {
+      throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
+    }
 
     let lastError = null
     for (const key of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
-          const cleanKey = encodeURIComponent(key)
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
           const res = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'x-goog-api-key': key.trim(),
             },
             body: JSON.stringify({ 
               contents: reqContents, 
@@ -1328,18 +1571,20 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
     const keysToTry = []
     if (userKey && userKey.length > 5) keysToTry.push(userKey)
     if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
-    if (!keysToTry.includes(SYSTEM_DEFAULT_API_KEY)) keysToTry.push(SYSTEM_DEFAULT_API_KEY)
+    if (keysToTry.length === 0) {
+      throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
+    }
 
     let lastError = null
     for (const key of keysToTry) {
       for (const model of FAST_TRANSACTION_MODELS) {
         try {
-          const cleanKey = encodeURIComponent(key)
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
           const res = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'x-goog-api-key': key.trim(),
             },
             body: JSON.stringify({
               contents: reqContents,

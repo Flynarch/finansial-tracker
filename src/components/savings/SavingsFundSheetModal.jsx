@@ -6,6 +6,7 @@ import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
 import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret } from '../../lib/utils'
+import { invalidateWalletBalance } from '../../lib/balanceEngine'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import { Plus, Minus, Calendar, FileText, Wallet, Check } from 'lucide-react'
@@ -59,45 +60,56 @@ export default function SavingsFundSheetModal({
         ? Math.max(0, currentGoalAmt - val)
         : currentGoalAmt + val
 
-      // 1. Update goal balance
-      await db.goals.update(goal.id, { currentAmount: newGoalAmount })
-
-      // 2. Fetch wallet name if selected
-      const walletIdNum = Number(selectedWalletId)
-      let walletObj = null
-      if (walletIdNum) {
-        walletObj = await db.wallets.get(walletIdNum)
-      }
-
-      // 3. Add to goal logs
       const now = new Date()
       const selectedDateObj = new Date(`${dateInput}T00:00:00`)
       selectedDateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
       const formattedLogDate = format(selectedDateObj, 'yyyy-MM-dd HH:mm:ss')
+      const walletIdNum = Number(selectedWalletId)
 
-      const logPayload = {
-        goalId: goal.id,
-        amount: isWithdraw ? -val : val,
-        notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
-        date: formattedLogDate,
-      }
-      if (walletObj) {
-        logPayload.walletName = walletObj.name
-      }
-      await db.goalLogs.add(logPayload)
+      await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
+        // 1. Update goal balance
+        await db.goals.update(goal.id, { currentAmount: newGoalAmount })
 
-      // 4. Add transaction record if wallet was selected
+        // 2. Fetch wallet name if selected
+        let walletObj = null
+        if (walletIdNum) {
+          walletObj = await db.wallets.get(walletIdNum)
+        }
+
+        // 3. Add transaction record if wallet was selected
+        let createdTxId = null
+        if (walletIdNum) {
+          createdTxId = await db.transactions.add({
+            date: dateInput,
+            amount: val,
+            type: isWithdraw ? 'income' : 'expense',
+            category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
+            notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+            currency: goal.currency || defaultCurrency,
+            walletId: walletIdNum,
+            goalId: goal.id,
+            createdAt: Date.now(),
+            isExcludeFromAnalytics: true,
+            excludeFromAnalytics: true,
+          })
+        }
+
+        // 4. Add to goal logs
+        const logPayload = {
+          goalId: goal.id,
+          amount: isWithdraw ? -val : val,
+          notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
+          date: formattedLogDate,
+          transactionId: createdTxId || null,
+        }
+        if (walletObj) {
+          logPayload.walletName = walletObj.name
+        }
+        await db.goalLogs.add(logPayload)
+      })
+
       if (walletIdNum) {
-        await db.transactions.add({
-          date: dateInput,
-          amount: val,
-          type: isWithdraw ? 'income' : 'expense',
-          category: 'tabungan',
-          notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
-          currency: goal.currency || defaultCurrency,
-          walletId: walletIdNum,
-          createdAt: Date.now(),
-        })
+        void invalidateWalletBalance([walletIdNum])
       }
 
       const targetAmt = Number(goal.targetAmount || 0)
@@ -177,7 +189,7 @@ export default function SavingsFundSheetModal({
               fundActionType === 'withdraw' ? 'text-[var(--earthy-terra)]' : 'text-[var(--earthy-green)]'
             }`}
           >
-            {fundActionType === 'withdraw' ? 'Jumlah Penarikan' : 'Jumlah Setoran'}
+            {fundActionType === 'withdraw' ? t('savings.withdrawAmount', 'Jumlah Penarikan') : t('savings.depositAmount', 'Jumlah Setoran')}
           </p>
           <input
             ref={inputRef}
@@ -205,7 +217,9 @@ export default function SavingsFundSheetModal({
         <div className="space-y-1">
           <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5 mb-1">
             <Wallet className="h-3.5 w-3.5 text-[var(--accent)]" />
-            {fundActionType === 'withdraw' ? 'Masuk ke Dompet (Opsional)' : 'Sumber Dompet (Opsional)'}
+            {fundActionType === 'withdraw'
+              ? t('savings.targetWalletOptional', 'Masuk ke Dompet (Opsional)')
+              : t('savings.sourceWalletOptional', 'Sumber Dompet (Opsional)')}
           </label>
           <WalletSelectTrigger
             wallet={selectedWallet}

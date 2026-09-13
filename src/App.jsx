@@ -7,9 +7,10 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const TodoList = lazy(() => import('./pages/TodoList'))
+const Profile = lazy(() => import('./pages/Profile'))
+
 const Calendar = lazy(() => import('./pages/Calendar'))
 const Reports = lazy(() => import('./pages/Reports'))
-const Profile = lazy(() => import('./pages/Profile'))
 const Budget = lazy(() => import('./pages/Budget'))
 const Savings = lazy(() => import('./pages/Savings'))
 const SavingsDetail = lazy(() => import('./pages/SavingsDetail'))

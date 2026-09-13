@@ -14,6 +14,8 @@ export default function BottomSheet({
   maxHeight = 'max-h-[min(88dvh,42rem)]',
   className = '',
   closeAriaLabel,
+  scrollable = true,
+  footer,
 }) {
   const { t } = useTranslation()
   const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
@@ -73,7 +75,10 @@ export default function BottomSheet({
         className={`absolute inset-0 bg-black/60 cursor-pointer ${
           sheetVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit'
         }`}
-        onClick={closeSheet}
+        onClick={() => {
+          closeSheet()
+          onClose?.()
+        }}
         aria-label={defaultCloseLabel}
       />
 
@@ -83,7 +88,7 @@ export default function BottomSheet({
           role="dialog"
           aria-modal="true"
           aria-label={typeof title === 'string' ? title : defaultCloseLabel}
-          className={`${maxHeight} overflow-y-auto overscroll-contain w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${
+          className={`flex flex-col ${maxHeight} w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu overflow-hidden ${
             isDragging || dragOffset > 0
               ? ''
               : sheetVisible
@@ -101,47 +106,69 @@ export default function BottomSheet({
               : {}),
           }}
         >
-          {/* Tactile drag handle & touch zone */}
-          {showHandle ? (
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              onTouchCancel={handleTouchEnd}
-              className="mx-auto -mt-2 mb-3 pt-2 pb-1.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
-            >
-              <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-all hover:bg-[var(--muted)]" />
-            </div>
-          ) : null}
+          {/* ZONE 1: FIXED TOP (Handle + Sticky Header) */}
+          <div className="shrink-0 px-5 pt-3.5 sm:px-6 select-none border-b border-[var(--border)]/60">
+            {showHandle && (
+              <div
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                className="mx-auto -mt-1.5 mb-2 pt-1 pb-1 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+              >
+                <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-all hover:bg-[var(--muted)]" />
+              </div>
+            )}
 
-          {title || showCloseButton ? (
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              onTouchCancel={handleTouchEnd}
-              className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3 cursor-grab select-none touch-none"
-            >
-              {title ? (
-                typeof title === 'string' ? (
-                  <p className="text-base font-black tracking-tight text-[var(--fg)]">{title}</p>
-                ) : (
-                  title
-                )
-              ) : <div />}
-              {showCloseButton ? (
-                <button
-                  type="button"
-                  className="rounded-xl px-3.5 py-1.5 min-h-[36px] flex items-center text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] active:scale-95 transition-all cursor-pointer ft-spring-press"
-                  onClick={closeSheet}
-                >
-                  {defaultCloseLabel}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+            {(title || showCloseButton) && (
+              <div className="mb-3 flex items-center justify-between gap-2">
+                {title ? (
+                  typeof title === 'string' ? (
+                    <p className="text-base font-black tracking-tight text-[var(--fg)]">{title}</p>
+                  ) : (
+                    title
+                  )
+                ) : <div />}
+                {showCloseButton && (
+                  <button
+                    type="button"
+                    className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer ft-spring-press"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      closeSheet()
+                      onClose?.()
+                    }}
+                    aria-label={defaultCloseLabel}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+                      <path d="M18 6L6 18" />
+                      <path d="M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-          {children}
+          {/* ZONE 2: ADAPTIVE SCROLLABLE BODY */}
+          <div
+            className={`flex-1 min-h-0 px-5 sm:px-6 py-3.5 ${
+              footer ? '' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+            } ${
+              scrollable
+                ? 'overflow-y-auto overscroll-contain ft-hide-scrollbar'
+                : 'overflow-hidden overscroll-none'
+            }`}
+          >
+            {children}
+          </div>
+
+          {/* ZONE 3: FIXED BOTTOM FOOTER (Optional) */}
+          {footer && (
+            <div className="shrink-0 px-5 sm:px-6 py-3 border-t border-[var(--border)]/60 bg-[var(--panel-strong)] pb-[max(1rem,calc(0.75rem+env(safe-area-inset-bottom)))]">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </div>,

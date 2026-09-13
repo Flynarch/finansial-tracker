@@ -6,6 +6,7 @@ import EmptyState from '../components/ui/EmptyState'
 import MonthPicker from '../components/ui/MonthPicker'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
+import BudgetCycleModal from '../components/budget/BudgetCycleModal'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import { getCategoryColorClass, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { db } from '../lib/db'
@@ -13,16 +14,17 @@ import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { formatCurrency, toSafeNumber, clampPercent, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { formatExpenseCategory } from '../lib/expenseCategories'
-import { calculateBudgetSpent } from '../lib/budgetUtils'
+import { calculateBudgetSpent, getBudgetPeriodDateRange, isTxMatchingBudget, getCurrentBudgetMonthKey } from '../lib/budgetUtils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useSwipeAction from '../hooks/useSwipeAction'
-import { ArrowLeft, Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon } from 'lucide-react'
-import { isTxMatchingBudget } from '../lib/budgetUtils'
+import PageHeader from '../components/ui/PageHeader'
+import { Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon, Edit2, Calendar } from 'lucide-react'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
 
 function Budget() {
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const budgetCycleStartDay = useSettingsStore((state) => state.budgetCycleStartDay || 1)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const motionDelay = reduceMotion ? 0 : 220
   const navigate = useNavigate()
@@ -50,8 +52,9 @@ function Budget() {
     return () => window.cancelAnimationFrame(id)
   }, [])
 
-  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const [month, setMonth] = useState(() => getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay))
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [isCycleModalOpen, setIsCycleModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [deletingBudget, setDeletingBudget] = useState(null)
   const openSheet = useCallback(() => setSheetOpen(true), [])
@@ -71,11 +74,19 @@ function Budget() {
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
-  const monthStart = `${month}-01`
-  const monthEnd = `${month}-31`
+  const budgetPeriod = useMemo(
+    () => getBudgetPeriodDateRange(month, budgetCycleStartDay, locale),
+    [month, budgetCycleStartDay, locale]
+  )
+
   const monthExpenseTxs = useLiveQuery(
-    () => db.transactions.where('date').between(monthStart, monthEnd, true, true).filter((tx) => tx.type === 'expense').toArray(),
-    [month],
+    () =>
+      db.transactions
+        .where('date')
+        .between(budgetPeriod.startDate, `${budgetPeriod.endDate}\uffff`, true, true)
+        .filter((tx) => tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
+        .toArray(),
+    [budgetPeriod.startDate, budgetPeriod.endDate],
     []
   )
 
@@ -129,29 +140,60 @@ function Budget() {
 
   const handleCopyPrevMonthBudgets = async () => {
     if (!prevMonthBudgets.length) return
-    const newBudgets = prevMonthBudgets.map((b) => ({
-      category: b.category,
-      limit: b.limit,
-      month: month,
-    }))
-    await db.budgets.bulkAdd(newBudgets)
+    const existingCategories = new Set((monthBudgets || []).map((b) => b.category))
+    const newBudgets = []
+    for (const b of prevMonthBudgets) {
+      if (!existingCategories.has(b.category)) {
+        existingCategories.add(b.category)
+        newBudgets.push({
+          category: b.category,
+          limit: b.limit,
+          month: month,
+        })
+      }
+    }
+    if (newBudgets.length > 0) {
+      await db.budgets.bulkAdd(newBudgets)
+    }
   }
 
   const unbudgetedExpenses = useMemo(() => {
     if (!monthExpenseTxs || !monthExpenseTxs.length) return []
     const unbudgetedMap = new Map()
 
-    monthExpenseTxs.forEach((tx) => {
-      if (isExcludeAnalyticsTx(tx)) return
-      const isBudgeted = sortedMonthBudgets.some((b) => isTxMatchingBudget(b.category, tx.category))
+    const processItem = (category, amount, itemTx) => {
+      if (isExcludeAnalyticsTx(itemTx)) return
+      const isBudgeted = sortedMonthBudgets.some((b) => isTxMatchingBudget(b.category, category))
       if (!isBudgeted) {
-        const catKey = tx.category || 'lainnya'
+        const catKey = category || 'lainnya'
         const current = unbudgetedMap.get(catKey) || { category: catKey, totalSpent: 0, count: 0 }
-        const amt = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+        const amt = convertCurrency(toSafeNumber(amount), itemTx.currency || defaultCurrency, defaultCurrency, rates)
         current.totalSpent += amt
         current.count += 1
         unbudgetedMap.set(catKey, current)
       }
+    }
+
+    monthExpenseTxs.forEach((tx) => {
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+          const itemType = si.type || tx.type
+          if (itemType === 'expense') {
+            const itemTx = {
+              ...tx,
+              ...si,
+              category: si.category || tx.category,
+              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+              isExcludeAnalyticsTx: false,
+            }
+            processItem(si.category || tx.category, si.amount, itemTx)
+          }
+        })
+        return
+      }
+
+      processItem(tx.category, tx.amount, tx)
     })
 
     return [...unbudgetedMap.values()].sort((a, b) => b.totalSpent - a.totalSpent)
@@ -201,31 +243,24 @@ function Budget() {
               : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* Header (Compact Single Row) */}
-        <div className="flex items-center justify-between gap-2.5 pt-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+        {/* Header */}
+        <PageHeader
+          title={t('budget.title')}
+          titlePosition="left"
+          onBack={handleBack}
+          backAriaLabel={t('budget.back')}
+          className="pt-2 !mb-0"
+          rightAction={
             <button
               type="button"
-              onClick={handleBack}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
-              aria-label={t('budget.back')}
+              onClick={() => openAdd()}
+              className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <ArrowLeft className="h-4.5 w-4.5" />
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <span>{t('budget.add')}</span>
             </button>
-            <h1 className="text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] truncate">
-              {t('budget.title')}
-            </h1>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => openAdd()}
-            className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            <span>{t('budget.add')}</span>
-          </button>
-        </div>
+          }
+        />
 
         {/* Summary Hero Card */}
         <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5">
@@ -265,6 +300,28 @@ function Budget() {
                   className="min-w-[105px]"
                 />
               </div>
+            </div>
+
+            {/* Cycle Period Indicator */}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setIsCycleModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)]/50 transition active:scale-95 cursor-pointer max-w-full truncate shadow-2xs"
+                title={t('budget.changeCycle', 'Ubah Siklus Anggaran')}
+              >
+                <Calendar className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
+                <span className="truncate">{budgetPeriod.label}</span>
+                {budgetPeriod.isCustomCycle ? (
+                  <span className="rounded-md bg-[var(--accent)]/15 px-1.5 py-0.2 text-[9px] font-black text-[var(--accent)] uppercase shrink-0">
+                    {t('budget.paydayTag', 'Gajian')} {budgetCycleStartDay}
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-[var(--field-bg)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-bold text-[var(--muted)] shrink-0">
+                    {t('budget.standardCycle', 'Kalender')}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Middle Row: Inline Big Amount + Limit */}
@@ -374,7 +431,7 @@ function Budget() {
 
                     {/* Sliding Foreground Card with crisp divider border on right */}
                     <div
-                      className={`relative z-10 rounded-2xl border-r border-[var(--border)]/70 p-4 sm:p-5 transition-[background-color,border-color] duration-200 shadow-2xs ${
+                      className={`relative z-10 rounded-2xl border-r border-[var(--border)]/70 p-4 sm:p-5 transition-[background-color,border-color] duration-200 shadow-2xs cursor-pointer ${
                         isDanger
                           ? 'bg-[var(--status-expense-soft)] border-[var(--status-expense)]/30'
                           : isWarn
@@ -382,6 +439,7 @@ function Budget() {
                           : 'bg-[var(--panel-strong)]'
                       }`}
                       style={{ transform: 'translate3d(0px, 0px, 0px)' }}
+                      onClick={() => openEdit(b)}
                       {...getSwipeHandlers(b.id, {
                         onEdit: () => openEdit(b),
                         onDelete: () => setDeletingBudget(b),
@@ -405,6 +463,18 @@ function Budget() {
                           <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-black tabular-nums ${badgeClass}`}>
                             {Math.round(pct)}%
                           </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEdit(b)
+                            }}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)] active:scale-95 transition-all cursor-pointer shadow-2xs"
+                            title={t('common.edit', 'Edit')}
+                            aria-label={t('common.edit', 'Edit')}
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
 
@@ -515,6 +585,11 @@ function Budget() {
           }}
           title={t('budget.delete', 'Hapus Anggaran')}
           message={t('budget.deleteConfirm', 'Hapus anggaran untuk kategori ini?')}
+        />
+        <BudgetCycleModal
+          isOpen={isCycleModalOpen}
+          onClose={() => setIsCycleModalOpen(false)}
+          currentMonth={month}
         />
       </div>
     </div>

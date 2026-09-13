@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, Suspense } from 'react'
 import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { App } from '@capacitor/app'
 import { StatusBar, Style } from '@capacitor/status-bar'
@@ -13,10 +13,13 @@ import {
   syncDailyReminderSchedule,
   registerNotificationTapListener,
 } from '../../lib/smartNotifications'
+import { syncNotificationQueue } from '../../lib/notificationIngestion'
+import { prefetchCriticalRoutes } from '../../lib/routePrefetcher'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LoadingScreen from '../ui/LoadingScreen'
 import LockScreen from '../ui/LockScreen'
+import ErrorBoundary from '../ui/ErrorBoundary'
 import OnboardingFlow from '../onboarding/OnboardingFlow'
 import SpotlightTour from '../onboarding/SpotlightTour'
 import BottomNav from './BottomNav'
@@ -26,8 +29,13 @@ import AiTriggerBar from '../chat/AiTriggerBar'
 import AiQuickLogModal from '../chat/AiQuickLogModal'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
+import QuickAddTransactionModal from '../transactions/QuickAddTransactionModal'
+import useTransactionStore from '../../store/useTransactionStore'
 import useAuthDeepLink from '../../hooks/useAuthDeepLink'
 import { primeThemeTransition } from '../../lib/themeTransition'
+import { ensureFirebaseAuthSynced } from '../../lib/auth'
+import { uploadLatestBackup } from '../../lib/cloudBackup'
+import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import AppBackground from './AppBackground'
 
 function AppShell() {
@@ -58,6 +66,7 @@ function AppShell() {
     location.pathname.startsWith('/wallet/') ||
     location.pathname.startsWith('/wallets/') ||
     location.pathname.startsWith('/savings/') ||
+    location.pathname.startsWith('/settings/') ||
     location.pathname === '/add-account' ||
     location.pathname === '/ai-chat' ||
     location.pathname === '/chat' ||
@@ -66,6 +75,11 @@ function AppShell() {
   // AI Quick Log states
   const isQuickLogOpen = useChatStore((state) => state.isQuickLogOpen)
   const openQuickLog = useChatStore((state) => state.openQuickLog)
+
+  // Quick Add Transaction states (for widget & deep-link)
+  const isQuickAddOpen = useTransactionStore((state) => state.isQuickAddOpen)
+  const quickAddNonce = useTransactionStore((state) => state.quickAddNonce)
+  const closeQuickAdd = useTransactionStore((state) => state.closeQuickAdd)
 
   useEffect(() => {
     const currentPath = location.pathname
@@ -93,7 +107,17 @@ function AppShell() {
     }
   }, [location.pathname, location.key, navigationType])
 
-  // Pure Android Hardware Back Button Polish
+  const pathnameRef = useRef(location.pathname)
+  const localeRef = useRef(locale)
+  const navigateRef = useRef(navigate)
+
+  useEffect(() => {
+    pathnameRef.current = location.pathname
+    localeRef.current = locale
+    navigateRef.current = navigate
+  }, [location.pathname, locale, navigate])
+
+  // Pure Android Hardware Back Button Polish - Registered once without route listener churn
   useEffect(() => {
     const handleBackButton = async () => {
       // 1. Check LIFO overlay stack (modals, drawers, popovers, pickers)
@@ -102,9 +126,10 @@ function AppShell() {
       }
 
       // 2. Hierarchical parent route navigation if on a sub-route
-      const parentRoute = getParentRoute(location.pathname)
+      const currentPath = pathnameRef.current
+      const parentRoute = getParentRoute(currentPath)
       if (parentRoute) {
-        navigate(parentRoute)
+        navigateRef.current(parentRoute)
         return
       }
 
@@ -115,11 +140,12 @@ function AppShell() {
       } else {
         lastBackPressRef.current = now
         hapticImpact('light')
+        const currentLocale = localeRef.current
         window.dispatchEvent(
           new CustomEvent('ft-show-toast', {
             detail: {
-              title: locale === 'en' ? 'Exit App' : 'Keluar Aplikasi',
-              message: locale === 'en' ? 'Press back again to exit' : 'Tekan sekali lagi untuk keluar',
+              title: currentLocale === 'en' ? 'Exit App' : 'Keluar Aplikasi',
+              message: currentLocale === 'en' ? 'Press back again to exit' : 'Tekan sekali lagi untuk keluar',
               type: 'info',
             },
           }),
@@ -130,9 +156,9 @@ function AppShell() {
     const listenerPromise = App.addListener('backButton', handleBackButton)
 
     return () => {
-      listenerPromise.then((l) => l.remove())
+      listenerPromise.then((l) => l.remove?.())
     }
-  }, [location.pathname, navigate, locale])
+  }, [])
 
   // Native Status Bar Dynamic Color & Contrast Syncing
   useEffect(() => {
@@ -200,15 +226,20 @@ function AppShell() {
   }, [motionPreference, setReduceMotion])
 
   useEffect(() => {
+    prefetchCriticalRoutes()
+  }, [])
+
+  useEffect(() => {
     const runAutomation = async () => {
       try {
         await processRecurringTransactions()
         await notifyTodayEvents()
         await initNotificationChannels()
-        const { dailyReminderEnabled, dailyReminderTime } = useSettingsStore.getState()
+        const { dailyReminderEnabled, dailyReminderTime, defaultCurrency } = useSettingsStore.getState()
         if (dailyReminderEnabled) {
           await syncDailyReminderSchedule(true, dailyReminderTime)
         }
+        await syncNotificationQueue({ defaultCurrency })
       } catch {
         // automation failure should not block app rendering
       }
@@ -218,7 +249,11 @@ function AppShell() {
 
   useEffect(() => {
     const unregister = registerNotificationTapListener((route) => {
-      if (route) navigate(route)
+      if (route === 'fintrack://quick-add' || route === '/quick-add') {
+        useTransactionStore.getState().openQuickAdd()
+      } else if (route) {
+        navigate(route)
+      }
     })
     return () => {
       if (typeof unregister === 'function') unregister()
@@ -264,6 +299,7 @@ function AppShell() {
         backgroundTimeRef.current = Date.now()
       } else {
         checkAndLock()
+        syncNotificationQueue({ defaultCurrency: useSettingsStore.getState().defaultCurrency }).catch(() => {})
       }
     }
 
@@ -275,6 +311,90 @@ function AppShell() {
       appListenerPromise.then((l) => l.remove?.())
     }
   }, [securityEnabled, autoLockTimeout, lock])
+
+  // Ensure native and web Firebase SDK authentication sessions are aligned on startup
+  useEffect(() => {
+    ensureFirebaseAuthSynced().catch(() => {})
+  }, [])
+
+  // Auto-sync cloud backup when app transitions to background for authenticated users
+  useEffect(() => {
+    let isBackingUp = false
+
+    // Scrub legacy plaintext backup caches from localStorage
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const keysToScrub = []
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i)
+          if (key && (key.startsWith('ft_cloud_backup_cache_') || key.startsWith('ft_user_backup_'))) {
+            keysToScrub.push(key)
+          }
+        }
+        keysToScrub.forEach((k) => window.localStorage.removeItem(k))
+      }
+    } catch {
+      /* ignore storage scrub error */
+    }
+
+    const handleBackgroundBackup = async () => {
+      const state = useSettingsStore.getState()
+      if (!state.authUserId || state.authProvider === 'guest' || isBackingUp) return
+
+      try {
+        isBackingUp = true
+        const backup = await exportAllDataAsJson().catch(() => null)
+        if (!backup) return
+
+        const hasData =
+          (backup.transactions && backup.transactions.length > 0) ||
+          (backup.wallets && backup.wallets.length > 0)
+        if (!hasData) return
+
+        const e2eePhrase = typeof window !== 'undefined' ? window.localStorage.getItem('fintrack_e2ee_phrase') : null
+        const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
+
+        if (!isE2eeActive) {
+          // Never upload unencrypted data to cloud storage in background auto-backup
+          return
+        }
+
+        let uploadPayload
+        try {
+          uploadPayload = await exportAllDataAsEncryptedEnvelope(e2eePhrase.trim())
+        } catch (err) {
+          console.error('Failed to encrypt backup envelope for E2EE cloud backup, aborting upload to protect privacy:', err)
+          return
+        }
+
+        await uploadLatestBackup(state.authUserId, uploadPayload, { isEncrypted: true })
+      } catch {
+        /* ignore background sync network error */
+      } finally {
+        isBackingUp = false
+      }
+    }
+
+    const handleAppStateChange = (state) => {
+      if (!state.isActive) {
+        handleBackgroundBackup().catch(() => {})
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleBackgroundBackup().catch(() => {})
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    const appListenerPromise = App.addListener('appStateChange', handleAppStateChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      appListenerPromise.then((l) => l.remove?.())
+    }
+  }, [])
 
   const hasCompletedOnboarding = useSettingsStore((state) => state.hasCompletedOnboarding)
 
@@ -298,7 +418,17 @@ function AppShell() {
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
         {location.pathname === '/ai-chat' || location.pathname === '/chat' || location.pathname === '/ai-finance' ? (
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+                <div className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+              </div>
+            }
+          >
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </Suspense>
         ) : (
           <main
             className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
@@ -313,7 +443,17 @@ function AppShell() {
             }`}
           >
             <div key={location.pathname} className="ft-page-transition">
-              <Outlet />
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+                    <div className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+                  </div>
+                }
+              >
+                <ErrorBoundary>
+                  <Outlet />
+                </ErrorBoundary>
+              </Suspense>
             </div>
           </main>
         )}
@@ -332,6 +472,11 @@ function AppShell() {
       <AiQuickLogModal />
 
       <InAppNotificationToast />
+      <QuickAddTransactionModal
+        nonce={quickAddNonce}
+        isOpen={isQuickAddOpen}
+        onClose={closeQuickAdd}
+      />
     </div>
   )
 }

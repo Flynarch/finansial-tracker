@@ -3,19 +3,19 @@ import CategoryIcon from '../../ui/CategoryIcon'
 import Button from '../../ui/Button'
 import { getCategoryToneClass } from '../../../lib/categoryIcon'
 import useTranslation from '../../../hooks/useTranslation'
+import useBackButton from '../../../hooks/useBackButton'
 import { triggerHaptic } from '../../../lib/haptics'
 import {
   addExpenseParentCategory,
   addExpenseSubcategory,
-  removeExpenseSubcategory,
   setExpenseCategoryColor,
 } from '../../../lib/expenseCategories'
 import {
   addIncomeParentCategory,
   addIncomeSubcategory,
-  removeIncomeSubcategory,
   setIncomeCategoryColor,
 } from '../../../lib/incomeCategories'
+import { cascadeDeleteSubcategory } from '../../../lib/categoryCleanup'
 
 const COLOR_TONES = ['amber', 'emerald', 'sky', 'indigo', 'purple', 'rose', 'teal', 'slate', 'orange', 'pink', 'yellow']
 
@@ -44,6 +44,8 @@ export default function CategorySheet({
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
 
+  useBackButton(onClose, Boolean(isOpen))
+
   if (!isOpen) return null
 
   const activeParent = activeTree?.find((p) => p.id === activeParentId)
@@ -64,9 +66,8 @@ export default function CategorySheet({
     onCategoryCustomChanged?.()
   }
 
-  const handleRemoveSub = (parentId, childId) => {
-    if (txType === 'expense') removeExpenseSubcategory(parentId, childId)
-    else removeIncomeSubcategory(parentId, childId)
+  const handleRemoveSub = async (parentId, childId) => {
+    await cascadeDeleteSubcategory(parentId, childId, txType)
     onCategoryCustomChanged?.()
   }
 

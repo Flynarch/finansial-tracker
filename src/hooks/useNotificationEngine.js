@@ -23,11 +23,20 @@ export default function useNotificationEngine() {
       const locale = useSettingsStore.getState().locale || 'id'
       const isEn = locale === 'en'
 
+      const isCreatedToday = (createdVal) => {
+        if (!createdVal) return false
+        try {
+          return format(new Date(createdVal), 'yyyy-MM-dd') === todayStr
+        } catch {
+          return false
+        }
+      }
+
       if (todos) {
         for (const todo of todos) {
           if (todo.reminderTime === currentTimeStr && todo.dueDate === todayStr) {
             const existing = await db.notifications
-              .filter(n => n.relatedId === `todo_${todo.id}` && n.createdAt.startsWith(todayStr))
+              .filter(n => n.relatedId === `todo_${todo.id}` && isCreatedToday(n.createdAt))
               .toArray()
             
             if (existing.length === 0) {
@@ -52,7 +61,8 @@ export default function useNotificationEngine() {
                       body: message,
                       extra: { route: `/todos/${todo.id}` },
                       schedule: { at: new Date(Date.now() + 500) },
-                      smallIcon: 'ic_stat_icon_config_sample',
+                      smallIcon: 'ic_stat_fintrack',
+                      iconColor: '#10b981',
                     }
                   ]
                 }).catch(() => {})
@@ -72,7 +82,7 @@ export default function useNotificationEngine() {
             const log = await db.habitLogs.where({ habitId: habit.id, date: todayStr }).first()
             if (!log) {
               const existing = await db.notifications
-                .filter(n => n.relatedId === `habit_${habit.id}` && n.createdAt.startsWith(todayStr))
+                .filter(n => n.relatedId === `habit_${habit.id}` && isCreatedToday(n.createdAt))
                 .toArray()
                 
               if (existing.length === 0) {
@@ -97,7 +107,8 @@ export default function useNotificationEngine() {
                         body: message,
                         extra: { route: '/todos' },
                         schedule: { at: new Date(Date.now() + 500) },
-                        smallIcon: 'ic_stat_icon_config_sample',
+                        smallIcon: 'ic_stat_fintrack',
+                        iconColor: '#10b981',
                       }
                     ]
                   }).catch(() => {})

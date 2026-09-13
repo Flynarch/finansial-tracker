@@ -40,12 +40,14 @@ export default function useBottomSheet(configOrState = false) {
     setIsClosingControlled(false)
   }
 
-  // Clear timeout when controlled state changes
+  // Clear timeout only when controlled state transitions from closed to open
+  const wasOpenRef = useRef(Boolean(controlledIsOpen))
   useEffect(() => {
-    if (controlledIsOpen && closeTimeoutRef.current) {
+    if (controlledIsOpen && !wasOpenRef.current && closeTimeoutRef.current) {
       window.clearTimeout(closeTimeoutRef.current)
       closeTimeoutRef.current = null
     }
+    wasOpenRef.current = Boolean(controlledIsOpen)
   }, [controlledIsOpen])
 
   // Clean up timeout on unmount

@@ -1,78 +1,459 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Fingerprint,
   AlertCircle,
-  Smartphone,
+  Delete,
+  CheckCircle2,
+  Lock,
+  Grid3X3,
 } from 'lucide-react'
 import { authenticateBiometric } from '../../lib/biometric'
+import { triggerHaptic } from '../../lib/haptics'
+import { verifyPin } from '../../lib/crypto'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
+
+const PATTERN_DOTS = [
+  { id: 0, x: 45, y: 45 },
+  { id: 1, x: 125, y: 45 },
+  { id: 2, x: 205, y: 45 },
+  { id: 3, x: 45, y: 125 },
+  { id: 4, x: 125, y: 125 },
+  { id: 5, x: 205, y: 125 },
+  { id: 6, x: 45, y: 205 },
+  { id: 7, x: 125, y: 205 },
+  { id: 8, x: 205, y: 205 },
+]
 
 function LockScreen({ onUnlock }) {
   const { t } = useTranslation()
+  const securityMethod = useSettingsStore((s) => s.securityMethod || 'biometric')
+  const lockSecret = useSettingsStore((s) => s.lockSecret || '')
+  const biometricEnabled = useSettingsStore((s) => s.biometricEnabled !== false)
 
   const [error, setError] = useState('')
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [isSuccessUnlocked, setIsSuccessUnlocked] = useState(false)
 
+  // PIN state
+  const [pinInput, setPinInput] = useState('')
+  const [isShaking, setIsShaking] = useState(false)
+  const [isBioFilling, setIsBioFilling] = useState(false)
+  const [bioFillCount, setBioFillCount] = useState(0)
+
+  // Pattern state
+  const [patternPath, setPatternPath] = useState([])
+  const [isDrawingPattern, setIsDrawingPattern] = useState(false)
+  const [cursorPos, setCursorPos] = useState(null)
+  const patternSvgRef = useRef(null)
+
+  // Biometric Unlock with cascading wave animation
   const handleBiometricUnlock = useCallback(async () => {
+    if (isAuthenticating || isSuccessUnlocked || isBioFilling) return
     setIsAuthenticating(true)
     setError('')
-    const success = await authenticateBiometric()
-    setIsAuthenticating(false)
-    if (success) {
-      onUnlock()
-      return
+    try {
+      const success = await authenticateBiometric()
+      if (success) {
+        triggerHaptic('success')
+        if (securityMethod === 'pin') {
+          // Play sequential pin dot fill animation as requested
+          setIsBioFilling(true)
+          setBioFillCount(1)
+          setTimeout(() => setBioFillCount(2), 70)
+          setTimeout(() => setBioFillCount(3), 140)
+          setTimeout(() => {
+            setBioFillCount(4)
+            setIsSuccessUnlocked(true)
+          }, 210)
+          setTimeout(() => {
+            onUnlock()
+          }, 450)
+        } else if (securityMethod === 'pattern' && lockSecret && !lockSecret.includes('$') && lockSecret.length <= 17) {
+          const rawNodes = lockSecret.split('-').map(Number)
+          if (rawNodes.length > 0 && rawNodes.every((n) => Number.isInteger(n) && n >= 0 && n <= 8)) {
+            let idx = 1
+            setPatternPath([rawNodes[0]])
+            const interval = setInterval(() => {
+              if (idx < rawNodes.length) {
+                setPatternPath(rawNodes.slice(0, idx + 1))
+                idx++
+              } else {
+                clearInterval(interval)
+                setIsSuccessUnlocked(true)
+                setTimeout(() => onUnlock(), 350)
+              }
+            }, 70)
+          } else {
+            setIsSuccessUnlocked(true)
+            setTimeout(() => onUnlock(), 300)
+          }
+        } else {
+          setIsSuccessUnlocked(true)
+          setTimeout(() => onUnlock(), 300)
+        }
+        return
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setIsAuthenticating(false)
     }
-    setError(t('lock.biometricFailed', 'Verifikasi sidik jari / sandi HP dibatalkan atau gagal.'))
-  }, [onUnlock, t])
+  }, [isAuthenticating, isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock])
 
-  // Automatically prompt native biometric/device passcode on mount
+  // Automatically prompt native biometric/device passcode on mount if biometric enabled
   useEffect(() => {
+    if (!biometricEnabled) return
     const timer = setTimeout(() => {
       handleBiometricUnlock()
-    }, 200)
+    }, 280)
     return () => clearTimeout(timer)
-  }, [handleBiometricUnlock])
+  }, [biometricEnabled, handleBiometricUnlock])
+
+  // Handle PIN digit input
+  const handlePinDigit = async (digit) => {
+    if (isBioFilling || isSuccessUnlocked) return
+    triggerHaptic('light')
+    setError('')
+
+    const nextPin = pinInput + digit
+    setPinInput(nextPin)
+
+    if (nextPin.length === 4) {
+      const isMatch = await verifyPin(nextPin, lockSecret)
+      if (isMatch) {
+        triggerHaptic('success')
+        setIsSuccessUnlocked(true)
+        setTimeout(() => {
+          onUnlock()
+        }, 300)
+      } else {
+        triggerHaptic('warning')
+        setIsShaking(true)
+        setError(t('lock.incorrectPin', 'PIN salah'))
+        setTimeout(() => {
+          setPinInput('')
+          setIsShaking(false)
+        }, 600)
+      }
+    }
+  }
+
+  const handlePinDelete = () => {
+    if (isBioFilling || isSuccessUnlocked) return
+    triggerHaptic('selection')
+    setError('')
+    setPinInput((prev) => prev.slice(0, -1))
+  }
+
+  // Handle Pattern Input
+  const getSvgPoint = (e) => {
+    if (!patternSvgRef.current) return null
+    const rect = patternSvgRef.current.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const x = ((clientX - rect.left) / rect.width) * 250
+    const y = ((clientY - rect.top) / rect.height) * 250
+    return { x, y }
+  }
+
+  const findNearbyDot = (pt) => {
+    if (!pt) return null
+    const threshold = 32
+    return PATTERN_DOTS.find((d) => Math.hypot(d.x - pt.x, d.y - pt.y) < threshold) || null
+  }
+
+  const handlePatternStart = (e) => {
+    if (isSuccessUnlocked) return
+    setError('')
+    const pt = getSvgPoint(e)
+    if (!pt) return
+    setIsDrawingPattern(true)
+    const dot = findNearbyDot(pt)
+    if (dot) {
+      triggerHaptic('light')
+      setPatternPath([dot.id])
+    } else {
+      setPatternPath([])
+    }
+    setCursorPos(pt)
+  }
+
+  const handlePatternMove = (e) => {
+    if (!isDrawingPattern || isSuccessUnlocked) return
+    const pt = getSvgPoint(e)
+    if (!pt) return
+    setCursorPos(pt)
+
+    const dot = findNearbyDot(pt)
+    if (dot && !patternPath.includes(dot.id)) {
+      triggerHaptic('selection')
+      setPatternPath((prev) => [...prev, dot.id])
+    }
+  }
+
+  const handlePatternEnd = async () => {
+    if (!isDrawingPattern || isSuccessUnlocked) return
+    setIsDrawingPattern(false)
+    setCursorPos(null)
+
+    if (patternPath.length === 0) return
+
+    const drawnStr = patternPath.join('-')
+    const isMatch = !lockSecret || (await verifyPin(drawnStr, lockSecret))
+    if (isMatch) {
+      triggerHaptic('success')
+      setIsSuccessUnlocked(true)
+      setTimeout(() => onUnlock(), 300)
+    } else {
+      triggerHaptic('warning')
+      setIsShaking(true)
+      setError(t('lock.incorrectPattern', 'Pola salah'))
+      setTimeout(() => {
+        setPatternPath([])
+        setIsShaking(false)
+      }, 600)
+    }
+  }
+
+  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'del']
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--bg)]/95 px-4 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--bg)]/95 px-4 backdrop-blur-md select-none animate-fadeIn">
       <div className="w-full max-w-xs flex flex-col items-center text-center">
-        {/* Fingerprint / Security Icon */}
-        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-[var(--field-bg)] text-[var(--fg)] border border-[var(--border)] mb-4 shadow-card">
-          <Fingerprint className="h-8 w-8" />
+        {/* Lock Header Icon */}
+        <div className={`grid h-16 w-16 place-items-center rounded-3xl border transition-all duration-300 shadow-card mb-3 ${
+          isSuccessUnlocked
+            ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 scale-105'
+            : 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border)]'
+        }`}>
+          {isSuccessUnlocked ? (
+            <CheckCircle2 className="h-8 w-8 text-emerald-500 animate-in zoom-in-75" />
+          ) : securityMethod === 'pattern' ? (
+            <Grid3X3 className="h-7 w-7 text-[var(--lock)]" />
+          ) : securityMethod === 'pin' ? (
+            <Lock className="h-7 w-7 text-[var(--lock)]" />
+          ) : (
+            <Fingerprint className="h-8 w-8 text-[var(--lock)]" />
+          )}
         </div>
 
         <h2 className="text-base font-black tracking-tight text-[var(--fg)]">
-          {t('lock.title', 'FinTrack Terkunci')}
+          {isSuccessUnlocked ? t('lock.unlocked', 'Terbuka') : t('lock.title', 'FinTrack Terkunci')}
         </h2>
-        <p className="mt-1 text-xs font-medium text-[var(--muted)]">
-          {t('lock.desc', 'Verifikasi sidik jari, Face ID, atau sandi HP untuk membuka')}
+        <p className="mt-0.5 text-xs font-medium text-[var(--muted)]">
+          {securityMethod === 'pattern'
+            ? t('lock.drawPatternDesc', 'Gambar pola untuk membuka')
+            : securityMethod === 'pin'
+            ? t('lock.enterPinDesc', 'Masukkan 4 digit PIN Anda')
+            : t('lock.desc', 'Verifikasi sidik jari, Face ID, atau sandi HP')}
         </p>
 
         {/* Error Alert */}
         {error ? (
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-bold text-rose-500 animate-fadeIn">
+          <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-bold text-rose-500 animate-fadeIn">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{error}</span>
           </p>
         ) : (
-          <div className="h-4 mt-3" />
+          <div className="h-4 mt-2" />
         )}
 
-        {/* Primary Action Button */}
-        <div className="mt-5 w-full">
-          <button
-            type="button"
-            onClick={handleBiometricUnlock}
-            className="flex items-center justify-center gap-2 w-full rounded-xl bg-[var(--fg)] py-3.5 px-4 text-xs font-extrabold text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer"
-          >
-            <Smartphone className="h-4 w-4" />
-            <span>
-              {isAuthenticating
-                ? t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
-                : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
-            </span>
-          </button>
-        </div>
+        {/* ── MODE 1: PIN LOCK ── */}
+        {securityMethod === 'pin' && (
+          <div className="w-full flex flex-col items-center mt-2 space-y-4">
+            {/* PIN Dots with Shake and Success Wave */}
+            <div
+              className={`flex items-center gap-4 transition-transform duration-150 ${
+                isShaking ? 'translate-x-1 animate-bounce' : ''
+              }`}
+            >
+              {[0, 1, 2, 3].map((i) => {
+                const isFilled = isBioFilling ? bioFillCount > i : pinInput.length > i
+                return (
+                  <div
+                    key={i}
+                    className={`h-4 w-4 rounded-full border transition-all duration-200 ${
+                      isSuccessUnlocked
+                        ? 'bg-emerald-500 border-emerald-500 scale-125 shadow-sm'
+                        : isFilled
+                        ? 'bg-[var(--lock)] border-[var(--lock)] scale-110 shadow-xs'
+                        : 'border-[var(--border-strong)] bg-[var(--field-bg)]'
+                    }`}
+                  />
+                )
+              })}
+            </div>
+
+            {/* Numeric Keypad */}
+            <div className="grid grid-cols-3 gap-3 w-full max-w-[250px] pt-2">
+              {digits.map((item, idx) => {
+                if (item === 'bio') {
+                  if (!biometricEnabled) return <div key={idx} className="h-14 w-14" />
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={handleBiometricUnlock}
+                      disabled={isAuthenticating || isSuccessUnlocked || isBioFilling}
+                      className="h-14 w-14 rounded-2xl flex items-center justify-center text-[var(--lock)] hover:bg-[var(--lock-soft)] border border-transparent hover:border-[var(--lock)]/25 transition active:scale-90 cursor-pointer mx-auto"
+                      aria-label={t('settings.biometricAuth', 'Verifikasi Biometrik')}
+                    >
+                      <Fingerprint className="h-6 w-6" />
+                    </button>
+                  )
+                }
+                if (item === 'del') {
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={handlePinDelete}
+                      disabled={pinInput.length === 0 || isBioFilling || isSuccessUnlocked}
+                      className="h-14 w-14 rounded-2xl flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-90 cursor-pointer disabled:opacity-30 disabled:pointer-events-none mx-auto"
+                      aria-label={t('common.delete', 'Hapus')}
+                    >
+                      <Delete className="h-5 w-5" />
+                    </button>
+                  )
+                }
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handlePinDigit(item)}
+                    disabled={isBioFilling || isSuccessUnlocked}
+                    className="h-14 w-14 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 text-[var(--fg)] text-xl font-black transition-all hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)] active:scale-90 active:bg-[var(--lock-soft)] active:text-[var(--lock)] cursor-pointer shadow-2xs mx-auto flex items-center justify-center"
+                  >
+                    {item}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── MODE 2: PATTERN LOCK ── */}
+        {securityMethod === 'pattern' && (
+          <div className="w-full flex flex-col items-center mt-2 space-y-3">
+            <div
+              className={`relative touch-none rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/60 p-2 shadow-inner transition-transform duration-150 ${
+                isShaking ? 'translate-x-1 animate-bounce' : ''
+              }`}
+            >
+              <svg
+                ref={patternSvgRef}
+                viewBox="0 0 250 250"
+                className="h-56 w-56 touch-none cursor-crosshair"
+                onMouseDown={handlePatternStart}
+                onMouseMove={handlePatternMove}
+                onMouseUp={handlePatternEnd}
+                onTouchStart={handlePatternStart}
+                onTouchMove={handlePatternMove}
+                onTouchEnd={handlePatternEnd}
+              >
+                {/* Connecting lines */}
+                {patternPath.map((dotId, index) => {
+                  if (index === patternPath.length - 1) return null
+                  const nextId = patternPath[index + 1]
+                  const p1 = PATTERN_DOTS[dotId]
+                  const p2 = PATTERN_DOTS[nextId]
+                  return (
+                    <line
+                      key={`line-${index}`}
+                      x1={p1.x}
+                      y1={p1.y}
+                      x2={p2.x}
+                      y2={p2.y}
+                      stroke={isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)'}
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  )
+                })}
+
+                {/* Active tracking line */}
+                {isDrawingPattern && cursorPos && patternPath.length > 0 && (
+                  <line
+                    x1={PATTERN_DOTS[patternPath[patternPath.length - 1]].x}
+                    y1={PATTERN_DOTS[patternPath[patternPath.length - 1]].y}
+                    x2={cursorPos.x}
+                    y2={cursorPos.y}
+                    stroke="var(--lock)"
+                    strokeWidth="3"
+                    strokeDasharray="4,4"
+                    strokeLinecap="round"
+                    opacity="0.8"
+                  />
+                )}
+
+                {/* Nodes */}
+                {PATTERN_DOTS.map((dot) => {
+                  const isSelected = patternPath.includes(dot.id)
+                  return (
+                    <g key={dot.id}>
+                      {isSelected && (
+                        <circle
+                          cx={dot.x}
+                          cy={dot.y}
+                          r="18"
+                          fill={isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)'}
+                          fillOpacity="0.2"
+                        />
+                      )}
+                      <circle
+                        cx={dot.x}
+                        cy={dot.y}
+                        r="10"
+                        fill="var(--field-bg)"
+                        stroke={isSelected ? (isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)') : 'var(--border-strong)'}
+                        strokeWidth={isSelected ? '3' : '2'}
+                      />
+                      <circle
+                        cx={dot.x}
+                        cy={dot.y}
+                        r="4"
+                        fill={isSelected ? (isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)') : 'var(--muted)'}
+                      />
+                    </g>
+                  )
+                })}
+              </svg>
+            </div>
+
+            {/* Pattern Biometric Trigger Button */}
+            {biometricEnabled && (
+              <button
+                type="button"
+                onClick={handleBiometricUnlock}
+                disabled={isAuthenticating || isSuccessUnlocked}
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-4 text-xs font-bold text-[var(--fg)] shadow-2xs hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
+              >
+                <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
+                <span>{t('lock.unlockBio', 'Buka dengan Sidik Jari')}</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── MODE 3: BIOMETRIC ONLY ── */}
+        {securityMethod === 'biometric' && (
+          <div className="mt-4 w-full">
+            <button
+              type="button"
+              onClick={handleBiometricUnlock}
+              disabled={isAuthenticating || isSuccessUnlocked}
+              className="flex items-center justify-center gap-2 w-full rounded-2xl bg-[var(--fg)] py-4 px-4 text-xs font-extrabold text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer disabled:opacity-60"
+            >
+              <Fingerprint className="h-5 w-5" />
+              <span>
+                {isAuthenticating
+                  ? t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
+                  : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

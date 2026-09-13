@@ -13,18 +13,20 @@ import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
-import { db, computeAllWalletBalances } from '../../lib/db'
+import CategoryIcon from '../ui/CategoryIcon'
+import { db } from '../../lib/db'
+import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { createTransaction } from '../../services/transactionService'
 import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 
 const QUICK_SPLIT_CATEGORIES = [
-  { key: 'makanan/restoran', label: 'Makanan & Resto' },
-  { key: 'belanja/kebutuhan_harian', label: 'Belanja' },
-  { key: 'hiburan/rekreasi', label: 'Hiburan' },
-  { key: 'transportasi/bahan_bakar', label: 'Transport' },
-  { key: 'lainnya/lainnya', label: 'Lainnya' },
+  { key: 'makanan/makan_diluar', label: 'Makanan & Resto', icon: 'food', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' },
+  { key: 'kebutuhan_harian/belanja_bulanan', label: 'Belanja', icon: 'shopping', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
+  { key: 'kultur/games', label: 'Hiburan', icon: 'entertainment', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
+  { key: 'transportasi/bensin', label: 'Transport', icon: 'transport', color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30' },
+  { key: 'lainnya_kategori/umum', label: 'Lainnya', icon: 'other', color: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30' },
 ]
 
 export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
@@ -35,7 +37,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState(1) // 1: Info, 2: Participants, 3: Success Summary
   const [billTitle, setBillTitle] = useState('')
   const [billDate, setBillDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [category, setCategory] = useState('makanan/restoran')
+  const [category, setCategory] = useState('makanan/makan_diluar')
   const [totalAmountInput, setTotalAmountInput] = useState('')
   const [currency, setCurrency] = useState(defaultCurrency)
   const [walletId, setWalletId] = useState(defaultWalletId || '')
@@ -50,11 +52,15 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     { id: '2', name: 'Teman 2', amount: '', isPayer: false },
   ])
 
-  const rawWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
-  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [], [])
-  const wallets = useMemo(() => {
-    return computeAllWalletBalances(rawWallets || [], allTransactions || [])
-  }, [rawWallets, allTransactions])
+  const wallets = useLiveQuery(
+    async () => {
+      const raw = await db.wallets.toArray()
+      if (!raw || raw.length === 0) return []
+      return await getAllWalletBalances(raw)
+    },
+    [],
+    []
+  )
 
   const selectedWallet = useMemo(() => {
     if (walletId) {
@@ -181,27 +187,47 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
       const splitBillId = `SPLIT-${Date.now()}`
       const effectiveDate = billDate || format(new Date(), 'yyyy-MM-dd')
 
-      // 1. Record Master Expense Transaction
-      const masterTxId = await createTransaction({
-        date: effectiveDate,
-        amount: parsedTotal,
-        type: 'expense',
-        category: category || 'makanan/restoran',
-        notes: `Split Bill: ${billTitle}`,
-        currency: activeCurrency,
-        walletId: Number(activeWalletId),
-        isSplit: true,
-        splitItems: participants.map((p) => ({
-          category: category || 'makanan/restoran',
-          amount: p.isPayer
-            ? (splitMode === 'equal' ? payerShareEqual : parseMoneyInput(p.amount, activeCurrency))
-            : (splitMode === 'equal' ? friendShareEqual : parseMoneyInput(p.amount, activeCurrency)),
-          notes: p.name,
-        })),
-        tags: ['patungan', 'splitbill'],
-      })
+      const payer = participants.find((p) => p.isPayer) || participants[0]
+      const userShare = splitMode === 'equal'
+        ? payerShareEqual
+        : parseMoneyInput(payer?.amount || 0, activeCurrency)
+      const friendsShare = parsedTotal - userShare
 
-      // 2. Create Receivable Loans for each non-payer participant
+      // 1. Record User's Personal Share as Operational Expense Transaction (affecting analytics & budget)
+      let personalTxId = null
+      if (userShare > 0) {
+        personalTxId = await createTransaction({
+          date: effectiveDate,
+          amount: userShare,
+          type: 'expense',
+          category: category || 'makanan/makan_diluar',
+          notes: `Split Bill (Porsi Saya): ${billTitle}`,
+          currency: activeCurrency,
+          walletId: Number(activeWalletId),
+          tags: ['patungan', 'splitbill'],
+        })
+      }
+
+      // 2. Record Friends' Portion as Non-Analytic Loan Disbursement Transaction
+      let friendsTxId = null
+      if (friendsShare > 0) {
+        friendsTxId = await createTransaction({
+          date: effectiveDate,
+          amount: friendsShare,
+          type: 'expense',
+          category: 'Pinjaman Diberikan',
+          isExcludeAnalyticsTx: true,
+          excludeFromAnalytics: true,
+          isExcludeFromAnalytics: true,
+          splitBillId,
+          notes: `Split Bill (Talangan Teman): ${billTitle}`,
+          currency: activeCurrency,
+          walletId: Number(activeWalletId),
+          tags: ['patungan', 'splitbill', 'exclude_analytics'],
+        })
+      }
+
+      // 3. Create Receivable Loans for each non-payer participant
       const receivablesCreated = []
       for (let i = 0; i < participants.length; i++) {
         const p = participants[i]
@@ -219,7 +245,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
             status: 'active',
             notes: `Auto-generated from Split Bill (${billTitle})`,
             walletId: Number(activeWalletId),
-            initialTransactionId: masterTxId,
+            initialTransactionId: friendsTxId || personalTxId,
             splitBillId,
             createdAt: Date.now(),
           })
@@ -255,7 +281,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     setStep(1)
     setBillTitle('')
     setBillDate(format(new Date(), 'yyyy-MM-dd'))
-    setCategory('makanan/restoran')
+    setCategory('makanan/makan_diluar')
     setTotalAmountInput('')
     setCreatedSummary(null)
     setErrorMsg('')
@@ -275,7 +301,16 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
         onClose?.()
       }}
     >
-      {errorMsg ? <ToastBanner message={errorMsg} /> : null}
+      {/* Zero Layout Shift Error Container */}
+      <div
+        className={`grid transition-all duration-200 ease-out overflow-hidden ${
+          errorMsg ? 'grid-rows-[1fr] opacity-100 mb-3' : 'grid-rows-[0fr] opacity-0 mb-0'
+        }`}
+      >
+        <div className="min-h-0">
+          {errorMsg ? <ToastBanner message={errorMsg} /> : null}
+        </div>
+      </div>
 
       {step === 1 && (
         <div className="space-y-4 pt-1">
@@ -311,12 +346,12 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Category Quick Selector */}
+          {/* Category Quick Selector with Icons and Color Accents */}
           <div>
             <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1.5 block">
               {t('settings.category', 'Kategori')}
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {QUICK_SPLIT_CATEGORIES.map((cat) => {
                 const isActive = category === cat.key
                 return (
@@ -324,13 +359,16 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
                     key={cat.key}
                     type="button"
                     onClick={() => setCategory(cat.key)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                       isActive
-                        ? 'bg-[var(--accent)] text-white shadow-xs'
-                        : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]'
+                        ? 'bg-[var(--panel-strong)] border-2 border-[var(--accent)] text-[var(--fg)] shadow-xs ring-2 ring-[var(--accent)]/20'
+                        : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)]'
                     }`}
                   >
-                    {cat.label}
+                    <div className={`grid h-5 w-5 place-items-center rounded-lg border ${cat.color} shrink-0`}>
+                      <CategoryIcon icon={cat.icon} className="h-3 w-3" />
+                    </div>
+                    <span>{cat.label}</span>
                   </button>
                 )
               })}

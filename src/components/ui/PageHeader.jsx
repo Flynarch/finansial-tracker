@@ -12,15 +12,15 @@ export default function PageHeader({
 }) {
   if (titlePosition === 'left') {
     return (
-      <header className={`flex items-start gap-3 mb-4 ${className}`}>
+      <header className={`flex ${subtitle ? 'items-start' : 'items-center'} gap-3 mb-4 ${className}`}>
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 mt-0.5"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
             aria-label={backAriaLabel}
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={20} strokeWidth={2.2} />
           </button>
         )}
         <div className="flex-1 min-w-0">
@@ -44,7 +44,7 @@ export default function PageHeader({
         <button
           type="button"
           onClick={onBack}
-          className="relative z-10 flex items-center justify-center w-9 h-9 -ml-1 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95 shrink-0"
+          className="relative z-10 flex items-center justify-center w-9 h-9 -ml-1 rounded-full text-[var(--fg)] hover:bg-[var(--fg)]/10 transition active:scale-95 shrink-0 cursor-pointer"
           aria-label={backAriaLabel}
         >
           <ChevronLeft size={22} strokeWidth={2.5} />

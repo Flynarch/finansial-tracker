@@ -45,7 +45,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Total Saldo"
+        android:text="Kekayaan Bersih"
         android:textColor="#9CA3AF"
         android:textSize="10sp"
         android:textStyle="bold" />
@@ -59,6 +59,17 @@
         android:textColor="#F3F4F6"
         android:textSize="20sp"
         android:textStyle="bold" />
+
+    <!-- Sparkline Trend Chart -->
+    <ImageView
+        android:id="@+id/widget_sparkline"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        android:contentDescription="Tren Kekayaan Bersih" />
 
     <!-- Bottom Stat & Action Row -->
     <LinearLayout
@@ -104,7 +115,7 @@
             android:paddingTop="6dp"
             android:paddingEnd="12dp"
             android:paddingBottom="6dp"
-            android:text="+ Transaksi"
+            android:text="+ Catat"
             android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:textStyle="bold" />

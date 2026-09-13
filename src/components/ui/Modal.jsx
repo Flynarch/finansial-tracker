@@ -9,18 +9,29 @@ function Modal({
   children,
   onClose,
   maxWidth = 'max-w-md',
+  maxHeight = 'max-h-[min(90dvh,44rem)]',
+  className = '',
   zIndex = 'z-50',
   showHeader = true,
   showCloseButton = true,
+  scrollable = true,
+  footer,
+  enableBackButton = true,
 }) {
-  const { isMounted, isVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { isMounted, isVisible, closeSheet } = useBottomSheet({
+    isOpen,
+    onClose,
+    useBackButton: enableBackButton,
+  })
   const { t } = useTranslation()
 
   // Handle escape key
   useEffect(() => {
     if (!isOpen) return undefined
     const handleEsc = (e) => {
-      if (e.key === 'Escape') closeSheet()
+      if (e.key === 'Escape') {
+        closeSheet()
+      }
     }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
@@ -36,14 +47,16 @@ function Modal({
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
       onTouchMove={(event) => event.target === event.currentTarget && event.preventDefault()}
       onClick={(e) => {
-        if (e.target === e.currentTarget) closeSheet()
+        if (e.target === e.currentTarget) {
+          closeSheet()
+        }
       }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
-        className={`w-full ${maxWidth} max-h-[min(90dvh,44rem)] overflow-y-auto overscroll-contain hide-scrollbar rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl transform-gpu`}
+        className={`flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu ${className}`}
         style={{
           boxShadow: 'var(--shadow-card)',
           transform: isVisible
@@ -51,16 +64,19 @@ function Modal({
             : 'translate3d(0, 100%, 0)',
           transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
         }}
-        onWheel={(event) => event.stopPropagation()}
-        onTouchMove={(event) => event.stopPropagation()}
       >
+        {/* ZONE 1: FIXED TOP HEADER */}
         {showHeader && (Boolean(title) || showCloseButton) && (
-          <div className="mb-3.5 flex items-center justify-between border-b border-[var(--border)]/60 pb-2.5">
+          <div className="shrink-0 px-4 sm:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 border-b border-[var(--border)]/60 flex items-center justify-between select-none">
             <h3 className="ft-display text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h3>
             {showCloseButton && (
               <button
                 type="button"
-                onClick={closeSheet}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  closeSheet()
+                  onClose?.()
+                }}
                 className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}
               >
@@ -72,7 +88,38 @@ function Modal({
             )}
           </div>
         )}
-        {children}
+
+        {/* ZONE 2: ADAPTIVE SCROLLABLE BODY */}
+        <div
+          className={`flex-1 min-h-0 px-4 sm:px-5 py-3.5 ${
+            footer ? '' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
+          } ${
+            scrollable ? 'overflow-y-auto overscroll-contain hide-scrollbar' : 'overflow-hidden overscroll-none'
+          }`}
+          onWheel={(event) => {
+            if (!scrollable) event.preventDefault()
+            else event.stopPropagation()
+          }}
+          onTouchMove={(event) => {
+            if (!scrollable) {
+              const tag = event.target?.tagName?.toLowerCase()
+              if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+                event.preventDefault()
+              }
+            } else {
+              event.stopPropagation()
+            }
+          }}
+        >
+          {children}
+        </div>
+
+        {/* ZONE 3: FIXED BOTTOM FOOTER (Optional) */}
+        {footer && (
+          <div className="shrink-0 px-4 sm:px-5 py-3 border-t border-[var(--border)]/60 bg-[var(--panel-strong)] pb-[max(1.25rem,calc(0.75rem+env(safe-area-inset-bottom)))]">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

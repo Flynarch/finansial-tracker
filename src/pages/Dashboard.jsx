@@ -43,6 +43,7 @@ export default function Dashboard() {
     currentMonthLabel,
     walletsWithBalance,
     totalWalletBalance,
+    netWorth,
     monthIncome,
     monthExpense,
     groupedRecentEntries,
@@ -88,13 +89,16 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
+    const points = Array.isArray(miniRevenueSeries) ? miniRevenueSeries.map((p) => Number(p.value) || 0) : []
     syncNativeWidgetData({
-      totalBalance: Number(totalWalletBalance) || 0,
+      totalBalance: Number(netWorth ?? totalWalletBalance) || 0,
       monthIncome: Number(monthIncome) || 0,
       monthExpense: Number(monthExpense) || 0,
       defaultCurrency: defaultCurrency || 'IDR',
+      period: currentMonthLabel || 'Bulan Ini',
+      sparklinePoints: points,
     })
-  }, [totalWalletBalance, monthIncome, monthExpense, defaultCurrency])
+  }, [netWorth, totalWalletBalance, monthIncome, monthExpense, defaultCurrency, currentMonthLabel, miniRevenueSeries])
 
   const closeZoom = useCallback(() => {
     if (zoomedChart === 'revenue') {

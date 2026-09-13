@@ -31,6 +31,10 @@
       "resize": "body",
       "style": "DARK",
       "resizeOnFullScreen": true
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_fintrack",
+      "iconColor": "#10b981"
     }
   }
 }

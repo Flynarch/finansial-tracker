@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import EmptyState from '../components/ui/EmptyState'
+import PageHeader from '../components/ui/PageHeader'
 import { Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -328,10 +329,12 @@ function TodoList() {
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
-        <header className="flex items-center justify-between px-1 min-h-[44px]">
-          <h1 className="ft-display text-2xl font-black tracking-tight text-[var(--fg)]">{t('todo.pageTitle')}</h1>
-          <div className="relative flex items-center min-h-[44px]">
-            {activeTab === 'todo' && (
+        <PageHeader
+          title={t('todo.pageTitle')}
+          titlePosition="left"
+          className="px-1 !mb-0"
+          rightAction={
+            activeTab === 'todo' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -342,11 +345,11 @@ function TodoList() {
                 aria-label={t('todo.add')}
               >
                 <Plus size={15} strokeWidth={3} />
-                <span>Tugas</span>
+                <span>{t('todo.addShort', 'Tugas')}</span>
               </button>
-            )}
-          </div>
-        </header>
+            ) : null
+          }
+        />
 
         {/* Segmented Control with Smooth Sliding Indicator */}
         <div className="relative grid grid-cols-2 rounded-[1rem] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] p-1 border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-inner select-none overflow-hidden">

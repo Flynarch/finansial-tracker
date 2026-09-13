@@ -7,38 +7,38 @@ import {
   CheckCircle2,
   FolderOpen,
   Plus,
-  X,
   Pencil,
   Sparkles,
   Search,
   Check,
   Palette,
 } from 'lucide-react'
-import { db } from '../../lib/db'
 import ConfirmDeleteModal from '../../components/ui/ConfirmDeleteModal'
 import Modal from '../../components/ui/Modal'
 import {
   getMergedExpenseTree,
   addExpenseParentCategory,
   updateExpenseCategoryName,
-  removeExpenseParentCategory,
   setExpenseCategoryColor,
   setExpenseCategoryIcon,
   addExpenseSubcategory,
-  removeExpenseSubcategory,
   resetExpenseCategoryCustomizations,
+  EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT,
 } from '../../lib/expenseCategories'
 import {
   getMergedIncomeTree,
   addIncomeParentCategory,
   updateIncomeCategoryName,
-  removeIncomeParentCategory,
   setIncomeCategoryColor,
   setIncomeCategoryIcon,
   addIncomeSubcategory,
-  removeIncomeSubcategory,
   resetIncomeCategoryCustomizations,
+  INCOME_CATEGORY_CUSTOM_CHANGED_EVENT,
 } from '../../lib/incomeCategories'
+import {
+  cascadeDeleteParentCategory,
+  cascadeDeleteSubcategory,
+} from '../../lib/categoryCleanup'
 import {
   resolveTransactionIconKey,
   autoDetectCategoryIcon,
@@ -55,12 +55,20 @@ import {
 
 const COLOR_TONES = [
   { id: 'emerald', bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/30', ring: 'ring-emerald-500', name: 'Hijau' },
-  { id: 'sky', bg: 'bg-sky-500/15', text: 'text-sky-600 dark:text-sky-400', border: 'border-sky-500/30', ring: 'ring-sky-500', name: 'Biru' },
+  { id: 'teal', bg: 'bg-teal-500/15', text: 'text-teal-600 dark:text-teal-400', border: 'border-teal-500/30', ring: 'ring-teal-500', name: 'Toska' },
+  { id: 'cyan', bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400', border: 'border-cyan-500/30', ring: 'ring-cyan-500', name: 'Sian' },
+  { id: 'sky', bg: 'bg-sky-500/15', text: 'text-sky-600 dark:text-sky-400', border: 'border-sky-500/30', ring: 'ring-sky-500', name: 'Langit' },
+  { id: 'blue', bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/30', ring: 'ring-blue-500', name: 'Biru' },
   { id: 'indigo', bg: 'bg-indigo-500/15', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/30', ring: 'ring-indigo-500', name: 'Indigo' },
+  { id: 'violet', bg: 'bg-violet-500/15', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-500/30', ring: 'ring-violet-500', name: 'Violet' },
   { id: 'purple', bg: 'bg-purple-500/15', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/30', ring: 'ring-purple-500', name: 'Ungu' },
+  { id: 'fuchsia', bg: 'bg-fuchsia-500/15', text: 'text-fuchsia-600 dark:text-fuchsia-400', border: 'border-fuchsia-500/30', ring: 'ring-fuchsia-500', name: 'Fuchsia' },
+  { id: 'pink', bg: 'bg-pink-500/15', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-500/30', ring: 'ring-pink-500', name: 'Merah Muda' },
   { id: 'rose', bg: 'bg-rose-500/15', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-500/30', ring: 'ring-rose-500', name: 'Mawar' },
   { id: 'amber', bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/30', ring: 'ring-amber-500', name: 'Emas' },
-  { id: 'teal', bg: 'bg-teal-500/15', text: 'text-teal-600 dark:text-teal-400', border: 'border-teal-500/30', ring: 'ring-teal-500', name: 'Toska' },
+  { id: 'orange', bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/30', ring: 'ring-orange-500', name: 'Oranye' },
+  { id: 'yellow', bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-500/30', ring: 'ring-yellow-500', name: 'Kuning' },
+  { id: 'lime', bg: 'bg-lime-500/15', text: 'text-lime-600 dark:text-lime-400', border: 'border-lime-500/30', ring: 'ring-lime-500', name: 'Limau' },
   { id: 'slate', bg: 'bg-slate-500/15', text: 'text-slate-600 dark:text-slate-400', border: 'border-slate-500/30', ring: 'ring-slate-500', name: 'Netral' },
 ]
 
@@ -111,11 +119,11 @@ export default function SettingsCategories() {
 
   useEffect(() => {
     const handleCustomChange = () => bumpVersion()
-    window.addEventListener('ft_expense_category_custom_changed', handleCustomChange)
-    window.addEventListener('ft_income_category_custom_changed', handleCustomChange)
+    window.addEventListener(EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT, handleCustomChange)
+    window.addEventListener(INCOME_CATEGORY_CUSTOM_CHANGED_EVENT, handleCustomChange)
     return () => {
-      window.removeEventListener('ft_expense_category_custom_changed', handleCustomChange)
-      window.removeEventListener('ft_income_category_custom_changed', handleCustomChange)
+      window.removeEventListener(EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT, handleCustomChange)
+      window.removeEventListener(INCOME_CATEGORY_CUSTOM_CHANGED_EVENT, handleCustomChange)
     }
   }, [bumpVersion])
 
@@ -178,7 +186,9 @@ export default function SettingsCategories() {
     setParentNameEn('')
     const defaultIcon = activeTab === 'income' ? 'income' : 'food'
     setParentIcon(defaultIcon)
-    setParentTone(activeTab === 'income' ? 'emerald' : 'sky')
+    const currentListLength = (activeTab === 'income' ? incomeTree.length : expenseTree.length) || 0
+    const nextTone = COLOR_TONES[currentListLength % COLOR_TONES.length]?.id || (activeTab === 'income' ? 'emerald' : 'indigo')
+    setParentTone(nextTone)
     setIsParentIconManuallySet(false)
     setAddParentModal(true)
   }
@@ -307,20 +317,7 @@ export default function SettingsCategories() {
   const handleConfirmDeleteSub = async () => {
     if (!deleteSubTarget) return
     const { parentId, childId } = deleteSubTarget
-    const targetPath = `${parentId}/${childId}`
-    const fallbackPath = `${parentId}/lainnya`
-
-    if (activeTab === 'expense') {
-      removeExpenseSubcategory(parentId, childId)
-    } else {
-      removeIncomeSubcategory(parentId, childId)
-    }
-
-    try {
-      await db.transactions.where('category').equals(targetPath).modify({ category: fallbackPath })
-    } catch {
-      // ignore
-    }
+    await cascadeDeleteSubcategory(parentId, childId, activeTab)
 
     bumpVersion()
     setDeleteSubTarget(null)
@@ -333,12 +330,7 @@ export default function SettingsCategories() {
   const handleConfirmDeleteParent = async () => {
     if (!deleteParentTarget) return
     const { parentId } = deleteParentTarget
-
-    if (activeTab === 'expense') {
-      removeExpenseParentCategory(parentId)
-    } else {
-      removeIncomeParentCategory(parentId)
-    }
+    await cascadeDeleteParentCategory(parentId, activeTab)
 
     bumpVersion()
     setDeleteParentTarget(null)
@@ -534,43 +526,16 @@ export default function SettingsCategories() {
                     {cat.children.map((sub) => {
                       const subName = sub.names?.[locale] || sub.names?.id || sub.id
                       return (
-                        <div
+                        <button
                           key={sub.id}
-                          className="group inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] pl-3 pr-1.5 py-1 text-xs font-semibold text-[var(--fg)] hover:border-[var(--border-strong)] transition-all shadow-2xs"
+                          type="button"
+                          onClick={() => openEditSub(cat.id, sub, catName)}
+                          className="group inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs"
+                          title={t('common.edit', 'Edit Subkategori')}
                         >
-                          <button
-                            type="button"
-                            onClick={() => openEditSub(cat.id, sub, catName)}
-                            className="cursor-pointer hover:underline truncate max-w-[140px] text-left"
-                            title={t('common.edit', 'Edit Subkategori')}
-                          >
-                            {subName}
-                          </button>
-                          <div className="flex items-center gap-0.5 ml-1">
-                            <button
-                              type="button"
-                              onClick={() => openEditSub(cat.id, sub, catName)}
-                              className="h-5 w-5 rounded-lg hover:bg-[var(--panel)] text-[var(--muted)] hover:text-[var(--fg)] grid place-items-center transition cursor-pointer"
-                              title={t('common.edit', 'Edit')}
-                            >
-                              <Pencil className="h-2.5 w-2.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDeleteSubTarget({
-                                  parentId: cat.id,
-                                  childId: sub.id,
-                                  childName: subName,
-                                })
-                              }
-                              className="h-5 w-5 rounded-lg hover:bg-rose-500/20 text-[var(--muted)] hover:text-rose-500 grid place-items-center transition cursor-pointer"
-                              title={t('settings.deleteSubcategory', 'Hapus')}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
+                          <span className="truncate max-w-[150px]">{subName}</span>
+                          <Pencil className="h-2.5 w-2.5 text-[var(--muted-2)] group-hover:text-[var(--accent)] transition-colors shrink-0" />
+                        </button>
                       )
                     })}
                   </div>
@@ -990,16 +955,6 @@ export default function SettingsCategories() {
                 </button>
               )
             })}
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setIconPickerOpen(false)}
-              className="w-full py-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] font-bold text-xs hover:bg-[var(--panel)] active:scale-[0.98] transition cursor-pointer"
-            >
-              {t('common.close', 'Tutup')}
-            </button>
           </div>
         </div>
       </Modal>

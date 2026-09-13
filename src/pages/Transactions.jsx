@@ -1,6 +1,6 @@
 import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -28,14 +28,27 @@ import {
 } from '../lib/utils'
 
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import PageHeader from '../components/ui/PageHeader'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
+import TransactionDetailSheet from '../components/transactions/TransactionDetailSheet'
+import ReceiptPreviewModal from '../components/transactions/ReceiptPreviewModal'
 import { TransactionListSection } from '../components/transactions/TransactionListSection'
 import TransactionFilterSheet from '../components/transactions/TransactionFilterSheet'
 import TransactionBulkBar from '../components/transactions/TransactionBulkBar'
 import SplitBillModal from '../components/split-bill/SplitBillModal'
+import StagingReviewInbox from '../components/transactions/StagingReviewInbox'
+
+const StatementImportModal = lazy(() => import('../components/transactions/StatementImportModal'))
+
+import {
+  getCachedDashboardTransactions,
+  setCachedDashboardTransactions,
+  getCachedDashboardWallets,
+  setCachedDashboardWallets,
+} from '../hooks/useDashboardData'
 
 const initialFormData = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -51,14 +64,45 @@ function Transactions() {
   const location = useLocation()
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const clearUnviewedMutations = useSettingsStore((state) => state.clearUnviewedMutations)
 
-  // Live queries from Dexie
+  // Live queries from Dexie with zero-latency memory cache fallback
   const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
   const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
 
-  const transactions = useMemo(() => transactionsRaw || [], [transactionsRaw])
-  const allWallets = useMemo(() => dbWallets || [], [dbWallets])
-  const isInitialLoading = transactionsRaw === undefined
+  useEffect(() => {
+    if (transactionsRaw) {
+      setCachedDashboardTransactions(transactionsRaw)
+    }
+  }, [transactionsRaw])
+
+  useEffect(() => {
+    if (dbWallets) {
+      setCachedDashboardWallets(dbWallets)
+    }
+  }, [dbWallets])
+
+  const transactions = useMemo(() => {
+    if (transactionsRaw !== undefined) return transactionsRaw
+    const dashboardTxs = getCachedDashboardTransactions?.()
+    if (dashboardTxs && dashboardTxs.length > 0) return dashboardTxs
+    return []
+  }, [transactionsRaw])
+
+  const allWallets = useMemo(() => {
+    if (dbWallets !== undefined) return dbWallets
+    const dashboardWallets = getCachedDashboardWallets?.()
+    if (dashboardWallets && dashboardWallets.length > 0) return dashboardWallets
+    return []
+  }, [dbWallets])
+
+  const pendingReviewTxs = useMemo(() => {
+    return transactions.filter((tx) => tx.isPendingReview === true || tx.isPendingReview === 1)
+  }, [transactions])
+
+  const isInitialLoading =
+    transactionsRaw === undefined &&
+    (!getCachedDashboardTransactions?.() || getCachedDashboardTransactions().length === 0)
 
   // Filter Engine Hook
   const {
@@ -77,12 +121,16 @@ function Transactions() {
 
   // Local State
   const [editingTransaction, setEditingTransaction] = useState(null)
+  const [detailTransaction, setDetailTransaction] = useState(null)
+  const [receiptPreviewTx, setReceiptPreviewTx] = useState(null)
+  const [singleDeleteTx, setSingleDeleteTx] = useState(null)
   const [editFormData, setEditFormData] = useState(initialFormData)
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
   const [apiError, setApiError] = useState('')
   const [apiErrorTone, setApiErrorTone] = useState('error')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isStatementImportOpen, setIsStatementImportOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
@@ -100,6 +148,10 @@ function Transactions() {
   const [isEntering, setIsEntering] = useState(false)
 
   // Android Hardware Back Button Handlers
+  useBackButton(() => setDetailTransaction(null), Boolean(detailTransaction))
+  useBackButton(() => setReceiptPreviewTx(null), Boolean(receiptPreviewTx))
+  useBackButton(() => setSingleDeleteTx(null), Boolean(singleDeleteTx))
+  useBackButton(() => setEditingTransaction(null), Boolean(editingTransaction))
   useBackButton(() => setIsMenuOpen(false), isMenuOpen)
   useBackButton(() => {
     setSelectedTxIds(new Set())
@@ -133,11 +185,12 @@ function Transactions() {
     loadRates()
   }, [defaultCurrency, t])
 
-  // Page entrance animation
+  // Page entrance animation & clear mutation badge
   useEffect(() => {
+    clearUnviewedMutations?.()
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(frameId)
-  }, [])
+  }, [clearUnviewedMutations])
 
   // Handle focus transaction from navigation state
   useEffect(() => {
@@ -177,18 +230,23 @@ function Transactions() {
 
   // Grouped entries for TransactionListSection
   const newestTransactionId = useMemo(() => {
-    if (!transactions || transactions.length === 0) return null
-    return transactions[0]?.id || null
-  }, [transactions])
+    if (!filteredTransactions || filteredTransactions.length === 0) return null
+    return filteredTransactions[0]?.id || null
+  }, [filteredTransactions])
 
   const groupedEntriesDetailed = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
-    const grouped = filteredTransactions.reduce((acc, tx) => {
+    const grouped = {}
+    for (let i = 0; i < filteredTransactions.length; i++) {
+      const tx = filteredTransactions[i]
       const key = tx.date || 'unknown'
-      return { ...acc, [key]: [...(acc[key] || []), tx] }
-    }, {})
+      if (!grouped[key]) {
+        grouped[key] = []
+      }
+      grouped[key].push(tx)
+    }
 
     const sortedEntries = Object.entries(grouped).sort((a, b) => String(b[0]).localeCompare(String(a[0])))
 
@@ -247,14 +305,24 @@ function Transactions() {
     })
   }, [filteredTransactions, locale, defaultCurrency, rates, t])
 
-  const handleScroll = (event) => {
-    setSwipedTransactionId(null)
-    setIsSwipingId(null)
+  const scrollRafRef = useRef(null)
+  const handleScroll = useCallback((event) => {
+    if (swipedTransactionId !== null) setSwipedTransactionId(null)
+    if (isSwipingId !== null) setIsSwipingId(null)
+
     const el = event.currentTarget
-    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
-    setShowTopFade(el.scrollTop > 2)
-    setShowBottomFade(maxScrollTop - el.scrollTop > 2)
-  }
+    if (!el) return
+    if (scrollRafRef.current) return
+
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null
+      const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
+      const nextTop = el.scrollTop > 2
+      const nextBottom = maxScrollTop - el.scrollTop > 2
+      setShowTopFade((prev) => (prev !== nextTop ? nextTop : prev))
+      setShowBottomFade((prev) => (prev !== nextBottom ? nextBottom : prev))
+    })
+  }, [swipedTransactionId, isSwipingId, setSwipedTransactionId, setIsSwipingId])
 
   // Bulk Selection Handlers
   const toggleSelectTx = (id) => {
@@ -289,7 +357,33 @@ function Transactions() {
   const handleBatchCategoryChange = async (newCategory) => {
     if (selectedTxIds.size === 0 || !newCategory) return
     const ids = Array.from(selectedTxIds)
-    await db.transactions.where('id').anyOf(ids).modify({ category: newCategory })
+    const selectedTxs = await db.transactions.where('id').anyOf(ids).toArray()
+
+    const nonSplitIds = []
+    let skippedSplitCount = 0
+
+    for (const tx of selectedTxs) {
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        skippedSplitCount++
+      } else {
+        nonSplitIds.push(tx.id)
+      }
+    }
+
+    if (nonSplitIds.length > 0) {
+      await db.transactions.where('id').anyOf(nonSplitIds).modify({ category: newCategory })
+    }
+
+    if (skippedSplitCount > 0) {
+      setApiError(
+        t(
+          'tx.batch.splitSkipped',
+          'Transaksi split dilewati karena memiliki rincian multi-kategori.'
+        )
+      )
+      setApiErrorTone('warning')
+    }
+
     setIsBatchCategoryModalOpen(false)
     clearBulkSelection()
   }
@@ -299,6 +393,7 @@ function Transactions() {
     setEditingTransaction(transaction)
     const matchingWallet = allWallets?.find((w) => String(w.id) === String(transaction.walletId))
     const targetCurrency = transaction.currency || matchingWallet?.currency || defaultCurrency
+    const receipt = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
     setEditFormData({
       date: transaction.date,
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
@@ -307,6 +402,9 @@ function Transactions() {
       notes: transaction.notes || '',
       currency: targetCurrency,
       walletId: transaction.walletId,
+      targetWalletId: transaction.targetWalletId || '',
+      receiptImage: receipt,
+      receipt: receipt,
     })
   }, [allWallets, defaultCurrency])
 
@@ -318,6 +416,7 @@ function Transactions() {
       await updateTransaction(editingTransaction.id, {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+        receiptImage: editFormData.receiptImage || null,
       })
       setEditingTransaction(null)
     } catch {
@@ -364,114 +463,125 @@ function Transactions() {
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
 
         {/* Top Bar Header */}
-        <section className="relative z-30 flex items-center justify-between gap-3 pt-1">
-          <h1 className="ft-display text-xl sm:text-2xl font-black tracking-tight text-[var(--fg)] min-w-0 flex-1 truncate">
-            {t('tx.pageTitle', 'Transaksi')}
-          </h1>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Search Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setIsSearchOpen((v) => !v)}
-              className={`inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
-                isSearchOpen || filters.search
-                  ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
-                  : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
-              }`}
-              aria-label={t('tx.search.placeholder') || 'Cari'}
-              title={t('tx.search.placeholder', 'Cari Transaksi')}
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
-                <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
-              </svg>
-            </button>
-
-            {/* Filter Modal Trigger Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsMenuOpen(false)
-                setIsFilterOpen(true)
-              }}
-              className={`relative inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
-                activeFilterCount > 0
-                  ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
-                  : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
-              }`}
-              aria-label={t('tx.filter.open')}
-              title={t('tx.filter.open', 'Filter Lengkap')}
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 6h16" strokeLinecap="round" />
-                <path d="M7 12h10" strokeLinecap="round" />
-                <path d="M10 18h4" strokeLinecap="round" />
-              </svg>
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]" />
-              )}
-            </button>
-
-            {/* 3-dots Menu */}
-            <div className="relative z-50 shrink-0">
-              {isMenuOpen ? (
-                <button
-                  type="button"
-                  className="fixed inset-0 z-40 cursor-default bg-transparent"
-                  aria-label={t('tx.menu.closeOverlay')}
-                  onClick={() => setIsMenuOpen(false)}
-                />
-              ) : null}
+        <PageHeader
+          title={t('tx.pageTitle', 'Transaksi')}
+          titlePosition="left"
+          className="relative z-30 pt-1 !mb-0"
+          rightAction={
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Search Toggle Button */}
               <button
                 type="button"
-                className="relative z-50 inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer"
-                onClick={() => setIsMenuOpen((v) => !v)}
-                aria-label={t('tx.menu.open')}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-              <div
-                className={`absolute right-0 top-12 z-50 w-52 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-[var(--shadow-card)] transition-all duration-200 ${
-                  isMenuOpen
-                    ? 'pointer-events-auto scale-100 opacity-100'
-                    : 'pointer-events-none scale-95 opacity-0'
+                onClick={() => setIsSearchOpen((v) => !v)}
+                className={`inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
+                  isSearchOpen || filters.search
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
                 }`}
+                aria-label={t('tx.search.placeholder') || 'Cari'}
+                title={t('tx.search.placeholder', 'Cari Transaksi')}
               >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
+                  <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+                </svg>
+              </button>
+
+              {/* Filter Modal Trigger Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false)
+                  setIsFilterOpen(true)
+                }}
+                className={`relative inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border transition active:scale-95 cursor-pointer ${
+                  activeFilterCount > 0
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)]'
+                }`}
+                aria-label={t('tx.filter.open')}
+                title={t('tx.filter.open', 'Filter Lengkap')}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 6h16" strokeLinecap="round" />
+                  <path d="M7 12h10" strokeLinecap="round" />
+                  <path d="M10 18h4" strokeLinecap="round" />
+                </svg>
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]" />
+                )}
+              </button>
+
+              {/* 3-dots Menu */}
+              <div className="relative z-50 shrink-0">
+                {isMenuOpen ? (
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default bg-transparent"
+                    aria-label={t('tx.menu.closeOverlay')}
+                    onClick={() => setIsMenuOpen(false)}
+                  />
+                ) : null}
                 <button
                   type="button"
-                  className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
-                  onClick={() => {
-                    setIsBulkMode(true)
-                    setIsMenuOpen(false)
-                  }}
+                  className="relative z-50 inline-flex h-10 w-10 min-h-[40px] min-w-[40px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer"
+                  onClick={() => setIsMenuOpen((v) => !v)}
+                  aria-label={t('tx.menu.open')}
                 >
-                  {t('tx.menu.bulkEdit', 'Edit Massal (Bulk)')}
+                  <MoreVertical className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
-                  onClick={() => {
-                    setIsSplitBillOpen(true)
-                    setIsMenuOpen(false)
-                  }}
+                <div
+                  className={`absolute right-0 top-12 z-50 w-52 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-[var(--shadow-card)] transition-all duration-200 ${
+                    isMenuOpen
+                      ? 'pointer-events-auto scale-100 opacity-100'
+                      : 'pointer-events-none scale-95 opacity-0'
+                  }`}
                 >
-                  {t('tx.menu.splitBill', 'Bagi Tagihan (Split Bill)')}
-                </button>
-                <button
-                  type="button"
-                  className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
-                  onClick={() => {
-                    handleExportCsv()
-                    setIsMenuOpen(false)
-                  }}
-                >
-                  {t('tx.menu.exportCsv')}
-                </button>
+                  <button
+                    type="button"
+                    className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
+                    onClick={() => {
+                      setIsBulkMode(true)
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    {t('tx.menu.bulkEdit', 'Edit Massal (Bulk)')}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
+                    onClick={() => {
+                      setIsSplitBillOpen(true)
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    {t('tx.menu.splitBill', 'Bagi Tagihan (Split Bill)')}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
+                    onClick={() => {
+                      setIsStatementImportOpen(true)
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    {t('tx.menu.importStatement', 'Impor Mutasi / e-Statement')}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full min-h-[44px] rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-[0.98] cursor-pointer flex items-center"
+                    onClick={() => {
+                      handleExportCsv()
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    {t('tx.menu.exportCsv')}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          }
+        />
 
         {/* Collapsible Search Input */}
         {(isSearchOpen || filters.search) && (
@@ -504,6 +614,15 @@ function Transactions() {
           </div>
         )}
 
+        {/* Staging Review Inbox for Pending Bank Mutations */}
+        <StagingReviewInbox
+          pendingTransactions={pendingReviewTxs}
+          wallets={allWallets}
+          formatCurrency={formatCurrency}
+          defaultCurrency={defaultCurrency}
+          t={t}
+        />
+
         {/* Transaction List Section Component */}
         <TransactionListSection
           isLoading={isInitialLoading}
@@ -521,6 +640,9 @@ function Transactions() {
           highlightedTransactionId={highlightedTransactionId}
           openEditTransaction={openEditTransaction}
           deleteTransaction={deleteTransaction}
+          onViewDetail={setDetailTransaction}
+          onPreviewReceipt={setReceiptPreviewTx}
+          onDelete={setSingleDeleteTx}
           onDuplicate={handleDuplicateTransaction}
           setSwipedTransactionId={setSwipedTransactionId}
           getSwipeHandlers={getSwipeHandlers}
@@ -534,12 +656,84 @@ function Transactions() {
           formatCurrency={formatCurrency}
           convertCurrency={convertCurrency}
           rates={rates}
-          setApiError={setApiError}
-          setApiErrorTone={setApiErrorTone}
           allWallets={allWallets}
           newestTransactionId={newestTransactionId}
         />
       </div>
+
+      {/* Single Delete Confirm Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(singleDeleteTx)}
+        onClose={() => setSingleDeleteTx(null)}
+        onConfirm={async () => {
+          if (!singleDeleteTx?.id) return
+          const txId = singleDeleteTx.id
+          setSingleDeleteTx(null)
+          try {
+            await deleteTransaction(txId)
+            if (swipedTransactionId === txId) setSwipedTransactionId(null)
+          } catch (err) {
+            const offline = typeof navigator !== 'undefined' && navigator.onLine === false
+            setApiError(err?.message || (offline ? t('common.error.offline') : t('common.error.saveFailed')))
+            setApiErrorTone('error')
+          }
+        }}
+        title={t('tx.item.delete') || 'Hapus Transaksi'}
+        message={t('tx.item.deleteConfirm') || 'Apakah Anda yakin ingin menghapus transaksi ini?'}
+      />
+
+      {/* Receipt Preview Modal */}
+      <ReceiptPreviewModal
+        isOpen={Boolean(receiptPreviewTx)}
+        onClose={() => setReceiptPreviewTx(null)}
+        imageSrc={
+          receiptPreviewTx?.receiptImage ||
+          receiptPreviewTx?.receipt ||
+          receiptPreviewTx?.receiptUrl ||
+          receiptPreviewTx?.image ||
+          null
+        }
+        amountFormatted={
+          receiptPreviewTx
+            ? `${receiptPreviewTx.type === 'income' ? '+' : '-'}${formatCurrency(
+                Math.abs(Number(receiptPreviewTx.amount || 0)),
+                receiptPreviewTx.currency || defaultCurrency,
+              )}`
+            : ''
+        }
+        date={receiptPreviewTx?.date}
+        notes={receiptPreviewTx?.notes}
+        category={
+          receiptPreviewTx
+            ? getTransactionCategoryLabels(receiptPreviewTx.category, receiptPreviewTx.type, locale)?.main
+            : ''
+        }
+        zIndex="z-[60]"
+      />
+
+      {/* Transaction Detail BottomSheet */}
+      <TransactionDetailSheet
+        isOpen={Boolean(detailTransaction)}
+        onClose={() => setDetailTransaction(null)}
+        transaction={detailTransaction}
+        openEditTransaction={(tx) => {
+          setDetailTransaction(null)
+          openEditTransaction(tx)
+        }}
+        deleteTransaction={(tx) => {
+          const targetTx = tx || detailTransaction
+          if (!targetTx?.id) return
+          setDetailTransaction(null)
+          setSingleDeleteTx(targetTx)
+        }}
+        wallets={allWallets}
+        defaultCurrency={defaultCurrency}
+        rates={rates}
+        formatCurrency={formatCurrency}
+        convertCurrency={convertCurrency}
+        locale={locale}
+        t={t}
+      />
 
       {/* Transaction Edit BottomSheet */}
       <TransactionEditSheet
@@ -616,6 +810,22 @@ function Transactions() {
         isOpen={isSplitBillOpen}
         onClose={() => setIsSplitBillOpen(false)}
       />
+
+      {/* Universal e-Statement & Bank Mutation Import Modal */}
+      {isStatementImportOpen && (
+        <Suspense fallback={null}>
+          <StatementImportModal
+            isOpen={isStatementImportOpen}
+            onClose={() => setIsStatementImportOpen(false)}
+            wallets={allWallets}
+            existingTransactions={transactions}
+            onImportComplete={(count) => {
+              setApiError(t('statement.importSuccess', 'Berhasil mengimpor {{count}} transaksi ke dompet.', { count }))
+              setApiErrorTone('success')
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

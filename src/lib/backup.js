@@ -1,4 +1,6 @@
 import { db } from './db'
+import { invalidateWalletBalance } from './balanceEngine'
+import { clearCachedDashboardState } from '../hooks/useDashboardData'
 
 export async function exportAllDataAsJson() {
   const [
@@ -19,6 +21,8 @@ export async function exportAllDataAsJson() {
     wallets,
     loans,
     loanPayments,
+    ideas,
+    boardLinks,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.investments.toArray(),
@@ -37,6 +41,8 @@ export async function exportAllDataAsJson() {
     db.wallets.toArray(),
     db.loans.toArray(),
     db.loanPayments.toArray(),
+    db.ideas.toArray(),
+    db.board_links.toArray(),
   ])
 
   let expenseCustom = null
@@ -49,6 +55,17 @@ export async function exportAllDataAsJson() {
   } catch {
     /* ignore */
   }
+
+  const sanitizedSettings = (settings || []).map((s) => {
+    const copy = { ...s }
+    if (copy.lockSecret) {
+      delete copy.lockSecret
+    }
+    if (copy.geminiApiKey) {
+      delete copy.geminiApiKey
+    }
+    return copy
+  })
 
   return {
     exportedAt: new Date().toISOString(),
@@ -67,11 +84,13 @@ export async function exportAllDataAsJson() {
       goalLogs,
       calendarEvents,
       recurringTransactions,
-      settings,
+      settings: sanitizedSettings,
       todos,
       sub_tasks: subTasks,
       habits,
       habitLogs,
+      ideas,
+      board_links: boardLinks,
       notifications,
       wallets,
       loans,
@@ -89,6 +108,7 @@ export async function importAllDataFromJsonPayload(payload) {
   if (payload.categoryCustomizations?.expense) {
     try {
       localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
+      window.dispatchEvent(new CustomEvent('ft-expense-category-custom-changed'))
       window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
     } catch {
       /* ignore */
@@ -97,14 +117,21 @@ export async function importAllDataFromJsonPayload(payload) {
   if (payload.categoryCustomizations?.income) {
     try {
       localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
+      window.dispatchEvent(new CustomEvent('ft-income-category-custom-changed'))
       window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
     } catch {
       /* ignore */
     }
   }
 
+  // 1. Capture current device authentication & security state to prevent session loss or lockout
+  const existingSettings = await db.settings.get('preferences').catch(() => null)
+
+  // 2. Clear tables excluding db.settings to preserve active session while updating
+  const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
+
   await db.transaction('rw', db.tables, async () => {
-    await Promise.all(db.tables.map((table) => table.clear()))
+    await Promise.all(tablesToClear.map((table) => table.clear()))
 
     if (Array.isArray(data.transactions) && data.transactions.length > 0) await db.transactions.bulkAdd(data.transactions)
     if (Array.isArray(data.investments) && data.investments.length > 0) await db.investments.bulkAdd(data.investments)
@@ -115,7 +142,6 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.calendarEvents) && data.calendarEvents.length > 0) await db.calendarEvents.bulkAdd(data.calendarEvents)
     if (Array.isArray(data.recurringTransactions) && data.recurringTransactions.length > 0)
       await db.recurringTransactions.bulkAdd(data.recurringTransactions)
-    if (Array.isArray(data.settings) && data.settings.length > 0) await db.settings.bulkPut(data.settings)
     if (Array.isArray(data.todos) && data.todos.length > 0) await db.todos.bulkAdd(data.todos)
     if (Array.isArray(data.sub_tasks) && data.sub_tasks.length > 0) await db.sub_tasks.bulkAdd(data.sub_tasks)
     if (Array.isArray(data.habits) && data.habits.length > 0) await db.habits.bulkAdd(data.habits)
@@ -126,6 +152,34 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.wallets) && data.wallets.length > 0) await db.wallets.bulkAdd(data.wallets)
     if (Array.isArray(data.loans) && data.loans.length > 0) await db.loans.bulkAdd(data.loans)
     if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkAdd(data.loanPayments)
+
+    // Merge settings: preserve active logged-in Google / Email user credentials and device lock
+    if (Array.isArray(data.settings) && data.settings.length > 0) {
+      const backupSetting = data.settings.find((s) => s.key === 'preferences') || data.settings.find((s) => s.key === 'fintrack_settings_v1') || data.settings[0]
+      const merged = {
+        ...backupSetting,
+        key: 'preferences',
+        // Preserve active session if currently signed in
+        ...(existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
+          ? {
+              authProvider: existingSettings.authProvider,
+              authUserEmail: existingSettings.authUserEmail,
+              authUserId: existingSettings.authUserId,
+              emailVerified: existingSettings.emailVerified,
+            }
+          : {}),
+        // Preserve device security configuration if currently enabled
+        ...(existingSettings?.securityEnabled && existingSettings?.lockSecret
+          ? {
+              securityEnabled: existingSettings.securityEnabled,
+              securityMethod: existingSettings.securityMethod,
+              lockSecret: existingSettings.lockSecret,
+              autoLockTimeout: existingSettings.autoLockTimeout,
+            }
+          : {}),
+      }
+      await db.settings.put(merged)
+    }
   })
 
   // Ensure at least one wallet exists if none were in the backup
@@ -138,12 +192,67 @@ export async function importAllDataFromJsonPayload(payload) {
       logoUrl: '/logos/wallets/cash.svg',
       currency: defaultCurrency,
       balance: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: Date.now(),
     })
+  }
+
+  // Clear in-memory caches and invalidate balance engine
+  clearCachedDashboardState()
+  void invalidateWalletBalance()
+
+  // Dynamically reload store if useSettingsStore is loaded
+  try {
+    const useSettingsStore = (await import('../store/useSettingsStore')).default
+    await useSettingsStore.getState().loadSettings?.()
+  } catch {
+    /* ignore */
+  }
+
+  // Notify UI of complete restoration
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ft-data-restored'))
+    window.dispatchEvent(new CustomEvent('ft_data_restored'))
   }
 }
 
 export async function isLocalDataEmpty() {
-  const counts = await Promise.all(db.tables.map((table) => table.count()))
-  return counts.reduce((acc, c) => acc + c, 0) === 0
+  const [txCount, walletCount, loanCount, goalCount, budgetCount, invCount] = await Promise.all([
+    db.transactions.count().catch(() => 0),
+    db.wallets.count().catch(() => 0),
+    db.loans.count().catch(() => 0),
+    db.goals.count().catch(() => 0),
+    db.budgets.count().catch(() => 0),
+    db.investments.count().catch(() => 0),
+  ])
+  if (txCount > 0 || loanCount > 0 || goalCount > 0 || budgetCount > 0 || invCount > 0) {
+    return false
+  }
+  return walletCount <= 1
+}
+
+/**
+ * Exports all database records into an AES-256-GCM encrypted envelope (.fintrack.enc).
+ */
+export async function exportAllDataAsEncryptedEnvelope(phrase = '') {
+  const cleanPhrase = String(phrase || '').trim()
+  if (!cleanPhrase) {
+    throw new Error('Frasa pemulihan 12-kata diperlukan untuk mengenkripsi berkas cadangan.')
+  }
+  const { encryptPayloadWithMnemonic } = await import('./mnemonicCrypto')
+  const rawPayload = await exportAllDataAsJson()
+  return await encryptPayloadWithMnemonic(rawPayload, cleanPhrase)
+}
+
+/**
+ * Decrypts and imports an encrypted envelope (.fintrack.enc) into Dexie database.
+ */
+export async function importAllDataFromEncryptedEnvelope(envelope = {}, phrase = '') {
+  const cleanPhrase = String(phrase || '').trim()
+  if (!cleanPhrase) {
+    throw new Error('Frasa pemulihan 12-kata diperlukan untuk mendekripsi berkas cadangan.')
+  }
+  const { decryptPayloadWithMnemonic } = await import('./mnemonicCrypto')
+  const decryptedPayload = await decryptPayloadWithMnemonic(envelope, cleanPhrase)
+  await importAllDataFromJsonPayload(decryptedPayload)
+  return decryptedPayload
 }

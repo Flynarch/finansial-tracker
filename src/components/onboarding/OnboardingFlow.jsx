@@ -16,7 +16,7 @@ import {
   promptGoogleOneTap,
 } from '../../lib/auth'
 import { executeThemeTransition } from '../../lib/themeTransition'
-import { importAllDataFromJsonPayload } from '../../lib/backup'
+import { importAllDataFromJsonPayload, importAllDataFromEncryptedEnvelope } from '../../lib/backup'
 import { downloadLatestBackupJson } from '../../lib/cloudBackup'
 import { APP_DISPLAY_VERSION } from '../../lib/version'
 import {
@@ -216,37 +216,8 @@ export default function OnboardingFlow() {
     [step]
   )
 
-  /* ── Restore User Snapshot Helper ──────────────────────────────── */
-  const restoreUserSnapshot = async (uid, isGoogle = false) => {
-    if (!uid) return
-    const userBackupKey = `ft_user_backup_${uid}`
-    const rawLocal = localStorage.getItem(userBackupKey)
-    if (rawLocal) {
-      try {
-        const data = JSON.parse(rawLocal)
-        await importAllDataFromJsonPayload(data)
-        return
-      } catch {
-        /* ignore */
-      }
-    }
-    if (isGoogle) {
-      try {
-        const cloudData = await Promise.race([
-          downloadLatestBackupJson(uid),
-          new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
-        ]).catch(() => null)
-        if (cloudData) {
-          await importAllDataFromJsonPayload(cloudData)
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
   /* ── Process Google Login (Smart Skip Onboarding for Existing Accounts) ── */
-  const processGoogleLoginUser = async (user) => {
+  const processGoogleLoginUser = useCallback(async (user) => {
     if (!user?.uid) return
     await setAuthUser(user)
     if (user.displayName) {
@@ -257,33 +228,27 @@ export default function OnboardingFlow() {
     }
 
     const uid = user.uid
-    const userBackupKey = `ft_user_backup_${uid}`
-    const rawLocal = localStorage.getItem(userBackupKey)
 
-    // 1. If user has a local backup saved, restore it and skip onboarding
-    if (rawLocal) {
-      try {
-        const data = JSON.parse(rawLocal)
-        await importAllDataFromJsonPayload(data)
-      } catch {
-        /* ignore */
-      }
-      await completeOnboarding()
-      clearProgress()
-      try {
-        localStorage.setItem('ft_onboarding_seen_v1', '1')
-      } catch {
-        /* ignore */
-      }
-      navigate('/dashboard', { replace: true })
-      return
-    }
-
-    // 2. Check if local database already contains wallets or transactions
+    // Check if cloud backup exists in Firebase Storage
     try {
-      const walletCount = await db.wallets.count()
-      const txCount = await db.transactions.count()
-      if (walletCount > 0 || txCount > 0) {
+      const cloudData = await Promise.race([
+        downloadLatestBackupJson(uid),
+        new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]).catch(() => null)
+
+      if (cloudData) {
+        if (cloudData.format === 'fintrack_encrypted_envelope') {
+          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          if (e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12) {
+            try {
+              await importAllDataFromEncryptedEnvelope(cloudData, e2eePhrase.trim())
+            } catch {
+              /* stored phrase mismatch or invalid */
+            }
+          }
+        } else {
+          await importAllDataFromJsonPayload(cloudData)
+        }
         await completeOnboarding()
         clearProgress()
         try {
@@ -295,18 +260,14 @@ export default function OnboardingFlow() {
         return
       }
     } catch {
-      /* ignore */
+      /* ignore cloud restore error */
     }
 
-    // 3. Check if cloud backup exists in Firebase Storage
+    // 3. Check if local database already contains real user data (transactions or multiple wallets)
     try {
-      const cloudData = await Promise.race([
-        downloadLatestBackupJson(uid),
-        new Promise((resolve) => setTimeout(() => resolve(null), 1800)),
-      ]).catch(() => null)
-
-      if (cloudData) {
-        await importAllDataFromJsonPayload(cloudData)
+      const walletCount = await db.wallets.count()
+      const txCount = await db.transactions.count()
+      if (txCount > 0 || walletCount > 1) {
         await completeOnboarding()
         clearProgress()
         try {
@@ -323,7 +284,7 @@ export default function OnboardingFlow() {
 
     // 4. Truly brand new user without previous data -> proceed to onboarding setup
     goTo(1)
-  }
+  }, [setAuthUser, setUsername, setProfilePhoto, completeOnboarding, navigate, goTo])
 
   /* ── Google One Tap on Onboarding Screen ───────────────────────── */
   useEffect(() => {
@@ -336,7 +297,7 @@ export default function OnboardingFlow() {
         if (msg) setGoogleError(msg)
       },
     })
-  }, [step, hasCompleted, setAuthUser, setProfilePhoto, goTo, completeOnboarding, clearProgress, navigate])
+  }, [step, hasCompleted, processGoogleLoginUser])
 
   /* ── Google Sign In Handler ────────────────────────────────────── */
   const handleGoogleSignIn = async () => {

@@ -289,11 +289,7 @@ export async function fetchGoldPricePerGramIDR(options = {}) {
 }
 
 export async function fetchCryptoPrice() {
-  const response = await fetch(COINGECKO_API_URL);
-  if (!response.ok) {
-    throw new Error("Failed to fetch crypto prices");
-  }
-  return response.json();
+  return await fetchJsonWithTimeout(COINGECKO_API_URL, 5000)
 }
 
 export function getCachedCurrencyRates(baseCurrency = "USD") {

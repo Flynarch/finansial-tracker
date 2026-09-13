@@ -1,16 +1,23 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback, useMemo } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import CategoryIcon from '../ui/CategoryIcon'
 import CategoryPickerModal from './CategoryPickerModal'
-import Button from '../ui/Button'
-import { ChevronRight } from 'lucide-react'
+import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
+import TransactionTypeSelector from './quick-add/TransactionTypeSelector'
+import AmountInput from './quick-add/AmountInput'
+import ReceiptUploadAttachment from './ReceiptUploadAttachment'
+import ReceiptPreviewModal from './ReceiptPreviewModal'
+import ReceiptScannerModal from './ReceiptScannerModal'
+import ToastBanner from '../ui/ToastBanner'
+import useBackButton from '../../hooks/useBackButton'
+import useTranslation from '../../hooks/useTranslation'
 import { resolveTransactionIconKey } from '../../lib/categoryIcon'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
-import { formatMoneyInput, getMoneyInputCaret } from '../../lib/utils'
-
-const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
+import { formatMoneyInput, parseMoneyInput } from '../../lib/utils'
+import { evaluateExpression } from '../../lib/calcParser'
+import { LayoutGrid, ChevronDown, Sliders, Pencil } from 'lucide-react'
 
 export default function TransactionEditSheet({
   isOpen,
@@ -18,231 +25,566 @@ export default function TransactionEditSheet({
   formData,
   setFormData,
   onSubmit,
-  t,
   locale,
   wallets = [],
 }) {
-  const amountInputRef = useRef(null)
+  const { t } = useTranslation()
+  const [walletModalMode, setWalletModalMode] = useState(null)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
-  const [editError, setEditError] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const [categoryError, setCategoryError] = useState(false)
-  const [categoryShaking, setCategoryShaking] = useState(false)
+  const [walletError, setWalletError] = useState(false)
+  const [amountError, setAmountError] = useState(false)
+  const [previewImage, setPreviewImage] = useState(null)
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false)
 
-  const selectedWallet = (wallets || []).find((w) => String(w.id) === String(formData.walletId))
-  const isCashWallet =
-    !selectedWallet ||
-    selectedWallet.institutionType === 'cash' ||
-    String(selectedWallet.name || '').toLowerCase().includes('cash') ||
-    String(selectedWallet.name || '').toLowerCase().includes('tunai')
+  const handleApplyAiReceipt = useCallback((scanResult, imagePreview) => {
+    if (!scanResult) return
+    setIsReceiptScannerOpen(false)
+    setFormData((prev) => {
+      const nextAmount = scanResult.amount ? formatMoneyInput(String(scanResult.amount), prev.currency) : prev.amount
+      const nextDate = scanResult.date || prev.date
+      const nextNotes = scanResult.notes || scanResult.merchant || prev.notes
+      let nextCat = prev.category
+      if (scanResult.category) {
+        nextCat = scanResult.category
+      }
+      return {
+        ...prev,
+        amount: nextAmount,
+        date: nextDate,
+        notes: nextNotes,
+        category: nextCat,
+        receiptImage: imagePreview || prev.receiptImage,
+      }
+    })
+  }, [setFormData])
+
+  const categoryButtonRef = useRef(null)
+  const walletButtonRef = useRef(null)
+  const receiptInputRef = useRef(null)
+  const receiptSectionRef = useRef(null)
+
+  const handleTriggerReceiptUpload = useCallback(() => {
+    receiptInputRef.current?.click()
+    receiptSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [])
+
+  useBackButton(() => {
+    if (isReceiptScannerOpen) {
+      setIsReceiptScannerOpen(false)
+      return
+    }
+    if (walletModalMode) {
+      setWalletModalMode(null)
+      return
+    }
+    if (isCatModalOpen) {
+      setIsCatModalOpen(false)
+      return
+    }
+    if (previewImage) {
+      setPreviewImage(null)
+      return
+    }
+    onClose?.()
+  }, Boolean(isOpen))
+
+  const selectedWallet = useMemo(
+    () => wallets?.find((w) => String(w.id) === String(formData?.walletId)),
+    [wallets, formData?.walletId]
+  )
+  const selectedTargetWallet = useMemo(
+    () => wallets?.find((w) => String(w.id) === String(formData?.targetWalletId)),
+    [wallets, formData?.targetWalletId]
+  )
+
+  const isCashWallet = useMemo(
+    () =>
+      Boolean(
+        selectedWallet &&
+          (selectedWallet.institutionType === 'cash' ||
+            selectedWallet.customIcon === 'dollar' ||
+            selectedWallet.customIcon === 'cash' ||
+            String(selectedWallet.name || '').toLowerCase().includes('cash') ||
+            String(selectedWallet.name || '').toLowerCase().includes('tunai'))
+      ),
+    [selectedWallet]
+  )
+
+  const modeAccent =
+    formData?.type === 'expense'
+      ? 'var(--expense)'
+      : formData?.type === 'income'
+      ? 'var(--income)'
+      : formData?.type === 'transfer'
+      ? 'var(--transfer)'
+      : 'var(--accent)'
+
+  const handleTypeSelect = useCallback(
+    (nextType) => {
+      setFormData((prev) => ({
+        ...prev,
+        type: nextType,
+        category: nextType === 'transfer' ? 'transfer' : prev.type === nextType ? prev.category : '',
+      }))
+    },
+    [setFormData]
+  )
+
+  const handleSwapWallets = useCallback(() => {
+    setFormData((prev) => {
+      const currentSource = prev.walletId
+      const currentTarget = prev.targetWalletId
+      if (!currentSource && !currentTarget) return prev
+
+      const chosen = wallets?.find((w) => String(w.id) === String(currentTarget))
+      const newCurr = chosen?.currency || prev.currency
+
+      return {
+        ...prev,
+        walletId: currentTarget,
+        targetWalletId: currentSource,
+        currency: newCurr,
+        amount: formatMoneyInput(prev.amount, newCurr),
+      }
+    })
+  }, [wallets, setFormData])
+
+  const handleSelectWallet = useCallback(
+    (selectedIdRaw) => {
+      const selectedId = String(selectedIdRaw)
+      if (!selectedId) return
+
+      if (walletModalMode === 'targetWalletId') {
+        setFormData((prev) => ({ ...prev, targetWalletId: selectedId }))
+      } else {
+        const chosen = wallets?.find((w) => String(w.id) === selectedId)
+        const newCurr = chosen?.currency || formData?.currency
+        setFormData((prev) => ({
+          ...prev,
+          walletId: selectedId,
+          currency: newCurr,
+          amount: formatMoneyInput(prev.amount, newCurr),
+        }))
+      }
+      setWalletError(false)
+      setWalletModalMode(null)
+    },
+    [walletModalMode, wallets, formData?.currency, setFormData]
+  )
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    try {
+      setSubmitError('')
+      if (formData.type !== 'transfer' && (!formData.category || !formData.category.trim())) {
+        setCategoryError(true)
+        setSubmitError('')
+        categoryButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        return
+      }
+      if (!formData.walletId) {
+        setWalletError(true)
+        setSubmitError('')
+        walletButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        return
+      }
+      if (formData.type === 'transfer') {
+        if (!formData.targetWalletId) {
+          setSubmitError(t('tx.selectTargetWallet', 'Silakan pilih dompet tujuan.'))
+          return
+        }
+        if (String(formData.walletId) === String(formData.targetWalletId)) {
+          setSubmitError(t('tx.sameWalletTransfer', 'Dompet asal dan tujuan tidak boleh sama.'))
+          return
+        }
+      }
+
+      const evalResult = evaluateExpression(formData.amount, formData.currency)
+      const totalAmount =
+        evalResult.isValid && evalResult.result !== null
+          ? evalResult.result
+          : parseMoneyInput(formData.amount, formData.currency)
+
+      if (formData.type !== 'balance_adjustment' && (!Number.isFinite(totalAmount) || totalAmount <= 0)) {
+        setAmountError(true)
+        setSubmitError(t('tx.amountPositive', 'Nominal transaksi harus lebih dari 0.'))
+        return
+      }
+
+      setSubmitError('')
+      setCategoryError(false)
+      setWalletError(false)
+      setAmountError(false)
+      onSubmit(event)
+    } catch {
+      setSubmitError(t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
+    }
+  }
+
+  if (!formData) return null
 
   return (
     <BottomSheet
       isOpen={isOpen}
       onClose={() => {
-        setEditError('')
+        setSubmitError('')
         setCategoryError(false)
-        setCategoryShaking(false)
+        setWalletError(false)
+        setAmountError(false)
         onClose()
       }}
-      title={t('tx.modal.editTitle') || 'Edit Transaksi'}
-      maxHeight="max-h-[88dvh]"
-    >
-      {editError ? (
-        <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-[ft-fade-in_0.2s_ease-out]">
-          {editError}
-        </div>
-      ) : null}
-      <form
-        className="grid gap-3 md:grid-cols-2 pt-1 pb-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!formData.category || !formData.category.trim()) {
-            setCategoryError(true)
-            setCategoryShaking(true)
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-              try {
-                navigator.vibrate([30, 50, 30])
-              } catch {
-                // ignore
-              }
-            }
-            setTimeout(() => setCategoryShaking(false), 500)
-            return
-          }
-          setEditError('')
-          setCategoryError(false)
-          onSubmit(event)
-        }}
-      >
-        <div className="ft-label md:col-span-2">
-          <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
-            {t('tx.date', 'Tanggal')}
-          </label>
-          <CustomDatePicker
-            value={formData.date}
-            onChange={(val) => setFormData((prev) => ({ ...prev, date: val }))}
-            title={t('tx.dateSelectTitle', 'Pilih Tanggal Transaksi')}
-          />
-        </div>
-
-        <label className="ft-label md:col-span-2">
-          {t('tx.amount', 'Jumlah')}
-          <input
-            ref={amountInputRef}
-            type="text"
-            inputMode="numeric"
-            value={formData.amount}
-            onChange={(event) => {
-              const rawValue = event.target.value
-              const currency = formData.currency
-              const formatted = formatMoneyInput(rawValue, currency)
-              const caret = getMoneyInputCaret(rawValue, formatted, event.target.selectionStart, currency)
-              setFormData((prev) => ({ ...prev, amount: formatted }))
-              window.requestAnimationFrame(() => {
-                const el = amountInputRef.current
-                if (!el) return
-                el.setSelectionRange(caret, caret)
-              })
+      title={
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-6 w-6 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor:
+                formData.type === 'expense'
+                  ? 'var(--expense-tint)'
+                  : formData.type === 'income'
+                  ? 'var(--income-tint)'
+                  : formData.type === 'transfer'
+                  ? 'var(--transfer-subtle)'
+                  : 'color-mix(in srgb, var(--accent) 15%, transparent)',
             }}
-            placeholder="0"
-            className="ft-field text-base font-extrabold"
-            required
-          />
-        </label>
-
-        <label className="ft-label">
-          {t('tx.type', 'Jenis Transaksi')}
-          <select
-            value={formData.type}
-            onChange={(event) => {
-              const nextType = event.target.value
-              setFormData((prev) => ({
-                ...prev,
-                type: nextType,
-                category: prev.type === nextType ? prev.category : '',
-              }))
-            }}
-            className="ft-field"
           >
-            <option value="income">{t('tx.type.income', 'Pemasukan')}</option>
-            <option value="expense">{t('tx.type.expense', 'Pengeluaran')}</option>
-          </select>
-        </label>
-
-        <div className={`ft-label ${categoryShaking ? 'ft-shake' : ''}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted-2)]">
-              {t('tx.category', 'Kategori')}
-            </span>
-            {categoryError && (
-              <span className="text-[10.5px] font-bold text-rose-500 flex items-center gap-1 animate-[ft-fade-in_0.2s_ease-out]">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
-                {t('addTx.selectCategoryRequired', 'Wajib dipilih')}
-              </span>
-            )}
+            <Pencil
+              className="h-3 w-3"
+              style={{
+                color: modeAccent,
+              }}
+            />
           </div>
+          <span className="text-sm font-bold tracking-tight text-[var(--fg)]">
+            {t('tx.modal.editTitle', 'Edit Transaksi')}
+          </span>
+        </div>
+      }
+      maxHeight="max-h-[95dvh]"
+      scrollable={true}
+      footer={
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setCategoryError(false)
-              setIsCatModalOpen(true)
+            className="w-1/3 h-[44px] rounded-xl text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] border border-[var(--border)] bg-[var(--field-bg)] transition-colors cursor-pointer active:scale-[0.98]"
+            onClick={onClose}
+          >
+            {t('addTx.cancel', 'Batal')}
+          </button>
+          <button
+            type="submit"
+            form="transaction-edit-form"
+            style={{
+              backgroundColor: modeAccent,
             }}
-            className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left transition-all cursor-pointer ${
-              categoryError
-                ? 'border border-[var(--danger)] bg-[var(--status-expense-soft)] ring-1 ring-[var(--danger)]'
-                : 'border border-[var(--border)] bg-[var(--field-bg)] hover:border-[var(--border-strong)]'
+            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
+              formData.type === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
             }`}
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <CategoryIcon
-                icon={resolveTransactionIconKey(formData.category, formData.type)}
-                className="h-6 w-6 shrink-0"
-              />
-              <span
-                className={`truncate text-sm ${
-                  !formData.category
-                    ? categoryError
-                      ? 'font-bold text-[var(--danger)]'
-                      : 'font-normal italic text-[var(--muted-2)]'
-                    : 'font-semibold text-[var(--fg)]'
-                }`}
-              >
-                {!formData.category
-                  ? t('addTx.selectCategory', 'Pilih Kategori...')
-                  : formData.type === 'expense'
-                    ? formatExpenseCategory(formData.category, locale)
-                    : formatIncomeCategory(formData.category, locale)}
-              </span>
-            </div>
-            <span className="shrink-0 text-xs font-bold text-[var(--accent)] flex items-center gap-0.5">
-              {t('tx.change', 'Ubah')}
-              <ChevronRight size={13} strokeWidth={2.5} />
-            </span>
+            {t('tx.modal.update', 'Perbarui Transaksi')}
           </button>
-          <CategoryPickerModal
-            isOpen={isCatModalOpen}
-            onClose={() => setIsCatModalOpen(false)}
-            txType={formData.type || 'expense'}
-            selectedCategory={formData.category}
-            onSelectCategory={(cat) => {
-              setCategoryError(false)
-              setFormData((prev) => ({ ...prev, category: cat }))
-            }}
-          />
         </div>
+      }
+    >
+      {submitError ? (
+        <div className="mb-2">
+          <ToastBanner message={submitError} />
+        </div>
+      ) : null}
 
-        <label className="ft-label">
-          {t('tx.currency', 'Mata Uang')}
-          {isCashWallet ? (
-            <select
-              value={formData.currency}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  currency: event.target.value,
-                  amount: formatMoneyInput(prev.amount, event.target.value),
-                }))
-              }
-              className="ft-field"
-            >
-              {currencyOptions.map((currency) => (
-                <option key={currency} value={currency}>
-                  {currency}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="flex h-11 items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/80 px-3 text-sm font-bold text-[var(--fg)]">
-              <span>{formData.currency}</span>
-              <span className="text-[10.5px] font-semibold text-[var(--muted)]">
-                {selectedWallet?.name ? `Terkunci (${selectedWallet.name})` : 'Terkunci'}
-              </span>
-            </div>
-          )}
-        </label>
-
-        <label className="ft-label md:col-span-2">
-          {t('tx.notes', 'Catatan')}
-          <input
-            type="text"
-            value={formData.notes}
-            onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
-            placeholder={t('tx.notes.placeholder', 'Catatan (opsional)')}
-            className="ft-field"
+      {/* Mode Toggle - Sliding Segmented Track */}
+      <div className="mb-3">
+        {formData.type === 'balance_adjustment' ? (
+          <div className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold select-none">
+            <Sliders className="h-3.5 w-3.5" />
+            <span>{t('tx.type.adjustment', 'Penyesuaian Saldo Sistem')}</span>
+          </div>
+        ) : (
+          <TransactionTypeSelector
+            txType={formData.type}
+            onSelectType={handleTypeSelect}
           />
-        </label>
+        )}
+      </div>
 
-        <div className="flex gap-2 md:col-span-2 pt-2">
-          <Button type="submit">{t('tx.modal.update', 'Perbarui Transaksi')}</Button>
-          <Button
-            type="button"
-            onClick={onClose}
-            className="bg-[var(--field-border)] text-[var(--fg)] hover:bg-[var(--field-border-hover)]"
-          >
-            {t('tx.cancel', 'Batal')}
-          </Button>
+      {/* Form Content */}
+      <form id="transaction-edit-form" onSubmit={handleSubmit} className="space-y-3">
+        <AmountInput
+          amount={formData.amount}
+          onChangeAmount={(val) => {
+            setAmountError(false)
+            setFormData((p) => ({ ...p, amount: val }))
+          }}
+          currency={formData.currency}
+          onChangeCurrency={(val) => {
+            setAmountError(false)
+            setFormData((p) => ({ ...p, currency: val }))
+          }}
+          isCashWallet={isCashWallet}
+          txType={formData.type}
+          onOpenAiScan={() => setIsReceiptScannerOpen(true)}
+          onAttachReceipt={handleTriggerReceiptUpload}
+          modeAccent={modeAccent}
+          hasError={amountError}
+        />
+
+        {/* Form Fields Container */}
+        <div className="space-y-2.5">
+          {/* Row 1: Tanggal + Dompet Asal */}
+          <div className="flex items-stretch gap-2">
+            <div className="shrink-0 min-w-[125px] sm:min-w-[135px]">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
+                {t('addTx.date', 'Tanggal')}
+              </div>
+              <div className="bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] rounded-xl px-0.5 h-[42px] hover:border-[var(--field-border-hover,var(--border-strong))] transition-colors">
+                <CustomDatePicker
+                  value={formData.date}
+                  onChange={(val) => setFormData((p) => ({ ...p, date: val }))}
+                  title={t('tx.date.selectTitle', 'Pilih Tanggal Transaksi')}
+                  buttonClassName="border-none bg-transparent shadow-none px-3 py-2 min-h-[42px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1 h-[14px]">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                  {formData.type === 'transfer' ? t('tx.transferFrom', 'Dari Dompet') : t('addTx.wallet', 'Dompet')}
+                </div>
+                {walletError && (
+                  <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out]">
+                    {t('addTx.selectWalletRequired', 'Wajib dipilih')}
+                  </span>
+                )}
+              </div>
+              <div ref={walletButtonRef}>
+                <WalletSelectTrigger
+                  wallet={selectedWallet}
+                  placeholder={
+                    formData.type === 'transfer'
+                      ? t('tx.transferFrom', 'Pilih Dompet Asal')
+                      : t('loans.selectWallet', 'Pilih Wallet / Akun')
+                  }
+                  compact
+                  error={walletError}
+                  abbreviateBalance
+                  onClick={() => {
+                    setWalletError(false)
+                    setWalletModalMode('walletId')
+                  }}
+                  className="!h-[42px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Kategori OR Dompet Tujuan */}
+          <div style={{ minHeight: '60px' }}>
+            {formData.type === 'transfer' ? (
+              <div>
+                <div className="flex items-center justify-between mb-1 h-[18px]">
+                  <div className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--transfer)]" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 5v14M12 19l-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--transfer)]">
+                      {t('tx.transferTo', 'Ke Dompet Tujuan')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSwapWallets}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--transfer)]/10 hover:bg-[var(--transfer)]/20 text-[var(--transfer)] text-[10.5px] font-bold transition active:scale-95 cursor-pointer"
+                    title={t('tx.swapWallets', 'Tukar')}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{t('tx.swapWallets', 'Tukar')}</span>
+                  </button>
+                </div>
+                <WalletSelectTrigger
+                  wallet={selectedTargetWallet}
+                  placeholder={t('tx.transferTo', 'Pilih Dompet Tujuan')}
+                  compact
+                  abbreviateBalance
+                  onClick={() => setWalletModalMode('targetWalletId')}
+                  className="!h-[42px]"
+                />
+              </div>
+            ) : formData.type === 'balance_adjustment' ? (
+              <div>
+                <div className="flex items-center justify-between mb-1 h-[18px]">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-amber-500">
+                    {t('tx.category', 'Kategori')}
+                  </div>
+                </div>
+                <div className="flex h-[42px] min-h-[42px] items-center rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 text-xs font-semibold text-amber-600 dark:text-amber-400 gap-2">
+                  <Sliders className="h-4 w-4 shrink-0 text-amber-500" />
+                  <span>{locale === 'en' ? 'System Adjustment' : 'Penyesuaian Sistem'}</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-1 h-[18px]">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                    {t('addTx.category', 'Kategori')}
+                  </div>
+                  {categoryError && (
+                    <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out]">
+                      {t('addTx.selectCategoryRequired', 'Wajib dipilih')}
+                    </span>
+                  )}
+                </div>
+                <button
+                  ref={categoryButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setCategoryError(false)
+                    setIsCatModalOpen(true)
+                  }}
+                  className={`group flex w-full h-[42px] min-h-[42px] items-center justify-between gap-2.5 rounded-xl px-3 py-1 text-left transition-all duration-200 focus-visible:outline-none active:scale-[0.99] cursor-pointer ${
+                    categoryError
+                      ? 'bg-rose-500/10 border-2 border-rose-500 text-rose-500'
+                      : formData.category
+                      ? 'bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-[var(--fg)] hover:border-[var(--field-border-hover,var(--border-strong))]'
+                      : 'bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-[var(--muted)] hover:border-[var(--field-border-hover,var(--border-strong))]'
+                  }`}
+                >
+                  {formData.category && formData.category.trim() ? (
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="h-7 w-7 rounded-full aspect-square flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--panel)] overflow-hidden shadow-2xs">
+                        <CategoryIcon
+                          icon={resolveTransactionIconKey(formData.category, formData.type)}
+                          className="h-4 w-4 text-[var(--fg)]/80"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
+                          {formData.type === 'expense'
+                            ? formatExpenseCategory(formData.category, locale)
+                            : formatIncomeCategory(formData.category, locale)}
+                        </p>
+                        <div className="text-[10px] font-medium text-[var(--muted)] truncate mt-0.5 leading-none">
+                          {formData.category.includes('/')
+                            ? formData.type === 'expense'
+                              ? formatExpenseCategory(formData.category.split('/')[0], locale)
+                              : formatIncomeCategory(formData.category.split('/')[0], locale)
+                            : t('categories.mainCategory', 'Kategori Utama')}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div
+                        className={`h-7 w-7 rounded-full aspect-square grid shrink-0 place-items-center border transition-colors ${
+                          categoryError
+                            ? 'border-rose-400/40 bg-rose-500/5 text-rose-400'
+                            : 'border border-dashed border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]'
+                        }`}
+                      >
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                      </div>
+                      <span
+                        className={`text-xs font-semibold truncate transition-colors ${
+                          categoryError ? 'text-rose-500/90 dark:text-rose-400' : 'text-[var(--muted)]'
+                        }`}
+                      >
+                        {t('addTx.selectCategory', 'Pilih Kategori')}
+                      </span>
+                    </div>
+                  )}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                      categoryError ? 'text-rose-400/70' : 'text-[var(--muted)] group-hover:text-[var(--fg)]'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Row 3: Catatan */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 h-[14px] flex items-center">
+              {t('addTx.notes', 'Catatan')}
+            </div>
+            <textarea
+              value={formData.notes || ''}
+              onChange={(e) => {
+                setFormData((p) => ({ ...p, notes: e.target.value }))
+                const el = e.target
+                el.style.height = 'auto'
+                el.style.height = `${Math.min(el.scrollHeight, 80)}px`
+              }}
+              placeholder={t('addTx.notesPlaceholder', 'Tulis catatan transaksi (opsional)...')}
+              rows={1}
+              className="w-full bg-[var(--field-bg)] rounded-xl border border-[var(--field-border,var(--border))] py-2.5 px-3.5 text-xs sm:text-sm font-normal text-[var(--fg)] outline-none placeholder:text-[var(--muted-2)]/60 hover:border-[var(--field-border-hover,var(--border-strong))] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--ring)] transition-all resize-none"
+            />
+          </div>
+
+          {/* Row 4: Lampiran Struk */}
+          <ReceiptUploadAttachment
+            inputRef={receiptInputRef}
+            containerRef={receiptSectionRef}
+            value={formData.receiptImage || formData.receipt || formData.receiptUrl || formData.image || ''}
+            onChange={(img) =>
+              setFormData((prev) => ({ ...prev, receiptImage: img || null, receipt: img || null }))
+            }
+            onView={(img) => setPreviewImage(img)}
+          />
         </div>
       </form>
+
+      {/* Wallet Select Modal */}
+      <WalletSelectModal
+        isOpen={Boolean(walletModalMode)}
+        onClose={() => setWalletModalMode(null)}
+        wallets={wallets}
+        selectedWalletId={walletModalMode === 'targetWalletId' ? formData.targetWalletId : formData.walletId}
+        onSelectWallet={handleSelectWallet}
+        title={
+          walletModalMode === 'targetWalletId'
+            ? t('tx.transferTo', 'Pilih Dompet Tujuan')
+            : formData.type === 'transfer'
+            ? t('tx.transferFrom', 'Pilih Dompet Asal')
+            : t('wallets.selectWalletTitle', 'Pilih Dompet / Akun')
+        }
+      />
+
+      {/* Category Picker Modal */}
+      <CategoryPickerModal
+        isOpen={isCatModalOpen}
+        onClose={() => setIsCatModalOpen(false)}
+        txType={formData.type || 'expense'}
+        selectedCategory={formData.category}
+        onSelectCategory={(cat) => {
+          setCategoryError(false)
+          setFormData((prev) => ({ ...prev, category: cat }))
+        }}
+      />
+
+      {/* Receipt Preview Modal */}
+      <ReceiptPreviewModal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        imageSrc={previewImage}
+        notes={formData.notes}
+        date={formData.date}
+        category={formData.category}
+        amountFormatted={formData.amount ? `${formData.amount} ${formData.currency || ''}` : null}
+        zIndex="z-[80]"
+      />
+
+      {/* AI Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        onApplyReceipt={handleApplyAiReceipt}
+        enableBackButton={false}
+      />
     </BottomSheet>
   )
 }

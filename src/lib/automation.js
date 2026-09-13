@@ -1,15 +1,40 @@
-import { addDays, addMonths, addWeeks, addYears, format } from 'date-fns'
+import { addDays, addWeeks, format } from 'date-fns'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { db } from './db'
 import { createTransaction } from '../services/transactionService'
+import useSettingsStore from '../store/useSettingsStore'
+import { formatCurrency } from './utils'
 
-function nextDateByFrequency(dateValue, frequency) {
+export function nextDateByFrequency(dateValue, frequency, anchorDay = null) {
   const freq = String(frequency || '').toLowerCase()
   if (freq === 'daily') return addDays(dateValue, 1)
   if (freq === 'weekly') return addWeeks(dateValue, 1)
-  if (freq === 'yearly') return addYears(dateValue, 1)
-  return addMonths(dateValue, 1)
+
+  const d = new Date(dateValue)
+  const effectiveAnchorDay = anchorDay != null ? Number(anchorDay) : d.getDate()
+
+  if (freq === 'yearly') {
+    const targetYear = d.getFullYear() + 1
+    const targetMonth = d.getMonth()
+    const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate()
+    const targetDay = Math.min(effectiveAnchorDay, daysInTargetMonth)
+    return new Date(targetYear, targetMonth, targetDay, d.getHours(), d.getMinutes(), d.getSeconds())
+  }
+
+  // Monthly
+  const targetYear = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
+  const targetMonth = (d.getMonth() + 1) % 12
+  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate()
+  const targetDay = Math.min(effectiveAnchorDay, daysInTargetMonth)
+  return new Date(targetYear, targetMonth, targetDay, d.getHours(), d.getMinutes(), d.getSeconds())
+}
+
+export function shouldAutoExecuteRecurring(item) {
+  if (!item) return false
+  const isEnabled = item.enabled === true || item.enabled === 1
+  if (!isEnabled) return false
+  return item.autoExecute !== false
 }
 
 function dateKey(dateValue) {
@@ -46,21 +71,27 @@ async function notifyIfAllowed(title, body) {
   }
 }
 
-export async function processRecurringTransactions() {
-  const today = new Date()
+export async function processRecurringTransactions(currentDate = new Date()) {
+  const today = currentDate instanceof Date ? currentDate : new Date(currentDate || Date.now())
   const todayKey = dateKey(today)
   const allRecurring = await db.recurringTransactions.toArray()
-  const recurringItems = allRecurring.filter((item) => item.enabled === true || item.enabled === 1)
+  const recurringItems = allRecurring.filter(shouldAutoExecuteRecurring)
+  const isEn = useSettingsStore.getState().locale === 'en'
 
   for (const item of recurringItems) {
     if (!item.nextDate || typeof item.nextDate !== 'string') continue
     let pointer = new Date(`${item.nextDate}T12:00:00`)
     if (isNaN(pointer.getTime())) continue
 
+    const anchorDay = item.anchorDay || parseInt(String(item.nextDate).split('-')[2], 10) || pointer.getDate()
+
+    let loopCount = 0
     while (dateKey(pointer) <= todayKey) {
+      if (++loopCount > 366) break
       const currentDateKey = dateKey(pointer)
-      const nextPointer = nextDateByFrequency(pointer, item.frequency)
+      const nextPointer = nextDateByFrequency(pointer, item.frequency, anchorDay)
       const nextKey = dateKey(nextPointer)
+      if (nextKey <= currentDateKey) break
 
       const txData = {
         date: currentDateKey,
@@ -76,9 +107,39 @@ export async function processRecurringTransactions() {
 
       try {
         await createTransaction(txData)
-        await db.recurringTransactions.update(item.id, { nextDate: nextKey })
-      } catch {
-        // If an error occurs, break out to prevent infinite loop
+        await db.recurringTransactions.update(item.id, { nextDate: nextKey, anchorDay })
+
+        try {
+          await db.notifications.add({
+            type: 'recurring_auto',
+            title: isEn ? 'Recurring Bill Auto-Logged' : 'Tagihan Rutin Dicatat Otomatis',
+            message: isEn
+              ? `Auto-logged "${item.title}" for ${formatCurrency(item.amount, item.currency || 'IDR', 'en')}`
+              : `Tagihan "${item.title}" sebesar ${formatCurrency(item.amount, item.currency || 'IDR', 'id')} telah dicatat otomatis ke dompet.`,
+            read: false,
+            relatedId: item.id,
+            createdAt: Date.now(),
+          })
+        } catch {
+          // Ignore notification storage error
+        }
+      } catch (err) {
+        // When execution fails, advance nextDate to next cycle and notify user rather than freezing execution indefinitely
+        try {
+          await db.recurringTransactions.update(item.id, { nextDate: nextKey, anchorDay })
+          await db.notifications.add({
+            type: 'recurring_failed',
+            title: isEn ? 'Recurring Bill Execution Failed' : 'Gagal Mencatat Tagihan Rutin',
+            message: isEn
+              ? `Failed to auto-log "${item.title}": ${err?.message || 'Unknown error'}. Advanced to next cycle.`
+              : `Gagal mencatat transaksi rutin "${item.title}": ${err?.message || 'Terjadi kesalahan'}. Jadwal dialihkan ke periode berikutnya.`,
+            read: false,
+            relatedId: item.id,
+            createdAt: Date.now(),
+          })
+        } catch {
+          // Ignore secondary notification/update errors
+        }
         break
       }
 
@@ -103,8 +164,13 @@ export async function notifyTodayEvents() {
   }
 
   const activeRecurring = recurring.filter((item) => item.enabled === true || item.enabled === 1)
+  const isEn = useSettingsStore.getState().locale === 'en'
   for (const item of activeRecurring) {
-    await notifyIfAllowed('Pengingat Tagihan Rutin', `${item.title} (${item.frequency}) jatuh tempo hari ini!`)
+    const title = isEn ? 'Recurring Bill Reminder' : 'Pengingat Tagihan Rutin'
+    const body = isEn
+      ? `${item.title} (${item.frequency}) is due today!`
+      : `${item.title} (${item.frequency}) jatuh tempo hari ini!`
+    await notifyIfAllowed(title, body)
   }
 
   localStorage.setItem(marker, '1')

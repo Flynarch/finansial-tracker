@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { matchPath, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -38,7 +39,15 @@ export default function SettingsLayout() {
           </div>
         </header>
       ) : null}
-      <Outlet />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-[30vh]">
+            <div className="h-6 w-6 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
     </div>
   )
 }

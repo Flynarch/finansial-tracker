@@ -9,8 +9,6 @@ import {
   addExpenseSubcategory,
   getMergedExpenseTree,
   isBuiltinExpenseChild,
-  removeExpenseParentCategory,
-  removeExpenseSubcategory,
   updateExpenseCategoryName,
   EXPENSE_CATEGORY_CUSTOM_CHANGED_EVENT,
 } from '../../lib/expenseCategories'
@@ -18,11 +16,13 @@ import {
   addIncomeSubcategory,
   getMergedIncomeTree,
   isBuiltinIncomeChild,
-  removeIncomeParentCategory,
-  removeIncomeSubcategory,
   updateIncomeCategoryName,
   INCOME_CATEGORY_CUSTOM_CHANGED_EVENT,
 } from '../../lib/incomeCategories'
+import {
+  cascadeDeleteParentCategory,
+  cascadeDeleteSubcategory,
+} from '../../lib/categoryCleanup'
 
 export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense', selectedCategory, onSelectCategory }) {
   const { locale, t } = useTranslation()
@@ -141,16 +141,15 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
     })
   }
 
-  const confirmDeleteCategory = () => {
+  const confirmDeleteCategory = async () => {
     if (!deleteTarget) return
     if (deleteTarget.type === 'sub') {
-      if (txType === 'expense') removeExpenseSubcategory(deleteTarget.parentId, deleteTarget.childId)
-      else removeIncomeSubcategory(deleteTarget.parentId, deleteTarget.childId)
+      await cascadeDeleteSubcategory(deleteTarget.parentId, deleteTarget.childId, txType)
     } else if (deleteTarget.type === 'parent') {
-      if (txType === 'expense') removeExpenseParentCategory(deleteTarget.parentId)
-      else removeIncomeParentCategory(deleteTarget.parentId)
+      await cascadeDeleteParentCategory(deleteTarget.parentId, txType)
       if (activeParentId === deleteTarget.parentId) setActiveParentId(null)
     }
+    setCategoryVersion((v) => v + 1)
     setDeleteTarget(null)
   }
 

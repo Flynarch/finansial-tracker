@@ -1,5 +1,7 @@
+import 'fake-indexeddb/auto'
 import { describe, it, expect } from 'vitest'
-import { computeWalletBalance, computeAllWalletBalances } from '../src/lib/db'
+import { computeWalletBalance, computeAllWalletBalances, db } from '../src/lib/db'
+import { getAllWalletBalances, invalidateAllBalances } from '../src/lib/balanceEngine'
 
 describe('balanceEngine - computeWalletBalance & computeAllWalletBalances', () => {
   const sampleWallet = {
@@ -57,5 +59,69 @@ describe('balanceEngine - computeWalletBalance & computeAllWalletBalances', () =
     const computed = computeAllWalletBalances(wallets, transactions)
     expect(computed[0].currentBalance).toBe(400000)
     expect(computed[1].currentBalance).toBe(150000)
+  })
+
+  it('never credits targetWalletId in computeAllWalletBalances if transaction type is not transfer', () => {
+    const wallets = [
+      { id: 1, name: 'BCA', currency: 'IDR', balance: 500000 },
+      { id: 2, name: 'GoPay', currency: 'IDR', balance: 100000 },
+    ]
+
+    // An expense transaction that happens to have a lingering targetWalletId
+    const transactions = [
+      { id: 401, walletId: 1, targetWalletId: 2, type: 'expense', amount: 50000, currency: 'IDR' },
+    ]
+
+    const computed = computeAllWalletBalances(wallets, transactions)
+    // Wallet 1 should decrease by 50,000 -> 450,000
+    expect(computed[0].currentBalance).toBe(450000)
+    // Wallet 2 should NOT increase because this is an expense, not a transfer -> stays 100,000
+    expect(computed[1].currentBalance).toBe(100000)
+  })
+
+  it('handles string wallet IDs and numeric wallet IDs consistently', () => {
+    const wallets = [
+      { id: 'wallet_abc', name: 'Cash', currency: 'IDR', balance: 200000 },
+      { id: 'wallet_xyz', name: 'Bank', currency: 'IDR', balance: 500000 },
+    ]
+
+    const transactions = [
+      { id: 501, walletId: 'wallet_abc', targetWalletId: 'wallet_xyz', type: 'transfer', amount: 50000, currency: 'IDR' },
+    ]
+
+    const computed = computeAllWalletBalances(wallets, transactions)
+    expect(computed[0].currentBalance).toBe(150000)
+    expect(computed[1].currentBalance).toBe(550000)
+  })
+
+  it('getAllWalletBalances recomputes all uncached wallets in a single batch pass', async () => {
+    await db.wallets.clear()
+    await db.transactions.clear()
+    await invalidateAllBalances()
+
+    const w1Id = await db.wallets.add({ name: 'Dompet A', balance: 500000, currency: 'IDR' })
+    const w2Id = await db.wallets.add({ name: 'Dompet B', balance: 200000, currency: 'IDR' })
+
+    await db.transactions.add({
+      walletId: w1Id,
+      type: 'expense',
+      amount: 100000,
+      currency: 'IDR',
+      date: '2026-03-01',
+    })
+
+    await db.transactions.add({
+      walletId: w2Id,
+      type: 'income',
+      amount: 50000,
+      currency: 'IDR',
+      date: '2026-03-01',
+    })
+
+    const wallets = await db.wallets.toArray()
+    const balances = await getAllWalletBalances(wallets)
+
+    expect(balances.find((w) => w.id === w1Id)?.currentBalance).toBe(400000)
+    expect(balances.find((w) => w.id === w2Id)?.currentBalance).toBe(250000)
   })
 })

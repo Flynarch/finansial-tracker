@@ -68,8 +68,8 @@ export default function InAppNotificationToast() {
     }
 
     // Process only recent notifications (created in the last 15 seconds)
-    const createdTime = new Date(latestNotification.createdAt).getTime()
-    if (Date.now() - createdTime > 15000) {
+    const createdTime = latestNotification.createdAt ? new Date(latestNotification.createdAt).getTime() : 0
+    if (isNaN(createdTime) || createdTime <= 0 || Date.now() - createdTime > 15000) {
       lastProcessedIdRef.current = notifId
       return
     }

@@ -18,7 +18,7 @@ import {
 import CategoryIcon from '../ui/CategoryIcon'
 import TransactionEditSheet from '../transactions/TransactionEditSheet'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
-import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
+import { formatCurrency, formatMoneyValueForInput, parseMoneyInput } from '../../lib/utils'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
 import { deleteTransaction, updateTransaction } from '../../services/transactionService'
@@ -172,7 +172,7 @@ export default function AiDigitalReceipt({
   }
 
   const getWalletInfo = (walletId) => {
-    return wallets.find((w) => w.id === walletId)
+    return wallets.find((w) => String(w.id) === String(walletId))
   }
 
   // Edit Handlers using the standard form
@@ -181,11 +181,14 @@ export default function AiDigitalReceipt({
     const txCurrency = tx.currency || defaultCurrency
     setEditFormData({
       date: tx.date || format(new Date(), 'yyyy-MM-dd'),
-      amount: formatMoneyInput(String(tx.amount || ''), txCurrency),
+      amount: formatMoneyValueForInput(tx.amount, txCurrency),
       type: tx.type || 'expense',
       category: tx.category || '',
       notes: tx.notes || '',
       currency: txCurrency,
+      walletId: tx.walletId,
+      targetWalletId: tx.targetWalletId || '',
+      receiptImage: tx.receiptImage || null,
     })
   }
 
@@ -200,6 +203,9 @@ export default function AiDigitalReceipt({
       category: editFormData.category,
       notes: editFormData.notes,
       currency: editFormData.currency,
+      walletId: editFormData.walletId,
+      targetWalletId: editFormData.targetWalletId || '',
+      receiptImage: editFormData.receiptImage || null,
     }
 
     try {
@@ -253,24 +259,29 @@ export default function AiDigitalReceipt({
         {/* Top Accent Line */}
         <div className={`h-1 w-full bg-gradient-to-r ${contextualTheme.line}`} />
 
-        {/* Unified Compact Header (Store/Merchant + Status Badge + Date) */}
-        <div className="px-3 py-2 border-b border-[var(--border)]/40 bg-[var(--field-bg)]/40 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
+        {/* Unified Fintech Ticket Header (Store/Merchant + Verified AI Badge + Date) */}
+        <div className="px-3.5 py-2.5 border-b border-[var(--border)]/40 bg-[var(--field-bg)]/50 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {activeMerchant ? (
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--accent)]/15 text-[var(--accent)]">
-                <Store className="h-3 w-3" />
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
+                <Store className="h-3.5 w-3.5" />
               </div>
             ) : (
-              <div className={`p-1 rounded-md ${contextualTheme.badge} border flex items-center justify-center shrink-0`}>
-                <CheckCircle2 className="h-3 w-3" />
+              <div className={`p-1.5 rounded-lg ${contextualTheme.badge} border flex items-center justify-center shrink-0 shadow-2xs`}>
+                <CheckCircle2 className="h-3.5 w-3.5" />
               </div>
             )}
-            <span className="text-xs font-extrabold text-[var(--fg)] truncate">
-              {activeMerchant || contextualTheme.title}
-            </span>
+            <div className="min-w-0">
+              <span className="block text-xs font-black text-[var(--fg)] truncate leading-tight">
+                {activeMerchant || contextualTheme.title}
+              </span>
+              <span className="block text-[9px] font-semibold text-[var(--muted)] truncate">
+                {t('ai.digitalReceiptHeader', 'Struk Digital FinTrack AI')}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 text-[10px] font-bold text-[var(--muted)] shrink-0 tabular-nums">
+          <div className="flex items-center gap-1 text-[10px] font-bold text-[var(--muted)] shrink-0 tabular-nums bg-[var(--panel)] px-2 py-0.5 rounded-md border border-[var(--border)]/60">
             <Calendar className="h-2.5 w-2.5" />
             <span>{receiptDate}</span>
           </div>
@@ -383,7 +394,7 @@ export default function AiDigitalReceipt({
                     <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
                       {t('addTx.notes', 'Catatan')}
                     </span>
-                    <p className="text-[11px] text-[var(--fg)] italic line-clamp-2 break-words mt-0.5">
+                    <p className="text-[11px] text-[var(--fg)] italic line-clamp-2 break-words [overflow-wrap:anywhere] mt-0.5">
                       &ldquo;{tx.notes}&rdquo;
                     </p>
                   </div>
@@ -531,29 +542,40 @@ export default function AiDigitalReceipt({
           </div>
         )}
 
-        {/* ── Compact Perforated Tear Line ────────────── */}
-        <div className="relative flex items-center px-3 py-0.5">
-          <div className="absolute -left-2 h-3.5 w-3.5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]" />
-          <div className="w-full border-t border-dashed border-[var(--border-strong)]/50" />
-          <div className="absolute -right-2 h-3.5 w-3.5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]" />
+        {/* ── Pronounced Perforated Ticket Notches & Tear Line ────────────── */}
+        <div className="relative flex items-center px-3 py-1 my-0.5">
+          <div className="absolute -left-3 h-5 w-5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_-2px_0_3px_rgba(0,0,0,0.15)]" />
+          <div className="w-full border-t-2 border-dashed border-[var(--border-strong)]/40" />
+          <div className="absolute -right-3 h-5 w-5 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_2px_0_3px_rgba(0,0,0,0.15)]" />
+        </div>
+
+        {/* Decorative Mini Barcode */}
+        <div className="px-4 pt-1 flex items-center justify-center gap-[2px] opacity-30 select-none overflow-hidden" aria-hidden="true">
+          {[2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 4, 1, 3, 2, 1, 3, 1, 2, 4, 1, 2, 3].map((w, i) => (
+            <div
+              key={i}
+              className="h-3 bg-[var(--fg)] rounded-xs shrink-0"
+              style={{ width: `${w}px` }}
+            />
+          ))}
         </div>
 
         {/* ── Compact Receipt Footer (Ref Code & Verification) ───────── */}
-        <div className="px-3 py-1.5 bg-[var(--field-bg)]/40 flex items-center justify-between text-[10px]">
+        <div className="px-3.5 py-2 bg-[var(--field-bg)]/40 flex items-center justify-between text-[10px]">
           <div className="flex items-center gap-1.5 font-mono text-[var(--muted)]">
             <Receipt className="h-3 w-3 text-[var(--accent)]" />
-            <span>{refCode}</span>
+            <span className="tracking-wide font-bold">{refCode}</span>
             <button
               type="button"
               onClick={handleCopyRef}
-              className="p-0.5 hover:text-[var(--fg)] transition cursor-pointer"
+              className="p-1 hover:text-[var(--fg)] hover:bg-[var(--panel)] rounded transition cursor-pointer"
               title={t('common.copyRef', 'Salin No. Referensi')}
             >
-              {copiedRef ? <Check className="h-2.5 w-2.5 text-emerald-500" /> : <Copy className="h-2.5 w-2.5" />}
+              {copiedRef ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
             </button>
           </div>
 
-          <span className={`font-bold text-[9px] uppercase tracking-wider ${contextualTheme.tag}`}>
+          <span className={`font-black text-[9.5px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--panel)] border border-[var(--border)]/60 ${contextualTheme.tag}`}>
             FinTrack Verified
           </span>
         </div>

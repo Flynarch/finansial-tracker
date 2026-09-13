@@ -1,8 +1,8 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import CategoryIcon from '../ui/CategoryIcon'
-import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
+import { Paperclip } from 'lucide-react'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -10,6 +10,9 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   highlightedTransactionId,
   openEditTransaction,
   deleteTransaction,
+  onDelete,
+  onViewDetail,
+  onPreviewReceipt,
   setSwipedTransactionId,
   getSwipeHandlers,
   getCategoryColorClass,
@@ -22,28 +25,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   formatCurrency,
   convertCurrency,
   rates,
-  setApiError,
-  setApiErrorTone,
   contextWalletId,
   wallets: walletsProp,
   newestTransactionId,
+  isBulkMode,
+  isSelected,
+  onToggleSelect,
 }) {
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-
-  const handleConfirmDelete = async () => {
-    try {
-      if (setApiError) setApiError('')
-      if (setApiErrorTone) setApiErrorTone('error')
-      await deleteTransaction(transaction.id)
-      if (setSwipedTransactionId) setSwipedTransactionId((prev) => (prev === transaction.id ? null : prev))
-      setIsDeleteModalOpen(false)
-    } catch {
-      const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-      if (setApiError) setApiError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
-      if (setApiErrorTone) setApiErrorTone('error')
-    }
-  }
-
   const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : []
 
   const getWalletName = (id) => {
@@ -90,7 +78,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       amountColorClass = 'ft-expense-text'
     } else {
       // Global view
-      colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
+      colorClass = 'ft-transfer-soft border border-[color-mix(in_srgb,var(--status-transfer)_25%,transparent)]'
       const fromName = getWalletName(transaction.walletId)
       const toName = getWalletName(transaction.targetWalletId)
       labels = {
@@ -98,7 +86,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         sub: `${fromName} -> ${toName}`,
       }
       amountPrefix = ''
-      amountColorClass = 'text-[var(--accent)]'
+      amountColorClass = 'ft-transfer-text'
     }
   }
 
@@ -127,17 +115,30 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end px-5 opacity-0 transition-colors duration-150 w-full" />
 
       <article
-        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 bg-[var(--panel-strong)] border-r border-[var(--border)]/60 transition-colors ${
+        className={`relative z-10 flex touch-pan-y items-center justify-between gap-3 p-3 sm:px-4 bg-[var(--panel-strong)] border-r border-[var(--border)]/60 transition-colors cursor-pointer active:bg-[var(--panel)] ${
           highlightedTransactionId === String(transaction.id)
             ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/50'
+            : isSelected
+            ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/30'
             : ''
         }`}
         onClick={() => {
           if (isSwiped && setSwipedTransactionId) {
             setSwipedTransactionId(null)
+            return
+          }
+          if (isBulkMode && onToggleSelect) {
+            onToggleSelect()
+            return
+          }
+          if (onViewDetail) {
+            onViewDetail(transaction)
           }
         }}
-        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, { onEdit: () => openEditTransaction?.(transaction), onDelete: () => setIsDeleteModalOpen(true) }) : {})}
+        {...(getSwipeHandlers ? getSwipeHandlers(transaction.id, {
+          onEdit: () => openEditTransaction?.(transaction),
+          onDelete: () => (onDelete ? onDelete(transaction) : deleteTransaction?.(transaction.id)),
+        }) : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* Avatar Icon */}
@@ -194,21 +195,16 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <p className="truncate text-sm font-extrabold text-[var(--fg)] leading-tight">{labels.main}</p>
-              {transaction.isSplit ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 border border-purple-500/30 px-1.5 py-0.2 text-[9px] font-extrabold text-purple-500 shrink-0">
+              {transaction.isSplit && Array.isArray(transaction.splitItems) && transaction.splitItems.length > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-[var(--split-bill-soft)] border border-[var(--split-bill)]/30 px-1.5 py-0.2 text-[9px] font-extrabold text-[var(--split-bill)] shrink-0">
                   <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 9 15"/><path d="M3 21l6-6"/></svg>
-                  <span>Split ({transaction.splitItems?.length || 0})</span>
+                  <span>Split ({transaction.splitItems.length})</span>
                 </span>
               ) : null}
               {String(transaction.notes || '').includes('(Auto:') ? (
                 <span className="inline-flex items-center gap-0.5 rounded-md bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)] shrink-0" title={t('tx.autoRecurringTooltip', 'Otomatis dari jadwal berulang')}>
                   <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                   <span>Auto</span>
-                </span>
-              ) : null}
-              {newestTransactionId && String(transaction.id) === String(newestTransactionId) ? (
-                <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white shrink-0">
-                  BARU
                 </span>
               ) : null}
             </div>
@@ -231,7 +227,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
             {/* Line 3: Notes (Dedicated Line with line-clamp-2) */}
             {noteStr ? (
-              <p className="mt-0.5 text-[11px] italic leading-tight text-[var(--muted)] line-clamp-2 break-words">
+              <p className="mt-0.5 text-[11px] italic leading-tight text-[var(--muted)] line-clamp-2 break-words [overflow-wrap:anywhere] break-all">
                 &ldquo;{noteStr}&rdquo;
               </p>
             ) : null}
@@ -252,38 +248,66 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           </div>
         </div>
 
-        {/* Amount */}
-        <div className="shrink-0 max-w-[45%] pl-2 text-right">
-          <p
-            className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
-          >
-            {amountPrefix}
-            {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
-          </p>
-          {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (
-            <p className="ft-muted break-all text-[10px] tabular-nums mt-0.5">
-              ≈{' '}
-              {formatCurrency(
-                convertCurrency(
-                  transaction.amount,
-                  transaction.currency || defaultCurrency,
-                  defaultCurrency,
-                  rates,
-                ),
-                defaultCurrency,
-              )}
-            </p>
-          ) : null}
-        </div>
-      </article>
+        {/* Right Section: Amount & Strictly Right-Aligned Badges */}
+        {(() => {
+          const receiptSrc = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
+          const isNewest = Boolean(newestTransactionId && String(transaction.id) === String(newestTransactionId))
 
-      <ConfirmDeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title={t('tx.item.delete') || 'Hapus Transaksi'}
-        message={t('tx.item.deleteConfirm') || 'Apakah Anda yakin ingin menghapus transaksi ini?'}
-      />
+          return (
+            <div className="shrink-0 max-w-[48%] pl-2 text-right flex flex-col items-end justify-center ml-auto">
+              <p
+                className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
+              >
+                {amountPrefix}
+                {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
+              </p>
+              {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (
+                <p className="ft-muted break-all text-[10px] tabular-nums mt-0.5">
+                  ≈{' '}
+                  {formatCurrency(
+                    convertCurrency(
+                      transaction.amount,
+                      transaction.currency || defaultCurrency,
+                      defaultCurrency,
+                      rates,
+                    ),
+                    defaultCurrency,
+                  )}
+                </p>
+              ) : null}
+
+              {/* Right-aligned Badges: Struk Attachment & BARU */}
+              {isNewest || receiptSrc ? (
+                <div className="mt-1.5 flex items-center justify-end gap-1.5 flex-wrap ml-auto">
+                  {receiptSrc ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (onPreviewReceipt) {
+                          onPreviewReceipt(transaction)
+                        } else if (onViewDetail) {
+                          onViewDetail(transaction)
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md bg-[var(--receipt-soft)] border border-[var(--receipt)]/30 px-1.5 py-0.5 text-[9.5px] font-extrabold text-[var(--receipt)] hover:bg-[var(--receipt)]/25 transition shrink-0 cursor-pointer shadow-2xs leading-normal active:scale-95"
+                      title={t('transactions.viewReceipt', 'Lihat Bukti Transaksi')}
+                    >
+                      <Paperclip className="h-2.5 w-2.5 shrink-0" />
+                      <span>{t('transactions.receiptBadge', 'Struk')}</span>
+                    </button>
+                  ) : null}
+                  {isNewest ? (
+                    <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[9.5px] font-black tracking-wider text-white shrink-0 uppercase leading-normal shadow-2xs">
+                      {t('common.new', 'BARU')}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          )
+        })()}
+      </article>
     </div>
   )
 }, (prevProps, nextProps) => {
@@ -292,11 +316,16 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     (prevProps.swipedTransactionId === prevProps.transaction?.id) === (nextProps.swipedTransactionId === nextProps.transaction?.id) &&
     (prevProps.isSwipingId === prevProps.transaction?.id) === (nextProps.isSwipingId === nextProps.transaction?.id) &&
     (prevProps.highlightedTransactionId === String(prevProps.transaction?.id)) === (nextProps.highlightedTransactionId === String(nextProps.transaction?.id)) &&
-    (prevProps.newestTransactionId === prevProps.transaction?.id) === (nextProps.newestTransactionId === nextProps.transaction?.id) &&
+    (String(prevProps.newestTransactionId) === String(prevProps.transaction?.id)) === (String(nextProps.newestTransactionId) === String(nextProps.transaction?.id)) &&
+    prevProps.isBulkMode === nextProps.isBulkMode &&
+    prevProps.isSelected === nextProps.isSelected &&
     prevProps.locale === nextProps.locale &&
     prevProps.defaultCurrency === nextProps.defaultCurrency &&
     prevProps.rates === nextProps.rates &&
     prevProps.contextWalletId === nextProps.contextWalletId &&
-    prevProps.wallets === nextProps.wallets
+    prevProps.wallets === nextProps.wallets &&
+    prevProps.onViewDetail === nextProps.onViewDetail &&
+    prevProps.onPreviewReceipt === nextProps.onPreviewReceipt &&
+    prevProps.onDelete === nextProps.onDelete
   )
 })

@@ -25,7 +25,7 @@ export default function TransactionTypeSelector({ txType, onSelectType }) {
               ? 'var(--expense)'
               : txType === 'income'
               ? 'var(--income)'
-              : '#3b82f6',
+              : 'var(--transfer)',
         }}
       />
 

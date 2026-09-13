@@ -29,7 +29,12 @@ export async function deleteCloudBackup(uid) {
   }
 }
 
-export async function uploadLatestBackup(uid, payload) {
+export async function uploadLatestBackup(uid, payload, options = {}) {
+  const { isEncrypted = false } = options
+  if (!isEncrypted || payload?.format !== 'fintrack_encrypted_envelope') {
+    console.error('Refusing to upload unencrypted backup data to cloud storage.')
+    return null
+  }
   const storage = getFirebaseStorage()
   const db = getFirebaseDb()
 
@@ -40,6 +45,7 @@ export async function uploadLatestBackup(uid, payload) {
     contentType: 'application/json',
     customMetadata: {
       exportedAt: String(payload?.exportedAt || ''),
+      isEncrypted: String(Boolean(isEncrypted)),
       app: 'FinTrack',
     },
   })
@@ -51,6 +57,7 @@ export async function uploadLatestBackup(uid, payload) {
       lastBackupAt: serverTimestamp(),
       lastBackupExportedAt: payload?.exportedAt || null,
       lastBackupUrl: url,
+      isEncrypted: Boolean(isEncrypted),
       app: 'FinTrack',
     },
     { merge: true },

@@ -122,6 +122,7 @@ export function autoDetectCategoryIcon(name, type = 'expense') {
   if (/kado|hadiah|gift|giveaway|undian/i.test(s)) return 'gift'
   if (/amal|donasi|sedekah|zakat|infaq|charity|sosial/i.test(s)) return 'heart'
   if (/teman|kumpul|nongkrong|hangout|people/i.test(s)) return 'people'
+  if (/tabungan|saving|celengan|cairkan/i.test(s)) return 'wallet'
 
   return type === 'income' ? 'income' : 'food'
 }
@@ -197,6 +198,16 @@ export function getCategoryToneClass(tone) {
       return 'bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/25'
     case 'yellow':
       return 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border border-yellow-500/25'
+    case 'cyan':
+      return 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25'
+    case 'violet':
+      return 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/25'
+    case 'fuchsia':
+      return 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-500/25'
+    case 'lime':
+      return 'bg-lime-500/15 text-lime-600 dark:text-lime-400 border border-lime-500/25'
+    case 'blue':
+      return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
     default:
       return null
   }
@@ -333,6 +344,13 @@ export function getTransactionCategoryLabels(rawCategory, txType, locale = 'id')
       }
     }
     
+    if (rawCategory === 'tabungan') {
+      return {
+        main: lang === 'en' ? 'Savings' : 'Tabungan',
+        sub: null,
+      }
+    }
+    
     // Fallback for missing/custom categories
     const parts = String(rawCategory || '').split('/')
     return { 
@@ -364,6 +382,20 @@ export function getTransactionCategoryLabels(rawCategory, txType, locale = 'id')
       }
     }
 
+    if (rawCategory === 'cairkan_tabungan') {
+      return {
+        main: lang === 'en' ? 'Liquidate Savings' : 'Cairkan Tabungan',
+        sub: null,
+      }
+    }
+
+    if (rawCategory === 'tabungan') {
+      return {
+        main: lang === 'en' ? 'Savings' : 'Tabungan',
+        sub: null,
+      }
+    }
+
     const parts = String(rawCategory || '').split('/')
     return { 
       main: formatFallback(parts[0]) || rawCategory, 
@@ -372,6 +404,19 @@ export function getTransactionCategoryLabels(rawCategory, txType, locale = 'id')
   }
 
   // Fallback for transfer or other types
+  if (rawCategory === 'cairkan_tabungan') {
+    return {
+      main: lang === 'en' ? 'Liquidate Savings' : 'Cairkan Tabungan',
+      sub: null,
+    }
+  }
+  if (rawCategory === 'tabungan') {
+    return {
+      main: lang === 'en' ? 'Savings' : 'Tabungan',
+      sub: null,
+    }
+  }
+
   const parts = String(rawCategory || '').split('/')
   return { 
     main: formatFallback(parts[0]) || rawCategory, 
@@ -384,6 +429,13 @@ export function formatCategoryName(rawCategory, locale = 'id') {
   const lang = locale === 'en' ? 'en' : 'id'
   const parentId = String(rawCategory).split('/')[0].trim()
   
+  if (parentId === 'cairkan_tabungan') {
+    return lang === 'en' ? 'Liquidate Savings' : 'Cairkan Tabungan'
+  }
+  if (parentId === 'tabungan') {
+    return lang === 'en' ? 'Savings' : 'Tabungan'
+  }
+
   const expenseParsed = parseExpenseCategoryPath(parentId)
   if (expenseParsed?.parent?.names?.[lang]) {
     return expenseParsed.parent.names[lang]

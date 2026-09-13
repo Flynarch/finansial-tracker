@@ -7,7 +7,6 @@ import ToastBanner from '../ui/ToastBanner'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import CategoryIcon from '../ui/CategoryIcon'
-import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -37,7 +36,8 @@ import {
   fetchCurrencyRates,
   getCachedCurrencyRates,
 } from '../../lib/api'
-import { db, computeAllWalletBalances } from '../../lib/db'
+import { db } from '../../lib/db'
+import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
   formatMoneyInput,
@@ -52,6 +52,9 @@ import AmountInput from './quick-add/AmountInput'
 import CategorySheet from './quick-add/CategorySheet'
 import InvestmentForm from './quick-add/InvestmentForm'
 import TagInput from './quick-add/TagInput'
+import ReceiptUploadAttachment from './ReceiptUploadAttachment'
+import ReceiptPreviewModal from './ReceiptPreviewModal'
+import ReceiptScannerModal from './ReceiptScannerModal'
 
 const investmentSubByType = {
   emas: 'emas',
@@ -82,7 +85,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     currency: defaultCurrency,
     walletId: initialWalletId || defaultWalletId || '',
     targetWalletId: '',
+    receiptImage: '',
   }))
+  const [previewImage, setPreviewImage] = useState(null)
   const [investmentForm, setInvestmentForm] = useState(() => ({
     action: 'buy',
     investmentId: '',
@@ -98,8 +103,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }))
 
   const ownedInvestments = useLiveQuery(() => db.investments.toArray(), [], [])
-  const rawWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
-  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [], [])
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   useEffect(() => {
@@ -108,9 +111,15 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       .catch(() => {})
   }, [])
 
-  const wallets = useMemo(() => {
-    return computeAllWalletBalances(rawWallets || [], allTransactions || [], rates)
-  }, [rawWallets, allTransactions, rates])
+  const wallets = useLiveQuery(
+    async () => {
+      const raw = await db.wallets.toArray()
+      if (!raw || raw.length === 0) return []
+      return await getAllWalletBalances(raw, rates)
+    },
+    [rates],
+    []
+  )
 
   const [walletModalMode, setWalletModalMode] = useState(null)
   const [tags, setTags] = useState([])
@@ -128,12 +137,13 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     setTags((prev) => prev.filter((t) => t !== tagToRemove))
   }
 
-  const openQuickLog = useChatStore((s) => s.openQuickLog)
+  const receiptInputRef = useRef(null)
+  const receiptSectionRef = useRef(null)
 
-  const handleOpenAiScan = useCallback(() => {
-    onClose?.()
-    openQuickLog({ autoScan: true })
-  }, [onClose, openQuickLog])
+  const handleTriggerReceiptUpload = useCallback(() => {
+    receiptInputRef.current?.click()
+    receiptSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [])
 
   const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
   const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
@@ -166,8 +176,36 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false)
+
+  const handleApplyAiReceipt = useCallback((scanResult, imagePreview) => {
+    if (!scanResult) return
+    setIsReceiptScannerOpen(false)
+    setForm((prev) => {
+      const nextAmount = scanResult.amount ? formatMoneyInput(String(scanResult.amount), prev.currency) : prev.amount
+      const nextDate = scanResult.date || prev.date
+      const nextNotes = scanResult.notes || scanResult.merchant || prev.notes
+      let nextCat = prev.category
+      if (scanResult.category && isValidExpenseCategoryPath(scanResult.category)) {
+        nextCat = scanResult.category
+      }
+      return {
+        ...prev,
+        amount: nextAmount,
+        date: nextDate,
+        notes: nextNotes,
+        category: nextCat,
+        receiptImage: imagePreview || prev.receiptImage,
+      }
+    })
+    hapticSuccess()
+  }, [])
 
   useBackButton(() => {
+    if (isReceiptScannerOpen) {
+      setIsReceiptScannerOpen(false)
+      return
+    }
     if (walletModalMode) {
       setWalletModalMode(null)
       return
@@ -281,7 +319,9 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         currency: defaultCurrency,
         walletId: initialWalletId || (wallets?.length > 0 ? wallets[0].id : ''),
         targetWalletId: '',
+        receiptImage: '',
       }))
+      setPreviewImage(null)
       syncExpenseParentFromCategory('')
       syncIncomeParentFromCategory('')
       setExpenseParentId(null)
@@ -381,7 +421,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       : txType === 'income'
       ? 'var(--income)'
       : txType === 'transfer'
-      ? '#3b82f6'
+      ? 'var(--transfer)'
       : 'var(--accent)'
 
   const handleSwapTransferWallets = useCallback(() => {
@@ -564,6 +604,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             fundingSource: investmentForm.fundingSource,
           })
           if (investmentForm.fundingSource === 'balance') {
+            const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
             await addTransaction({
               date: effectiveDate,
               amount: totalAmount,
@@ -571,7 +612,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               category: `investasi_pengeluaran/${investmentSub}`,
               notes: `Buy ${investmentName}`,
               currency: selectedCurrency,
+              walletId: effectiveWalletId,
               createdAt,
+              isExcludeFromAnalytics: true,
+              isExcludeAnalyticsTx: true,
+              excludeFromAnalytics: true,
             })
           }
         } else {
@@ -605,6 +650,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             fundingSource: investmentForm.fundingSource,
           })
           if (investmentForm.fundingSource === 'balance') {
+            const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
             await addTransaction({
               date: effectiveDate,
               amount: totalAmount,
@@ -612,7 +658,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               category: `investasi/${investmentSub}`,
               notes: `Sell ${selectedOwnedInvestment.name}`,
               currency: selectedCurrency,
+              walletId: effectiveWalletId,
               createdAt,
+              isExcludeFromAnalytics: true,
+              isExcludeAnalyticsTx: true,
+              excludeFromAnalytics: true,
             })
           }
         }
@@ -668,22 +718,53 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           walletId: Number(form.walletId),
           targetWalletId: txType === 'transfer' ? Number(form.targetWalletId) : undefined,
           tags: tags.length > 0 ? tags : undefined,
+          receiptImage: form.receiptImage || undefined,
         })
         hapticSuccess()
       }
       onClose?.()
-    } catch {
+    } catch (err) {
       hapticWarning()
-      setSubmitError('Gagal menyimpan transaksi. Cek kembali data Anda.')
+      setSubmitError(err?.message || t('common.error.saveFailed'))
     }
   }
 
   return (
-    <Modal key={nonce} isOpen={isOpen} title={t('addTx.title')} onClose={onClose}>
+    <Modal
+      key={nonce}
+      isOpen={isOpen}
+      title={t('addTx.title')}
+      onClose={onClose}
+      maxHeight="max-h-[95dvh]"
+      scrollable={true}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="w-1/3 h-[44px] rounded-xl text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] border border-[var(--border)] bg-[var(--field-bg)] transition-colors cursor-pointer active:scale-[0.98]"
+            onClick={onClose}
+          >
+            {t('addTx.cancel')}
+          </button>
+          <button
+            type="submit"
+            form="quick-add-transaction-form"
+            style={{
+              backgroundColor: modeAccent,
+            }}
+            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
+              txType === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
+            }`}
+          >
+            {t('addTx.save', 'Simpan')}
+          </button>
+        </div>
+      }
+    >
       {submitError ? <ToastBanner message={submitError} /> : null}
 
       {/* Mode Toggle - Sliding Segmented Track */}
-      <div className="mb-4">
+      <div className="mb-3">
         <TransactionTypeSelector
           txType={txType}
           onSelectType={handleSelectType}
@@ -691,7 +772,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       </div>
 
       {/* Form Content */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id="quick-add-transaction-form" onSubmit={handleSubmit} className="space-y-3">
         {txType === 'investment' ? (
           <InvestmentForm
             form={investmentForm}
@@ -715,13 +796,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               }}
               isCashWallet={isCashWallet}
               txType={txType}
-              onOpenAiScan={handleOpenAiScan}
+              onOpenAiScan={() => setIsReceiptScannerOpen(true)}
+              onAttachReceipt={handleTriggerReceiptUpload}
               modeAccent={modeAccent}
               hasError={amountError}
             />
 
             {/* Form Fields Container */}
-            <div className="space-y-3" style={{ minHeight: '192px' }}>
+            <div className="space-y-2.5">
               {/* Row 1: Tanggal + Dompet Asal */}
               <div className="flex items-stretch gap-2">
                 <div className="shrink-0 min-w-[125px] sm:min-w-[135px]">
@@ -772,17 +854,17 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                   <div>
                     <div className="flex items-center justify-between mb-1 h-[18px]">
                       <div className="flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--transfer)]" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <path d="M12 5v14M12 19l-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--transfer)]">
                           {t('tx.transferTo', 'Ke Dompet Tujuan')}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={handleSwapTransferWallets}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10.5px] font-bold transition active:scale-95 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--transfer)]/10 hover:bg-[var(--transfer)]/20 text-[var(--transfer)] text-[10.5px] font-bold transition active:scale-95 cursor-pointer"
                         title={t('tx.swapWallets', 'Tukar')}
                       >
                         <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -904,31 +986,18 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 tagInput={tagInput}
                 onChangeTagInput={setTagInput}
               />
+
+              {/* Row 5: Receipt / Proof Attachment */}
+              <ReceiptUploadAttachment
+                inputRef={receiptInputRef}
+                containerRef={receiptSectionRef}
+                value={form.receiptImage}
+                onChange={(img) => setForm((p) => ({ ...p, receiptImage: img }))}
+                onView={(img) => setPreviewImage(img)}
+              />
             </div>
           </>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-2 pt-2">
-          <button
-            type="submit"
-            style={{
-              backgroundColor: modeAccent,
-            }}
-            className={`w-full h-[48px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
-              txType === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
-            }`}
-          >
-            {t('addTx.save', 'Simpan')}
-          </button>
-          <button
-            type="button"
-            className="w-full py-2 text-center text-xs font-semibold text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
-            onClick={onClose}
-          >
-            {t('addTx.cancel')}
-          </button>
-        </div>
       </form>
 
       {/* Category Bottom Sheet */}
@@ -961,6 +1030,23 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             ? t('tx.transferFrom', 'Pilih Dompet Asal')
             : t('loans.selectWallet', 'Pilih Dompet / Akun')
         }
+      />
+
+      {/* Receipt Fullscreen Preview Modal */}
+      <ReceiptPreviewModal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        imageSrc={previewImage}
+        notes={form.notes}
+        date={form.date}
+      />
+
+      {/* AI Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        onApplyReceipt={handleApplyAiReceipt}
+        enableBackButton={false}
       />
     </Modal>
   )

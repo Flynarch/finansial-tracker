@@ -137,7 +137,7 @@ export default function TodoCreateModal({
             variant="secondary"
             onClick={onClose}
           >
-            {t('common.close')}
+            {t('common.cancel', 'Batal')}
           </Button>
           <Button type="submit">{t('todo.save')}</Button>
         </div>

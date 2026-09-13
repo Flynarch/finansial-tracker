@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Minus, Target, Edit2, Trash2, ArrowLeft, Star, Archive, RotateCcw, CheckCircle2, MoreVertical } from 'lucide-react'
-import { differenceInDays } from 'date-fns'
+import { Plus, Minus, Target, Edit2, Trash2, Star, Archive, RotateCcw, CheckCircle2, MoreVertical } from 'lucide-react'
+import { differenceInDays, format } from 'date-fns'
 import EmptyState from '../components/ui/EmptyState'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import SavingsFundSheetModal from '../components/savings/SavingsFundSheetModal'
+import PageHeader from '../components/ui/PageHeader'
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useSwipeAction from '../hooks/useSwipeAction'
@@ -23,6 +25,7 @@ import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 function Savings() {
   const { locale, t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const motionDelay = reduceMotion ? 0 : 220
   const navigate = useNavigate()
@@ -60,13 +63,36 @@ function Savings() {
       return []
     }
   }, [], [])
+
+  const wallets = useLiveQuery(async () => {
+    try {
+      return await db.wallets.toArray()
+    } catch {
+      return []
+    }
+  }, [], [])
+
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = useCallback(() => setSheetOpen(true), [])
   const closeSheet = useCallback(() => setSheetOpen(false), [])
   const [editingId, setEditingId] = useState(null)
   const [deletingGoal, setDeletingGoal] = useState(null)
+  const [liquidationWalletId, setLiquidationWalletId] = useState('')
   const [menuOpenId, setMenuOpenId] = useState(null)
   const { setSwipedId } = useSwipeAction()
+
+  const promptDeleteGoal = useCallback(
+    (goal, e) => {
+      e?.stopPropagation()
+      setMenuOpenId(null)
+      setDeletingGoal(goal)
+      const defWallet =
+        wallets?.find((w) => !w.isArchived && String(w.id) === String(defaultWalletId)) ||
+        wallets?.find((w) => !w.isArchived)
+      setLiquidationWalletId(defWallet ? String(defWallet.id) : (wallets?.[0]?.id ? String(wallets[0].id) : ''))
+    },
+    [wallets, defaultWalletId]
+  )
 
   const [fundGoal, setFundGoal] = useState(null)
   const [fundActionType, setFundActionType] = useState('add')
@@ -219,61 +245,54 @@ function Savings() {
               : 'translate-y-2 opacity-0'
         }`}
       >
-        {/* Header (Compact Single Row) */}
-        <div className="flex items-center justify-between gap-2.5 pt-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
-              aria-label={t('savings.back', 'Kembali')}
-            >
-              <ArrowLeft className="h-4.5 w-4.5" />
-            </button>
-            <h1 className="text-lg sm:text-xl font-black tracking-tight text-[var(--fg)] truncate">
-              {showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title', 'Target Tabungan')}
-            </h1>
-          </div>
+        {/* Page Header */}
+        <PageHeader
+          title={showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title', 'Target Tabungan')}
+          titlePosition="left"
+          onBack={handleBack}
+          backAriaLabel={t('savings.back', 'Kembali')}
+          className="pt-2 mb-0"
+          rightAction={
+            <div className="flex items-center gap-1.5 shrink-0">
+              {!showArchive && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenArchive}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs transition-all active:scale-95 cursor-pointer relative"
+                    title={t('savings.openArchive', 'Buka Arsip Tabungan')}
+                  >
+                    <Archive className="h-4.5 w-4.5" />
+                    {unseenArchivedCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--status-income)] text-[9px] font-black text-white shadow-2xs animate-fadeIn">
+                        {unseenArchivedCount}
+                      </span>
+                    )}
+                  </button>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {!showArchive && (
-              <>
+                  <button
+                    type="button"
+                    onClick={() => openAdd()}
+                    className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    <span>{t('savings.newGoal', 'Target Baru')}</span>
+                  </button>
+                </>
+              )}
+
+              {showArchive && (
                 <button
                   type="button"
-                  onClick={handleOpenArchive}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs transition-all active:scale-95 cursor-pointer relative"
-                  title={t('savings.openArchive', 'Buka Arsip Tabungan')}
+                  onClick={() => setSearchParams({})}
+                  className="h-10 px-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs active:scale-95 transition-all cursor-pointer"
                 >
-                  <Archive className="h-4.5 w-4.5" />
-                  {unseenArchivedCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--status-income)] text-[9px] font-black text-white shadow-2xs animate-fadeIn">
-                      {unseenArchivedCount}
-                    </span>
-                  )}
+                  {t('savings.backToActive', 'Kembali ke Aktif')}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAdd()}
-                  className="h-10 px-3.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-xs transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  <span>{t('savings.newGoal', 'Target Baru')}</span>
-                </button>
-              </>
-            )}
-
-            {showArchive && (
-              <button
-                type="button"
-                onClick={() => setSearchParams({})}
-                className="h-10 px-3.5 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] shadow-xs active:scale-95 transition-all cursor-pointer"
-              >
-                {t('savings.backToActive', 'Kembali ke Aktif')}
-              </button>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
+          }
+        />
 
         {/* Summary Hero Card (Active View Only) */}
         {!showArchive && (
@@ -462,11 +481,7 @@ function Savings() {
 
                                     <button
                                       type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setMenuOpenId(null)
-                                        setDeletingGoal(g)
-                                      }}
+                                      onClick={(e) => promptDeleteGoal(g, e)}
                                       className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[var(--status-expense)] hover:bg-[var(--status-expense-soft)] rounded-xl transition-colors cursor-pointer"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -568,13 +583,82 @@ function Savings() {
         onClose={() => setDeletingGoal(null)}
         onConfirm={async () => {
           if (deletingGoal) {
-            await db.goals.delete(deletingGoal.id)
+            const currentAmt = toSafeNumber(deletingGoal.currentAmount)
+            const targetWalletIdNum = liquidationWalletId ? Number(liquidationWalletId) : null
+
+            await db.transaction('rw', db.goals, db.goalLogs, db.transactions, async () => {
+              if (currentAmt > 0 && targetWalletIdNum) {
+                const now = new Date()
+                const targetWallet = wallets?.find((w) => Number(w.id) === targetWalletIdNum)
+                const walletName = targetWallet?.name || 'Dompet'
+                const targetCurrency = targetWallet?.currency || deletingGoal.currency || defaultCurrency
+                const effectiveAmount =
+                  targetCurrency !== (deletingGoal.currency || defaultCurrency)
+                    ? convertCurrency(currentAmt, deletingGoal.currency || defaultCurrency, targetCurrency, rates)
+                    : currentAmt
+
+                await db.transactions.add({
+                  date: format(now, 'yyyy-MM-dd'),
+                  amount: effectiveAmount,
+                  type: 'income',
+                  category: 'cairkan_tabungan',
+                  notes: `Pencairan Tabungan: ${deletingGoal.name} ke ${walletName}`,
+                  currency: targetCurrency,
+                  walletId: targetWalletIdNum,
+                  goalId: deletingGoal.id,
+                  createdAt: Date.now(),
+                  isExcludeFromAnalytics: true,
+                  excludeFromAnalytics: true,
+                })
+              }
+              await db.goals.delete(deletingGoal.id)
+              const logsToDelete = await db.goalLogs
+                .filter((l) => String(l.goalId) === String(deletingGoal.id))
+                .toArray()
+              if (logsToDelete.length > 0) {
+                await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
+              }
+            })
+
+            if (currentAmt > 0 && targetWalletIdNum) {
+              void invalidateWalletBalance([targetWalletIdNum])
+            }
             setDeletingGoal(null)
           }
         }}
         title={t('savings.delete', 'Hapus')}
         message={t('savings.deleteConfirm', 'Hapus tujuan tabungan ini?')}
-      />
+      >
+        {toSafeNumber(deletingGoal?.currentAmount) > 0 && (
+          <div className="space-y-2 p-3 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs">
+            <div className="flex items-center justify-between font-bold text-[var(--fg)]">
+              <span>{t('savings.savedFunds', 'Dana Tersimpan')}:</span>
+              <span className="text-[var(--status-income)] font-extrabold">
+                {formatCurrency(deletingGoal.currentAmount, deletingGoal.currency || defaultCurrency)}
+              </span>
+            </div>
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] font-medium text-[var(--muted)]">
+                {t('savings.returnFundsToWallet', 'Kembalikan dana tersimpan ke dompet:')}
+              </label>
+              <select
+                value={liquidationWalletId}
+                onChange={(e) => setLiquidationWalletId(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] cursor-pointer"
+              >
+                {wallets
+                  ?.filter((w) => !w.isArchived)
+                  .map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({formatCurrency(w.balance || 0, w.currency || defaultCurrency)})
+                    </option>
+                  ))}
+                <option value="">{t('savings.doNotReturnFunds', '-- Jangan kembalikan dana (hapus saja) --')}</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </ConfirmDeleteModal>
     </div>
   )
 }

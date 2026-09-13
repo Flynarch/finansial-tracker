@@ -1,4 +1,5 @@
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
 
 /**
  * Creates a new wallet account in Dexie.
@@ -12,6 +13,7 @@ export async function createWallet(payload) {
     createdAt: payload.createdAt || Date.now(),
     balance: payload.balance || 0,
   })
+  void invalidateWalletBalance([id])
   return id
 }
 
@@ -24,7 +26,9 @@ export async function createWallet(payload) {
  */
 export async function updateWallet(id, payload) {
   const walletId = Number(id)
-  return await db.wallets.update(walletId, payload)
+  const res = await db.wallets.update(walletId, payload)
+  void invalidateWalletBalance([walletId])
+  return res
 }
 
 /**
@@ -34,17 +38,10 @@ export async function updateWallet(id, payload) {
  * @returns {Promise<void>}
  */
 export async function deleteWallet(id) {
-  const walletId = Number(id)
-  const txsToDelete = await db.transactions
-    .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
-    .primaryKeys()
-
-  await db.transaction('rw', db.transactions, db.wallets, async () => {
-    if (txsToDelete.length > 0) {
-      await db.transactions.bulkDelete(txsToDelete)
-    }
-    await db.wallets.delete(walletId)
-  })
+  // Soft-delete: archive the wallet instead of hard-deleting to preserve
+  // transaction history and prevent counterparty wallet balance corruption.
+  // Archived wallets are hidden from active lists while their balance and transactions remain intact.
+  return archiveWallet(id)
 }
 
 /**
@@ -55,7 +52,9 @@ export async function deleteWallet(id) {
  */
 export async function archiveWallet(id) {
   const walletId = Number(id)
-  return await db.wallets.update(walletId, { isArchived: 1 })
+  const res = await db.wallets.update(walletId, { isArchived: 1 })
+  void invalidateWalletBalance([walletId])
+  return res
 }
 
 /**
@@ -66,5 +65,7 @@ export async function archiveWallet(id) {
  */
 export async function unarchiveWallet(id) {
   const walletId = Number(id)
-  return await db.wallets.update(walletId, { isArchived: 0 })
+  const res = await db.wallets.update(walletId, { isArchived: 0 })
+  void invalidateWalletBalance([walletId])
+  return res
 }

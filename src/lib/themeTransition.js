@@ -50,9 +50,16 @@ export function primeThemeTransition() {
       const transition = document.startViewTransition(() => {
         document.documentElement.setAttribute('data-vt-prime', '1')
       })
-      transition.finished.finally(() => {
-        document.documentElement.removeAttribute('data-vt-prime')
-      }).catch(() => {})
+      if (transition) {
+        transition.ready?.catch(() => {})
+        transition.updateCallbackDone?.catch(() => {})
+        transition.finished
+          ?.catch(() => {})
+          ?.finally(() => {
+            document.documentElement.removeAttribute('data-vt-prime')
+          })
+          ?.catch(() => {})
+      }
     } catch {
       /* ignore */
     }
@@ -142,9 +149,13 @@ export function executeThemeTransition({ currentTheme, targetTheme, setTheme, or
         document.documentElement.classList.remove('ft-theme-transitioning')
       })
 
-      transition.finished.finally(() => {
-        document.documentElement.classList.remove('ft-theme-transitioning')
-      })
+      transition.updateCallbackDone?.catch(() => {})
+      transition.finished
+        ?.catch(() => {})
+        ?.finally(() => {
+          document.documentElement.classList.remove('ft-theme-transitioning')
+        })
+        ?.catch(() => {})
     } catch {
       document.documentElement.setAttribute('data-theme', nextTheme)
       setTheme(nextTheme)

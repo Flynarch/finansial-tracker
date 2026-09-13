@@ -1,8 +1,9 @@
-﻿import { format, startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, TrendingUp, PieChart, Landmark } from 'lucide-react'
-import { db, computeAllWalletBalances } from '../lib/db'
+import { db } from '../lib/db'
+import { getAllWalletBalances } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
 import { formatExpenseCategory, parseExpenseCategoryPath } from '../lib/expenseCategories'
 import { formatIncomeCategory } from '../lib/incomeCategories'
@@ -78,16 +79,40 @@ export default function Reports() {
     [cutoffDate],
     []
   )
-  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], [])
   const investments = useLiveQuery(() => db.investments.toArray(), [], [])
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
   const loans = useLiveQuery(() => db.loans.toArray(), [], [])
+  const savings = useLiveQuery(() => db.goals.toArray(), [], [])
+  const computedWallets = useLiveQuery(
+    async () => {
+      const rawWallets = await db.wallets.toArray()
+      if (!rawWallets || rawWallets.length === 0) return []
+      return await getAllWalletBalances(rawWallets, rates)
+    },
+    [rates],
+    []
+  )
+  const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return []
-    const validTxs = transactions.filter((t) => !isExcludeAnalyticsTx(t))
+    const validTxs = transactions.filter((t) => {
+      if (t.isSplit && Array.isArray(t.splitItems) && t.splitItems.length > 0) {
+        return t.splitItems.some((si) =>
+          !isExcludeAnalyticsTx({
+            ...t,
+            ...si,
+            category: si.category || t.category,
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            isExcludeAnalyticsTx: false,
+          })
+        )
+      }
+      return !isExcludeAnalyticsTx(t)
+    })
     if (selectedWalletFilter === 'all') return validTxs
-    return validTxs.filter((t) => Number(t.walletId) === Number(selectedWalletFilter))
+    return validTxs.filter((t) => String(t.walletId) === String(selectedWalletFilter))
   }, [transactions, selectedWalletFilter])
 
   const monthlyIncomeExpense = useMemo(() => {
@@ -123,43 +148,85 @@ export default function Reports() {
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map()
     filteredTransactions.forEach((tx) => {
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+          const itemType = si.type || tx.type
+          if (itemType !== 'expense') return
+          const itemTx = {
+            ...tx,
+            ...si,
+            category: si.category || tx.category,
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            isExcludeAnalyticsTx: false,
+          }
+          if (isExcludeAnalyticsTx(itemTx)) return
+
+          const parsed = parseExpenseCategoryPath(itemTx.category)
+          let key
+          let label
+          let isParent
+          let parentId
+
+          if (!selectedDrilldownParent) {
+            parentId = parsed?.parentId || itemTx.category || 'lainnya'
+            key = parentId
+            label = parsed?.parent?.names?.[locale === 'en' ? 'en' : 'id'] || formatExpenseCategory(key, locale)
+            isParent = true
+          } else {
+            const itemParent = parsed?.parentId || itemTx.category || 'lainnya'
+            if (itemParent !== selectedDrilldownParent) return
+            key = parsed?.childId || 'utama'
+            label =
+              parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] ||
+              (locale === 'en' ? 'Main / General' : 'Utama / Umum')
+            isParent = false
+            parentId = selectedDrilldownParent
+          }
+
+          const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
+          let val = toSafeNumber(si.amount)
+          if (tx.currency && tx.currency !== defaultCurrency && rates) {
+            val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+          }
+          current.value += val
+          categoryMap.set(key, current)
+        })
+        return
+      }
+
       if (tx.type !== 'expense') return
-      const itemsToProcess =
-        tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0
-          ? tx.splitItems.map((si) => ({ category: si.category, amount: si.amount }))
-          : [{ category: tx.category, amount: tx.amount }]
+      if (isExcludeAnalyticsTx(tx)) return
 
-      itemsToProcess.forEach((item) => {
-        const parsed = parseExpenseCategoryPath(item.category)
-        let key
-        let label
-        let isParent
-        let parentId
+      const parsed = parseExpenseCategoryPath(tx.category)
+      let key
+      let label
+      let isParent
+      let parentId
 
-        if (!selectedDrilldownParent) {
-          parentId = parsed?.parentId || item.category || 'lainnya'
-          key = parentId
-          label = parsed?.parent?.names?.[locale === 'en' ? 'en' : 'id'] || formatExpenseCategory(key, locale)
-          isParent = true
-        } else {
-          const itemParent = parsed?.parentId || item.category || 'lainnya'
-          if (itemParent !== selectedDrilldownParent) return
-          key = parsed?.childId || 'utama'
-          label =
-            parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] ||
-            (locale === 'en' ? 'Main / General' : 'Utama / Umum')
-          isParent = false
-          parentId = selectedDrilldownParent
-        }
+      if (!selectedDrilldownParent) {
+        parentId = parsed?.parentId || tx.category || 'lainnya'
+        key = parentId
+        label = parsed?.parent?.names?.[locale === 'en' ? 'en' : 'id'] || formatExpenseCategory(key, locale)
+        isParent = true
+      } else {
+        const itemParent = parsed?.parentId || tx.category || 'lainnya'
+        if (itemParent !== selectedDrilldownParent) return
+        key = parsed?.childId || 'utama'
+        label =
+          parsed?.child?.names?.[locale === 'en' ? 'en' : 'id'] ||
+          (locale === 'en' ? 'Main / General' : 'Utama / Umum')
+        isParent = false
+        parentId = selectedDrilldownParent
+      }
 
-        const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
-        let val = toSafeNumber(item.amount)
-        if (tx.currency && tx.currency !== defaultCurrency && rates) {
-          val = convertCurrency(val, tx.currency, defaultCurrency, rates)
-        }
-        current.value += val
-        categoryMap.set(key, current)
-      })
+      const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
+      let val = toSafeNumber(tx.amount)
+      if (tx.currency && tx.currency !== defaultCurrency && rates) {
+        val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+      }
+      current.value += val
+      categoryMap.set(key, current)
     })
     return [...categoryMap.values()].sort((a, b) => b.value - a.value)
   }, [locale, filteredTransactions, selectedDrilldownParent, defaultCurrency, rates])
@@ -167,7 +234,32 @@ export default function Reports() {
   const incomeByCategory = useMemo(() => {
     const categoryMap = new Map()
     filteredTransactions.forEach((tx) => {
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+          const itemType = si.type || tx.type
+          if (itemType !== 'income') return
+          const itemTx = {
+            ...tx,
+            ...si,
+            category: si.category || tx.category,
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            isExcludeAnalyticsTx: false,
+          }
+          if (isExcludeAnalyticsTx(itemTx)) return
+          const key = si.category || tx.category || ''
+          const current = categoryMap.get(key) ?? 0
+          let val = toSafeNumber(si.amount)
+          if (tx.currency && tx.currency !== defaultCurrency && rates) {
+            val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+          }
+          categoryMap.set(key, current + val)
+        })
+        return
+      }
+
       if (tx.type !== 'income') return
+      if (isExcludeAnalyticsTx(tx)) return
       const key = tx.category || ''
       const current = categoryMap.get(key) ?? 0
       let val = toSafeNumber(tx.amount)
@@ -185,13 +277,8 @@ export default function Reports() {
       .sort((a, b) => b.value - a.value)
   }, [locale, filteredTransactions, defaultCurrency, rates])
 
-  const computedWallets = useMemo(
-    () => computeAllWalletBalances(wallets || [], allTransactionsForBalance || [], rates),
-    [wallets, allTransactionsForBalance, rates]
-  )
-
   const totalCash = useMemo(() => {
-    return computedWallets.reduce((sum, w) => {
+    return (computedWallets || []).reduce((sum, w) => {
       return (
         sum +
         convertCurrency(
@@ -218,8 +305,18 @@ export default function Reports() {
     )
   }, [investments, defaultCurrency, rates])
 
+  const totalSavings = useMemo(() => {
+    return (savings || [])
+      .filter((g) => !g.isArchived)
+      .reduce((sum, g) => {
+        const amt = toSafeNumber(g.currentAmount)
+        if (amt <= 0) return sum
+        return sum + convertCurrency(amt, g.currency || defaultCurrency, defaultCurrency, rates)
+      }, 0)
+  }, [savings, defaultCurrency, rates])
+
   const netWorthTrend = useMemo(() => {
-    const currentNetWorth = totalCash + investmentValue + netLoanPosition
+    const currentNetWorth = totalCash + investmentValue + netLoanPosition + totalSavings
     const totalNetFlow = monthlyIncomeExpense.reduce((sum, m) => sum + (m.income - m.expense), 0)
     let accumulator = currentNetWorth - totalNetFlow
 
@@ -232,7 +329,7 @@ export default function Reports() {
       })
     }
     return trend
-  }, [totalCash, investmentValue, netLoanPosition, monthlyIncomeExpense])
+  }, [totalCash, investmentValue, netLoanPosition, totalSavings, monthlyIncomeExpense])
 
   const thisMonth = monthlyIncomeExpense.at(-1) ?? { income: 0, expense: 0 }
   const previousMonth = monthlyIncomeExpense.at(-2) ?? { income: 0, expense: 0 }
@@ -279,16 +376,7 @@ export default function Reports() {
     [incomeByCategory]
   )
 
-  const hasAnyTransactionsEver = (allTransactionsForBalance || []).length > 0
-
-  const statementCategories = useMemo(() => {
-    const source = donutKind === 'expense' ? expenseByCategory : incomeByCategory
-    return source.map((cat) => ({
-      name: cat.label || cat.key,
-      amount: toSafeNumber(cat.value),
-      percent: donutTotal > 0 ? Math.round((toSafeNumber(cat.value) / donutTotal) * 100) : 0,
-    }))
-  }, [donutKind, expenseByCategory, incomeByCategory, donutTotal])
+  const hasAnyTransactionsEver = (txCount || 0) > 0
 
   return (
     <div className="min-h-full pb-32 sm:pb-24">
@@ -433,17 +521,17 @@ export default function Reports() {
         />
 
         {/* In-App Financial Statement Preview Modal */}
-        <ReportStatementModal
-          isOpen={isStatementModalOpen}
-          onClose={() => setIsStatementModalOpen(false)}
-          periodName={`${rangeMonths === 'ytd' ? 'YTD' : `${rangeMonths} Bulan`} (${format(new Date(), 'MMMM yyyy')})`}
-          totalIncome={thisMonth.income}
-          totalExpense={thisMonth.expense}
-          netSavings={thisMonth.income - thisMonth.expense}
-          categories={statementCategories}
-          transactions={filteredTransactions}
-          wallets={wallets}
-        />
+        {isStatementModalOpen && (
+          <ReportStatementModal
+            isOpen={isStatementModalOpen}
+            onClose={() => setIsStatementModalOpen(false)}
+            wallets={wallets || []}
+            savings={savings || []}
+            loans={loans || []}
+            investments={investments || []}
+            rates={rates}
+          />
+        )}
       </div>
     </div>
   )

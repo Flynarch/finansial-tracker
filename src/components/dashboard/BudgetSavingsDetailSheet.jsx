@@ -391,7 +391,7 @@ export default function BudgetSavingsDetailSheet({
                 <div
                   className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl border ${
                     isBudget
-                      ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/25'
+                      ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/25'
                       : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
                   }`}
                 >
@@ -473,7 +473,7 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                  : 'bg-indigo-500/15 text-indigo-500 border-indigo-500/30'
+                                  : 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
                               }`}
                             >
                               {budgetCalc.overallPct}% {t('dashboard.usedPct', 'Terpakai')}
@@ -501,7 +501,7 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500'
-                                  : 'bg-indigo-500'
+                                  : 'bg-[var(--accent)]'
                               }`}
                               style={{ width: `${Math.min(100, Math.max(budgetCalc.overallPct, 3))}%` }}
                             />

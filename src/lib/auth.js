@@ -96,6 +96,24 @@ export async function signOutCurrentUser() {
   }
 }
 
+export async function ensureFirebaseAuthSynced() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const auth = getFirebaseAuth()
+    if (!auth || auth.currentUser) return
+    const current = await FirebaseAuthentication.getCurrentUser().catch(() => null)
+    if (current?.user) {
+      const tokenRes = await FirebaseAuthentication.getIdToken().catch(() => null)
+      if (tokenRes?.token) {
+        const credential = GoogleAuthProvider.credential(tokenRes.token)
+        await signInWithCredential(auth, credential).catch(() => {})
+      }
+    }
+  } catch {
+    // Graceful fallback
+  }
+}
+
 let gsiScriptPromise = null
 
 /**
@@ -230,6 +248,24 @@ export async function signInWithGoogle() {
       const result = await FirebaseAuthentication.signInWithGoogle()
       const u = result?.user
       if (u) {
+        // Bridge native credential into Web Firebase SDK so Firestore and Storage are authenticated
+        try {
+          const auth = getFirebaseAuth()
+          let idToken = result?.credential?.idToken
+          if (!idToken) {
+            const tokenRes = await FirebaseAuthentication.getIdToken().catch(() => null)
+            idToken = tokenRes?.token
+          }
+          if (auth && idToken) {
+            const credential = GoogleAuthProvider.credential(idToken)
+            await signInWithCredential(auth, credential).catch((bridgeErr) => {
+              console.warn('Firebase JS SDK credential bridge warning:', bridgeErr)
+            })
+          }
+        } catch (bridgeErr) {
+          console.warn('Credential bridging failed:', bridgeErr)
+        }
+
         return {
           success: true,
           user: {
@@ -684,17 +720,23 @@ export async function deleteCurrentAccount() {
   const auth = getFirebaseAuth()
   const currentUser = auth?.currentUser
 
+  const withTimeout = (promise, ms = 3500) =>
+    Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+    ])
+
   if (currentUser) {
     const uid = currentUser.uid
-    // 1. Purge cloud backup data
-    await deleteCloudBackup(uid).catch(() => {})
+    // 1. Purge cloud backup data with timeout protection
+    await withTimeout(deleteCloudBackup(uid).catch(() => {}), 3500)
 
-    // 2. Delete user from Firebase Auth
+    // 2. Delete user from Firebase Auth with timeout protection
     try {
       if (Capacitor.isNativePlatform()) {
-        await FirebaseAuthentication.deleteUser().catch(() => {})
+        await withTimeout(FirebaseAuthentication.deleteUser().catch(() => {}), 3000)
       }
-      await deleteUser(currentUser)
+      await withTimeout(deleteUser(currentUser), 3000)
     } catch (error) {
       if (error?.code === 'auth/requires-recent-login') {
         return {
@@ -713,12 +755,11 @@ export async function deleteCurrentAccount() {
   try {
     const dataTables = [
       db.transactions,
-      db.budgets,
-      db.goals,
-      db.savings,
-      db.loans,
       db.investments,
       db.investmentOrders,
+      db.budgets,
+      db.goals,
+      db.goalLogs,
       db.calendarEvents,
       db.recurringTransactions,
       db.todos,
@@ -728,8 +769,10 @@ export async function deleteCurrentAccount() {
       db.ideas,
       db.board_links,
       db.notifications,
-      db.goalLogs,
       db.wallets,
+      db.loans,
+      db.loanPayments,
+      db.walletBalanceCache,
     ]
     await Promise.all(dataTables.map((t) => t?.clear?.().catch(() => {})))
   } catch {

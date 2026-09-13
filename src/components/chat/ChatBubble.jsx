@@ -4,8 +4,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import useSettingsStore from '../../store/useSettingsStore'
-import { translate } from '../../lib/i18n'
 import { getTransactionCategoryLabels } from '../../lib/categoryIcon'
+import { formatCurrency } from '../../lib/utils'
 
 function getCurrentTimeStr(timestamp) {
   const date = timestamp ? new Date(timestamp) : new Date()
@@ -70,20 +70,13 @@ export const AiBubble = memo(function AiBubble({ content, timestamp, isStreaming
 })
 
 export const TypingIndicator = memo(function TypingIndicator() {
-  const locale = useSettingsStore(s => s.locale)
   return (
     <div className="flex items-center gap-2.5 max-w-[80%] my-1.5 ft-swush-in">
-      <AiAvatarBadge isThinking={true} />
-      <div className="flex items-center gap-2.5 rounded-2xl rounded-tl-xs border border-[var(--border)] bg-[var(--field-bg)] px-4 py-2.5 shadow-xs">
-        <div className="flex items-center gap-1 h-4">
-          <div className="ft-eq-bar bg-[var(--accent)]" />
-          <div className="ft-eq-bar bg-[var(--accent)]" />
-          <div className="ft-eq-bar bg-[var(--accent)]" />
-          <div className="ft-eq-bar bg-[var(--accent)]" />
-        </div>
-        <span className="text-xs font-bold text-[var(--fg)] opacity-90">
-          {translate(locale, 'aiChat.thinking')}
-        </span>
+      <AiAvatarBadge />
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-xs border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-3 shadow-xs">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce" />
       </div>
     </div>
   )
@@ -91,7 +84,7 @@ export const TypingIndicator = memo(function TypingIndicator() {
 
 const ELEGANT_PIE_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#818cf8']
 
-function CustomTooltip({ active, payload }) {
+function CustomTooltip({ active, payload, defaultCurrency = 'IDR' }) {
   if (active && payload && payload.length) {
     const d = payload[0].payload
     return (
@@ -99,14 +92,14 @@ function CustomTooltip({ active, payload }) {
         <div className="flex items-center gap-2 mb-2">
           <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span>
           <span className="font-bold text-[var(--fg)] text-sm">{d.name}</span>
-          <span className="ml-auto font-bold text-[var(--fg)] text-sm">Rp {d.value.toLocaleString('id-ID')}</span>
+          <span className="ml-auto font-bold text-[var(--fg)] text-sm">{formatCurrency(d.value, defaultCurrency)}</span>
         </div>
         {d.children && d.children.length > 0 && (
           <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/60 pt-2.5 mt-1.5">
             {d.children.map((child, i) => (
               <div key={i} className="flex justify-between items-center gap-4 text-[12px] text-[var(--muted)]">
                 <span className="truncate">{child.name}</span>
-                <span className="font-medium shrink-0">Rp {child.value.toLocaleString('id-ID')}</span>
+                <span className="font-medium shrink-0">{formatCurrency(child.value, defaultCurrency)}</span>
               </div>
             ))}
           </div>
@@ -119,6 +112,7 @@ function CustomTooltip({ active, payload }) {
 
 export const ChartBubble = memo(function ChartBubble({ data = {}, chartType = 'expense', timestamp, embedded = false }) {
   const locale = useSettingsStore(s => s.locale)
+  const defaultCurrency = useSettingsStore(s => s.defaultCurrency || 'IDR')
   const timeStr = getCurrentTimeStr(timestamp)
   
   const groupedData = useMemo(() => {
@@ -166,7 +160,7 @@ export const ChartBubble = memo(function ChartBubble({ data = {}, chartType = 'e
           {chartType === 'income' ? 'Ringkasan Pemasukan' : 'Ringkasan Pengeluaran'}
         </span>
         <span className="text-xs font-black tabular-nums text-[var(--fg)]">
-          Rp {total.toLocaleString('id-ID')}
+          {formatCurrency(total, defaultCurrency)}
         </span>
       </div>
 
@@ -191,7 +185,7 @@ export const ChartBubble = memo(function ChartBubble({ data = {}, chartType = 'e
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip defaultCurrency={defaultCurrency} />} />
               <Legend 
                 formatter={(val) => <span className="text-[11px] font-bold text-[var(--fg)]">{val}</span>} 
                 layout="horizontal" 

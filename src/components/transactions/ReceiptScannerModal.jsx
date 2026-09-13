@@ -13,10 +13,11 @@ import {
 import Modal from '../ui/Modal'
 import { scanReceiptImage } from '../../lib/gemini'
 import { formatCurrency } from '../../lib/utils'
+import { compressImage } from '../../lib/imageCompression'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 
-export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt }) {
+export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, enableBackButton = false }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
   const geminiApiKey = useSettingsStore((s) => s.geminiApiKey)
@@ -57,25 +58,40 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
     } catch (err) {
       console.error('Scan error:', err)
       setErrorMsg(
-        err?.message ||
-          t('transactions.ocr.error', 'Gagal memindai struk. Pastikan gambar jelas dan coba lagi.')
+        err.message ||
+          t(
+            'receipt.scanError',
+            'Gagal memindai struk. Pastikan foto struk terlihat jelas dan coba lagi.'
+          )
       )
     } finally {
       setIsScanning(false)
     }
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!scanResult) return
+    let compressedProof = null
+    if (imagePreview) {
+      try {
+        compressedProof = await compressImage(imagePreview, 800, 0.7)
+      } catch (err) {
+        console.warn('Failed to compress receipt image:', err)
+        compressedProof = imagePreview
+      }
+    }
+
     onApplyReceipt({
       amount: scanResult.totalAmount,
       date: scanResult.date,
-      category: scanResult.suggestedCategory,
+      category: scanResult.category || scanResult.suggestedCategory,
       notes: scanResult.notes || scanResult.merchantName,
+      merchant: scanResult.merchantName,
       currency: scanResult.currency || defaultCurrency,
       items: scanResult.items || [],
       merchantName: scanResult.merchantName,
-    })
+      receiptImage: compressedProof,
+    }, compressedProof)
     handleClose()
   }
 
@@ -97,8 +113,9 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
   return (
     <Modal
       isOpen={isOpen}
-      title={t('transactions.ocr.modalTitle', 'Pindai Struk Belanja (OCR AI)')}
       onClose={handleClose}
+      enableBackButton={enableBackButton}
+      title={t('transactions.ocr.modalTitle', 'Pindai Struk Belanja (OCR AI)')}
     >
       <div className="space-y-4">
         {/* State 1: Choose Image Source */}
@@ -222,12 +239,12 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
             {/* Success Extraction Result Card */}
             {scanResult && !isScanning && (
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3.5 animate-fadeIn">
-                <div className="flex items-center justify-between border-b border-emerald-500/15 pb-2.5">
-                  <div className="flex items-center gap-2 text-emerald-500 font-extrabold text-xs">
+                <div className="flex items-center justify-between border-b border-emerald-500/15 pb-2.5 gap-2 min-w-0">
+                  <div className="flex items-center gap-2 text-emerald-500 font-extrabold text-xs shrink-0">
                     <CheckCircle2 className="h-4.5 w-4.5" />
                     <span>{t('transactions.ocr.successTitle', 'Struk Berhasil Diekstrak')}</span>
                   </div>
-                  <span className="text-[11px] font-bold text-[var(--muted)]">
+                  <span className="text-[11px] font-bold text-[var(--muted)] truncate max-w-[50%] text-right">
                     {scanResult.merchantName}
                   </span>
                 </div>
@@ -262,12 +279,12 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt })
                       {scanResult.items.map((item, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-[11px] text-[var(--fg)] py-0.5"
+                          className="flex items-center justify-between text-[11px] text-[var(--fg)] py-0.5 gap-2 min-w-0"
                         >
-                          <span className="truncate pr-2 font-medium">
+                          <span className="truncate pr-2 font-medium min-w-0 flex-1">
                             {item.name} {item.qty > 1 ? `x${item.qty}` : ''}
                           </span>
-                          <span className="font-bold shrink-0 text-[var(--muted)]">
+                          <span className="font-bold shrink-0 text-[var(--muted)] tabular-nums">
                             {formatCurrency(item.price, scanResult.currency, locale)}
                           </span>
                         </div>

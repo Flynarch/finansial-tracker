@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import Modal from '../ui/Modal'
@@ -7,6 +6,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import { calculateHabitStats, calculateWeeklyTrend } from '../../lib/habitStats'
 import HabitHeatmapWidget from './HabitHeatmapWidget'
 import useTranslation from '../../hooks/useTranslation'
+import { safeFormatDate } from '../../lib/utils'
 
 export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }) {
   const { t } = useTranslation()
@@ -66,7 +66,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
           <div>
             <h3 className="text-lg font-bold text-[var(--fg)] leading-tight">{activeHabit.title}</h3>
             <p className="text-sm font-medium text-[var(--muted)]">
-              {t('habits.createdDatePrefix', 'Dibuat')}: {activeHabit.createdAt ? format(new Date(activeHabit.createdAt), 'dd MMM yyyy') : t('common.today', 'Hari ini')}
+              {t('habits.createdDatePrefix', 'Dibuat')}: {activeHabit.createdAt ? safeFormatDate(activeHabit.createdAt, 'dd MMM yyyy') || t('common.today', 'Hari ini') : t('common.today', 'Hari ini')}
             </p>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)]">{t('habits.notes', 'Catatan')}</span>
                 <button type="button" onClick={handleStartEdit} className="text-[11px] font-bold text-[var(--accent)] hover:underline">{t('common.edit', 'Edit')}</button>
               </div>
-              <p className="text-sm text-[var(--fg)] whitespace-pre-wrap">{activeHabit.notes}</p>
+              <p className="text-sm text-[var(--fg)] whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{activeHabit.notes}</p>
             </div>
           ) : (
             <button 

@@ -20,17 +20,18 @@ import {
 import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History, HeartHandshake } from 'lucide-react'
 import LoanForgiveModal from './LoanForgiveModal'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
+import { getLocalDateString } from '../../lib/dateUtils'
 
-export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved }) {
+export default function LoanPaymentModal({ isOpen, onClose, loan = null, initialAmount = null, onSaved, onOpenForgive }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
-  const { recordPayment } = useLoanStore()
+  const recordPayment = useLoanStore((state) => state.recordPayment)
   const [sheetError, setSheetError] = useState('')
   const amountInputRef = useRef(null)
 
   const [amount, setAmount] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getLocalDateString())
   const [notes, setNotes] = useState('')
   const [paymentWalletId, setPaymentWalletId] = useState('')
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
@@ -57,8 +58,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
     setPrevLoanId(loan?.id)
     if (isOpen) {
       setSheetError('')
-      setAmount('')
-      setDate(new Date().toISOString().split('T')[0])
+      const initAmtVal = initialAmount ? formatMoneyValueForInput(initialAmount, loan?.currency || defaultCurrency) : ''
+      setAmount(initAmtVal)
+      setDate(getLocalDateString())
       setNotes('')
       setPaymentWalletId(loan?.walletId ? String(loan.walletId) : '')
     }
@@ -234,6 +236,19 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
                 {t('loans.payment.setNominal', 'Set Nominal:')}
               </span>
               <div className="grid grid-cols-3 gap-1.5">
+                {loan?.monthlyPayment > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const installmentVal = Math.min(remaining, toSafeNumber(loan.monthlyPayment))
+                      setAmount(formatMoneyValueForInput(installmentVal, currency))
+                    }}
+                    className="col-span-3 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[11px] font-extrabold hover:bg-[var(--accent)]/20 transition-colors cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {t('loans.payment.oneInstallment', '1x Cicilan')} ({formatCurrency(loan.monthlyPayment, currency)})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setAmountPercent(100)}
@@ -384,10 +399,12 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
             <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
               {paymentLogs.map((log) => (
                 <div key={log.id} className="flex items-center justify-between text-xs py-1 border-b border-[var(--border)]/40 last:border-0">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[var(--fg)] truncate flex items-center gap-1">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="font-semibold text-[var(--fg)] flex items-center gap-1 min-w-0">
                       {log.isForgive && <HeartHandshake className="h-3 w-3 text-purple-500 shrink-0" />}
-                      {log.notes || (log.isForgive ? t('loans.badge.forgiven', 'Diikhlaskan') : t('loans.payment.defaultLog', 'Pembayaran Cicilan'))}
+                      <span className="break-words [overflow-wrap:anywhere] break-all line-clamp-2">
+                        {log.notes || (log.isForgive ? t('loans.badge.forgiven', 'Diikhlaskan') : t('loans.payment.defaultLog', 'Pembayaran Cicilan'))}
+                      </span>
                     </p>
                     <p className="text-[9px] text-[var(--muted)]">{log.date}</p>
                   </div>
@@ -410,7 +427,13 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
         <div className="pt-0.5">
           <button
             type="button"
-            onClick={() => setIsForgiveOpen(true)}
+            onClick={() => {
+              if (typeof onOpenForgive === 'function') {
+                onOpenForgive(loan)
+              } else {
+                setIsForgiveOpen(true)
+              }
+            }}
             className="w-full py-2 px-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
           >
             <HeartHandshake className="h-3.5 w-3.5" />
@@ -433,15 +456,17 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, onSaved
         </div>
       </div>
 
-      <LoanForgiveModal
-        isOpen={isForgiveOpen}
-        onClose={() => setIsForgiveOpen(false)}
-        loan={loan}
-        onSuccess={() => {
-          onSaved?.()
-          onClose?.()
-        }}
-      />
+      {!onOpenForgive && (
+        <LoanForgiveModal
+          isOpen={isForgiveOpen}
+          onClose={() => setIsForgiveOpen(false)}
+          loan={loan}
+          onSuccess={() => {
+            onSaved?.()
+            onClose?.()
+          }}
+        />
+      )}
     </Modal>
   )
 }

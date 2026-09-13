@@ -25,6 +25,7 @@ import {
   Send,
   AlertCircle,
   Bell,
+  Calendar,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -35,13 +36,14 @@ import {
   reloadAuthUser,
 } from '../../lib/auth'
 import { db } from '../../lib/db'
-import { exportAllDataAsJson } from '../../lib/backup'
+import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import { uploadLatestBackup } from '../../lib/cloudBackup'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
 import AuthModal from '../../components/auth/AuthModal'
-import { currencyOptions } from './settingsConstants'
+import BudgetCycleModal from '../../components/budget/BudgetCycleModal'
+import { currencyOptions, clearFinancialLocalStorage } from './settingsConstants'
 import CurrencyFlag from '../../components/currency/CurrencyFlag'
 import {
   SettingsBentoTile,
@@ -82,8 +84,10 @@ export default function SettingsHome() {
   const setLocale = useSettingsStore((state) => state.setLocale)
   const setTheme = useSettingsStore((state) => state.setTheme)
   const setMotionPreference = useSettingsStore((state) => state.setMotionPreference)
+  const budgetCycleStartDay = useSettingsStore((state) => state.budgetCycleStartDay || 1)
 
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false)
+  const [isBudgetCycleModalOpen, setIsBudgetCycleModalOpen] = useState(false)
   const [isGuestWarningOpen, setIsGuestWarningOpen] = useState(false)
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
@@ -101,6 +105,27 @@ export default function SettingsHome() {
     }, 1000)
     return () => clearInterval(timer)
   }, [verifCooldown])
+
+  // Preserve and restore scroll position when navigating to and from sub-settings pages
+  useEffect(() => {
+    const savedPos = sessionStorage.getItem('ft_settings_scroll_pos')
+    if (savedPos) {
+      const top = parseInt(savedPos, 10)
+      if (!isNaN(top) && top > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top, behavior: 'instant' })
+        })
+      }
+    }
+
+    const onScroll = () => {
+      sessionStorage.setItem('ft_settings_scroll_pos', String(window.scrollY || 0))
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
 
   const triggerSuccessExit = () => {
     setVerifPhase('success')
@@ -155,34 +180,69 @@ export default function SettingsHome() {
 
   const executePerformLogout = async () => {
     try {
-      const currentUid = authUserId || (authProvider === 'google' ? 'google_last' : authProvider === 'email' ? 'email_last' : 'guest_last')
       const backup = await exportAllDataAsJson().catch(() => null)
-      if (backup) {
-        try {
-          localStorage.setItem(`ft_user_backup_${currentUid}`, JSON.stringify(backup))
-        } catch {
-          /* ignore */
-        }
-        if (authUserId) {
-          await Promise.race([
-            uploadLatestBackup(authUserId, backup),
-            new Promise((resolve) => setTimeout(resolve, 2500)),
-          ]).catch(() => {})
+      if (backup && authUserId) {
+        const hasData = (backup.transactions && backup.transactions.length > 0) || (backup.wallets && backup.wallets.length > 0)
+        if (hasData) {
+          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
+
+          if (isE2eeActive) {
+            let uploadPayload = null
+            try {
+              uploadPayload = await exportAllDataAsEncryptedEnvelope(e2eePhrase.trim())
+            } catch (err) {
+              console.error('Failed to encrypt backup envelope for E2EE cloud backup, aborting upload to protect privacy:', err)
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('ft-show-toast', {
+                    detail: {
+                      title: t('settings.security.e2eeEncryptFailedTitle', 'Enkripsi Gagal'),
+                      message: t(
+                        'settings.security.e2eeEncryptFailedMsg',
+                        'Gagal mengenkripsi data cadangan E2EE. Unggahan ke cloud dibatalkan untuk menjaga keamanan.',
+                      ),
+                      type: 'danger',
+                    },
+                  })
+                )
+              }
+            }
+
+            if (uploadPayload) {
+              await Promise.race([
+                uploadLatestBackup(authUserId, uploadPayload, { isEncrypted: true }),
+                new Promise((resolve) => setTimeout(resolve, 7000)),
+              ]).catch(() => {})
+            }
+          }
         }
       }
 
-      // Safely clear financial data tables without deleting settings configuration
+      // Safely clear financial and feature data tables without deleting settings configuration
       const dataTables = [
         db.transactions,
-        db.wallets,
-        db.categories,
-        db.budgets,
-        db.savings,
-        db.loans,
         db.investments,
+        db.investmentOrders,
+        db.budgets,
+        db.goals,
+        db.goalLogs,
+        db.calendarEvents,
+        db.recurringTransactions,
         db.todos,
+        db.sub_tasks,
+        db.habits,
+        db.habitLogs,
+        db.ideas,
+        db.board_links,
+        db.notifications,
+        db.wallets,
+        db.loans,
+        db.loanPayments,
+        db.walletBalanceCache,
       ]
       await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch(() => {})))
+      clearFinancialLocalStorage()
     } catch {
       /* ignore */
     } finally {
@@ -243,7 +303,7 @@ export default function SettingsHome() {
   }, [defaultCurrency])
 
   return (
-    <div className="ft-settings-page max-w-2xl mx-auto pb-24 px-0">
+    <div className="ft-settings-page max-w-2xl mx-auto pb-36 px-0">
       <PageHeader
         title={t('settings.title', 'Pengaturan')}
         subtitle={t('settings.subtitle', 'Sesuaikan bahasa, tampilan, keamanan, dan cadangan data.')}
@@ -509,6 +569,16 @@ export default function SettingsHome() {
           label={t('settings.fxRatesTitle', 'Kurs & Konversi Mata Uang')}
           icon={TrendingUp}
         />
+        <SettingsLinkRow
+          label={t('settings.budgetCycleTitle', 'Siklus Anggaran Bulanan')}
+          subtitle={
+            budgetCycleStartDay > 1
+              ? `${t('settings.paydayPrefix', 'Siklus Gajian')}: ${t('common.day', 'Tgl')} ${budgetCycleStartDay}`
+              : t('settings.standardMonthPrefix', 'Standar Kalender: Tgl 1')
+          }
+          icon={Calendar}
+          onClick={() => setIsBudgetCycleModalOpen(true)}
+        />
       </SettingsSection>
 
       {/* 4. Directory Group 2: Keamanan, Notifikasi & AI */}
@@ -607,6 +677,12 @@ export default function SettingsHome() {
         </div>
       </Modal>
 
+      {/* Modal Budget Cycle Selector */}
+      <BudgetCycleModal
+        isOpen={isBudgetCycleModalOpen}
+        onClose={() => setIsBudgetCycleModalOpen(false)}
+      />
+
       {/* Modal Guest Warning when Logging Out */}
       <Modal
         isOpen={isGuestWarningOpen}
@@ -652,7 +728,7 @@ export default function SettingsHome() {
                 setIsGuestWarningOpen(false)
                 executePerformLogout()
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-500 font-bold text-xs hover:bg-red-500/20 transition-all cursor-pointer active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-[var(--status-expense)]/30 bg-[var(--status-expense)]/10 text-[var(--status-expense)] font-bold text-xs hover:bg-[var(--status-expense)]/20 transition-all cursor-pointer active:scale-[0.98]"
             >
               <LogOut size={15} />
               <span>{t('settings.proceedLogoutAnyway', 'Tetap Keluar & Ganti Akun')}</span>
@@ -678,7 +754,7 @@ export default function SettingsHome() {
       >
         <div className="space-y-4">
           <div className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center shrink-0 mt-0.5">
               <Database size={18} strokeWidth={2.5} />
             </div>
             <p className="text-xs text-[var(--muted)] leading-relaxed min-w-0 flex-1">
@@ -696,7 +772,7 @@ export default function SettingsHome() {
                 setIsLogoutConfirmOpen(false)
                 executePerformLogout()
               }}
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-red-500 text-white font-bold text-xs sm:text-sm hover:bg-red-600 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--status-expense)] text-white font-bold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
             >
               <LogOut size={15} />
               <span>{t('settings.proceedLogoutAnyway', 'Keluar & Ganti Akun')}</span>

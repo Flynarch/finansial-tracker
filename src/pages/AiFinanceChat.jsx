@@ -6,10 +6,13 @@ import { createTransaction as addTransaction, updateTransaction, deleteTransacti
 import { createWallet } from '../services/walletService'
 import useLoanStore from '../store/useLoanStore'
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { getCachedCurrencyRates } from '../lib/api'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseTransactionFromText } from '../lib/gemini'
 import { sanitizeCategoryPath } from '../lib/categorySanitizer'
 import { format } from 'date-fns'
+import { getLocalDateString } from '../lib/dateUtils'
 import {
   Send,
   Trash2,
@@ -30,6 +33,8 @@ import MediaSourcePickerModal from '../components/chat/MediaSourcePickerModal'
 import useChatStore from '../store/useChatStore'
 import useBackButton from '../hooks/useBackButton'
 import { triggerHaptic } from '../lib/haptics'
+import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 
 const BG_TEXTURE_OPTIONS = [
   { id: 'paper', labelKey: 'aiChat.texture.paper', defaultLabel: 'Kertas Jurnal' },
@@ -43,7 +48,7 @@ export default function AiFinanceChat() {
   const navigate = useNavigate()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const transactions = useLiveQuery(() => db.transactions.toArray(), []) || []
+  const defaultWalletId = useSettingsStore((s) => s.defaultWalletId)
   const addLoan = useLoanStore((s) => s.addLoan)
   const recordPayment = useLoanStore((s) => s.recordPayment)
   const updateLoan = useLoanStore((s) => s.updateLoan)
@@ -70,6 +75,7 @@ export default function AiFinanceChat() {
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
   const textureDropdownRef = useRef(null)
+  const deletingMsgIdsRef = useRef(new Set())
 
   useBackButton(() => {
     if (showMediaSourcePicker) {
@@ -305,12 +311,14 @@ export default function AiFinanceChat() {
     streamBufferRef.current = ''
 
     try {
+      const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
       const result = await parseTransactionFromText(text || "Lihat gambar struk ini", {
         locale,
         defaultCurrency,
         previousMessages: messages,
         imageData: image,
         wallets,
+        rates: activeRates,
         scanMode,
         onStream: (chunk) => {
           streamBufferRef.current += chunk
@@ -375,30 +383,90 @@ export default function AiFinanceChat() {
         }
         
         if (result.action === 'update' || result.action === 'delete') {
-           const sq = result.searchQuery.toLowerCase()
-           const matchedTx = transactions.find(t => 
-              (t.notes && t.notes.toLowerCase().includes(sq)) || 
-              (t.category && t.category.toLowerCase().includes(sq)) ||
-              (result.date && t.date === result.date)
-           )
-           
-           if (!matchedTx) {
-              newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: "Maaf, transaksi yang dimaksud tidak ditemukan di history Anda." })
-           } else {
-              if (result.action === 'update') {
-                 await updateTransaction(matchedTx.id, { ...matchedTx, ...result.updatedFields })
-                 newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'success', data: { ...matchedTx, ...result.updatedFields }, customMsg: "Transaksi berhasil diperbarui" })
-              } else {
-                 await deleteTransaction(matchedTx.id)
-                 newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: "Oke, transaksi tersebut telah dihapus." })
+          const allFreshTxs = await db.transactions.toArray()
+          allFreshTxs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0))
+
+          let matchedTx = null
+          if (result.transactionId) {
+            matchedTx = allFreshTxs.find((t) => t.id === Number(result.transactionId))
+          }
+
+          const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
+          if (!matchedTx && sq) {
+            if (sq === 'terakhir' || sq === 'latest' || sq === 'tadi' || sq === 'barusan') {
+              matchedTx = allFreshTxs[0]
+            } else {
+              matchedTx = allFreshTxs.find((t) =>
+                (t.notes && t.notes.toLowerCase().includes(sq)) ||
+                (t.category && t.category.toLowerCase().includes(sq)) ||
+                (result.date && t.date === result.date)
+              )
+            }
+          }
+
+          if (!matchedTx) {
+            const isVagueDelete = result.action === 'delete' && !result.transactionId && !sq
+            const vagueMsg = locale === 'en'
+              ? 'Please specify which transaction you would like to delete (for example: "delete transaction coffee 30k" or "delete latest transaction").'
+              : 'Mohon sebutkan transaksi mana yang ingin Anda hapus (contoh: "hapus transaksi kopi 30rb" atau "hapus transaksi terakhir").'
+            const notFoundMsg = locale === 'en'
+              ? 'Sorry, the requested transaction was not found in your history.'
+              : 'Maaf, transaksi yang dimaksud tidak ditemukan di riwayat Anda.'
+
+            newMsgs.push({
+              id: Date.now() + 3,
+              role: 'ai',
+              type: 'text',
+              content: isVagueDelete ? vagueMsg : notFoundMsg,
+            })
+          } else {
+            if (result.action === 'update') {
+              const updatedPayload = { ...result.updatedFields }
+              if (updatedPayload.amount !== undefined) {
+                updatedPayload.amount = Number(updatedPayload.amount)
               }
-           }
+              if (updatedPayload.walletId !== undefined) {
+                updatedPayload.walletId = updatedPayload.walletId ? Number(updatedPayload.walletId) : undefined
+              }
+              if (updatedPayload.targetWalletId !== undefined) {
+                updatedPayload.targetWalletId = updatedPayload.targetWalletId ? Number(updatedPayload.targetWalletId) : undefined
+              }
+
+              await updateTransaction(matchedTx.id, updatedPayload)
+              const updatedTx = { ...matchedTx, ...updatedPayload }
+              newMsgs.push({
+                id: Date.now() + 3,
+                role: 'ai',
+                type: 'success',
+                data: updatedTx,
+                customMsg: locale === 'en' ? 'Transaction updated successfully' : 'Transaksi berhasil diperbarui',
+              })
+            } else {
+              newMsgs.push({
+                id: Date.now() + 3,
+                role: 'ai',
+                type: 'delete_confirm',
+                data: {
+                  id: matchedTx.id,
+                  amount: matchedTx.amount,
+                  category: matchedTx.category,
+                  date: matchedTx.date,
+                  notes: matchedTx.notes,
+                  type: matchedTx.type,
+                  currency: matchedTx.currency || defaultCurrency,
+                },
+                content: locale === 'en'
+                  ? 'Are you sure you want to delete this transaction?'
+                  : 'Apakah Anda yakin ingin menghapus transaksi ini?',
+              })
+            }
+          }
         }
       }
       
       if (result.type === 'habit') {
         const habits = await db.habits.toArray()
-        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        const fuzzyMatch = (str, query) => String(str || '').toLowerCase().includes(String(query || '').toLowerCase())
         
         if (result.action === 'create') {
           const newHabit = {
@@ -409,10 +477,25 @@ export default function AiFinanceChat() {
             frequencyValue: null,
             reminderEnabled: !!result.reminderTime,
             reminderTime: result.reminderTime || null,
-            createdAt: new Date().toISOString()
+            createdAt: Date.now()
           }
-          await db.habits.add(newHabit)
-          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'habit', action: 'create', title: result.title } })
+          const newHabitId = await db.habits.add(newHabit)
+          newMsgs.push({
+            id: Date.now()+3,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'habit',
+              action: 'create',
+              title: result.title,
+              data: {
+                id: newHabitId,
+                title: result.title,
+                color: result.color || 'indigo',
+                frequencyType: result.frequencyType || 'daily'
+              }
+            }
+          })
         } else if (result.action === 'log') {
           const matched = habits.find(h => fuzzyMatch(h.title, result.title))
           if (matched) {
@@ -420,10 +503,23 @@ export default function AiFinanceChat() {
             const existingLog = await db.habitLogs.where({ habitId: matched.id, date: todayStr }).first()
             if (!existingLog) {
               await db.habitLogs.add({ habitId: matched.id, date: todayStr })
-              newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'habit', action: 'log', title: matched.title } })
-            } else {
-              newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Habit "**${matched.title}**" sudah dicentang sebelumnya hari ini.` })
             }
+            newMsgs.push({
+              id: Date.now()+3,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'habit',
+                action: 'log',
+                title: matched.title,
+                data: {
+                  id: matched.id,
+                  title: matched.title,
+                  color: matched.color || 'indigo',
+                  frequencyType: matched.frequencyType || 'daily'
+                }
+              }
+            })
           } else {
             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Habit yang mirip dengan "${result.title}" tidak ditemukan di daftar Anda.` })
           }
@@ -447,37 +543,138 @@ export default function AiFinanceChat() {
 
       if (result.type === 'savings') {
         const goals = await db.goals.toArray()
-        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        const fuzzyMatch = (str, query) => String(str || '').toLowerCase().includes(String(query || '').toLowerCase())
         
         if (result.action === 'create') {
+          const targetAmt = Number(result.amount) || 0
           await db.goals.add({
             name: result.name,
-            targetAmount: result.amount,
+            targetAmount: targetAmt,
             currentAmount: 0,
             deadline: null,
             currency: defaultCurrency
           })
-          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'create', title: result.name, subtitle: `Target: Rp ${result.amount.toLocaleString('id-ID')}` } })
+          newMsgs.push({
+            id: Date.now()+3,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'savings',
+              action: 'create',
+              title: result.name,
+              data: {
+                title: result.name,
+                targetAmount: targetAmt,
+                currentAmount: 0,
+                currency: defaultCurrency
+              }
+            }
+          })
         } else if (result.action === 'add_funds') {
           const matched = goals.find(g => fuzzyMatch(g.name, result.name))
           if (matched) {
-            await db.goals.update(matched.id, { currentAmount: matched.currentAmount + result.amount })
-            await db.goalLogs.add({
-              goalId: matched.id,
-              amount: result.amount,
-              notes: 'Dicatat oleh AI',
-              date: format(new Date(), 'yyyy-MM-dd HH:mm:ss')
-            })
-            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'savings', action: 'add_funds', title: matched.name, subtitle: `Ditambah: Rp ${result.amount.toLocaleString('id-ID')}` } })
+            const depositAmt = Number(result.amount) || 0
+            if (depositAmt <= 0) {
+              newMsgs.push({
+                id: Date.now() + 3,
+                role: 'ai',
+                type: 'text',
+                content: locale === 'en'
+                  ? 'Deposit amount must be greater than 0.'
+                  : 'Nominal setoran tabungan harus lebih dari 0.',
+              })
+            } else {
+              // Resolve funding wallet (specified wallet, default wallet from settings, cash wallet, or first active wallet)
+              const activeWallets = (wallets || []).filter(w => !w.isArchived)
+              let chosenWallet = null
+              if (result.walletId) {
+                chosenWallet = activeWallets.find(w => w.id === Number(result.walletId)) || null
+              }
+              if (!chosenWallet && defaultWalletId) {
+                chosenWallet = activeWallets.find(w => w.id === Number(defaultWalletId)) || null
+              }
+              if (!chosenWallet) {
+                chosenWallet = activeWallets.find(w => w.institutionType === 'cash') || activeWallets[0] || null
+              }
+
+              if (!chosenWallet) {
+                newMsgs.push({
+                  id: Date.now() + 3,
+                  role: 'ai',
+                  type: 'text',
+                  content: locale === 'en'
+                    ? 'Cannot deposit to savings: no active wallet found to debit funds from. Please create a wallet first.'
+                    : 'Gagal menyetor ke tabungan: tidak ditemukan dompet aktif untuk memotong saldo. Silakan buat dompet terlebih dahulu.',
+                })
+              } else {
+                const walletIdNum = Number(chosenWallet.id)
+                const newCurrent = (matched.currentAmount || 0) + depositAmt
+
+                const createdTxId = await db.transactions.add({
+                  date: getLocalDateString(),
+                  amount: depositAmt,
+                  type: 'expense',
+                  category: 'tabungan',
+                  notes: `Setor ke Tabungan: ${matched.name}`,
+                  currency: matched.currency || chosenWallet?.currency || defaultCurrency,
+                  walletId: walletIdNum,
+                  goalId: matched.id,
+                  createdAt: Date.now(),
+                  isExcludeFromAnalytics: true,
+                  excludeFromAnalytics: true,
+                })
+                void invalidateWalletBalance([walletIdNum])
+
+                await db.goals.update(matched.id, { currentAmount: newCurrent })
+                await db.goalLogs.add({
+                  goalId: matched.id,
+                  amount: depositAmt,
+                  notes: 'Dicatat oleh AI',
+                  date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+                  walletName: chosenWallet?.name || null,
+                  transactionId: createdTxId || null,
+                })
+
+                const walletSubtitle = locale === 'en'
+                  ? `Deducted from ${chosenWallet.name}`
+                  : `Dipotong dari dompet ${chosenWallet.name}`
+
+                newMsgs.push({
+                  id: Date.now() + 3,
+                  role: 'ai',
+                  type: 'action_success',
+                  data: {
+                    type: 'savings',
+                    action: 'add',
+                    title: matched.name,
+                    subtitle: walletSubtitle,
+                    data: {
+                      title: matched.name,
+                      targetAmount: matched.targetAmount,
+                      currentAmount: newCurrent,
+                      currency: matched.currency || defaultCurrency,
+                      walletName: chosenWallet?.name,
+                    }
+                  }
+                })
+              }
+            }
           } else {
-            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Tabungan yang mirip dengan "${result.name}" tidak ditemukan.` })
+            newMsgs.push({
+              id: Date.now() + 3,
+              role: 'ai',
+              type: 'text',
+              content: locale === 'en'
+                ? `Savings goal matching "${result.name || ''}" not found.`
+                : `Tabungan yang mirip dengan "${result.name || ''}" tidak ditemukan.`
+            })
           }
         }
       }
 
       if (result.type === 'todo') {
         const todos = await db.todos.toArray()
-        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        const fuzzyMatch = (str, query) => String(str || '').toLowerCase().includes(String(query || '').toLowerCase())
         
         if (result.action === 'create') {
           const validCategories = ['tagihan', 'investasi', 'belanja', 'tabungan', 'pekerjaan', 'pribadi', 'kesehatan', 'pendidikan', 'rumah', 'transportasi', 'lainnya']
@@ -490,7 +687,7 @@ export default function AiFinanceChat() {
             priority: result.priority || 'medium',
             completed: false,
             reminderTime: result.reminderTime || null,
-            createdAt: new Date().toISOString()
+            createdAt: Date.now()
           })
           
           if (result.subTasks && Array.isArray(result.subTasks) && result.subTasks.length > 0) {
@@ -502,12 +699,45 @@ export default function AiFinanceChat() {
             await db.sub_tasks.bulkAdd(subTasksToInsert)
           }
           
-          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'todo', action: 'create', title: result.title } })
+          newMsgs.push({
+            id: Date.now()+3,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'todo',
+              action: 'create',
+              title: result.title,
+              data: {
+                id: todoId,
+                title: result.title,
+                category: aiCategory,
+                dueDate: result.dueDate || format(new Date(), 'yyyy-MM-dd'),
+                priority: result.priority || 'medium',
+                subTasks: result.subTasks || []
+              }
+            }
+          })
         } else if (result.action === 'complete') {
           const matched = todos.find(t => !t.completed && fuzzyMatch(t.title, result.title))
           if (matched) {
             await db.todos.update(matched.id, { completed: true })
-            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'todo', action: 'complete', title: matched.title } })
+            newMsgs.push({
+              id: Date.now()+3,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'todo',
+                action: 'done',
+                title: matched.title,
+                data: {
+                  id: matched.id,
+                  title: matched.title,
+                  category: matched.category,
+                  dueDate: matched.dueDate,
+                  priority: matched.priority
+                }
+              }
+            })
           } else {
             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Tugas aktif yang mirip dengan "${result.title}" tidak ditemukan.` })
           }
@@ -516,22 +746,77 @@ export default function AiFinanceChat() {
 
       if (result.type === 'budget') {
         const budgets = await db.budgets.toArray()
-        const fuzzyMatch = (str, query) => str.toLowerCase().includes(query.toLowerCase())
+        const allTxs = await db.transactions.toArray()
+        const fuzzyMatch = (str, query) => str?.toLowerCase().includes((query || '').toLowerCase())
         const monthStr = format(new Date(), 'yyyy-MM')
-        const limitFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(result.limit)
         
-        if (result.action === 'create' || result.action === 'update') {
-          const matched = budgets.find(b => b.month === monthStr && fuzzyMatch(b.category, result.category))
+        const catTarget = result.category || 'Semua'
+        const spentThisMonth = allTxs
+          .filter(tx => tx.type === 'expense' && (tx.date || '').startsWith(monthStr) && (catTarget === 'Semua' || (tx.category || '').toLowerCase().includes(catTarget.toLowerCase())))
+          .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
+
+        if (result.action === 'status') {
+          const matched = budgets.find(b => b.month === monthStr && (catTarget === 'Semua' || fuzzyMatch(b.category, catTarget)))
+          const foundLimit = matched ? Number(matched.limit) : (Number(result.limit) || 0)
+          newMsgs.push({
+            id: Date.now()+3,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'budget',
+              action: 'status',
+              title: catTarget,
+              data: {
+                category: catTarget,
+                limit: foundLimit,
+                spent: spentThisMonth,
+                currency: defaultCurrency
+              }
+            }
+          })
+        } else if (result.action === 'create' || result.action === 'update') {
+          const matched = budgets.find(b => b.month === monthStr && fuzzyMatch(b.category, catTarget))
+          const numLimit = Number(result.limit) || 0
           if (matched) {
-            await db.budgets.update(matched.id, { limit: result.limit })
-            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'budget', action: 'update', title: `Kategori: ${matched.category}`, subtitle: `Batas: ${limitFormatted}` } })
+            await db.budgets.update(matched.id, { limit: numLimit })
+            newMsgs.push({
+              id: Date.now()+3,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'budget',
+                action: 'update',
+                title: matched.category,
+                data: {
+                  category: matched.category,
+                  limit: numLimit,
+                  spent: spentThisMonth,
+                  currency: defaultCurrency
+                }
+              }
+            })
           } else {
             await db.budgets.add({
-              category: result.category,
-              limit: result.limit,
+              category: catTarget,
+              limit: numLimit,
               month: monthStr
             })
-            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'budget', action: 'create', title: `Kategori: ${result.category}`, subtitle: `Batas: ${limitFormatted}` } })
+            newMsgs.push({
+              id: Date.now()+3,
+              role: 'ai',
+              type: 'action_success',
+              data: {
+                type: 'budget',
+                action: 'create',
+                title: catTarget,
+                data: {
+                  category: catTarget,
+                  limit: numLimit,
+                  spent: spentThisMonth,
+                  currency: defaultCurrency
+                }
+              }
+            })
           }
         }
       }
@@ -550,35 +835,102 @@ export default function AiFinanceChat() {
 
       if (result.type === 'recurring') {
         const recurrings = await db.recurringTransactions.toArray()
-        const fuzzyMatch = (str, query) => str?.toLowerCase().includes(query.toLowerCase())
+        const fuzzyMatch = (str, query) => String(str || '').toLowerCase().includes(String(query || '').toLowerCase())
         
         if (result.action === 'create') {
+          const recAmt = Number(result.amount) || 0
           await db.recurringTransactions.add({
             title: result.title,
             type: 'expense',
             category: result.category || 'Lainnya',
-            amount: result.amount || 0,
+            amount: recAmt,
             currency: defaultCurrency,
             frequency: result.frequency || 'monthly',
             nextDate: format(new Date(), 'yyyy-MM-dd'),
             enabled: true
           })
-          newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'create', title: result.title, subtitle: `Rp ${(result.amount || 0).toLocaleString('id-ID')} (${result.frequency || 'monthly'})` } })
-        } else if (result.action === 'update' || result.action === 'delete') {
-          const matched = recurrings.find(r => fuzzyMatch(r.title, result.title))
-          if (matched) {
-            if (result.action === 'update') {
-               const updates = {}
-               if (result.amount) updates.amount = result.amount
-               if (result.frequency) updates.frequency = result.frequency
-               await db.recurringTransactions.update(matched.id, updates)
-               newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'update', title: matched.title, subtitle: `Langganan diperbarui` } })
-            } else {
-               await db.recurringTransactions.delete(matched.id)
-               newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'action_success', data: { type: 'recurring', action: 'delete', title: matched.title, subtitle: 'Langganan berhasil dibatalkan' } })
+          newMsgs.push({
+            id: Date.now()+3,
+            role: 'ai',
+            type: 'action_success',
+            data: {
+              type: 'recurring',
+              action: 'create',
+              title: result.title,
+              data: {
+                title: result.title,
+                amount: recAmt,
+                frequency: result.frequency || 'monthly',
+                category: result.category || 'Lainnya',
+                currency: defaultCurrency
+              }
             }
+          })
+        } else if (result.action === 'update' || result.action === 'delete') {
+          if (result.action === 'delete' && (!result.title || !result.title.trim())) {
+            newMsgs.push({
+              id: Date.now() + 3,
+              role: 'ai',
+              type: 'text',
+              content: locale === 'en'
+                ? 'Please specify which recurring subscription you would like to cancel.'
+                : 'Mohon sebutkan langganan berulang mana yang ingin Anda batalkan.',
+            })
           } else {
-             newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: `Maaf, langganan bernama "${result.title}" tidak ditemukan.` })
+            const matched = recurrings.find(r => fuzzyMatch(r.title, result.title))
+            if (matched) {
+              if (result.action === 'update') {
+                const updates = {}
+                if (result.amount) updates.amount = Number(result.amount)
+                if (result.frequency) updates.frequency = result.frequency
+                await db.recurringTransactions.update(matched.id, updates)
+                newMsgs.push({
+                  id: Date.now()+3,
+                  role: 'ai',
+                  type: 'action_success',
+                  data: {
+                    type: 'recurring',
+                    action: 'update',
+                    title: matched.title,
+                    data: {
+                      title: matched.title,
+                      amount: updates.amount ?? matched.amount,
+                      frequency: updates.frequency ?? matched.frequency,
+                      category: matched.category,
+                      currency: defaultCurrency
+                    }
+                  }
+                })
+              } else {
+                newMsgs.push({
+                  id: Date.now() + 3,
+                  role: 'ai',
+                  type: 'delete_confirm',
+                  data: {
+                    id: matched.id,
+                    entityType: 'recurring',
+                    title: matched.title,
+                    notes: matched.title,
+                    amount: matched.amount,
+                    frequency: matched.frequency,
+                    category: matched.category,
+                    currency: defaultCurrency,
+                  },
+                  content: locale === 'en'
+                    ? `Are you sure you want to cancel the recurring subscription "${matched.title}"?`
+                    : `Apakah Anda yakin ingin membatalkan langganan berulang "${matched.title}"?`,
+                })
+              }
+            } else {
+              newMsgs.push({
+                id: Date.now()+3,
+                role: 'ai',
+                type: 'text',
+                content: locale === 'en'
+                  ? `Recurring subscription "${result.title || ''}" not found.`
+                  : `Maaf, langganan bernama "${result.title || ''}" tidak ditemukan.`
+              })
+            }
           }
         }
       }
@@ -675,7 +1027,6 @@ export default function AiFinanceChat() {
           if (!selectedWalletId || !wallets.find((w) => w.id === selectedWalletId)) {
             selectedWalletId = wallets.length > 0 ? wallets[0].id : null
           }
-          const chosenWallet = wallets.find((w) => w.id === selectedWalletId)
           await addLoan({
             type: result.loanType || 'debt',
             personName: result.personName || 'Pihak Terkait',
@@ -693,7 +1044,14 @@ export default function AiFinanceChat() {
               type: 'loan',
               action: 'create',
               title: result.title || 'Pinjaman Baru',
-              subtitle: `${result.loanType === 'debt' ? 'Hutang' : 'Piutang'} (${result.personName || 'Pihak Terkait'})${chosenWallet ? ` • ${chosenWallet.name}` : ''}`,
+              data: {
+                title: result.title || 'Pinjaman Baru',
+                personName: result.personName || 'Pihak Terkait',
+                loanType: result.loanType || 'debt',
+                amount: Number(result.amount) || 0,
+                dueDate: result.dueDate || null,
+                currency: defaultCurrency
+              }
             },
           })
         } else if (result.action === 'pay') {
@@ -707,7 +1065,7 @@ export default function AiFinanceChat() {
             if (payWalletId && matched.walletId !== payWalletId) {
               await db.loans.update(matched.id, { walletId: payWalletId })
             }
-            await recordPayment(matched.id, result.amount, new Date().toISOString().split('T')[0], 'Dicatat via AI Assistant')
+            await recordPayment(matched.id, result.amount, getLocalDateString(), 'Dicatat via AI Assistant', payWalletId)
             newMsgs.push({
               id: Date.now() + 4,
               role: 'ai',
@@ -716,7 +1074,14 @@ export default function AiFinanceChat() {
                 type: 'loan',
                 action: 'pay',
                 title: matched.title,
-                subtitle: `Cicilan ${result.amount ? 'Rp ' + Number(result.amount).toLocaleString('id-ID') : ''} dicatat`,
+                data: {
+                  title: matched.title,
+                  personName: matched.personName,
+                  loanType: matched.type,
+                  amount: Number(result.amount) || 0,
+                  dueDate: matched.dueDate,
+                  currency: defaultCurrency
+                }
               },
             })
           }
@@ -724,35 +1089,74 @@ export default function AiFinanceChat() {
           const allLoans = await db.loans.toArray()
           const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()))
           if (matched) {
-            await updateLoan(matched.id, { status: 'paid', remainingAmount: 0 })
+            const payWalletId = result.walletId ? Number(result.walletId) : (matched.walletId || (wallets.length > 0 ? wallets[0].id : null))
+            const remaining = Number(matched.remainingAmount) || 0
+            if (remaining > 0) {
+              await recordPayment(matched.id, remaining, getLocalDateString(), 'Pelunasan pinjaman via AI Assistant', payWalletId)
+            } else {
+              await updateLoan(matched.id, { status: 'paid', remainingAmount: 0 })
+            }
             newMsgs.push({
               id: Date.now() + 4,
               role: 'ai',
               type: 'action_success',
               data: {
                 type: 'loan',
-                action: 'update',
+                action: 'pay',
                 title: matched.title,
-                subtitle: 'Ditandai lunas',
+                subtitle: 'Pinjaman berhasil dilunasi',
+                data: {
+                  title: matched.title,
+                  personName: matched.personName,
+                  loanType: matched.type,
+                  amount: remaining,
+                  currency: matched.currency || defaultCurrency,
+                },
               },
             })
           }
         } else if (result.action === 'delete') {
-          const allLoans = await db.loans.toArray()
-          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()))
-          if (matched) {
-            await deleteLoan(matched.id)
+          if (!result.title || !result.title.trim()) {
             newMsgs.push({
               id: Date.now() + 4,
               role: 'ai',
-              type: 'action_success',
-              data: {
-                type: 'loan',
-                action: 'delete',
-                title: matched.title,
-                subtitle: 'Catatan pinjaman dihapus',
-              },
+              type: 'text',
+              content: locale === 'en'
+                ? 'Please specify which loan record you would like to delete (for example: "delete loan Motor").'
+                : 'Mohon sebutkan catatan pinjaman mana yang ingin Anda hapus (contoh: "hapus pinjaman Motor").',
             })
+          } else {
+            const allLoans = await db.loans.toArray()
+            const matched = allLoans.find((l) => l.title?.toLowerCase().includes(result.title.toLowerCase()))
+            if (matched) {
+              newMsgs.push({
+                id: Date.now() + 4,
+                role: 'ai',
+                type: 'delete_confirm',
+                data: {
+                  id: matched.id,
+                  entityType: 'loan',
+                  title: matched.title,
+                  notes: matched.title,
+                  personName: matched.personName,
+                  amount: matched.remainingAmount ?? matched.totalAmount ?? matched.amount,
+                  currency: matched.currency || defaultCurrency,
+                  loanType: matched.type,
+                },
+                content: locale === 'en'
+                  ? `Are you sure you want to delete the loan "${matched.title}"?`
+                  : `Apakah Anda yakin ingin menghapus catatan pinjaman "${matched.title}"?`,
+              })
+            } else {
+              newMsgs.push({
+                id: Date.now() + 4,
+                role: 'ai',
+                type: 'text',
+                content: locale === 'en'
+                  ? `Loan "${result.title || ''}" not found.`
+                  : `Catatan pinjaman "${result.title || ''}" tidak ditemukan.`,
+              })
+            }
           }
         }
       }
@@ -803,13 +1207,17 @@ export default function AiFinanceChat() {
          setMessages(prev => prev.filter(m => m.id !== aiMsgId))
       }
     } catch (err) {
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
+      const offlineMsg = locale === 'en'
+        ? 'No internet connection. Please check your network connection and try again.'
+        : 'Tidak ada koneksi internet. Silakan periksa jaringan Anda dan coba lagi.'
       setMessages(prev => {
          const filtered = prev.filter(m => m.id !== aiMsgId)
          return [...filtered, {
            id: Date.now() + 1,
            role: 'ai',
            type: 'text',
-           content: err.message || translate(locale, 'aiChat.error')
+           content: isOffline ? offlineMsg : (err?.message || translate(locale, 'aiChat.error'))
          }]
       })
     } finally {
@@ -847,6 +1255,93 @@ export default function AiFinanceChat() {
           type: 'info',
         },
       })
+    )
+  }
+
+  const handleConfirmDelete = async (id, msgId, entityType = 'transaction') => {
+    if (deletingMsgIdsRef.current.has(msgId)) return
+    deletingMsgIdsRef.current.add(msgId)
+    try {
+      triggerHaptic('medium')
+      if (entityType === 'loan') {
+        await deleteLoan(id)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  type: 'text',
+                  content: locale === 'en' ? 'Loan record has been deleted.' : 'Catatan pinjaman telah berhasil dihapus.',
+                  deleted: true,
+                }
+              : m,
+          ),
+        )
+      } else if (entityType === 'recurring') {
+        await db.recurringTransactions.delete(id)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  type: 'text',
+                  content: locale === 'en' ? 'Recurring subscription cancelled.' : 'Langganan berulang berhasil dibatalkan.',
+                  deleted: true,
+                }
+              : m,
+          ),
+        )
+      } else {
+        await deleteTransaction(id)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  type: 'text',
+                  content: locale === 'en' ? 'Transaction has been deleted.' : 'Transaksi telah berhasil dihapus.',
+                  deleted: true,
+                }
+              : m,
+          ),
+        )
+      }
+      triggerHaptic('success')
+    } catch (err) {
+      triggerHaptic('warning')
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId
+            ? {
+                ...m,
+                type: 'text',
+                content: err.message || (locale === 'en' ? 'Failed to delete.' : 'Gagal menghapus.'),
+              }
+            : m,
+        ),
+      )
+    } finally {
+      deletingMsgIdsRef.current.delete(msgId)
+    }
+  }
+
+  const handleCancelDelete = (msgId, entityType = 'transaction') => {
+    triggerHaptic('light')
+    const cancelMsg = entityType === 'loan'
+      ? (locale === 'en' ? 'Loan deletion cancelled.' : 'Penghapusan pinjaman dibatalkan.')
+      : entityType === 'recurring'
+      ? (locale === 'en' ? 'Cancellation cancelled.' : 'Pembatalan langganan dibatalkan.')
+      : (locale === 'en' ? 'Transaction deletion cancelled.' : 'Penghapusan transaksi dibatalkan.')
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId
+          ? {
+              ...m,
+              type: 'text',
+              content: cancelMsg,
+            }
+          : m,
+      ),
     )
   }
 
@@ -966,48 +1461,19 @@ export default function AiFinanceChat() {
       </header>
 
       {/* ── Clear Confirmation Modal ── */}
-      {showClearConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-[ft-fade-in_0.15s_ease-out_both]"
-          onClick={() => setShowClearConfirm(false)}
-        >
-          <div
-            className="w-full max-w-xs rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4.5 shadow-2xl space-y-3 animate-[ft-spring-dropdown_0.2s_ease-out_both]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2.5 text-rose-500">
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-rose-500/15 text-rose-500 border border-rose-500/20 shadow-2xs">
-                <Trash2 size={16} strokeWidth={2.2} />
-              </div>
-              <h3 className="text-sm font-black tracking-tight text-[var(--fg)]">
-                {locale === 'en' ? 'Clear Conversation?' : 'Hapus Percakapan?'}
-              </h3>
-            </div>
-            <p className="text-xs text-[var(--muted)] leading-relaxed font-medium">
-              {locale === 'en'
-                ? 'All messages in this session will be cleared.'
-                : 'Semua riwayat percakapan sesi ini akan dihapus dan diatur ulang ke pesan pembuka.'}
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
-              >
-                {locale === 'en' ? 'Cancel' : 'Batal'}
-              </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                className="px-3.5 py-2 rounded-xl bg-rose-500 text-white text-xs font-bold shadow-sm shadow-rose-500/30 hover:bg-rose-600 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 size={13} strokeWidth={2.2} />
-                <span>{locale === 'en' ? 'Clear' : 'Hapus'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={handleClear}
+        title={locale === 'en' ? 'Clear Conversation?' : 'Hapus Percakapan?'}
+        description={
+          locale === 'en'
+            ? 'All messages in this session will be cleared.'
+            : 'Semua riwayat percakapan sesi ini akan dihapus dan diatur ulang ke pesan pembuka.'
+        }
+        confirmText={locale === 'en' ? 'Clear' : 'Hapus'}
+        cancelText={locale === 'en' ? 'Cancel' : 'Batal'}
+      />
 
       {/* ── Scan Mode Picker Modal ── */}
       {showScanModePicker && selectedImage && (
@@ -1104,8 +1570,53 @@ export default function AiFinanceChat() {
                           action={msg.data.action}
                           title={msg.data.title}
                           subtitle={msg.data.subtitle}
+                          data={msg.data.data || msg.data}
                           embedded={true}
                         />
+                      ) : msg.type === 'delete_confirm' && msg.data ? (
+                        <div className="mt-2 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-[var(--fg)] truncate">
+                                {msg.data.title || msg.data.notes || msg.data.category || (locale === 'en' ? 'Item' : 'Data')}
+                              </p>
+                              <p className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
+                                {msg.data.entityType === 'loan' ? (
+                                  <span>{msg.data.loanType === 'debt' ? (locale === 'en' ? 'Debt' : 'Hutang') : (locale === 'en' ? 'Receivable' : 'Piutang')}{msg.data.personName ? ` • ${msg.data.personName}` : ''}</span>
+                                ) : msg.data.entityType === 'recurring' ? (
+                                  <span>{msg.data.frequency || (locale === 'en' ? 'Recurring' : 'Berulang')}{msg.data.category ? ` • ${msg.data.category}` : ''}</span>
+                                ) : (
+                                  <>
+                                    <span>{msg.data.date}</span>
+                                    {msg.data.category && <span>• {msg.data.category}</span>}
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                            {msg.data.amount != null && (
+                              <span className={`text-xs font-black shrink-0 ${msg.data.type === 'income' ? 'text-[var(--income)]' : 'text-[var(--expense)]'}`}>
+                                {formatCurrency(msg.data.amount, msg.data.currency)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleCancelDelete(msg.id, msg.data.entityType)}
+                              className="flex-1 py-2 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer text-center"
+                            >
+                              {locale === 'en' ? 'Cancel' : 'Batal'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmDelete(msg.data.id, msg.id, msg.data.entityType)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <Trash2 size={13} strokeWidth={2.2} />
+                              <span>{locale === 'en' ? 'Delete' : 'Hapus'}</span>
+                            </button>
+                          </div>
+                        </div>
                       ) : null
                     }
                   />
@@ -1199,7 +1710,7 @@ export default function AiFinanceChat() {
                 handleSend()
               }
             }}
-            placeholder={translate(locale, 'aiChat.placeholder') || (locale === 'en' ? 'Ask or record anything...' : 'Ketik transaksi, tugas, atau pertanyaan...')}
+            placeholder={translate(locale, 'aiChat.placeholder') || (locale === 'en' ? 'Ask anything...' : 'Ketik apapun...')}
             className="flex-1 max-h-[120px] min-h-[36px] resize-none bg-transparent py-2 px-2 text-[13px] font-medium leading-snug text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none"
           />
 

@@ -1,4 +1,5 @@
 import { formatCurrency, toSafeNumber } from './utils'
+import { getLocalDateString } from './dateUtils'
 
 /**
  * Escapes string for safe HTML rendering to prevent XSS.
@@ -30,7 +31,7 @@ export function escapeCsv(str) {
  * Includes UTF-8 BOM (\uFEFF) for seamless opening in Microsoft Excel
  * and standard RFC 4180 parsers.
  */
-export function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR') {
+export async function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR') {
   if (!transactions || transactions.length === 0) {
     return false
   }
@@ -76,12 +77,29 @@ export function exportTransactionsToCsv(transactions = [], wallets = [], default
   // Prepend UTF-8 BOM (\uFEFF)
   const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
+  const dateStr = getLocalDateString()
+  const filename = `fintrack-laporan-transaksi-${dateStr}.csv`
 
-  const dateStr = new Date().toISOString().slice(0, 10)
+  // On mobile/Android WebView, try Web Share API with File
+  if (typeof navigator !== 'undefined' && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: 'text/csv;charset=utf-8;' })
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Laporan Transaksi FinTrack',
+          files: [file],
+        })
+        return true
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return true
+    }
+  }
+
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.setAttribute('href', url)
-  link.setAttribute('download', `fintrack-laporan-transaksi-${dateStr}.csv`)
+  link.setAttribute('download', filename)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

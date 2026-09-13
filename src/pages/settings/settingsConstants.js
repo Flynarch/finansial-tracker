@@ -12,10 +12,13 @@ export const APP_LOCAL_STORAGE_KEYS = [
   'usd-idr-fallback-v1',
 ]
 
+import { clearCachedDashboardState } from '../../hooks/useDashboardData'
+
 /**
  * Clear only financial caches without wiping user authentication, onboarding, or profile state
  */
 export function clearFinancialLocalStorage() {
+  clearCachedDashboardState()
   if (typeof window === 'undefined') return
   try {
     const keysToRemove = [
@@ -40,6 +43,7 @@ export function clearFinancialLocalStorage() {
 }
 
 export function clearAppLocalStorage() {
+  clearCachedDashboardState()
   if (typeof window === 'undefined') return
   try {
     window.localStorage.clear()

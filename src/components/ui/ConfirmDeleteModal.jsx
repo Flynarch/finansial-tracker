@@ -13,6 +13,7 @@ export default function ConfirmDeleteModal({
   confirmText,
   cancelText,
   isLoading = false,
+  children,
 }) {
   const { t } = useTranslation()
 
@@ -30,6 +31,8 @@ export default function ConfirmDeleteModal({
             {displayMessage}
           </div>
         </div>
+
+        {children}
 
         <div className="flex gap-2 pt-2">
           <Button

@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest'
+import { describe, it, test, expect } from 'vitest'
 import {
   formatCurrency,
   formatCompactCurrency,
@@ -9,6 +9,7 @@ import {
   convertCurrency,
   isExcludeAnalyticsTx,
   toTransactionsCsv,
+  safeFormatDate,
   FALLBACK_EXCHANGE_RATES,
 } from '../src/lib/utils'
 
@@ -138,3 +139,50 @@ describe('utils - toTransactionsCsv & numeric helpers', () => {
     expect(toSafeNumber('abc')).toBe(0)
   })
 })
+
+describe('isExcludeAnalyticsTx - savings categories', () => {
+  test('should exclude tabungan (savings deposit) category', () => {
+    expect(isExcludeAnalyticsTx({ category: 'tabungan', type: 'expense' })).toBe(true)
+  })
+
+  test('should exclude cairkan_tabungan (savings withdrawal) category', () => {
+    expect(isExcludeAnalyticsTx({ category: 'cairkan_tabungan', type: 'income' })).toBe(true)
+  })
+
+  test('should exclude when isExcludeFromAnalytics flag is set', () => {
+    expect(isExcludeAnalyticsTx({ isExcludeFromAnalytics: true, category: 'Makanan' })).toBe(true)
+  })
+})
+
+describe('utils - safeFormatDate', () => {
+  it('formats YYYY-MM-DD strings without timezone day-shift', () => {
+    const formatted = safeFormatDate('2026-09-09', 'dd MMM yyyy')
+    expect(formatted).toBe('09 Sep 2026')
+  })
+
+  it('formats YYYY-MM-DD with local time pattern without noon contamination', () => {
+    const formatted = safeFormatDate('2026-09-09', 'dd MMM yyyy, HH:mm')
+    expect(formatted).toBe('09 Sep 2026, 00:00')
+  })
+
+  it('formats timestamp numbers correctly', () => {
+    const ts = new Date(2026, 8, 9, 15, 30).getTime()
+    const formatted = safeFormatDate(ts, 'dd MMM yyyy, HH:mm')
+    expect(formatted).toBe('09 Sep 2026, 15:30')
+  })
+
+  it('formats Date objects correctly', () => {
+    const d = new Date(2026, 8, 9)
+    const formatted = safeFormatDate(d, 'yyyy-MM-dd')
+    expect(formatted).toBe('2026-09-09')
+  })
+
+  it('handles invalid dates gracefully and returns empty string', () => {
+    expect(safeFormatDate('')).toBe('')
+    expect(safeFormatDate(null)).toBe('')
+    expect(safeFormatDate(undefined)).toBe('')
+    expect(safeFormatDate('not-a-date')).toBe('')
+    expect(safeFormatDate('2026-02-31')).toBe('') // Invalid calendar date
+  })
+})
+

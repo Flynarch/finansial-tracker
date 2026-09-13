@@ -14,9 +14,9 @@ import useSwipeAction from '../hooks/useSwipeAction'
 import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { triggerHaptic } from '../lib/haptics'
+import PageHeader from '../components/ui/PageHeader'
 import {
   Plus,
-  ChevronLeft,
   HandCoins,
   Receipt,
   CheckCircle2,
@@ -25,8 +25,10 @@ import {
   Pencil,
   Scale,
   HeartHandshake,
+  Calendar,
 } from 'lucide-react'
 import LoanForgiveModal from '../components/loans/LoanForgiveModal'
+import LoanInstallmentModal from '../components/loans/LoanInstallmentModal'
 import { differenceInDays, format } from 'date-fns'
 
 export default function Loans() {
@@ -112,6 +114,10 @@ export default function Loans() {
 
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+  const [payInitialAmount, setPayInitialAmount] = useState(null)
+
+  const [installmentLoan, setInstallmentLoan] = useState(null)
+  const [isInstallmentOpen, setIsInstallmentOpen] = useState(false)
 
   const [forgiveLoanItem, setForgiveLoanItem] = useState(null)
   const [isForgiveOpen, setIsForgiveOpen] = useState(false)
@@ -136,9 +142,22 @@ export default function Loans() {
     openSheet()
   }
 
-  const openPaymentModal = (loan, e) => {
+  const openPaymentModal = (loan, e, initialAmount = null) => {
     e?.stopPropagation()
     setPayLoan(loan)
+    setPayInitialAmount(initialAmount)
+    setIsPayOpen(true)
+  }
+
+  const openInstallmentModal = (loan, e) => {
+    e?.stopPropagation()
+    setInstallmentLoan(loan)
+    setIsInstallmentOpen(true)
+  }
+
+  const handlePayFromInstallment = (amount) => {
+    setPayLoan(installmentLoan)
+    setPayInitialAmount(amount)
     setIsPayOpen(true)
   }
 
@@ -164,7 +183,7 @@ export default function Loans() {
   const rows = useMemo(() => {
     return (loans ?? []).map((l) => {
       const total = toSafeNumber(l.totalAmount)
-      const remaining = toSafeNumber(l.remainingAmount)
+      const remaining = toSafeNumber(l.remainingAmount ?? l.totalAmount)
       const isForgiven = l.status === 'forgiven'
       const isPaid = l.status === 'paid' || (remaining <= 0 && !isForgiven)
       const isSettled = isPaid || isForgiven
@@ -271,32 +290,23 @@ export default function Loans() {
         }`}
       >
         {/* Page Header */}
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <PageHeader
+          title={t('loans.title')}
+          titlePosition="left"
+          onBack={handleBack}
+          backAriaLabel={t('loans.back')}
+          className="pt-2 mb-0"
+          rightAction={
             <button
               type="button"
-              onClick={handleBack}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel-strong)] transition-all cursor-pointer active:scale-95"
-              aria-label={t('loans.back')}
+              onClick={openAdd}
+              className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              {t('loans.recordNew', 'Catat Baru')}
             </button>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">
-                {t('loans.title')}
-              </h1>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={openAdd}
-            className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            {t('loans.recordNew', 'Catat Baru')}
-          </button>
-        </div>
+          }
+        />
 
         {/* Summary Card Header */}
         <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-[var(--shadow-card)] space-y-3.5">
@@ -452,7 +462,7 @@ export default function Loans() {
             onClick={() => setStatusFilter('forgiven')}
             className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border active:scale-95 shrink-0 ${
               statusFilter === 'forgiven'
-                ? 'bg-purple-600 text-white border-purple-600'
+                ? 'bg-[var(--forgiven)] text-white border-[var(--forgiven)]'
                 : 'bg-[var(--panel-strong)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
             }`}
           >
@@ -562,7 +572,7 @@ export default function Loans() {
                             </div>
                             {isForgiven ? (
                               <span
-                                className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-purple-500 text-white ring-2 ring-[var(--panel-strong)]"
+                                className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--forgiven)] text-white ring-2 ring-[var(--panel-strong)]"
                                 title={t('loans.badge.forgiven', 'Diikhlaskan')}
                               >
                                 <HeartHandshake className="h-2.5 w-2.5" strokeWidth={3} />
@@ -591,7 +601,7 @@ export default function Loans() {
                                 </span>
                               )}
                               {isForgiven && (
-                                <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black bg-purple-500/15 text-purple-500 border border-purple-500/30">
+                                <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black bg-[var(--forgiven-soft)] text-[var(--forgiven)] border border-[var(--forgiven)]/30">
                                   <HeartHandshake className="h-2.5 w-2.5" /> {t('loans.badge.forgiven', 'Diikhlaskan')}
                                 </span>
                               )}
@@ -614,6 +624,19 @@ export default function Loans() {
                                 <span className="text-[var(--accent)] font-semibold"> (Cicilan: {formatCurrency(item.monthlyPayment, item.currency || defaultCurrency)}/bln)</span>
                               ) : null}
                             </p>
+                            {(item.tenorMonths > 1 || item.monthlyPayment > 0) && (
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => openInstallmentModal(item, e)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-[var(--field-bg)] hover:bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-all cursor-pointer active:scale-95"
+                                  title={t('loans.installments.viewSchedule', 'Jadwal Cicilan')}
+                                >
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{t('loans.installments.viewSchedule', 'Jadwal Cicilan')}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -624,7 +647,7 @@ export default function Loans() {
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               isForgiven
-                                ? 'bg-purple-500'
+                                ? 'bg-[var(--forgiven)]'
                                 : isPaid
                                   ? 'bg-emerald-500'
                                   : isDebt
@@ -637,7 +660,7 @@ export default function Loans() {
 
                         <div className="shrink-0 text-[11px] font-extrabold tabular-nums">
                           {isForgiven ? (
-                            <span className="text-purple-500 flex items-center gap-1 font-black">
+                            <span className="text-[var(--forgiven)] flex items-center gap-1 font-black">
                               <HeartHandshake className="h-3 w-3" /> {formatCurrency(item.total, item.currency || defaultCurrency)}
                             </span>
                           ) : isPaid ? (
@@ -711,12 +734,23 @@ export default function Loans() {
                           </div>
 
                           {/* CTA Button side (right) */}
-                          {!isSettled && (
+                          {!isSettled ? (
                             <div className="flex items-center gap-1.5 shrink-0">
+                              {(item.tenorMonths > 1 || item.monthlyPayment > 0) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => openInstallmentModal(item, e)}
+                                  className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                  title={t('loans.installments.viewSchedule', 'Jadwal Cicilan')}
+                                >
+                                  <Calendar className="h-3 w-3" />
+                                  <span className="hidden xs:inline">{t('loans.installments.schedule', 'Cicilan')}</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => openForgiveModal(item, e)}
-                                className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-purple-500 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-[var(--forgiven)] bg-[var(--forgiven-soft)] hover:bg-[var(--forgiven)]/20 border border-[var(--forgiven)]/20 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                                 title={isDebt ? t('loans.action.forgiveDebt', 'Diikhlaskan') : t('loans.action.forgive', 'Ikhlaskan')}
                               >
                                 <HeartHandshake className="h-3 w-3" />
@@ -735,6 +769,20 @@ export default function Loans() {
                                 {isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')}
                               </button>
                             </div>
+                          ) : (
+                            (item.tenorMonths > 1 || item.monthlyPayment > 0) && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => openInstallmentModal(item, e)}
+                                  className="shrink-0 px-2 py-1 rounded-xl text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                  title={t('loans.installments.viewSchedule', 'Jadwal Cicilan')}
+                                >
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{t('loans.installments.viewSchedule', 'Jadwal Cicilan')}</span>
+                                </button>
+                              </div>
+                            )
                           )}
                         </div>
                       )}
@@ -755,7 +803,27 @@ export default function Loans() {
         defaultType={activeTab}
       />
 
-      <LoanPaymentModal isOpen={isPayOpen} onClose={() => setIsPayOpen(false)} loan={payLoan} />
+      <LoanPaymentModal
+        isOpen={isPayOpen}
+        onClose={() => {
+          setIsPayOpen(false)
+          setPayInitialAmount(null)
+        }}
+        loan={payLoan}
+        initialAmount={payInitialAmount}
+        onOpenForgive={(loan) => {
+          setIsPayOpen(false)
+          setPayInitialAmount(null)
+          openForgiveModal(loan)
+        }}
+      />
+
+      <LoanInstallmentModal
+        isOpen={isInstallmentOpen}
+        onClose={() => setIsInstallmentOpen(false)}
+        loan={installmentLoan}
+        onPayInstallment={handlePayFromInstallment}
+      />
 
       <LoanForgiveModal
         isOpen={isForgiveOpen}

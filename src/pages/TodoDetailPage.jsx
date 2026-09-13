@@ -8,6 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import CustomDateTimePicker from '../components/ui/CustomDateTimePicker'
 import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import PageHeader from '../components/ui/PageHeader'
 import {
   ArrowLeft,
   ChevronRight,
@@ -29,6 +30,7 @@ import useTranslation from '../hooks/useTranslation'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import { triggerHaptic } from '../lib/haptics'
+import { safeFormatDate } from '../lib/utils'
 import { TODO_CATEGORIES, TODO_CATEGORY_META } from '../components/todos/TodoMeta'
 
 const PRIORITIES = ['low', 'medium', 'high']
@@ -47,8 +49,8 @@ function priorityConfig(p) {
     }
   }
   return {
-    dot: 'bg-slate-400',
-    badge: 'border-slate-500/30 bg-slate-500/10 text-slate-400',
+    dot: 'bg-[var(--muted)]',
+    badge: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)]',
   }
 }
 
@@ -66,8 +68,13 @@ function getDueStatusConfig(dueDate, completed, t, dateLocale = idLocale) {
   }
 
   try {
+    const rawStr = String(dueDate).trim()
+    if (!rawStr) return null
+    const datePart = rawStr.includes('T') ? rawStr.split('T')[0] : rawStr
+    const dueDateObj = startOfDay(new Date(datePart + 'T00:00:00'))
+    if (isNaN(dueDateObj.getTime())) return null
+
     const todayObj = startOfDay(new Date())
-    const dueDateObj = startOfDay(new Date(String(dueDate) + 'T00:00:00'))
 
     if (isToday(dueDateObj)) {
       return {
@@ -131,9 +138,30 @@ export default function TodoDetailPage() {
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [editError, setEditError] = useState('')
 
-  const todo = useLiveQuery(() => (isValidId ? db.todos.get(todoId) : Promise.resolve(undefined)), [todoId, isValidId])
+  const todo = useLiveQuery(async () => {
+    if (!isValidId) return null
+    try {
+      const item = await db.todos.get(todoId)
+      if (item) return item
+      const all = await db.todos.toArray()
+      return all.find((t) => String(t.id) === String(todoId)) || null
+    } catch {
+      return null
+    }
+  }, [todoId, isValidId])
+
   const subTasks = useLiveQuery(
-    () => (isValidId ? db.sub_tasks.where('todoId').equals(todoId).sortBy('id') : Promise.resolve([])),
+    async () => {
+      if (!isValidId) return []
+      try {
+        const subs = await db.sub_tasks.where('todoId').equals(todoId).sortBy('id')
+        if (subs && subs.length > 0) return subs
+        const all = await db.sub_tasks.toArray()
+        return all.filter((s) => String(s.todoId) === String(todoId)).sort((a, b) => (a.id || 0) - (b.id || 0))
+      } catch {
+        return []
+      }
+    },
     [todoId, isValidId],
   )
 
@@ -359,7 +387,11 @@ export default function TodoDetailPage() {
     setEditingSubId(null)
   }, [editingSubText])
 
-  if (!todo) {
+  if (todo === undefined) {
+    return <div className="min-h-screen bg-[var(--bg)]" />
+  }
+
+  if (todo === null) {
     return (
       <div className="min-h-screen bg-[var(--bg)] p-4 pt-[calc(1rem+env(safe-area-inset-top))]">
         <button
@@ -378,9 +410,7 @@ export default function TodoDetailPage() {
   const dateLocale = locale === 'en' ? enLocale : idLocale
   const statusCfg = getDueStatusConfig(todo.dueDate, todo.completed, t, dateLocale)
   const priorityCfg = priorityConfig(todo.priority)
-  const formattedCreated = todo.createdAt
-    ? format(new Date(Number(todo.createdAt)), 'dd MMM yyyy, HH:mm', { locale: dateLocale })
-    : ''
+  const formattedCreated = safeFormatDate(todo.createdAt, 'dd MMM yyyy, HH:mm', { locale: dateLocale })
   const doneSubCount = (subTasks || []).filter((s) => s.checked).length
   const totalSubCount = (subTasks || []).length
   const subPercent = totalSubCount > 0 ? Math.round((doneSubCount / totalSubCount) * 100) : 0
@@ -392,66 +422,64 @@ export default function TodoDetailPage() {
     <div className="ft-page-enter min-h-screen bg-[var(--bg)] pb-28">
       {/* ── Top Navigation Header ────────────────────────────────────── */}
       <div className="pt-[calc(0.75rem+env(safe-area-inset-top))] px-3.5 sm:px-5">
-        <div className="mx-auto max-w-3xl py-2 flex items-center justify-between min-h-[44px]">
-          {/* Back Button (Settings-style ArrowLeft) */}
-          <button
-            type="button"
-            onClick={() => (isEditing ? cancelEditing() : navigate('/todos'))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs transition hover:bg-[var(--field-bg)] active:scale-95 cursor-pointer"
-            aria-label={t('common.back')}
-          >
-            <ArrowLeft className="h-4.5 w-4.5" />
-          </button>
-
-          {/* Right Action */}
-          {!isEditing ? (
-            <div className="relative" data-todo-popover="more-menu">
-              <button
-                type="button"
-                onClick={() => setMoreMenuOpen((p) => !p)}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-90 cursor-pointer"
-                aria-label={t('common.options')}
-              >
-                <MoreVertical size={20} strokeWidth={2.2} />
-              </button>
-
-              {moreMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-44 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="mx-auto max-w-3xl pt-2">
+          <PageHeader
+            titlePosition="left"
+            title={isEditing ? t('todo.editTitle', 'Edit Tugas') : todo.title}
+            subtitle={isEditing ? t('todo.editSubtitle', 'Perbarui detail tugas') : catMeta.label}
+            onBack={() => (isEditing ? cancelEditing() : navigate('/todos'))}
+            backAriaLabel={t('common.back', 'Kembali')}
+            rightAction={
+              !isEditing ? (
+                <div className="relative" data-todo-popover="more-menu">
                   <button
                     type="button"
-                    onClick={() => {
-                      setMoreMenuOpen(false)
-                      startEditing()
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer text-left"
+                    onClick={() => setMoreMenuOpen((p) => !p)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-90 cursor-pointer"
+                    aria-label={t('common.options', 'Opsi')}
                   >
-                    <Edit3 size={14} className="text-[var(--muted)]" />
-                    <span>{t('todo.menu.edit', 'Edit Tugas')}</span>
+                    <MoreVertical size={20} strokeWidth={2.2} />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreMenuOpen(false)
-                      setDeleteConfirmOpen(true)
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
-                  >
-                    <Trash2 size={14} className="text-rose-500" />
-                    <span>{t('todo.menu.delete', 'Hapus Tugas')}</span>
-                  </button>
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-44 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-1.5 shadow-xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMoreMenuOpen(false)
+                          startEditing()
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer text-left"
+                      >
+                        <Edit3 size={14} className="text-[var(--muted)]" />
+                        <span>{t('todo.menu.edit', 'Edit Tugas')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMoreMenuOpen(false)
+                          setDeleteConfirmOpen(true)
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+                      >
+                        <Trash2 size={14} className="text-rose-500" />
+                        <span>{t('todo.menu.delete', 'Hapus Tugas')}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={cancelEditing}
-              className="rounded-full px-3.5 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-95 cursor-pointer"
-            >
-              <span>{t('todo.editCancel', 'Batal')}</span>
-            </button>
-          )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="rounded-full px-3.5 py-1.5 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>{t('todo.editCancel', 'Batal')}</span>
+                </button>
+              )
+            }
+          />
         </div>
       </div>
 

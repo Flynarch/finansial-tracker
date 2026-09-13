@@ -174,9 +174,12 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             )}
           </>
         ) : (
-          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-3 text-center">
-            <p className="text-xs font-bold text-[var(--muted)]">
-              {t('loans.empty', 'Belum Ada Catatan Utang & Piutang')}
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 p-3 text-center transition-colors hover:border-[var(--border-strong)]">
+            <p className="text-xs font-bold text-[var(--fg)] truncate">
+              {t('loans.emptyTitle', 'Belum Ada Catatan Pinjaman')}
+            </p>
+            <p className="text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">
+              {t('loans.emptyDescCompact', 'Kelola utang dan piutang Anda secara rapi')}
             </p>
           </div>
         )}

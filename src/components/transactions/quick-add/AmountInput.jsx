@@ -12,6 +12,7 @@ export default function AmountInput({
   isCashWallet = false,
   txType = 'expense',
   onOpenAiScan,
+  onAttachReceipt,
   currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP'],
   modeAccent = 'var(--accent)',
   hasError = false,
@@ -64,27 +65,42 @@ export default function AmountInput({
 
   return (
     <div className="py-2">
+      {/* Top Header Bar: Fixed h-7 height so nothing shifts */}
       <div className="flex h-7 items-center justify-between mb-2 px-0.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] flex items-center gap-1.5 shrink-0">
-            <span>{txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}</span>
-            {calcEvaluation.hasExpression && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]">
-                <Calculator className="w-3 h-3 text-[var(--muted)]" />
-                <span>{t('calculator.title', 'Kalkulator')}</span>
-              </span>
-            )}
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-2)] shrink-0">
+            {txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}
           </div>
-          {hasError && (
+
+          {/* Subtle Inline Calculator Result Pill - strictly within the h-7 header container to prevent any layout shift */}
+          {calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null ? (
+            <button
+              type="button"
+              onClick={handleCommitCalc}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-[var(--field-bg)] border border-[var(--border-strong)] text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs animate-[ft-fade-in_0.15s_ease-out] truncate"
+              title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
+            >
+              <Calculator className="w-3 h-3 text-[var(--accent)] shrink-0" />
+              <span className="font-extrabold text-[var(--accent)] tabular-nums truncate">
+                = {formatCurrency(calcEvaluation.result, currency)}
+              </span>
+              <span className="text-[9.5px] text-[var(--muted)] font-medium border-l border-[var(--border)] pl-1.5 shrink-0">
+                {t('calculator.apply', 'Terapkan')}
+              </span>
+            </button>
+          ) : null}
+
+          {hasError && !calcEvaluation.hasExpression && (
             <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out] truncate">
               {t('addTx.invalidAmountSubtle', 'Wajib diisi & > 0')}
             </span>
           )}
         </div>
-        {txType !== 'transfer' && onOpenAiScan ? (
+
+        {txType !== 'transfer' && (onOpenAiScan || onAttachReceipt) ? (
           <button
             type="button"
-            onClick={onOpenAiScan}
+            onClick={onOpenAiScan || onAttachReceipt}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 text-xs font-semibold cursor-pointer shadow-2xs group h-7 shrink-0"
             title={t('transactions.ocr.pillBtn', 'Pindai Struk')}
           >
@@ -92,7 +108,7 @@ export default function AmountInput({
             <span className="text-[11px] font-bold">{t('transactions.ocr.pillBtn', 'Pindai Struk')}</span>
           </button>
         ) : (
-          <div className="h-7" />
+          <div className="h-7 shrink-0" />
         )}
       </div>
 
@@ -156,19 +172,6 @@ export default function AmountInput({
                 : 'text-2xl sm:text-3xl'
             }`}
           />
-
-          {/* Calculator Evaluation Result Preview Badge */}
-          {calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null && (
-            <button
-              type="button"
-              onClick={handleCommitCalc}
-              className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border-strong)] text-[var(--fg)] text-xs font-bold transition-all hover:bg-[var(--panel-strong)] active:scale-95 cursor-pointer shadow-xs"
-            >
-              <span className="text-[var(--muted)] font-medium">=</span>
-              <span className="font-extrabold text-[var(--fg)]">{formatCurrency(calcEvaluation.result, currency)}</span>
-              <span className="text-[10.5px] text-[var(--muted)] font-normal border-l border-[var(--border)] pl-1.5">{t('calculator.tapToApply', 'Tekan untuk terapkan')}</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -182,13 +185,6 @@ export default function AmountInput({
           transform: isAmountFocused || hasError ? 'scaleX(1)' : 'scaleX(0.98)',
         }}
       />
-
-      {/* Subtle compact example hint */}
-      {!amount && !calcEvaluation.hasExpression && (
-        <p className="mt-1.5 text-[11px] text-[var(--muted)] font-medium tracking-tight">
-          {t('addTx.amountExampleHint', 'Contoh: 25k, 1.5jt, atau 50k + 20k')}
-        </p>
-      )}
     </div>
   )
 }

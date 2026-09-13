@@ -19,10 +19,15 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
 
   return (transactions || [])
     .filter((item) => {
+      if (item?.isPendingReview === true || item?.isPendingReview === 1) return false
       if (searchLower) {
         const tagsStr = Array.isArray(item.tags) ? item.tags.join(' ') : ''
-        const searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`.toLowerCase()
-        if (!searchTarget.includes(searchLower)) return false
+        let searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`
+        if (item.isSplit && Array.isArray(item.splitItems)) {
+          const splitText = item.splitItems.map((si) => `${si.category || ''} ${si.subcategory || ''} ${si.notes || ''}`).join(' ')
+          searchTarget += ` ${splitText}`
+        }
+        if (!searchTarget.toLowerCase().includes(searchLower)) return false
       }
 
       if (activeTag) {
@@ -48,7 +53,18 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
             ? String(item.category).split('/')[0].trim()
             : String(item.category).trim()
           : ''
-        if (!activeCategories.includes(itemCat)) return false
+        let matchCat = activeCategories.includes(itemCat)
+        if (!matchCat && item.isSplit && Array.isArray(item.splitItems)) {
+          matchCat = item.splitItems.some((si) => {
+            const sc = si.category
+              ? String(si.category).includes('/')
+                ? String(si.category).split('/')[0].trim()
+                : String(si.category).trim()
+              : ''
+            return activeCategories.includes(sc)
+          })
+        }
+        if (!matchCat) return false
       }
 
       if (startDate && item.date < startDate) return false
@@ -101,7 +117,7 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
   const usedCategories = useMemo(() => {
     const set = new Set()
     for (const tx of transactions) {
-      if (!tx?.category) continue
+      if (!tx?.category || tx.isPendingReview === true || tx.isPendingReview === 1) continue
       const rawCat = String(tx.category).trim()
       const parentCat = rawCat.includes('/') ? rawCat.split('/')[0].trim() : rawCat
       if (parentCat) set.add(parentCat)

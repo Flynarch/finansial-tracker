@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
+import { derivePbkdf2Pin, hashPin, isPinHash } from '../lib/crypto'
 
 const SETTINGS_KEY = 'preferences'
 
@@ -42,16 +43,22 @@ const useSettingsStore = create((set, get) => ({
   securityEnabled: false,
   securityMethod: 'biometric',
   lockSecret: '',
+  biometricEnabled: true,
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
   dailyReminderEnabled: true,
   dailyReminderTime: '20:00',
   budgetAlertsEnabled: true,
+  budgetCycleStartDay: 1,
   emailVerified: false,
   emailVerificationDismissed: false,
   hideBalance: typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false,
   isUnlocked: true,
   isLoaded: false,
+  unviewedMutationsCount: 0,
+  incrementUnviewedMutations: (count = 1) =>
+    set((s) => ({ unviewedMutationsCount: s.unviewedMutationsCount + count })),
+  clearUnviewedMutations: () => set({ unviewedMutationsCount: 0 }),
   persist: async (updates) => {
     const next = { ...get(), ...updates }
     await db.settings.put({
@@ -73,11 +80,13 @@ const useSettingsStore = create((set, get) => ({
       securityEnabled: next.securityEnabled,
       securityMethod: next.securityMethod,
       lockSecret: next.lockSecret,
+      biometricEnabled: next.biometricEnabled !== undefined ? Boolean(next.biometricEnabled) : true,
       autoLockTimeout: next.autoLockTimeout,
       geminiApiKey: next.geminiApiKey,
       dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
+      budgetCycleStartDay: next.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(next.budgetCycleStartDay) || 1))) : 1,
       hideBalance: Boolean(next.hideBalance),
     })
   },
@@ -189,17 +198,34 @@ const useSettingsStore = create((set, get) => ({
     set({ budgetAlertsEnabled: next })
     await get().persist({ budgetAlertsEnabled: next })
   },
+  setBudgetCycleStartDay: async (budgetCycleStartDay) => {
+    const next = Math.min(28, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
+    set({ budgetCycleStartDay: next })
+    await get().persist({ budgetCycleStartDay: next })
+  },
   setReduceMotion: (reduceMotion) => {
     set({ reduceMotion: Boolean(reduceMotion) })
   },
-  setSecurity: async ({ securityEnabled, securityMethod, lockSecret, autoLockTimeout }) => {
-    set({
-      securityEnabled: securityEnabled ?? get().securityEnabled,
-      securityMethod: securityMethod ?? get().securityMethod,
-      lockSecret: lockSecret ?? get().lockSecret,
+  setSecurity: async ({ securityEnabled, securityMethod, lockSecret, autoLockTimeout, biometricEnabled }) => {
+    const nextMethod = securityMethod ?? get().securityMethod
+    const nextEnabled = securityEnabled ?? get().securityEnabled
+    const autoBio = (securityMethod === 'pin' || securityMethod === 'pattern') ? true : undefined
+    const nextBiometricEnabled = biometricEnabled !== undefined ? Boolean(biometricEnabled) : (autoBio ?? get().biometricEnabled ?? true)
+
+    let finalSecret = lockSecret !== undefined ? lockSecret : get().lockSecret
+    if ((nextMethod === 'pin' || nextMethod === 'pattern') && finalSecret && !isPinHash(finalSecret)) {
+      finalSecret = await derivePbkdf2Pin(finalSecret)
+    }
+
+    const updates = {
+      securityEnabled: nextEnabled,
+      securityMethod: nextMethod,
+      lockSecret: finalSecret,
       autoLockTimeout: autoLockTimeout !== undefined ? Number(autoLockTimeout) : get().autoLockTimeout,
-    })
-    await get().persist({ securityEnabled, securityMethod, lockSecret, autoLockTimeout })
+      biometricEnabled: nextBiometricEnabled,
+    }
+    set(updates)
+    await get().persist(updates)
   },
   unlock: () => set({ isUnlocked: true }),
   lock: () => set({ isUnlocked: false }),
@@ -273,6 +299,12 @@ const useSettingsStore = create((set, get) => ({
     } catch {
       /* ignore */
     }
+    let initialLockSecret = record.lockSecret || ''
+    if ((record.securityMethod === 'pin' || record.securityMethod === 'pattern') && initialLockSecret && !isPinHash(initialLockSecret)) {
+      initialLockSecret = await hashPin(initialLockSecret)
+      void db.settings.update(SETTINGS_KEY, { lockSecret: initialLockSecret }).catch(() => {})
+    }
+
     set({
       theme: loadedTheme,
       locale: record.locale ? (record.locale === 'en' ? 'en' : 'id') : detectSystemLocale(),
@@ -292,12 +324,14 @@ const useSettingsStore = create((set, get) => ({
       hasCompletedSpotlightTour: tourDone,
       securityEnabled,
       securityMethod: record.securityMethod || 'biometric',
-      lockSecret: record.lockSecret || '',
+      lockSecret: initialLockSecret,
+      biometricEnabled: record.biometricEnabled !== undefined ? Boolean(record.biometricEnabled) : true,
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
       geminiApiKey: record.geminiApiKey || '',
       dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
+      budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
       hideBalance: record.hideBalance !== undefined
         ? Boolean(record.hideBalance)
         : (typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false),

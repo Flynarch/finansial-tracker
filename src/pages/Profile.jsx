@@ -6,6 +6,7 @@ import Modal from '../components/ui/Modal'
 import UserAvatar from '../components/ui/UserAvatar'
 import ChangePhotoModal from '../components/profile/ChangePhotoModal'
 import SplitBillModal from '../components/split-bill/SplitBillModal'
+import PageHeader from '../components/ui/PageHeader'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { db } from '../lib/db'
@@ -189,6 +190,12 @@ function Profile() {
           isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
+        <PageHeader
+          title={t('profile.pageTitle', 'Profil')}
+          titlePosition="left"
+          className="pt-2 !mb-0 px-1"
+        />
+
         {/* ── Hero profile card ── */}
         <section className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
           <div className="relative flex flex-col items-center px-5 pb-8 pt-8">

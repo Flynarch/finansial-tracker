@@ -21,8 +21,8 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
   t,
 }) {
   const navigate = useNavigate()
-  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
-  const wallets = walletsProp || dbWallets || []
+  const dbWallets = useLiveQuery(() => (walletsProp && walletsProp.length > 0 ? null : db.wallets.toArray()), [walletsProp])
+  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : (dbWallets || [])
 
   const formatDateHeader = useCallback(
     (dateKey) => {
@@ -165,7 +165,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                         <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
                       ) : null}
                       {noteStr ? (
-                        <p className="mt-0.5 text-[9.5px] italic leading-tight text-[var(--muted-2)] line-clamp-2 break-words">&ldquo;{noteStr}&rdquo;</p>
+                        <p className="mt-0.5 text-[9.5px] italic leading-tight text-[var(--muted-2)] line-clamp-2 break-words [overflow-wrap:anywhere]">&ldquo;{noteStr}&rdquo;</p>
                       ) : null}
                     </div>
                   </div>

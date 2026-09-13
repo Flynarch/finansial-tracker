@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, test, expect } from 'vitest'
 import { evaluateExpression } from '../src/lib/calcParser'
 
 describe('calcParser - evaluateExpression', () => {
@@ -52,3 +52,36 @@ describe('calcParser - evaluateExpression', () => {
     expect(evaluateExpression('abc').isValid).toBe(false)
   })
 })
+
+describe('decimal currency handling', () => {
+  test('USD $50.50 should not be inflated to 5050', () => {
+    const result = evaluateExpression('50.50', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(50.5)
+  })
+
+  test('EUR 99.99 should preserve decimals', () => {
+    const result = evaluateExpression('99.99', 'EUR')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(99.99)
+  })
+
+  test('IDR 50.000 should still strip thousand dots', () => {
+    const result = evaluateExpression('50.000', 'IDR')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(50000)
+  })
+
+  test('IDR 1.500.000 should strip multiple thousand dots', () => {
+    const result = evaluateExpression('1.500.000', 'IDR')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(1500000)
+  })
+
+  test('USD 1.50 + 2.50 should equal 4', () => {
+    const result = evaluateExpression('1.50 + 2.50', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(4)
+  })
+})
+

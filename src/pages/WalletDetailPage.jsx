@@ -21,6 +21,8 @@ import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../data/walletInstitutions'
 import { TransactionItemCard } from '../components/transactions/TransactionItemCard'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
+import TransactionDetailSheet from '../components/transactions/TransactionDetailSheet'
+import ReceiptPreviewModal from '../components/transactions/ReceiptPreviewModal'
 import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService'
 import { deleteWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
@@ -41,6 +43,7 @@ import {
   toTransactionsCsv,
   downloadTextFile,
   FALLBACK_EXCHANGE_RATES,
+  safeFormatDate,
 } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
@@ -54,7 +57,17 @@ export default function WalletDetailPage() {
   const hideBalance = useSettingsStore((state) => state.hideBalance)
   const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
   
-  const wallet = useLiveQuery(() => (walletId && !isNaN(walletId) ? db.wallets.get(walletId) : null), [walletId])
+  const wallet = useLiveQuery(async () => {
+    if (!walletId || isNaN(walletId)) return null
+    try {
+      const item = await db.wallets.get(walletId)
+      if (item) return item
+      const all = await db.wallets.toArray()
+      return all.find((w) => String(w.id) === String(walletId)) || null
+    } catch {
+      return null
+    }
+  }, [walletId])
   const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
 
   const allWallets = useMemo(() => {
@@ -63,9 +76,20 @@ export default function WalletDetailPage() {
 
   const allTransactions = useLiveQuery(async () => {
     if (!walletId || isNaN(walletId)) return []
-    const txs = await db.transactions
-      .filter((tx) => tx.walletId === walletId || tx.targetWalletId === walletId)
-      .toArray()
+    const [srcTxsNum, srcTxsStr, tgtTxsNum, tgtTxsStr] = await Promise.all([
+      db.transactions.where('walletId').equals(walletId).toArray(),
+      db.transactions.where('walletId').equals(String(walletId)).toArray(),
+      db.transactions.where('targetWalletId').equals(walletId).toArray(),
+      db.transactions.where('targetWalletId').equals(String(walletId)).toArray(),
+    ])
+    const txMap = new Map()
+    for (const tx of [...srcTxsNum, ...srcTxsStr]) {
+      if (tx && tx.id != null) txMap.set(tx.id, tx)
+    }
+    for (const tx of [...tgtTxsNum, ...tgtTxsStr]) {
+      if (tx && tx.id != null && tx.type === 'transfer') txMap.set(tx.id, tx)
+    }
+    const txs = Array.from(txMap.values())
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
   }, [walletId])
 
@@ -104,6 +128,9 @@ export default function WalletDetailPage() {
   const [newBalanceRaw, setNewBalanceRaw] = useState('')
 
   const [editingTransaction, setEditingTransaction] = useState(null)
+  const [detailTransaction, setDetailTransaction] = useState(null)
+  const [receiptPreviewTx, setReceiptPreviewTx] = useState(null)
+  const [singleDeleteTx, setSingleDeleteTx] = useState(null)
   const [editFormData, setEditFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     amount: '',
@@ -123,6 +150,7 @@ export default function WalletDetailPage() {
   const openEditTransaction = useCallback((transaction) => {
     setEditingTransaction(transaction)
     const targetCurrency = transaction.currency || wallet?.currency || defaultCurrency
+    const receipt = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
     setEditFormData({
       date: transaction.date,
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
@@ -131,6 +159,9 @@ export default function WalletDetailPage() {
       notes: transaction.notes || '',
       currency: targetCurrency,
       walletId: transaction.walletId,
+      targetWalletId: transaction.targetWalletId || '',
+      receiptImage: receipt,
+      receipt: receipt,
     })
   }, [wallet?.currency, defaultCurrency])
 
@@ -141,6 +172,7 @@ export default function WalletDetailPage() {
       await updateTransaction(editingTransaction.id, {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+        receiptImage: editFormData.receiptImage || null,
       })
       setEditingTransaction(null)
     } catch (err) {
@@ -203,8 +235,8 @@ export default function WalletDetailPage() {
       if (activeTab !== 'all') {
         if (tx.type === activeTab) matchesTab = true
         else if (tx.type === 'transfer') {
-          if (activeTab === 'income' && tx.targetWalletId === walletId) matchesTab = true
-          else if (activeTab === 'expense' && tx.walletId === walletId) matchesTab = true
+          if (activeTab === 'income' && String(tx.targetWalletId) === String(walletId)) matchesTab = true
+          else if (activeTab === 'expense' && String(tx.walletId) === String(walletId)) matchesTab = true
           else matchesTab = false
         } else if (tx.type === 'balance_adjustment') {
           if (activeTab === 'income' && Number(tx.amount || 0) > 0) matchesTab = true
@@ -218,9 +250,9 @@ export default function WalletDetailPage() {
       // Search Filter
       let matchesSearch = true
       if (query) {
-        const catLabels = getTransactionCategoryLabels(tx.type, tx.category, locale)
-        const catName = (catLabels?.categoryName || tx.category || '').toLowerCase()
-        const subName = (catLabels?.subcategoryName || '').toLowerCase()
+        const catLabels = getTransactionCategoryLabels(tx.category, tx.type, locale)
+        const catName = (catLabels?.main || tx.category || '').toLowerCase()
+        const subName = (catLabels?.sub || '').toLowerCase()
         const notes = (tx.notes || '').toLowerCase()
         const amountStr = String(tx.amount || '')
         matchesSearch = catName.includes(query) || subName.includes(query) || notes.includes(query) || amountStr.includes(query)
@@ -267,9 +299,9 @@ export default function WalletDetailPage() {
         let net = 0
         items.forEach((tx) => {
           const amt = convertCurrency(tx.amount, tx.currency || defaultCurrency, wallet?.currency || defaultCurrency, rates)
-          if (tx.type === 'income' || (tx.type === 'transfer' && tx.targetWalletId === walletId)) {
+          if (tx.type === 'income' || (tx.type === 'transfer' && String(tx.targetWalletId) === String(walletId))) {
             net += amt
-          } else if (tx.type === 'expense' || (tx.type === 'transfer' && tx.walletId === walletId)) {
+          } else if (tx.type === 'expense' || (tx.type === 'transfer' && String(tx.walletId) === String(walletId))) {
             net -= amt
           } else if (tx.type === 'balance_adjustment') {
             net += amt
@@ -288,17 +320,46 @@ export default function WalletDetailPage() {
       })
   }, [filteredTransactions, t, defaultCurrency, wallet?.currency, rates, walletId])
 
+  const currentFilterKey = `${activeTab}-${searchQuery}-${walletId}`
+  const [extraCount, setExtraCount] = useState(0)
+  const [prevFilterKey, setPrevFilterKey] = useState(currentFilterKey)
+
+  if (prevFilterKey !== currentFilterKey) {
+    setPrevFilterKey(currentFilterKey)
+    setExtraCount(0)
+  }
+
+  const displayCount = 30 + extraCount
+
+  const visibleGroups = useMemo(() => {
+    let count = 0
+    const result = []
+    for (const group of groupedTransactions) {
+      if (count >= displayCount) break
+      result.push(group)
+      count += group.items.length
+    }
+    return result
+  }, [groupedTransactions, displayCount])
+
+  const totalTxCount = filteredTransactions.length
+  const currentRenderedTxCount = useMemo(() => {
+    return visibleGroups.reduce((acc, g) => acc + g.items.length, 0)
+  }, [visibleGroups])
+
+  const hasMore = currentRenderedTxCount < totalTxCount
+
   const currentBalance = useMemo(() => {
     if (!wallet) return 0
-    return computeWalletBalance(wallet, allTransactions || [], rates)
-  }, [wallet, allTransactions, rates])
+    return computeWalletBalance(wallet, allTransactions || [], rates, allWallets)
+  }, [wallet, allTransactions, rates, allWallets])
 
   const handleDeleteWallet = async () => {
     try {
       const activeLoans = await db.loans
         .where('walletId')
         .equals(Number(walletId))
-        .filter((l) => l.status !== 'paid')
+        .filter((l) => l.status !== 'paid' && l.status !== 'forgiven' && Number(l.remainingAmount || 0) > 0)
         .toArray()
 
       if (activeLoans && activeLoans.length > 0) {
@@ -308,7 +369,7 @@ export default function WalletDetailPage() {
       }
 
       if (isDefaultWallet) {
-        const nextWallet = allWallets.find((w) => w.id !== walletId)
+        const nextWallet = allWallets.find((w) => !w.isArchived && w.id !== walletId)
         await setDefaultWalletId(nextWallet ? nextWallet.id : null)
       }
 
@@ -353,15 +414,17 @@ export default function WalletDetailPage() {
       if (tx.type === 'expense') expense++
       else if (tx.type === 'income') income++
       else if (tx.type === 'transfer') {
-        if (tx.walletId === walletId) expense++
-        if (tx.targetWalletId === walletId) income++
+        if (String(tx.walletId) === String(walletId)) expense++
+        if (String(tx.targetWalletId) === String(walletId)) income++
       }
     }
     return { all: allTransactions.length, expense, income }
   }, [allTransactions, walletId])
 
 
-  if (wallet === null || (dbWallets !== undefined && !wallet)) {
+  if (wallet === undefined) return <div className="min-h-screen bg-[var(--bg)]" />
+
+  if (wallet === null) {
     return (
       <div className="min-h-screen bg-[var(--bg)] p-4 max-w-2xl mx-auto flex flex-col">
         <PageHeader title={t('wallets.notFound', 'Akun Tidak Ditemukan')} onBack={() => navigate('/dashboard')} />
@@ -383,8 +446,6 @@ export default function WalletDetailPage() {
     )
   }
 
-  if (wallet === undefined) return <div className="min-h-screen bg-[var(--bg)]" />
-
   const formatAccountType = (type, name) => {
     const rawType = String(type || '').toLowerCase().trim()
     const rawName = String(name || '').toLowerCase().trim()
@@ -397,19 +458,19 @@ export default function WalletDetailPage() {
       return 'Bank'
     }
     if (rawType.includes('cash') || rawType.includes('tunai') || rawName.includes('cash') || rawName.includes('tunai')) {
-      return 'Kas Fisik'
+      return locale === 'en' ? 'Cash' : 'Kas Fisik'
     }
-    if (rawType === 'investasi' || rawType === 'investment') return 'Investasi'
-    if (!type || type === 'lainnya') return 'Akun Manual'
+    if (rawType === 'investasi' || rawType === 'investment') return locale === 'en' ? 'Investment' : 'Investasi'
+    if (!type || type === 'lainnya') return locale === 'en' ? 'Manual Account' : 'Akun Manual'
     return type.charAt(0).toUpperCase() + type.slice(1)
   }
 
-  const updatedAt = wallet.createdAt ? format(new Date(wallet.createdAt), 'dd MMM yyyy, HH:mm') : 'Baru saja'
+  const updatedAt = safeFormatDate(wallet.createdAt, 'dd MMM yyyy, HH:mm') || (locale === 'en' ? 'Just now' : 'Baru saja')
 
   const TABS = [
-    { id: 'all', label: 'Semua', count: counts.all },
-    { id: 'expense', label: 'Pengeluaran', count: counts.expense },
-    { id: 'income', label: 'Pemasukan', count: counts.income },
+    { id: 'all', label: t('common.all', 'Semua'), count: counts.all },
+    { id: 'expense', label: t('common.expense', 'Pengeluaran'), count: counts.expense },
+    { id: 'income', label: t('common.income', 'Pemasukan'), count: counts.income },
   ]
 
   return (
@@ -489,12 +550,12 @@ export default function WalletDetailPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                  Saldo Akun Saat Ini
+                  {t('wallets.currentAccountBalance', 'Saldo Akun Saat Ini')}
                 </span>
                 <button
                   type="button"
                   onClick={toggleHideBalance}
-                  className="grid h-6 w-6 place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
+                  className="grid h-7 w-7 min-h-[36px] min-w-[36px] place-items-center rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
                   title={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
                   aria-label={hideBalance ? t('dashboard.showBalance', 'Tampilkan Saldo') : t('dashboard.hideBalance', 'Sembunyikan Saldo')}
                 >
@@ -592,56 +653,72 @@ export default function WalletDetailPage() {
             </div>
 
             {/* Grouped Transaction List */}
-            {groupedTransactions && groupedTransactions.length > 0 ? (
-              groupedTransactions.map((group, idx) => (
-                <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
-                  {/* Sticky Date Header Strip */}
-                  <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)]/95 backdrop-blur-xs rounded-lg">
-                    <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">
-                      {group.dateLabel}
-                    </span>
-                    {group.dailySummaryText ? (
-                      <span className={`text-[11px] font-black tabular-nums ${
-                        group.isPositive ? 'text-[var(--status-income)]' : 'text-[var(--muted)]'
-                      }`}>
-                        {group.dailySummaryText}
+            {visibleGroups && visibleGroups.length > 0 ? (
+              <>
+                {visibleGroups.map((group, idx) => (
+                  <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
+                    {/* Sticky Date Header Strip */}
+                    <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)]/95 backdrop-blur-xs rounded-lg">
+                      <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">
+                        {group.dateLabel}
                       </span>
-                    ) : null}
-                  </div>
+                      {group.dailySummaryText ? (
+                        <span className={`text-[11px] font-black tabular-nums ${
+                          group.isPositive ? 'text-[var(--status-income)]' : 'text-[var(--muted)]'
+                        }`}>
+                          {group.dailySummaryText}
+                        </span>
+                      ) : null}
+                    </div>
 
-                  {/* Transaction Cards Container */}
-                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] divide-y divide-[var(--border)]/40 shadow-xs">
-                    {group.items.map((tx) => (
-                      <TransactionItemCard
-                        key={tx.id}
-                        transaction={tx}
-                        locale={locale}
-                        t={t}
-                        format={format}
-                        defaultCurrency={defaultCurrency}
-                        formatCurrency={formatCurrency}
-                        getCategoryColorClass={getCategoryColorClass}
-                        resolveTransactionIconKey={resolveTransactionIconKey}
-                        getTransactionCategoryLabels={getTransactionCategoryLabels}
-                        convertCurrency={convertCurrency}
-                        rates={rates}
-                        openEditTransaction={openEditTransaction}
-                        deleteTransaction={deleteTransaction}
-                        swipedTransactionId={swipedTransactionId}
-                        setSwipedTransactionId={setSwipedTransactionId}
-                        isSwipingId={isSwipingId}
-                        getSwipeHandlers={getSwipeHandlers}
-                        contextWalletId={walletId}
-                        wallets={allWallets}
-                      />
-                    ))}
+                    {/* Transaction Cards Container */}
+                    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] divide-y divide-[var(--border)]/40 shadow-xs">
+                      {group.items.map((tx) => (
+                        <TransactionItemCard
+                          key={tx.id}
+                          transaction={tx}
+                          locale={locale}
+                          t={t}
+                          format={format}
+                          defaultCurrency={defaultCurrency}
+                          formatCurrency={formatCurrency}
+                          getCategoryColorClass={getCategoryColorClass}
+                          resolveTransactionIconKey={resolveTransactionIconKey}
+                          getTransactionCategoryLabels={getTransactionCategoryLabels}
+                          convertCurrency={convertCurrency}
+                          rates={rates}
+                          openEditTransaction={openEditTransaction}
+                          deleteTransaction={deleteTransaction}
+                          onDelete={setSingleDeleteTx}
+                          onViewDetail={setDetailTransaction}
+                          onPreviewReceipt={setReceiptPreviewTx}
+                          swipedTransactionId={swipedTransactionId}
+                          setSwipedTransactionId={setSwipedTransactionId}
+                          isSwipingId={isSwipingId}
+                          getSwipeHandlers={getSwipeHandlers}
+                          contextWalletId={walletId}
+                          wallets={allWallets}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+                {hasMore && (
+                  <div className="pt-2 pb-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setExtraCount((prev) => prev + 30)}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] hover:bg-[var(--panel)] transition cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      {t('common.loadMore', 'Muat Lebih Banyak')} ({totalTxCount - currentRenderedTxCount})
+                    </button>
                   </div>
-                </section>
-              ))
+                )}
+              </>
             ) : (
               <EmptyState
                 title={t('wallets.emptyTxTitle', 'Belum Ada Transaksi')}
-                description={`Belum ada catatan transaksi ${activeTab !== 'all' ? activeTab : ''} di akun dompet ini.`}
+                description={t('wallets.emptyTxDesc', 'Belum ada catatan transaksi di akun dompet ini.')}
               />
             )}
           </div>
@@ -758,11 +835,83 @@ export default function WalletDetailPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-rose-500">{t('wallets.deleteTitle', 'Hapus Akun Dompet')}</p>
-              <p className="text-[10px] text-rose-500/80">{t('wallets.deleteDesc', 'Hapus akun ini dan seluruh riwayat transaksinya')}</p>
+              <p className="text-[10px] text-rose-500/80">{t('wallets.deleteDesc', 'Arsipkan akun ini. Riwayat transaksi tetap aman tersimpan.')}</p>
             </div>
           </button>
         </div>
       </BottomSheet>
+
+      {/* ── Transaction Detail BottomSheet ────────────────────────── */}
+      <TransactionDetailSheet
+        isOpen={Boolean(detailTransaction)}
+        onClose={() => setDetailTransaction(null)}
+        transaction={detailTransaction}
+        openEditTransaction={(tx) => {
+          setDetailTransaction(null)
+          openEditTransaction(tx)
+        }}
+        deleteTransaction={(tx) => {
+          const targetTx = tx || detailTransaction
+          if (!targetTx?.id) return
+          setDetailTransaction(null)
+          setSingleDeleteTx(targetTx)
+        }}
+        wallets={allWallets}
+        defaultCurrency={defaultCurrency}
+        rates={rates}
+        formatCurrency={formatCurrency}
+        convertCurrency={convertCurrency}
+        locale={locale}
+        t={t}
+      />
+
+      {/* ── Single Transaction Delete Confirm Modal ─────────────────── */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(singleDeleteTx)}
+        onClose={() => setSingleDeleteTx(null)}
+        onConfirm={async () => {
+          if (!singleDeleteTx?.id) return
+          const txId = singleDeleteTx.id
+          setSingleDeleteTx(null)
+          try {
+            await deleteTransaction(txId)
+            if (swipedTransactionId === txId) setSwipedTransactionId(null)
+          } catch (err) {
+            setPageError(err.message || 'Gagal menghapus transaksi.')
+          }
+        }}
+        title={t('tx.item.delete') || 'Hapus Transaksi'}
+        message={t('tx.item.deleteConfirm') || 'Apakah Anda yakin ingin menghapus transaksi ini?'}
+      />
+
+      {/* ── Receipt Preview Modal ────────────────────────────────────── */}
+      <ReceiptPreviewModal
+        isOpen={Boolean(receiptPreviewTx)}
+        onClose={() => setReceiptPreviewTx(null)}
+        imageSrc={
+          receiptPreviewTx?.receiptImage ||
+          receiptPreviewTx?.receipt ||
+          receiptPreviewTx?.receiptUrl ||
+          receiptPreviewTx?.image ||
+          null
+        }
+        amountFormatted={
+          receiptPreviewTx
+            ? `${receiptPreviewTx.type === 'income' ? '+' : '-'}${formatCurrency(
+                Math.abs(Number(receiptPreviewTx.amount || 0)),
+                receiptPreviewTx.currency || defaultCurrency,
+              )}`
+            : ''
+        }
+        date={receiptPreviewTx?.date}
+        notes={receiptPreviewTx?.notes}
+        category={
+          receiptPreviewTx
+            ? getTransactionCategoryLabels(receiptPreviewTx.category, receiptPreviewTx.type, locale)?.main
+            : ''
+        }
+        zIndex="z-[60]"
+      />
 
       {/* ── Existing Modals ─────────────────────────────────────────── */}
       <TransactionEditSheet
@@ -783,7 +932,7 @@ export default function WalletDetailPage() {
         title={t('wallets.deleteTitle', 'Hapus Dompet')}
         message={
           <>
-            {t('wallets.deleteConfirmPrefix', 'Apakah Anda yakin ingin menghapus dompet')} <strong className="text-[var(--fg)]">{wallet?.name}</strong>? {t('wallets.deleteConfirmSuffix', 'Semua transaksi yang terkait dengan dompet ini juga akan dihapus secara permanen.')}
+            {t('wallets.deleteConfirmPrefix', 'Apakah Anda yakin ingin menghapus dompet')} <strong className="text-[var(--fg)]">{wallet?.name}</strong>? {t('wallets.deleteConfirmSuffix', 'Dompet akan diarsipkan dan disembunyikan. Seluruh riwayat transaksi tetap aman tersimpan.')}
           </>
         }
       />

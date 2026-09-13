@@ -1,7 +1,8 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
-import QuickAddTransactionModal from '../transactions/QuickAddTransactionModal'
+import useTransactionStore from '../../store/useTransactionStore'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import { navItems } from './navItems'
 import { triggerHaptic } from '../../lib/haptics'
 
@@ -112,8 +113,7 @@ function NavIcon({ name, isActive }) {
 function BottomNav() {
   const { t } = useTranslation()
   const navBarUid = useId().replace(/:/g, '')
-  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
-  const [addTxNonce, setAddTxNonce] = useState(0)
+  const openQuickAdd = useTransactionStore((state) => state.openQuickAdd)
 
   const primaryPaths = useMemo(() => ['/dashboard', '/transactions', '/todos', '/profile'], [])
   const primaryItems = useMemo(
@@ -122,6 +122,8 @@ function BottomNav() {
   )
   const leftItems = primaryItems.slice(0, 2)
   const rightItems = primaryItems.slice(2, 4)
+
+  const unviewedMutationsCount = useSettingsStore((state) => state.unviewedMutationsCount || 0)
 
   return (
     <>
@@ -177,7 +179,14 @@ function BottomNav() {
                 >
                   {({ isActive }) => (
                     <>
-                      <NavIcon name={item.icon} isActive={isActive} />
+                      <div className="relative">
+                        <NavIcon name={item.icon} isActive={isActive} />
+                        {item.path === '/transactions' && unviewedMutationsCount > 0 && (
+                          <span className="absolute -top-1 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-black text-white shadow-xs">
+                            {unviewedMutationsCount > 9 ? '9+' : unviewedMutationsCount}
+                          </span>
+                        )}
+                      </div>
                       <span
                         className={`mt-0.5 truncate text-[10px] font-semibold ${
                           isActive ? 'text-[var(--nav-item-active)]' : 'text-[var(--nav-item-inactive)]'
@@ -224,8 +233,7 @@ function BottomNav() {
               }}
               onClick={() => {
                 triggerHaptic('medium')
-                setAddTxNonce((v) => v + 1)
-                setIsAddTransactionOpen(true)
+                openQuickAdd()
               }}
               aria-label={t('addTx.title')}
             >
@@ -237,8 +245,6 @@ function BottomNav() {
           </div>
         </div>
       </nav>
-
-      <QuickAddTransactionModal nonce={addTxNonce} isOpen={isAddTransactionOpen} onClose={() => setIsAddTransactionOpen(false)} />
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Mail,
   Lock,
@@ -26,8 +26,13 @@ import {
   sendEmailMagicLink,
   promptGoogleOneTap,
 } from '../../lib/auth'
-import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
+import {
+  importAllDataFromJsonPayload,
+  exportAllDataAsEncryptedEnvelope,
+  importAllDataFromEncryptedEnvelope,
+} from '../../lib/backup'
 import { uploadLatestBackup, downloadLatestBackupJson } from '../../lib/cloudBackup'
+import { db } from '../../lib/db'
 import { triggerHaptic } from '../../lib/haptics'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -171,43 +176,88 @@ export default function AuthModal({
     return score
   }, [password])
 
-  const restoreUserBackup = async (userObj, isNewUser = false) => {
+  const restoreUserBackup = useCallback(async (userObj, isNewUser = false) => {
     if (!userObj?.uid) return
     try {
-      const userBackupKey = `ft_user_backup_${userObj.uid}`
-      
-      // Brand new user: immediately export guest data and upload in background
+      const getUploadPayload = async () => {
+        const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+        const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
+        if (!isE2eeActive) {
+          // Never upload unencrypted data to cloud storage
+          return null
+        }
+        try {
+          const enc = await exportAllDataAsEncryptedEnvelope(e2eePhrase.trim())
+          return { payload: enc, isEncrypted: true }
+        } catch (err) {
+          console.error('Failed to encrypt backup envelope for E2EE cloud backup, aborting upload to protect privacy:', err)
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('ft-show-toast', {
+                detail: {
+                  title: t('settings.security.e2eeEncryptFailedTitle', 'Enkripsi Gagal'),
+                  message: t(
+                    'settings.security.e2eeEncryptFailedMsg',
+                    'Gagal mengenkripsi data cadangan E2EE. Unggahan ke cloud dibatalkan untuk menjaga keamanan.',
+                  ),
+                  type: 'danger',
+                },
+              })
+            )
+          }
+          return null
+        }
+      }
+
+      // Brand new user: immediately export guest data and upload in background if real user data exists
       if (isNewUser) {
-        const backup = await exportAllDataAsJson()
-        localStorage.setItem(userBackupKey, JSON.stringify(backup))
-        uploadLatestBackup(userObj.uid, backup).catch(() => {})
+        const txCount = await db.transactions.count().catch(() => 0)
+        const loanCount = await db.loans.count().catch(() => 0)
+        const goalCount = await db.goals.count().catch(() => 0)
+        if (txCount > 0 || loanCount > 0 || goalCount > 0) {
+          const uploadRes = await getUploadPayload()
+          if (uploadRes?.payload) {
+            uploadLatestBackup(userObj.uid, uploadRes.payload, { isEncrypted: uploadRes.isEncrypted }).catch(() => {})
+          }
+        }
         return
       }
 
-      const rawLocal = localStorage.getItem(userBackupKey)
-      if (rawLocal) {
-        const data = JSON.parse(rawLocal)
-        await importAllDataFromJsonPayload(data)
-        return
-      }
-
-      // Existing user sign-in: attempt cloud download with fast timeout
+      // Existing user sign-in: attempt cloud download with resilient fast timeout
       const cloudData = await Promise.race([
         downloadLatestBackupJson(userObj.uid),
-        new Promise((resolve) => setTimeout(() => resolve(null), 3500)),
+        new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
       ]).catch(() => null)
 
       if (cloudData) {
-        await importAllDataFromJsonPayload(cloudData)
+        if (cloudData.format === 'fintrack_encrypted_envelope') {
+          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          if (e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12) {
+            try {
+              await importAllDataFromEncryptedEnvelope(cloudData, e2eePhrase.trim())
+            } catch {
+              /* stored phrase mismatch or invalid, user can restore in settings */
+            }
+          }
+        } else {
+          await importAllDataFromJsonPayload(cloudData)
+        }
       } else {
-        const backup = await exportAllDataAsJson()
-        localStorage.setItem(userBackupKey, JSON.stringify(backup))
-        uploadLatestBackup(userObj.uid, backup).catch(() => {})
+        // Only upload local data if real financial records exist, preventing overwriting cloud backups with empty default wallets
+        const txCount = await db.transactions.count().catch(() => 0)
+        const loanCount = await db.loans.count().catch(() => 0)
+        const goalCount = await db.goals.count().catch(() => 0)
+        if (txCount > 0 || loanCount > 0 || goalCount > 0) {
+          const uploadRes = await getUploadPayload()
+          if (uploadRes?.payload) {
+            uploadLatestBackup(userObj.uid, uploadRes.payload, { isEncrypted: uploadRes.isEncrypted }).catch(() => {})
+          }
+        }
       }
     } catch {
       // Backup restore error non-blocking
     }
-  }
+  }, [t])
 
   /* ── Auto Prompt Google One Tap on Web ───────────────────────────── */
   useEffect(() => {
@@ -227,7 +277,7 @@ export default function AuthModal({
         if (msg) setErrorMessage(msg)
       },
     })
-  }, [isOpen, mode, setAuthUser, onSuccess, onClose, t])
+  }, [isOpen, mode, setAuthUser, onSuccess, onClose, t, restoreUserBackup])
 
   /* ── Google Sign In ─────────────────────────────────────────────── */
   const handleGoogleAuth = async () => {
@@ -238,14 +288,13 @@ export default function AuthModal({
       const res = await signInWithGoogle()
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        // Run cloud data restore asynchronously in background
-        restoreUserBackup(res.user, Boolean(res.isNewUser)).catch(() => {})
+        await restoreUserBackup(res.user, Boolean(res.isNewUser))
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
         setTimeout(() => {
           onSuccess?.(res.user)
           onClose?.()
-        }, 250)
+        }, 500)
       } else if (!res.cancelled) {
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google.'))

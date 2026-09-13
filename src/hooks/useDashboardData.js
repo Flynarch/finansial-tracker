@@ -2,9 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, subMonths, subDays, differenceInDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, computeAllWalletBalances } from '../lib/db'
+import { db } from '../lib/db'
+import { getAllWalletBalances } from '../lib/balanceEngine'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
+import { calculateBudgetSpent, getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../lib/budgetUtils'
 import useTranslation from './useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
@@ -45,35 +47,136 @@ const cachedDashboardState = {
   budgets: null,
   goals: null,
   loans: null,
-  allTransactionsForBalance: null,
   wallets: null,
+  walletsWithBalance: null,
   rawHabitLogs: null,
   rawHabits: null,
 }
 
+export function clearCachedDashboardState() {
+  cachedDashboardState.transactions = null
+  cachedDashboardState.investments = null
+  cachedDashboardState.budgets = null
+  cachedDashboardState.goals = null
+  cachedDashboardState.loans = null
+  cachedDashboardState.wallets = null
+  cachedDashboardState.walletsWithBalance = null
+  cachedDashboardState.rawHabitLogs = null
+  cachedDashboardState.rawHabits = null
+}
+
+export function getCachedDashboardTransactions() {
+  return cachedDashboardState.transactions
+}
+
+export function setCachedDashboardTransactions(transactions) {
+  cachedDashboardState.transactions = transactions
+}
+
+export function getCachedDashboardWallets() {
+  return cachedDashboardState.wallets
+}
+
+export function setCachedDashboardWallets(wallets) {
+  cachedDashboardState.wallets = wallets
+}
+
+export function computeNetWorthGrowth(startVal, currentVal) {
+  const net = currentVal - startVal
+  const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
+  return { net, pct }
+}
+
+export function generateMonthlyData(monthsCount, endMonthD = new Date()) {
+  const baseDate = startOfMonth(endMonthD)
+  const arr = Array.from({ length: monthsCount }, (_, idx) => {
+    const d = subMonths(baseDate, monthsCount - 1 - idx)
+    return { day: format(d, 'MMM yyyy'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
+  })
+  const map = new Map(arr.map((r) => [r.key, r]))
+  return { arr, map }
+}
+
+export function calculatePeriodStats(safeTx, period, defaultCurrency = 'IDR', rates = null) {
+  if (!Array.isArray(safeTx) || !period?.startDate || !period?.endDate) {
+    return { income: 0, expense: 0 }
+  }
+
+  return safeTx.reduce(
+    (acc, tx) => {
+      const txDate = (tx?.date || '').slice(0, 10)
+      if (!txDate || txDate < period.startDate || txDate > period.endDate) return acc
+
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+        const itemTx = {
+          ...tx,
+          ...si,
+          category: si.category || tx.category,
+          isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+          isExcludeAnalyticsTx: false,
+        }
+          if (isExcludeAnalyticsTx(itemTx)) return
+          const amount = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+          const itemType = si.type || tx.type
+          if (itemType === 'income') acc.income += amount
+          if (itemType === 'expense') acc.expense += amount
+        })
+        return acc
+      }
+
+      if (isExcludeAnalyticsTx(tx)) return acc
+      const amount = tx.convertedAmount != null
+        ? tx.convertedAmount
+        : convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      if (tx.type === 'income') acc.income += amount
+      if (tx.type === 'expense') acc.expense += amount
+      return acc
+    },
+    { income: 0, expense: 0 },
+  )
+}
+
 export function useDashboardData() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const budgetCycleStartDay = useSettingsStore((state) => state.budgetCycleStartDay || 1)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const { t, locale } = useTranslation()
 
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
-  const currentMonthKey = format(new Date(), 'yyyy-MM')
-  const currentMonthLabel = format(new Date(), 'MMM yyyy', {
+  const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
+  const currentPeriod = useMemo(
+    () => getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale),
+    [currentMonthKey, budgetCycleStartDay, locale],
+  )
+  const currentMonthLabel = budgetCycleStartDay > 1 ? currentPeriod.label : format(new Date(), 'MMM yyyy', {
     locale: locale === 'en' ? enUS : idLocale,
   })
 
+  const [zoomRevenueRange, setZoomRevenueRangeState] = useState(() => getSavedNetWorthRange())
+  const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
+
+  const isAllRange = zoomRevenueRange === 'all' || miniRevenueRange === 'all'
   const txCutoffDate = format(startOfMonth(subMonths(new Date(), 12)), 'yyyy-MM-dd')
   const transactions = useLiveQuery(
-    () => db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray(),
-    [txCutoffDate],
+    () => (isAllRange ? db.transactions.toArray() : db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray()),
+    [isAllRange, txCutoffDate],
     cachedDashboardState.transactions,
   )
   const investments = useLiveQuery(() => db.investments.toArray(), [], cachedDashboardState.investments)
   const budgets = useLiveQuery(() => db.budgets.toArray(), [], cachedDashboardState.budgets)
   const goals = useLiveQuery(() => db.goals.toArray(), [], cachedDashboardState.goals)
   const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans)
-  const allTransactionsForBalance = useLiveQuery(() => db.transactions.toArray(), [], cachedDashboardState.allTransactionsForBalance)
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets)
+  const walletsWithBalance = useLiveQuery(
+    async () => {
+      const rawWallets = await db.wallets.toArray()
+      if (!rawWallets || rawWallets.length === 0) return []
+      return await getAllWalletBalances(rawWallets, rates)
+    },
+    [rates],
+    cachedDashboardState.walletsWithBalance,
+  )
   const rawHabitLogs = useLiveQuery(() => db.habitLogs.toArray(), [], cachedDashboardState.rawHabitLogs)
   const rawHabits = useLiveQuery(() => db.habits.toArray(), [], cachedDashboardState.rawHabits)
 
@@ -84,25 +187,22 @@ export function useDashboardData() {
     if (budgets !== null) cachedDashboardState.budgets = budgets
     if (goals !== null) cachedDashboardState.goals = goals
     if (loans !== null) cachedDashboardState.loans = loans
-    if (allTransactionsForBalance !== null) cachedDashboardState.allTransactionsForBalance = allTransactionsForBalance
-    if (wallets !== null) cachedDashboardState.wallets = wallets
+    if (walletsWithBalance !== null && walletsWithBalance !== undefined) cachedDashboardState.walletsWithBalance = walletsWithBalance
     if (rawHabitLogs !== null && rawHabitLogs !== undefined) cachedDashboardState.rawHabitLogs = rawHabitLogs
     if (rawHabits !== null && rawHabits !== undefined) cachedDashboardState.rawHabits = rawHabits
-  }, [transactions, investments, budgets, goals, loans, allTransactionsForBalance, wallets, rawHabitLogs, rawHabits])
+  }, [transactions, investments, budgets, goals, loans, walletsWithBalance, rawHabitLogs, rawHabits])
 
   const allHabitLogs = useMemo(() => rawHabitLogs || [], [rawHabitLogs])
   const allHabits = useMemo(() => rawHabits || [], [rawHabits])
 
   const isDbLoading =
     transactions === null ||
-    wallets === null ||
-    allTransactionsForBalance === null ||
+    walletsWithBalance === null ||
+    walletsWithBalance === undefined ||
     budgets === null ||
     goals === null ||
     loans === null
 
-  const [zoomRevenueRange, setZoomRevenueRangeState] = useState(() => getSavedNetWorthRange())
-  const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   const [comparePrevious, setComparePrevious] = useState(false)
   const [zoomTooltipDismissed, setZoomTooltipDismissed] = useState(false)
@@ -154,30 +254,27 @@ export function useDashboardData() {
     loadRates()
   }, [defaultCurrency])
 
-  const walletsWithBalance = useMemo(() => {
-    if (wallets === null || wallets === undefined || allTransactionsForBalance === null || allTransactionsForBalance === undefined) {
-      return undefined
-    }
-    if (!wallets) {
-      return []
-    }
-    return computeAllWalletBalances(wallets, allTransactionsForBalance, rates)
-  }, [wallets, allTransactionsForBalance, rates])
-
   const totalWalletBalance = useMemo(() => {
     if (walletsWithBalance === undefined || walletsWithBalance === null) {
       return 0
     }
-    return walletsWithBalance.reduce((s, w) => {
-      const converted = convertCurrency(
-        w.currentBalance || 0,
-        w.currency || defaultCurrency,
-        defaultCurrency,
-        rates,
-      )
-      return s + converted
-    }, 0)
+    return walletsWithBalance
+      .filter((w) => !w.isArchived)
+      .reduce((s, w) => {
+        const converted = convertCurrency(
+          w.currentBalance || 0,
+          w.currency || defaultCurrency,
+          defaultCurrency,
+          rates,
+        )
+        return s + converted
+      }, 0)
   }, [walletsWithBalance, defaultCurrency, rates])
+
+  const activeWalletIdSet = useMemo(() => {
+    if (!walletsWithBalance) return new Set()
+    return new Set(walletsWithBalance.filter((w) => !w.isArchived).map((w) => String(w.id)))
+  }, [walletsWithBalance])
 
   const normalizedTransactions = useMemo(() => {
     if (!transactions) return []
@@ -189,17 +286,6 @@ export function useDashboardData() {
       }
     })
   }, [transactions, defaultCurrency, rates])
-
-  const normalizedAllTransactionsForBalance = useMemo(() => {
-    if (!allTransactionsForBalance) return []
-    return allTransactionsForBalance.map((tx) => {
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      return {
-        ...tx,
-        convertedAmount: amount,
-      }
-    })
-  }, [allTransactionsForBalance, defaultCurrency, rates])
 
   const monthStats = useMemo(() => {
     if (transactions === null || investments === null) {
@@ -214,31 +300,14 @@ export function useDashboardData() {
       }
     }
     const safeTx = normalizedTransactions
-    const lastMonthKey = format(subMonths(new Date(), 1), 'yyyy-MM')
+    const [cYear, cMonth] = currentMonthKey.split('-').map(Number)
+    const currentMonthDate = new Date(cYear, cMonth - 1, 1)
+    const lastMonthKey = format(subMonths(currentMonthDate, 1), 'yyyy-MM')
 
-    const lastMonth = safeTx.reduce(
-      (acc, tx) => {
-        if (!tx?.date?.startsWith(lastMonthKey)) return acc
-        if (isExcludeAnalyticsTx(tx)) return acc
-        const amount = tx.convertedAmount || 0
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
+    const lastPeriod = getBudgetPeriodDateRange(lastMonthKey, budgetCycleStartDay, locale)
 
-    const thisMonth = safeTx.reduce(
-      (acc, tx) => {
-        if (!tx?.date?.startsWith(currentMonthKey)) return acc
-        if (isExcludeAnalyticsTx(tx)) return acc
-        const amount = tx.convertedAmount || 0
-        if (tx.type === 'income') acc.income += amount
-        if (tx.type === 'expense') acc.expense += amount
-        return acc
-      },
-      { income: 0, expense: 0 },
-    )
+    const thisMonth = calculatePeriodStats(safeTx, currentPeriod, defaultCurrency, rates)
+    const lastMonth = calculatePeriodStats(safeTx, lastPeriod, defaultCurrency, rates)
 
     const monthDelta = thisMonth.income - thisMonth.expense
     return {
@@ -254,7 +323,7 @@ export function useDashboardData() {
         ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100
         : thisMonth.expense > 0 ? 100 : 0,
     }
-  }, [transactions, investments, currentMonthKey, normalizedTransactions])
+  }, [transactions, investments, currentMonthKey, budgetCycleStartDay, locale, currentPeriod, normalizedTransactions, defaultCurrency, rates])
 
   const portfolioStats = useMemo(() => {
     if (investments === null) return { portfolioValue: 0 }
@@ -287,6 +356,18 @@ export function useDashboardData() {
     const flow = normalizedTransactions.reduce(
       (acc, tx) => {
         if (tx?.date !== todayKey) return acc
+        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+          tx.splitItems.forEach((si) => {
+            const itemTx = { ...tx, ...si, category: si.category || tx.category }
+            if (isExcludeAnalyticsTx(itemTx)) return
+            const amount = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const itemType = si.type || tx.type
+            if (itemType === 'income') acc.income += amount
+            if (itemType === 'expense') acc.expense += amount
+          })
+          return acc
+        }
+        if (isExcludeAnalyticsTx(tx)) return acc
         const amount = tx.convertedAmount || 0
         if (tx.type === 'income') acc.income += amount
         if (tx.type === 'expense') acc.expense += amount
@@ -295,7 +376,7 @@ export function useDashboardData() {
       { income: 0, expense: 0 },
     )
     return { todayIncome: flow.income, todayNet: flow.income - flow.expense }
-  }, [transactions, normalizedTransactions])
+  }, [transactions, normalizedTransactions, defaultCurrency, rates])
 
   const { todayIncome } = todayStats
 
@@ -322,9 +403,9 @@ export function useDashboardData() {
     }
 
     const generateMonthly = (monthsCount, endMonthD = new Date()) => {
+      const baseDate = startOfMonth(endMonthD)
       const arr = Array.from({ length: monthsCount }, (_, idx) => {
-        const d = new Date(endMonthD)
-        d.setMonth(d.getMonth() - (monthsCount - 1 - idx))
+        const d = subMonths(baseDate, monthsCount - 1 - idx)
         return { day: format(d, 'MMM yyyy'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
       })
       const map = new Map(arr.map((r) => [r.key, r]))
@@ -353,41 +434,63 @@ export function useDashboardData() {
     const { arr: dataAll, map: mapAll } = generateMonthly(totalMonths)
 
     safeTx.forEach((tx) => {
+      const isAdj = tx.type === 'balance_adjustment'
       const amount = tx.convertedAmount || 0
       const txDate = tx?.date
       if (!txDate) return
 
-      const r1w = map1w.get(txDate)
-      if (r1w) {
-        r1w[tx.type] = (r1w[tx.type] || 0) + amount
-      }
-      const r1m = map1m.get(txDate)
-      if (r1m) {
-        r1m[tx.type] = (r1m[tx.type] || 0) + amount
-      }
-      const r3m = map3m.get(txDate)
-      if (r3m) {
-        r3m[tx.type] = (r3m[tx.type] || 0) + amount
+      const isSrcActive = activeWalletIdSet.has(String(tx?.walletId))
+      const isTgtActive = tx?.targetWalletId ? activeWalletIdSet.has(String(tx.targetWalletId)) : false
+
+      let cashChange = 0
+      if (tx.type === 'transfer') {
+        if (isSrcActive && !isTgtActive) cashChange = -amount
+        else if (!isSrcActive && isTgtActive) {
+          cashChange =
+            tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
+              ? convertCurrency(toSafeNumber(tx.targetAmount), tx.targetCurrency || defaultCurrency, defaultCurrency, rates)
+              : amount
+        }
+      } else if (isSrcActive) {
+        if (tx.type === 'income' || isAdj) cashChange = amount
+        else if (tx.type === 'expense') cashChange = -amount
       }
 
+      const isExcluded = isExcludeAnalyticsTx(tx)
+
+      const applyToRow = (row) => {
+        if (!row) return
+        row.cashNet = (row.cashNet || 0) + cashChange
+        if (isAdj) {
+          row.adjustment = (row.adjustment || 0) + amount
+        } else if (isSrcActive) {
+          if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+            tx.splitItems.forEach((si) => {
+              const itemTx = { ...tx, ...si, category: si.category || tx.category }
+              if (isExcludeAnalyticsTx(itemTx)) return
+              const itemAmt = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+              const itemType = si.type || tx.type
+              row[itemType] = (row[itemType] || 0) + itemAmt
+            })
+          } else if (!isExcluded) {
+            row[tx.type] = (row[tx.type] || 0) + amount
+          }
+        }
+      }
+
+      applyToRow(map1w.get(txDate))
+      applyToRow(map1m.get(txDate))
+      applyToRow(map3m.get(txDate))
+
       const monthKey = txDate.slice(0, 7)
-      const rytd = mapYtd.get(monthKey)
-      if (rytd) {
-        rytd[tx.type] = (rytd[tx.type] || 0) + amount
-      }
-      const r1y = map1y.get(monthKey)
-      if (r1y) {
-        r1y[tx.type] = (r1y[tx.type] || 0) + amount
-      }
-      const rall = mapAll.get(monthKey)
-      if (rall) {
-        rall[tx.type] = (rall[tx.type] || 0) + amount
-      }
+      applyToRow(mapYtd.get(monthKey))
+      applyToRow(map1y.get(monthKey))
+      applyToRow(mapAll.get(monthKey))
     })
 
     const calcNet = (arr) =>
       arr.forEach((r) => {
-        r.net = (r.income || 0) - (r.expense || 0)
+        r.net = r.cashNet !== undefined ? r.cashNet : ((r.income || 0) - (r.expense || 0) + (r.adjustment || 0))
       })
     calcNet(data1w)
     calcNet(data1m)
@@ -404,7 +507,7 @@ export function useDashboardData() {
       data1y,
       dataAll,
     }
-  }, [transactions, normalizedTransactions])
+  }, [transactions, normalizedTransactions, activeWalletIdSet, defaultCurrency, rates])
 
   const { data1w, data1m, data3m, dataYtd, data1y, dataAll } = chartData
 
@@ -412,7 +515,8 @@ export function useDashboardData() {
     const safeLoans = loans ?? []
     const activeLoans = safeLoans
       .map((l) => {
-        const remaining = toSafeNumber(l.remainingAmount ?? l.totalAmount)
+        const rawRemaining = l.remainingAmount !== undefined && l.remainingAmount !== null && l.remainingAmount !== '' ? l.remainingAmount : l.totalAmount
+        const remaining = toSafeNumber(rawRemaining)
         const total = toSafeNumber(l.totalAmount || remaining)
         const paid = Math.max(0, total - remaining)
         const paidPct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
@@ -484,10 +588,20 @@ export function useDashboardData() {
     }
   }, [loans, defaultCurrency, rates])
 
+  const totalSavings = useMemo(() => {
+    return (goals || [])
+      .filter((g) => !g.isArchived)
+      .reduce((sum, g) => {
+        const amt = toSafeNumber(g.currentAmount)
+        if (amt <= 0) return sum
+        return sum + convertCurrency(amt, g.currency || defaultCurrency, defaultCurrency, rates)
+      }, 0)
+  }, [goals, defaultCurrency, rates])
+
   const netLoanPosition = loanSummary.netPosition || 0
   const portfolioValue = portfolioStats.portfolioValue || 0
   const cashBalance = totalWalletBalance || 0
-  const netWorth = cashBalance + portfolioValue + netLoanPosition
+  const netWorth = cashBalance + portfolioValue + netLoanPosition + totalSavings
 
   const {
     monthIncome,
@@ -513,27 +627,31 @@ export function useDashboardData() {
   const budgetGoalSummary = useMemo(() => {
     const safeBudgets = budgets ?? []
     const safeGoals = goals ?? []
-    const currentMonthTxs = normalizedTransactions.filter(
-      (tx) => tx.date?.startsWith(currentMonthKey) && tx.type === 'expense' && !isExcludeAnalyticsTx(tx),
+
+    const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
+    const periodExpenseTxs = (transactions || []).filter(
+      (tx) =>
+        tx?.date &&
+        tx.date >= budgetPeriod.startDate &&
+        tx.date <= budgetPeriod.endDate &&
+        (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
     )
 
     const budgetRows = safeBudgets
       .filter((b) => b.month === currentMonthKey)
       .map((b) => {
-        const spent = currentMonthTxs
-          .filter((tx) => {
-            if (!tx.category) return false
-            if (b.category.includes('/')) return tx.category === b.category
-            return tx.category.startsWith(b.category + '/') || tx.category === b.category
-          })
-          .reduce((sum, tx) => sum + (tx.convertedAmount || 0), 0)
+        const spent = calculateBudgetSpent(b.category, periodExpenseTxs, defaultCurrency, rates)
         const limit = toSafeNumber(b.limit)
-        const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0
+        const pct = limit > 0 ? (spent / limit) * 100 : 0
+        const remaining = Math.max(0, limit - spent)
+        const isOver = spent > limit
         return {
           ...b,
           spent,
           limit,
           pct,
+          remaining,
+          isOver,
         }
       })
 
@@ -553,38 +671,67 @@ export function useDashboardData() {
       budgetRows,
       goalRows,
     }
-  }, [budgets, goals, currentMonthKey, normalizedTransactions])
+  }, [budgets, goals, currentMonthKey, budgetCycleStartDay, locale, transactions, defaultCurrency, rates])
 
   const computeCashBalanceBeforeDate = useCallback(
     (dateKey) => {
-      const safeTx = normalizedAllTransactionsForBalance.length > 0 ? normalizedAllTransactionsForBalance : normalizedTransactions
+      const safeTx = normalizedTransactions || []
       const target = String(dateKey || '')
       if (!target) return totalWalletBalance || 0
 
       const netFlowSinceTarget = safeTx.reduce((acc, tx) => {
         const d = String(tx?.date || '')
         if (!d || d < target) return acc
+        const isSrcActive = activeWalletIdSet.has(String(tx?.walletId))
+        const isTgtActive = tx?.targetWalletId ? activeWalletIdSet.has(String(tx.targetWalletId)) : false
+
+        if (tx.type === 'transfer') {
+          if (isSrcActive && !isTgtActive) {
+            return acc - (tx.convertedAmount || 0)
+          }
+          if (!isSrcActive && isTgtActive) {
+            const tgtAmt =
+              tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
+                ? convertCurrency(toSafeNumber(tx.targetAmount), tx.targetCurrency || defaultCurrency, defaultCurrency, rates)
+                : (tx.convertedAmount || 0)
+            return acc + tgtAmt
+          }
+          return acc
+        }
+
+        if (!isSrcActive) return acc
+        const isAdj = tx.type === 'balance_adjustment'
         const amount = tx.convertedAmount || 0
         if (tx.type === 'income') return acc + amount
         if (tx.type === 'expense') return acc - amount
+        if (isAdj) return acc + amount
         return acc
       }, 0)
 
       return (totalWalletBalance || 0) - netFlowSinceTarget
     },
-    [normalizedAllTransactionsForBalance, normalizedTransactions, totalWalletBalance],
+    [normalizedTransactions, totalWalletBalance, activeWalletIdSet, defaultCurrency, rates],
   )
 
   const buildRevenueSeries = useCallback(
     (rangeId) => {
       if (rangeId === '1d') {
         const todayKey = format(new Date(), 'yyyy-MM-dd')
-        const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue + netLoanPosition
+        const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue + netLoanPosition + totalSavings
         const hourNet = Array.from({ length: 24 }, () => 0)
         normalizedTransactions.forEach((tx) => {
           if (String(tx?.date || '') !== todayKey) return
+          if (tx.type === 'transfer') return
+          const isAdj = tx.type === 'balance_adjustment'
           const amount = tx.convertedAmount || 0
-          const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+          const signed =
+            tx.type === 'income'
+              ? amount
+              : tx.type === 'expense'
+                ? -amount
+                : isAdj
+                  ? amount
+                  : 0
           const fallbackMs = Number(new Date(`${todayKey}T12:00:00`).getTime())
           const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
           const hour = new Date(txMs).getHours()
@@ -621,7 +768,7 @@ export function useDashboardData() {
 
       const firstItem = sourceData[0]
       const startDate = isMonthly ? `${firstItem.key}-01` : firstItem.date
-      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue + netLoanPosition
+      const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue + netLoanPosition + totalSavings
 
       let running = startBalance
       return sourceData.map((row) => {
@@ -630,12 +777,12 @@ export function useDashboardData() {
         return { time: timeMs, value: running }
       })
     },
-    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, netLoanPosition, normalizedTransactions],
+    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, netLoanPosition, totalSavings, normalizedTransactions],
   )
 
   const computeRevenueValue = useCallback(() => {
-    return cashBalance + portfolioValue + netLoanPosition
-  }, [cashBalance, portfolioValue, netLoanPosition])
+    return cashBalance + portfolioValue + netLoanPosition + totalSavings
+  }, [cashBalance, portfolioValue, netLoanPosition, totalSavings])
 
   const zoomRevenueSeries = useMemo(() => {
     try {
@@ -714,26 +861,33 @@ export function useDashboardData() {
   }, [zoomRevenueRange, todayIncome, todayStats, data1w, data1m, data3m, dataYtd, data1y, dataAll])
 
   const netWorthGrowth = useMemo(() => {
+    if (miniRevenueSeries && miniRevenueSeries.length >= 2) {
+      const startVal = miniRevenueSeries[0].value
+      const currentVal = miniRevenueSeries[miniRevenueSeries.length - 1].value
+      const net = currentVal - startVal
+      const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
+      return { net, pct }
+    }
     const net = rangedSummaryStats.net ?? 0
     const currentVal = zoomRevenueValue ?? 0
     const startVal = currentVal - net
-    const pct = startVal > 0 ? (net / startVal) * 100 : startVal === 0 && net > 0 ? 100 : 0
+    const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
 
     return {
       net,
       pct,
     }
-  }, [rangedSummaryStats.net, zoomRevenueValue])
+  }, [miniRevenueSeries, rangedSummaryStats.net, zoomRevenueValue])
 
   const buildPreviousPeriodRevenueSeries = useCallback(
     (rangeId, currentSeries) => {
       if (!currentSeries || currentSeries.length === 0) return []
-      const safeTx = normalizedAllTransactionsForBalance.length > 0 ? normalizedAllTransactionsForBalance : normalizedTransactions
+      const safeTx = normalizedTransactions || []
 
       if (rangeId === '1d') {
         const yesterday = subDays(new Date(), 1)
         const yesterdayKey = format(yesterday, 'yyyy-MM-dd')
-        const startBalanceYesterday = computeCashBalanceBeforeDate(yesterdayKey) + portfolioValue + netLoanPosition
+        const startBalanceYesterday = computeCashBalanceBeforeDate(yesterdayKey) + portfolioValue + netLoanPosition + totalSavings
 
         const hourNetYesterday = Array.from({ length: 24 }, () => 0)
         safeTx.forEach((tx) => {
@@ -778,7 +932,7 @@ export function useDashboardData() {
         })
 
         const startPrevDate = prevDates[0]
-        const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue + netLoanPosition
+        const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue + netLoanPosition + totalSavings
 
         const prevDailyNetMap = new Map(prevDates.map((d) => [d, 0]))
         safeTx.forEach((tx) => {
@@ -822,7 +976,7 @@ export function useDashboardData() {
           return `${prevYear}-${m}`
         })
 
-        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition
+        const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition + totalSavings
         const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
@@ -865,7 +1019,7 @@ export function useDashboardData() {
         })
 
         const firstMonth = prevMonths[0]
-        const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + portfolioValue + netLoanPosition
+        const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + portfolioValue + netLoanPosition + totalSavings
         const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
         safeTx.forEach((tx) => {
           const m = String(tx?.date || '').slice(0, 7)
@@ -901,7 +1055,7 @@ export function useDashboardData() {
 
       return currentSeries
     },
-    [normalizedAllTransactionsForBalance, normalizedTransactions, computeCashBalanceBeforeDate, portfolioValue, netLoanPosition],
+    [normalizedTransactions, computeCashBalanceBeforeDate, portfolioValue, netLoanPosition, totalSavings],
   )
 
   const zoomCombinedChartSeries = useMemo(() => {
@@ -1079,6 +1233,7 @@ export function useDashboardData() {
     expenseDeltaPct,
     portfolioValue,
     cashBalance,
+    totalSavings,
     netWorth,
     recentTransactions,
     groupedRecentEntries,

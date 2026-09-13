@@ -66,6 +66,7 @@ To maintain compatibility across diverse developer environments (Antigravity 2.0
 1. **Red**: Write or update failing unit tests covering the target behavior/regression before writing functional code.
 2. **Green**: Write minimal, clean functional code required to pass the tests.
 3. **Refactor**: Clean up the code while ensuring test suite remains 100% green.
+- **No Speculative Import Pruning**: Never prune imports based on search matches alone. Always verify via `npm run lint` immediately after modifying imports to ensure zero `no-undef` regressions in JSX elements.
 
 ### C. Issue Tracking & Error Memory (`ISSUES_LOG.md`)
 - If an error or test failure persists after 2 attempts, log the issue in `ISSUES_LOG.md`.
@@ -79,6 +80,9 @@ To maintain compatibility across diverse developer environments (Antigravity 2.0
 - **Functional Patterns**: Prefer pure functions, immutability, and explicit return types.
 - **Error Handling**: Use custom typed exception classes or Result types; never swallow errors silently.
 - **Minimal Dependencies**: Do not introduce new third-party packages unless existing stack utilities cannot solve the problem.
+- **Financial Split Transaction Invariants**: When aggregating transaction totals for analytics (daily flow, monthly stats, category breakdowns, or charts), transactions with `tx.isSplit === true` MUST unpack `tx.splitItems`. Parent-level amounts apply ONLY to wallet-level cash balance changes (`cashNet`). Analytics exclusion (`isExcludeAnalyticsTx`) and category categorization must be evaluated on each individual split item.
+- **Safe Month Date Stepping**: Never use `d.setMonth(d.getMonth() - n)` on raw dates. Month-end dates (29th, 30th, 31st) will silently skip short months (e.g. March 31 minus 1 month evaluates to March 2/3 instead of February). Always anchor to the start of the month using `subMonths(startOfMonth(date), n)` from `date-fns`.
+- **Immutable Ledger History on Deletion**: Never execute `db.transactions.bulkDelete()` when deleting parent entities (loans, goals, categories, wallets). Always soft-archive (`isArchived: 1`) or decouple transaction references (`loanId = null`) to maintain historical wallet balances and bank statement reconciliation.
 
 ---
 
@@ -180,5 +184,6 @@ When requested to **Debug**, **Audit**, or **Improve** a feature (or when trigge
 - **Virtual Keyboard Resizing**: Forms and bottom sheets must support mobile virtual keyboards without occluding submit buttons (`interactive-widget=resizes-content`).
 
 ### D. Android APK Assembly Workflow
-- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v4.6.4.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
+- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v<version>.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
+- **Explicit User Confirmation Required**: Always ask for explicit user confirmation before building the APK and before handling its upload/placement into Google Drive. Do not run APK assembly or cloud distribution automatically without permission.
 

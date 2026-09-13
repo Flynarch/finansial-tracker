@@ -10,6 +10,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
+          if (id.includes('pdfjs-dist')) return 'vendor-pdfjs'
+          if (id.includes('jspdf')) return 'vendor-jspdf'
+          if (id.includes('acorn')) return 'vendor-acorn'
+          if (id.includes('react-markdown') || id.includes('remark-') || id.includes('micromark') || id.includes('mdast') || id.includes('unist')) return 'vendor-markdown'
+          if (id.includes('papaparse')) return 'vendor-csv'
+          if (id.includes('@capacitor') || id.includes('@aparajita')) return 'vendor-capacitor'
           if (id.includes('react-big-calendar')) return 'vendor-calendar'
           if (id.includes('recharts')) return 'vendor-recharts'
           if (id.includes('firebase')) return 'vendor-firebase'

@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   HardDrive,
   UserX,
+  FileKey,
 } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
+import MnemonicRecoveryModal from '../../components/security/MnemonicRecoveryModal'
 import { db } from '../../lib/db'
 import { downloadTextFile } from '../../lib/utils'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
@@ -20,6 +22,8 @@ import { clearFinancialLocalStorage } from './settingsConstants'
 import { SettingsSection } from './settingsComponents'
 import { resetExpenseCategoryCustomizations } from '../../lib/expenseCategories'
 import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
+import { invalidateAllBalances } from '../../lib/balanceEngine'
+import { clearCachedDashboardState } from '../../hooks/useDashboardData'
 
 export default function SettingsData() {
   const { t } = useTranslation()
@@ -28,6 +32,7 @@ export default function SettingsData() {
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false)
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resetConfirmText, setResetConfirmText] = useState('')
   const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
@@ -83,13 +88,35 @@ export default function SettingsData() {
     try {
       setBusyAction('reset')
 
-      // 1. Clear all data tables in Dexie
-      await Promise.all(db.tables.map((tbl) => tbl.clear().catch(() => {})))
+      // 1. Clear all data tables in Dexie EXCEPT db.settings to preserve user authentication, preferences & security
+      const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
+      await Promise.all(tablesToClear.map((tbl) => tbl.clear().catch(() => {})))
 
-      // 2. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
+      // 2. Re-create default primary cash wallet so the user is never left with 0 wallets
+      const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
+      await db.wallets.add({
+        name: 'Kas Utama',
+        institutionType: 'cash',
+        logoUrl: '/logos/wallets/cash.svg',
+        currency: defaultCurrency,
+        balance: 0,
+        createdAt: Date.now(),
+      })
+
+      // 3. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
       clearFinancialLocalStorage()
       resetExpenseCategoryCustomizations()
       resetIncomeCategoryCustomizations()
+
+      // 4. Invalidate balance engine and clear in-memory dashboard caches
+      await invalidateAllBalances()
+      clearCachedDashboardState()
+
+      // 5. Notify all listeners of reset data
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ft-data-restored'))
+        window.dispatchEvent(new CustomEvent('ft_data_restored'))
+      }
 
       setIsClearModalOpen(false)
       setResetConfirmText('')
@@ -221,19 +248,32 @@ export default function SettingsData() {
             </div>
           </div>
 
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
-          >
-            <UploadCloud className="h-4.5 w-4.5" />
-            <span>
-              {isBusy && busyAction === 'import'
-                ? t('common.loading', 'Mengimpor Data...')
-                : t('settings.backup.import', 'Pilih File Cadangan JSON')}
-            </span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 text-xs sm:text-sm font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
+            >
+              <UploadCloud className="h-4.5 w-4.5" />
+              <span>
+                {isBusy && busyAction === 'import'
+                  ? t('common.loading', 'Mengimpor Data...')
+                  : t('settings.backup.import', 'Pilih File Cadangan JSON')}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => setIsRecoveryModalOpen(true)}
+              className="h-12 px-3.5 flex items-center justify-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-extrabold text-[var(--fg)] shadow-2xs transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer"
+              title={t('mnemonic.restoreEncryptedBtn', 'Pulihkan File .enc')}
+            >
+              <FileKey className="h-4 w-4 text-[var(--accent)]" />
+              <span className="hidden sm:inline">{t('mnemonic.restoreEncryptedBtn', 'Pulihkan File .enc')}</span>
+            </button>
+          </div>
 
           <input
             ref={fileInputRef}
@@ -449,6 +489,16 @@ export default function SettingsData() {
           </div>
         </div>
       </Modal>
+
+      {isRecoveryModalOpen && (
+        <MnemonicRecoveryModal
+          isOpen={isRecoveryModalOpen}
+          onClose={() => setIsRecoveryModalOpen(false)}
+          onRestoreComplete={() => {
+            setStatusMessage(t('mnemonic.restoreSuccessBanner', 'Pemulihan data terenkripsi berhasil disinkronkan!'))
+          }}
+        />
+      )}
     </>
   )
 }
