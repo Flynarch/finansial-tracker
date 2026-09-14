@@ -22,7 +22,8 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (type === 'income') {
     const parsed = parseIncomeCategoryPath(raw)
     if (parsed) {
-      return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/umum`
+      const defaultChild = parsed.parent?.children?.[0]?.id || 'umum'
+      return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/${defaultChild}`
     }
   } else {
     const parsed = parseExpenseCategoryPath(raw)
@@ -199,7 +200,7 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('listrik') || lower.includes('pln') || lower.includes('token listrik') || lower.includes('token pln')) return 'tagihan/listrik'
   if (/\b(air|pdam)\b/i.test(lower) && !lower.includes('conditioner') && !lower.includes('fryer')) return 'tagihan/air'
   if (lower.includes('wifi') || lower.includes('indihome') || lower.includes('biznet') || lower.includes('myrepublic') || lower.includes('firstmedia') || lower.includes('internet')) return 'tagihan/internet'
-  if (lower.includes('pulsa') || lower.includes('kuota') || lower.includes('paket data') || lower.includes('telkomsel') || lower.includes('indosat') || lower.includes('xl') || lower.includes('tri') || lower.includes('smartfren')) return 'tagihan/paket_data'
+  if (lower.includes('pulsa') || lower.includes('kuota') || lower.includes('paket data') || lower.includes('paketan') || lower.includes('paket internet') || lower.includes('telkomsel') || lower.includes('indosat') || lower.includes('xl') || lower.includes('tri') || lower.includes('smartfren')) return 'tagihan/paket_data'
   if (lower.includes('netflix') || lower.includes('spotify') || lower.includes('youtube') || lower.includes('disney') || lower.includes('apple') || lower.includes('langganan') || lower.includes('subscription')) return 'tagihan/langganan'
   if (lower.includes('asuransi') || lower.includes('bpjs')) return 'tagihan/asuransi'
   if (lower.includes('cicilan') || lower.includes('paylater') || lower.includes('kredivo') || lower.includes('spaylater') || lower.includes('angsuran') || lower.includes('kredit') || /\b(kosan|kos|kontrakan)\b/i.test(lower)) return 'tagihan/cicilan'

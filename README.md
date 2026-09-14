@@ -100,6 +100,7 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 ### 2. Android Native Home Screen Widget with Live Sparkline Chart
 - **Native RemoteViews Widget**: Live home screen widget displays real-time Kekayaan Bersih, monthly income, monthly expenses, and active period label.
 - **Java Canvas Sparkline**: Renders a crisp 30-day net worth trend curve directly inside the Android widget layout using native Java `Canvas`, `Path`, `Paint`, and `LinearGradient` in Indigo Accent (`#818CF8` and `#6366F1`) with a glowing latest-point indicator.
+- **Automated Lifecycle Sync**: Native widget updates dynamically upon every transaction addition, edit, deletion, loan installment, and wallet balance recalculation across both background tasks and foreground operations.
 - **Direct Quick-Add Action**: Dedicated "+ Catat" button triggers a native deep link `fintrack://quick-add` that directly opens the transaction entry sheet without intermediate navigation.
 - **Resource Efficient**: Offscreen bitmap rendering remains under 160 KB, well within Android's 1 MB Binder IPC transaction limit.
 
@@ -110,6 +111,9 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 
 ### 4. Google Gemini AI Perception Engine & Conversational Advisor
 - **Dual-Model AI Architecture**: Employs ultra-fast `gemini-2.5-flash-lite` for instantaneous natural language parsing and multimodal receipt OCR, paired with deep analytical `gemini-2.5-flash` for conversational financial chat, debt strategies, and financial health diagnostics.
+- **Shielded Calendar Date NLP**: Advanced Indonesian finance heuristic masks calendar date numbers (*e.g., "9 september", "12 sep"*) so calendar day digits are never mistakenly captured as monetary amounts.
+- **Multi-Clause Sentence Splitting**: Automatically parses compound prompts connected by conjunctions (*"dan", "lalu", "terus", "kemudian", "serta"*) into separate, independent transactions with distinct dates, nominals, income/expense classifications, and target wallets (*e.g., `(dana)`*).
+- **Missing Nominal Interception**: Proactively detects incomplete financial prompts and provides immediate friendly guidance instead of triggering failed remote API calls.
 - **Multimodal Receipt OCR**: Upload or capture physical paper receipts to automatically extract merchant name, transaction date, line items, and grand total using Google Gemini Vision.
 - **Natural Language Quick-Log**: Type plain language prompts (*e.g., "Paid 45k for fuel via Mandiri"*) to instantly populate categorized records.
 - **Financial Intelligence Chat**: Conversational AI advisor analyzes historical spending trends, identifies budget leaks, and suggests savings optimizations.

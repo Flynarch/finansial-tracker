@@ -193,6 +193,153 @@ export function getRecentPastDayDate(targetDayIndex, refDate = new Date(), force
 }
 
 /**
+ * Common Indonesian month definitions and regex
+ */
+export const MONTH_DEFINITIONS = [
+  { month: 1, regex: /\b(januari|jan)\b/i, name: 'Januari' },
+  { month: 2, regex: /\b(februari|feb)\b/i, name: 'Februari' },
+  { month: 3, regex: /\b(maret|mar)\b/i, name: 'Maret' },
+  { month: 4, regex: /\b(april|apr)\b/i, name: 'April' },
+  { month: 5, regex: /\b(mei|may)\b/i, name: 'Mei' },
+  { month: 6, regex: /\b(juni|jun)\b/i, name: 'Juni' },
+  { month: 7, regex: /\b(juli|jul)\b/i, name: 'Juli' },
+  { month: 8, regex: /\b(agustus|ags|agst|aug)\b/i, name: 'Agustus' },
+  { month: 9, regex: /\b(september|sep|sept)\b/i, name: 'September' },
+  { month: 10, regex: /\b(oktober|okt|oct)\b/i, name: 'Oktober' },
+  { month: 11, regex: /\b(november|nov)\b/i, name: 'November' },
+  { month: 12, regex: /\b(desember|des|dec)\b/i, name: 'Desember' },
+]
+
+export const MONTH_NAME_REGEX = /\b(januari|jan|februari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|ags|agst|aug|september|sep|sept|oktober|okt|oct|november|nov|desember|des|dec)\b/i
+
+export function escapeRegExp(string) {
+  return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Masks date strings and relative time expressions so date numbers are never captured as monetary amounts
+ * @param {string} text
+ * @returns {string}
+ */
+export function maskDateExpressions(text) {
+  if (!text || typeof text !== 'string') return ''
+  let t = text
+  // 1. Day + Month Name: "9 september", "12 sep 2026", "tgl 25 agustus", "10 okt"
+  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}\s+(?:januari|jan|februari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|ags|agst|aug|september|sep|sept|oktober|okt|oct|november|nov|desember|des|dec)(?:\s+\d{4})?\b/gi, ' ')
+  // 2. Numeric date: "12/09/2026", "9/9", "25-08-2026"
+  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?\b/gi, ' ')
+  // 3. Relative time expressions: "2 hari lalu", "3 jam lalu", "5 menit lalu"
+  t = t.replace(/\b\d{1,2}\s+(?:hari|jam|menit|bulan|tahun)(?:\s+lalu)?\b/gi, ' ')
+  // 4. Standalone tanggal/tgl + number: "tanggal 9", "tgl 12"
+  t = t.replace(/\b(?:tanggal|tgl)\s+\d{1,2}\b/gi, ' ')
+  return t
+}
+
+/**
+ * Extracts a calendar date, weekday name, or relative day from a phrase
+ * @param {string} phrase
+ * @param {Date} [referenceDate=new Date()]
+ * @returns {{ dateStr: string, matchedText: string, day?: number, month?: number, year?: number } | null}
+ */
+export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
+  if (!phrase || typeof phrase !== 'string') return null
+  const lower = phrase.toLowerCase()
+  const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
+  const refYear = ref.getFullYear()
+
+  // 1. Calendar Date with Month Name: "9 september", "12 sep", "tgl 25 agustus 2026", "10 okt"
+  const monthDateMatch = lower.match(
+    /(?:(?:tgl|tanggal)\s+)?\b(\d{1,2})\s+(januari|jan|februari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|ags|agst|aug|september|sep|sept|oktober|okt|oct|november|nov|desember|des|dec)(?:\s+(\d{4}))?\b/i
+  )
+  if (monthDateMatch) {
+    const day = parseInt(monthDateMatch[1], 10)
+    const monthStr = monthDateMatch[2].toLowerCase()
+    const year = monthDateMatch[3] ? parseInt(monthDateMatch[3], 10) : refYear
+
+    const monthDef = MONTH_DEFINITIONS.find((m) => m.regex.test(monthStr))
+    if (monthDef && day >= 1 && day <= 31) {
+      const dateStr = `${year}-${String(monthDef.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      return {
+        dateStr,
+        matchedText: monthDateMatch[0].trim(),
+        day,
+        month: monthDef.month,
+        year,
+      }
+    }
+  }
+
+  // 2. Numeric Slash/Dash Date: "9/9", "12/09", "12/9/2026", "25-08-2026"
+  const numericDateMatch = lower.match(
+    /(?:(?:tgl|tanggal)\s+)?\b(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/i
+  )
+  if (numericDateMatch) {
+    const day = parseInt(numericDateMatch[1], 10)
+    const month = parseInt(numericDateMatch[2], 10)
+    let year = refYear
+    if (numericDateMatch[3]) {
+      const rawYear = parseInt(numericDateMatch[3], 10)
+      year = rawYear < 100 ? 2000 + rawYear : rawYear
+    }
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      return {
+        dateStr,
+        matchedText: numericDateMatch[0].trim(),
+        day,
+        month,
+        year,
+      }
+    }
+  }
+
+  // 3. Day of week name (senin, selasa, rabu, kamis, jumat, sabtu, minggu)
+  for (const def of DAY_DEFINITIONS) {
+    if (def.regex.test(lower)) {
+      const hasPastQualifier =
+        new RegExp(`${def.canonical}\\s+(kemarin|lalu|minggu\\s+lalu)`, 'i').test(lower) ||
+        new RegExp(`(kemarin|minggu\\s+lalu)\\s+hari\\s+${def.canonical}`, 'i').test(lower)
+      const dateStr = getRecentPastDayDate(def.dayIndex, ref, hasPastQualifier)
+      const dayWordMatch = lower.match(def.regex)
+      return {
+        dateStr,
+        matchedText: dayWordMatch ? dayWordMatch[0] : def.canonical,
+        dayIndex: def.dayIndex,
+      }
+    }
+  }
+
+  // 4. Relative Day: kemarin lusa, 2 hari lalu
+  if (/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i.test(lower)) {
+    const match = lower.match(/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i)
+    return {
+      dateStr: format(subDays(ref, 2), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'kemarin lusa',
+    }
+  }
+
+  // 5. Standalone kemarin, semalam, tadi malam
+  if (/\b(kemarin|semalam|tadi\s+malam)\b/i.test(lower)) {
+    const match = lower.match(/\b(kemarin|semalam|tadi\s+malam)\b/i)
+    return {
+      dateStr: format(subDays(ref, 1), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'kemarin',
+    }
+  }
+
+  // 6. Hari ini, tadi pagi, tadi siang, barusan
+  if (/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|barusan)\b/i.test(lower)) {
+    const match = lower.match(/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|barusan)\b/i)
+    return {
+      dateStr: format(ref, 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'hari ini',
+    }
+  }
+
+  return null
+}
+
+/**
  * Parses numeric monetary amounts from Indonesian slang or formatted strings
  * e.g. "10k" -> 10000, "1.5jt" -> 1500000, "ceban" -> 10000
  * @param {string} raw
@@ -230,13 +377,14 @@ export function parseIndonesianAmount(raw) {
 }
 
 /**
- * Extracts clean monetary amount from a sentence, guarding against date numbers (e.g. "2 hari lalu", "tanggal 12")
+ * Extracts clean monetary amount from a sentence, guarding against date numbers (e.g. "2 hari lalu", "9 september", "12 sep")
  * @param {string} text
  * @returns {number}
  */
 export function extractMonetaryAmountFromText(text) {
   if (!text || typeof text !== 'string') return 0
-  const lower = text.toLowerCase()
+  const masked = maskDateExpressions(text)
+  const lower = masked.toLowerCase()
 
   // 1. Check for slang nominals first
   const slangMatch = lower.match(/\b(ceban|goceng|gocap|seceng|noceng|cenggo|nocenggo|cepek|pekgo|sejeti)\b/i)
@@ -245,16 +393,16 @@ export function extractMonetaryAmountFromText(text) {
     if (slangVal > 0) return slangVal
   }
 
-  // 2. Spending-verb bound amounts (e.g. "habisin 10k", "sebesar 25rb", "bayar 15k")
+  // 2. Spending/Receiving-verb bound amounts (e.g. "habisin 10k", "sebesar 25rb", "bayar 15k", "dapet 60k", "uang saku 60k")
   const verbMatch = lower.match(
-    /(?:habisin|keluarin|keluar|sebesar|bayar|beli|total)\s*(?:rp\.?\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)\b/i
+    /(?:habisin|keluarin|keluar|sebesar|bayar|beli|total|dapet|dapat|terima|masuk|saku|jajan|gaji|sangu)\s*(?:rp\.?\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)\b/i
   )
   if (verbMatch && verbMatch[1]) {
     const val = parseIndonesianAmount(verbMatch[1])
     if (val > 0) return val
   }
 
-  // 3. Amount with explicit currency suffix or prefix (e.g. "10k", "rp 50000", "25rb", "1.5jt")
+  // 3. Amount with explicit currency suffix or prefix (e.g. "10k", "rp 50000", "25rb", "1.5jt", "60k")
   const suffixMatch = lower.match(/\b(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak))\b/i)
   if (suffixMatch && suffixMatch[1]) {
     const val = parseIndonesianAmount(suffixMatch[1])
@@ -267,7 +415,7 @@ export function extractMonetaryAmountFromText(text) {
     if (val > 0) return val
   }
 
-  // 4. Fallback: search for numbers that are NOT dates (not followed by "hari lalu" or preceded by "tanggal")
+  // 4. Fallback: search for numbers that are NOT dates (not followed by month name, "hari lalu", or preceded by "tanggal")
   const words = lower.split(/\s+/)
   for (let i = 0; i < words.length; i++) {
     const w = words[i]
@@ -276,6 +424,7 @@ export function extractMonetaryAmountFromText(text) {
       const next = words[i + 1] || ''
       if (prev.includes('tanggal') || prev.includes('tgl')) continue
       if (next.includes('hari') || next.includes('jam') || next.includes('menit') || next.includes('bulan') || next.includes('tahun')) continue
+      if (MONTH_NAME_REGEX.test(next) || MONTH_NAME_REGEX.test(prev)) continue
       const num = parseInt(w, 10)
       if (num >= 500) return num
     }
@@ -328,6 +477,182 @@ export function extractMerchantAndCategory(text) {
 }
 
 /**
+ * Finds a matching wallet by name or type in text
+ * @param {string} text
+ * @param {Array} wallets
+ * @param {number|string} defaultWalletId
+ * @returns {number|string}
+ */
+export function findWalletInText(text, wallets = [], defaultWalletId = 1) {
+  if (!wallets || wallets.length === 0) return defaultWalletId
+  const cleanText = text.toLowerCase()
+  for (const w of wallets) {
+    const wName = String(w.name || '').trim().toLowerCase()
+    if (!wName) continue
+    const escaped = escapeRegExp(wName)
+    const regex = new RegExp(`(?:\\(|\\b)${escaped}(?:\\)|\\b)`, 'i')
+    if (regex.test(cleanText)) {
+      return w.id
+    }
+    const wType = String(w.institutionType || w.type || '').toLowerCase()
+    if (
+      (wType === 'cash' || wName.includes('cash') || wName.includes('tunai')) &&
+      /\b(cash|tunai)\b/i.test(cleanText)
+    ) {
+      return w.id
+    }
+  }
+  return defaultWalletId
+}
+
+/**
+ * Parses multi-clause / multi-segment sentences connecting multiple transactions
+ * e.g. "9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)"
+ *
+ * @param {string} normalizedText
+ * @param {Array} [wallets]
+ * @param {string} [defaultCurrency='IDR']
+ * @param {Date} [referenceDate=new Date()]
+ * @returns {object|null}
+ */
+export function parseMultiClauseTransactions(
+  normalizedText,
+  wallets = [],
+  defaultCurrency = 'IDR',
+  referenceDate = new Date()
+) {
+  const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
+  const todayStr = format(ref, 'yyyy-MM-dd')
+  const currentTime = format(ref, 'HH:mm')
+  const defaultWalletId = wallets[0]?.id || 1
+
+  // Split by conjunctions: dan, lalu, terus, kemudian, serta, ;, \n, or non-decimal comma
+  const delimiterRegex = /\s*(?:;|\n+|\s+(?:dan|lalu|terus|kemudian|serta)\s+|(?<!\d),(?!\d)\s*)\s*/i
+  const rawClauses = normalizedText.split(delimiterRegex).map((c) => c.trim()).filter(Boolean)
+
+  if (rawClauses.length < 2) return null
+
+  // Ensure this is not a multi-day shared spending scenario (e.g. "sabtu dan jumat masing-masing 10k")
+  if (/\b(masing-masing|tiap\s+hari|setiap\s+hari|per\s+hari)\b/i.test(normalizedText)) {
+    return null
+  }
+
+  const clauseDetails = []
+  let previousDateStr = null
+
+  for (const rawClause of rawClauses) {
+    const clauseAmt = extractMonetaryAmountFromText(rawClause)
+    if (clauseAmt <= 0) continue
+
+    // Extract calendar date or relative date from this clause
+    const dateExtraction = extractDateFromPhrase(rawClause, ref)
+    let clauseDate = todayStr
+    let dateMatchedText = ''
+
+    if (dateExtraction) {
+      clauseDate = dateExtraction.dateStr
+      dateMatchedText = dateExtraction.matchedText
+      previousDateStr = clauseDate
+    } else if (previousDateStr) {
+      clauseDate = previousDateStr
+    }
+
+    // Determine type: income vs expense
+    const isIncome =
+      /\b(dapet|dapat|terima|diterima|uang\s+saku|uang\s+jajan|sangu|gaji|salary|pemasukan|penghasilan|masuk|kiriman|dikasih|bonus|thr|hadiah|kado|cashback|komisi|cuan|hasil\s+jual|penjualan|freelance|proyek|adsense|dividen)\b/i.test(
+        rawClause
+      )
+    const txType = isIncome ? 'income' : 'expense'
+
+    // Match wallet
+    const resolvedWalletId = findWalletInText(rawClause, wallets, defaultWalletId)
+    const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
+    const txCurrency = matchedWallet?.currency || defaultCurrency
+
+    // Clean notes: remove date, amount, wallet, and leading verbs
+    let cleanNotes = rawClause
+    if (dateMatchedText) {
+      cleanNotes = cleanNotes.replace(new RegExp(`\\b${escapeRegExp(dateMatchedText)}\\b`, 'gi'), ' ')
+    }
+    if (matchedWallet) {
+      cleanNotes = cleanNotes.replace(new RegExp(`\\(?\\b${escapeRegExp(matchedWallet.name)}\\b\\)?`, 'gi'), ' ')
+    }
+    // Remove standalone parenthesized wallet mentions like (dana) or (cash)
+    cleanNotes = cleanNotes.replace(/\([a-zA-Z0-9\s_-]+\)/g, ' ')
+
+    // Remove amount (e.g. 60k, 25k, rp 50000)
+    cleanNotes = cleanNotes.replace(/\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?\b/gi, ' ')
+    cleanNotes = cleanNotes.replace(/rp\.?\s*/gi, ' ')
+
+    // Remove leading action verbs
+    cleanNotes = cleanNotes
+      .replace(/[()]/g, ' ')
+      .replace(/^(?:dapet|dapat|terima|diterima|buat\s+beli|beli|buat|untuk|bayar|keluar|keluarin)\s+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // Determine category and merchant
+    let category
+    let merchant = undefined
+
+    if (txType === 'income') {
+      category = sanitizeCategoryPath(cleanNotes || rawClause, 'income')
+      merchant = undefined
+    } else {
+      const extracted = extractMerchantAndCategory(cleanNotes || rawClause)
+      category = extracted.category
+      if (extracted.merchant && !MONTH_NAME_REGEX.test(extracted.merchant)) {
+        merchant = extracted.merchant
+      }
+    }
+
+    let finalNotes = cleanNotes
+    if (!finalNotes) {
+      finalNotes = txType === 'income' ? 'Pemasukan' : 'Pengeluaran'
+    } else {
+      finalNotes = finalNotes
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+    }
+
+    clauseDetails.push({
+      type: txType,
+      amount: clauseAmt,
+      category,
+      currency: txCurrency,
+      walletId: resolvedWalletId,
+      date: clauseDate,
+      time: currentTime,
+      merchant,
+      notes: finalNotes,
+    })
+  }
+
+  if (clauseDetails.length >= 2) {
+    const incomeCount = clauseDetails.filter((t) => t.type === 'income').length
+    const expenseCount = clauseDetails.filter((t) => t.type === 'expense').length
+    const parts = []
+    if (incomeCount > 0) parts.push(`${incomeCount} pemasukan`)
+    if (expenseCount > 0) parts.push(`${expenseCount} pengeluaran`)
+    const summary = `Berhasil mencatat ${clauseDetails.length} transaksi (${parts.join(', ')}).`
+
+    return {
+      type: 'transactions',
+      action: 'create',
+      transactions: clauseDetails,
+      merchant: clauseDetails.find((t) => t.merchant)?.merchant,
+      currency: defaultCurrency,
+      text: summary,
+      chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+      isInstant: true,
+    }
+  }
+
+  return null
+}
+
+/**
  * Primary intelligent heuristic NLP parser for Indonesian financial sentences.
  * Resolves:
  * - Multi-day transactions ("sabtu dan jumwt masing-masing 10k buat maxim")
@@ -365,6 +690,12 @@ export function parseIndonesianFinancialText(
   const todayStr = format(ref, 'yyyy-MM-dd')
   const currentTime = format(ref, 'HH:mm')
   const defaultWalletId = wallets[0]?.id || 1
+
+  // 1A. PATTERN 0: Multi-clause transactions connecting multiple items (e.g. "9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)")
+  const multiClauseResult = parseMultiClauseTransactions(normalized, wallets, defaultCurrency, ref)
+  if (multiClauseResult) {
+    return multiClauseResult
+  }
 
   // 2. PATTERN A: Multi-day spending resolution
   // Scan for mentioned days of the week
@@ -481,35 +812,28 @@ export function parseIndonesianFinancialText(
         isInstant: true,
       }
     }
-  }
 
-  // 3. PATTERN B: Single-day with relative day or specific day name
-  let resolvedDate = todayStr
-  let matchedDayName = ''
-
-  for (const def of DAY_DEFINITIONS) {
-    if (def.regex.test(lower)) {
-      const hasPastQualifier =
-        new RegExp(`${def.canonical}\\s+(kemarin|lalu|minggu\\s+lalu)`, 'i').test(lower) ||
-        new RegExp(`(kemarin|minggu\\s+lalu)\\s+hari\\s+${def.canonical}`, 'i').test(lower)
-      resolvedDate = getRecentPastDayDate(def.dayIndex, ref, hasPastQualifier)
-      matchedDayName = def.nameId
-      break
+    if (commonAmount <= 0) {
+      const dayNamesStr = allFoundDays.map((d) => d.name).join(' dan ')
+      return {
+        error: true,
+        message: `Nominal transaksi belum disebutkan untuk ${dayNamesStr}. Contoh: "kemarin ${allFoundDays[0]?.name.toLowerCase()} dan ${allFoundDays[1]?.name.toLowerCase()} masing-masing 10k buat maxim".`,
+      }
     }
   }
 
-  if (!matchedDayName) {
-    if (/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i.test(lower)) {
-      resolvedDate = format(subDays(ref, 2), 'yyyy-MM-dd')
-    } else if (/\b(kemarin|semalam|tadi\s+malam)\b/i.test(lower)) {
-      resolvedDate = format(subDays(ref, 1), 'yyyy-MM-dd')
-    }
-  }
+  // 3. PATTERN B: Single-day with relative day, weekday name, or calendar date
+  const dateResult = extractDateFromPhrase(normalized, ref)
+  const resolvedDate = dateResult ? dateResult.dateStr : todayStr
 
   // 4. PATTERN C: Clean item & amount extraction
-  const clean = normalized
+  let clean = normalized
+  if (dateResult?.matchedText) {
+    clean = clean.replace(new RegExp(`\\b${escapeRegExp(dateResult.matchedText)}\\b`, 'gi'), ' ')
+  }
+  clean = clean
     .replace(/^(kemarin\s+|tadi\s+pagi\s+|tadi\s+siang\s+|tadi\s+malam\s+|hari\s+ini\s+|semalam\s+)/i, '')
-    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|terima|makan|minum)\s+/i, '')
+    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|dapet|terima|makan|minum)\s+/i, '')
     .trim()
 
   const match = clean.match(
@@ -527,7 +851,8 @@ export function parseIndonesianFinancialText(
         const isIncome =
           /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
             rawItem.toLowerCase()
-          )
+          ) ||
+          /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
         const txType = isIncome ? 'income' : 'expense'
 
         const { merchant, category } = extractMerchantAndCategory(rawTail ? `${rawItem} ${rawTail}` : rawItem)
@@ -573,39 +898,66 @@ export function parseIndonesianFinancialText(
   }
 
   // 5. Structured fallback for phrases like "habisin 10k buat maxim kemarin"
-  const amountMatch = normalized.match(
-    /(?:habisin|bayar|beli|keluar|sebesar)?\s*(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)\s+(?:buat|untuk|di|naik)?\s*([a-zA-Z0-9\-_]+)/i
-  )
-  if (amountMatch && amountMatch[1] && amountMatch[2]) {
-    const amt = parseIndonesianAmount(amountMatch[1])
-    const targetWord = amountMatch[2]
-    if (amt > 0 && targetWord.length >= 3) {
-      const { merchant, category } = extractMerchantAndCategory(targetWord)
-      const cleanMerchant = merchant || targetWord.charAt(0).toUpperCase() + targetWord.slice(1)
-      const matchedWallet = wallets.find((w) => String(w.id) === String(defaultWalletId))
-      const txCurrency = matchedWallet?.currency || defaultCurrency
+  const amountMatch =
+    normalized.match(
+      /(?:habisin|bayar|beli|keluar|sebesar)\s*(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)\s+(?:buat|untuk|di|naik)?\s*([a-zA-Z0-9\-_]+)/i
+    ) ||
+    normalized.match(
+      /\b(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak))\s+(?:buat|untuk|di|naik)\s+([a-zA-Z0-9\-_]+)/i
+    )
 
+  if (amountMatch && amountMatch[1] && amountMatch[2]) {
+    const targetWord = amountMatch[2].toLowerCase()
+    // Month names are NEVER merchants or transaction targets
+    if (!MONTH_NAME_REGEX.test(targetWord)) {
+      const amt = parseIndonesianAmount(amountMatch[1])
+      if (amt > 0 && targetWord.length >= 3) {
+        const { merchant, category } = extractMerchantAndCategory(amountMatch[2])
+        const cleanMerchant = merchant || amountMatch[2].charAt(0).toUpperCase() + amountMatch[2].slice(1)
+        const matchedWallet = wallets.find((w) => String(w.id) === String(defaultWalletId))
+        const txCurrency = matchedWallet?.currency || defaultCurrency
+
+        return {
+          type: 'transactions',
+          action: 'create',
+          transactions: [
+            {
+              type: 'expense',
+              amount: amt,
+              category,
+              currency: txCurrency,
+              walletId: defaultWalletId,
+              date: resolvedDate,
+              time: currentTime,
+              merchant: cleanMerchant,
+              notes: cleanMerchant,
+            },
+          ],
+          merchant: cleanMerchant,
+          currency: txCurrency,
+          text: `Berhasil mencatat pengeluaran ${cleanMerchant} sebesar ${formatCurrency(amt, txCurrency)}.`,
+          chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+          isInstant: true,
+        }
+      }
+    }
+  }
+
+  // 6. Action verb guard when user clearly attempted to record an expenditure without mentioning amount
+  const isQuestion =
+    /\?|^(apa|apakah|berapa|bagaimana|gimana|kapan|kenapa|siapa|tolong\s+jelaskan|tolong\s+cek)\b/i.test(lower) ||
+    /\b(apa\s+saja|apa\s+aja|berapa\s+total|berapa\s+banyak)\b/i.test(lower)
+
+  if (!isQuestion && !nonTxQuery) {
+    const hasExplicitSpendingAction =
+      /\b(habisin|habiskan|keluarin|ngeluarin|buat\s+beli|beli|bayar|buat\s+maxim|buat\s+gofood|buat\s+grab)\b/i.test(
+        lower
+      )
+    const totalAmt = extractMonetaryAmountFromText(lower)
+    if (hasExplicitSpendingAction && totalAmt <= 0) {
       return {
-        type: 'transactions',
-        action: 'create',
-        transactions: [
-          {
-            type: 'expense',
-            amount: amt,
-            category,
-            currency: txCurrency,
-            walletId: defaultWalletId,
-            date: resolvedDate,
-            time: currentTime,
-            merchant: cleanMerchant,
-            notes: cleanMerchant,
-          },
-        ],
-        merchant: cleanMerchant,
-        currency: txCurrency,
-        text: `Berhasil mencatat pengeluaran ${cleanMerchant} sebesar ${formatCurrency(amt, txCurrency)}.`,
-        chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
-        isInstant: true,
+        error: true,
+        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "beli kopi 20rb" atau "buat maxim 15k").',
       }
     }
   }

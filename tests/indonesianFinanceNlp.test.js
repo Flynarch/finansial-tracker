@@ -6,6 +6,10 @@ import {
   extractMonetaryAmountFromText,
   extractMerchantAndCategory,
   parseIndonesianFinancialText,
+  extractDateFromPhrase,
+  maskDateExpressions,
+  findWalletInText,
+  parseMultiClauseTransactions,
 } from '../src/lib/ai/indonesianFinanceNlp'
 import { parseShortTransactionFast } from '../src/lib/gemini'
 import { sanitizeCategoryPath } from '../src/lib/categorySanitizer'
@@ -239,6 +243,138 @@ describe('Indonesian Finance NLP Parser & Heuristics', () => {
       expect(parseIndonesianFinancialText('bagaimana kesehatan keuangan saya?')).toBeNull()
       expect(parseIndonesianFinancialText('analisis pengeluaran bulan ini')).toBeNull()
       expect(parseIndonesianFinancialText('siapa yang punya utang ke saya?')).toBeNull()
+    })
+  })
+
+  describe('Calendar Dates & Multi-Clause Transactions (Bug 2 Fix)', () => {
+    const mockWalletsWithDana = [
+      { id: 1, name: 'BCA Utama', currency: 'IDR' },
+      { id: 2, name: 'GoPay', currency: 'IDR' },
+      { id: 3, name: 'Cash Dompet', currency: 'IDR' },
+      { id: 4, name: 'DANA', currency: 'IDR' },
+    ]
+
+    const exactPrompt = '9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)'
+
+    it('accurately parses exact user prompt into two distinct transactions with dates, types, and wallets', () => {
+      const result = parseIndonesianFinancialText(exactPrompt, mockWalletsWithDana, 'IDR', refDateMonday)
+
+      expect(result).not.toBeNull()
+      expect(result.type).toBe('transactions')
+      expect(result.action).toBe('create')
+      expect(result.transactions).toHaveLength(2)
+
+      const [txIncome, txExpense] = result.transactions
+
+      // Transaction 1: 9 September 2026, Income Rp 60.000, Uang Saku
+      expect(txIncome.date).toBe('2026-09-09')
+      expect(txIncome.amount).toBe(60000)
+      expect(txIncome.type).toBe('income')
+      expect(txIncome.category).toBe('uang_jajan/uang_saku')
+      expect(txIncome.notes).toMatch(/uang saku/i)
+      expect(txIncome.merchant).toBeUndefined()
+
+      // Transaction 2: 12 September 2026, Expense Rp 25.000, Paket Data, DANA wallet
+      expect(txExpense.date).toBe('2026-09-12')
+      expect(txExpense.amount).toBe(25000)
+      expect(txExpense.type).toBe('expense')
+      expect(txExpense.category).toBe('tagihan/paket_data')
+      expect(txExpense.walletId).toBe(4)
+      expect(txExpense.notes).toMatch(/paketan/i)
+    })
+
+    it('works seamlessly when called via parseShortTransactionFast', () => {
+      const result = parseShortTransactionFast(exactPrompt, mockWalletsWithDana, 'IDR', refDateMonday)
+      expect(result).not.toBeNull()
+      expect(result.transactions).toHaveLength(2)
+      expect(result.transactions[0].date).toBe('2026-09-09')
+      expect(result.transactions[0].amount).toBe(60000)
+      expect(result.transactions[0].type).toBe('income')
+      expect(result.transactions[1].date).toBe('2026-09-12')
+      expect(result.transactions[1].amount).toBe(25000)
+      expect(result.transactions[1].type).toBe('expense')
+      expect(result.transactions[1].walletId).toBe(4)
+    })
+
+    it('never captures calendar date day numbers as monetary amounts', () => {
+      expect(extractMonetaryAmountFromText('9 september dapet uang saku 60k')).toBe(60000)
+      expect(extractMonetaryAmountFromText('12 sep 25k buat beli paketan')).toBe(25000)
+      expect(extractMonetaryAmountFromText('25 agustus bayar wifi 300k')).toBe(300000)
+      expect(extractMonetaryAmountFromText('tanggal 10 okt beli sepatu 150k')).toBe(150000)
+      expect(extractMonetaryAmountFromText('9 september')).toBe(0)
+      expect(extractMonetaryAmountFromText('12 sep')).toBe(0)
+    })
+
+    it('extracts calendar dates accurately from various Indonesian formats', () => {
+      expect(extractDateFromPhrase('9 september', refDateMonday)?.dateStr).toBe('2026-09-09')
+      expect(extractDateFromPhrase('12 sep', refDateMonday)?.dateStr).toBe('2026-09-12')
+      expect(extractDateFromPhrase('25 agustus 2026', refDateMonday)?.dateStr).toBe('2026-08-25')
+      expect(extractDateFromPhrase('tanggal 10 okt', refDateMonday)?.dateStr).toBe('2026-10-10')
+      expect(extractDateFromPhrase('15/09/2026', refDateMonday)?.dateStr).toBe('2026-09-15')
+    })
+
+    it('masks date expressions so date digits are never mistaken for amounts', () => {
+      const masked = maskDateExpressions('9 september dapet uang saku 60k dan 12 sep 25k')
+      expect(masked).not.toMatch(/\b9\b/)
+      expect(masked).not.toMatch(/\b12\b/)
+      expect(masked).toContain('60k')
+      expect(masked).toContain('25k')
+    })
+
+    it('matches wallets by name, parenthesized name, and cash/tunai type', () => {
+      expect(findWalletInText('beli paketan (dana)', mockWalletsWithDana, 1)).toBe(4)
+      expect(findWalletInText('beli pulsa di dana', mockWalletsWithDana, 1)).toBe(4)
+      expect(findWalletInText('bayar kosan pakai bca', mockWalletsWithDana, 1)).toBe(1)
+      expect(findWalletInText('jajan kopi pakai cash', mockWalletsWithDana, 1)).toBe(3)
+      expect(findWalletInText('jajan kopi tunai', mockWalletsWithDana, 1)).toBe(3)
+      expect(findWalletInText('beli bakso tanpa dompet', mockWalletsWithDana, 1)).toBe(1)
+    })
+
+    it('supports multiple clauses connected by lalu, terus, kemudian, serta', () => {
+      const text = 'dapet gaji 5jt terus bayar kosan 1.5jt bca serta beli kopi 25rb gopay'
+      const result = parseIndonesianFinancialText(text, mockWalletsWithDana, 'IDR', refDateMonday)
+
+      expect(result).not.toBeNull()
+      expect(result.transactions).toHaveLength(3)
+
+      expect(result.transactions[0].type).toBe('income')
+      expect(result.transactions[0].amount).toBe(5000000)
+      expect(result.transactions[0].category).toBe('gaji/gaji_pokok')
+
+      expect(result.transactions[1].type).toBe('expense')
+      expect(result.transactions[1].amount).toBe(1500000)
+      expect(result.transactions[1].walletId).toBe(1)
+
+      expect(result.transactions[2].type).toBe('expense')
+      expect(result.transactions[2].amount).toBe(25000)
+      expect(result.transactions[2].walletId).toBe(2)
+      expect(result.transactions[2].category).toBe('makanan/kopi')
+    })
+
+    it('tests parseMultiClauseTransactions helper directly', () => {
+      const res = parseMultiClauseTransactions('gaji 5jt dan makan siang 30rb', mockWalletsWithDana, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions).toHaveLength(2)
+      expect(res.transactions[0].amount).toBe(5000000)
+      expect(res.transactions[1].amount).toBe(30000)
+    })
+
+    it('returns helpful error when multi-day sentence is missing nominal (Screenshot 1 scenario)', () => {
+      const promptNoAmount = 'Kemarin hari sabtu dan jumwt masing masing hwri habisin (buat maxim)'
+      const result = parseIndonesianFinancialText(promptNoAmount, mockWalletsWithDana, 'IDR', refDateMonday)
+      expect(result).not.toBeNull()
+      expect(result.error).toBe(true)
+      expect(result.message).toMatch(/nominal/i)
+      expect(result.message).toMatch(/sabtu/i)
+      expect(result.message).toMatch(/jumat/i)
+    })
+
+    it('returns helpful error when explicit spending verb is used without monetary amount', () => {
+      const promptNoAmount = 'Kemarin beli kopi di starbucks tapi lupa tulis harga'
+      const result = parseIndonesianFinancialText(promptNoAmount, mockWalletsWithDana, 'IDR', refDateMonday)
+      expect(result).not.toBeNull()
+      expect(result.error).toBe(true)
+      expect(result.message).toMatch(/nominal/i)
     })
   })
 })

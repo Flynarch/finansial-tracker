@@ -26,12 +26,27 @@ export function getEffectiveApiKey() {
   return ''
 }
 
-function parseApiErrorMessage(errText, status) {
+export function getApiKeysToTry() {
+  const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+  const keysToTry = []
+  if (userKey && userKey.length > 5) {
+    keysToTry.push({ key: userKey, isUserKey: true })
+  }
+  if (envKey && envKey.length > 5 && envKey !== userKey) {
+    keysToTry.push({ key: envKey, isUserKey: false })
+  }
+  return { keysToTry, hasUserKey: Boolean(userKey && userKey.length > 5) }
+}
+
+function parseApiErrorMessage(errText, status, isUserKey = true) {
   if (status === 429) {
-    return 'Batas kuota harian atau kecepatan API tercapai (Rate Limit). Silakan tunggu beberapa saat lagi.'
+    return isUserKey
+      ? 'Batas kuota harian atau kecepatan API Key Anda tercapai (Rate Limit). Silakan tunggu beberapa saat lagi.'
+      : 'Batas kuota harian AI bawaan sistem tercapai (Rate Limit). Silakan gunakan API Key pribadi di menu Pengaturan > Integrasi AI.'
   }
   if (status === 404) {
-    return 'Model tidak ditemukan untuk versi API ini.'
+    return 'Model AI tidak ditemukan untuk versi API ini.'
   }
   if (!errText) return 'Terjadi kendala saat menghubungi server AI.'
   try {
@@ -45,7 +60,9 @@ function parseApiErrorMessage(errText, status) {
         msg.includes('OAuth 2 access token') ||
         msg.includes('invalid authentication credentials')
       ) {
-        return 'Kredensial API Key tidak valid. Silakan periksa kembali API Key Anda di menu Pengaturan > Integrasi AI.'
+        return isUserKey
+          ? 'Kredensial API Key tidak valid. Silakan periksa kembali API Key Anda di menu Pengaturan > Integrasi AI.'
+          : 'Layanan AI bawaan sistem sedang mengalami kendala otentikasi. Silakan tambahkan API Key pribadi Anda di menu Pengaturan > Integrasi AI.'
       }
       return msg
     }
@@ -74,7 +91,16 @@ export const GEMINI_MODELS = [
 ]
 
 export async function testGeminiApiKey(customKey) {
-  const key = (customKey || getEffectiveApiKey() || '').trim().replace(/^["']|["']$/g, '')
+  const { keysToTry } = getApiKeysToTry()
+  const cleanCustom = (customKey || '').trim().replace(/^["']|["']$/g, '')
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+  const userStoreKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
+
+  const key = cleanCustom || keysToTry[0]?.key || ''
+  const isUserKey = cleanCustom
+    ? (cleanCustom === userStoreKey || cleanCustom !== envKey)
+    : (keysToTry[0]?.isUserKey ?? false)
+
   if (!key) {
     return { ok: false, message: 'API Key belum diisi.' }
   }
@@ -100,10 +126,10 @@ export async function testGeminiApiKey(customKey) {
       }
 
       const errText = await res.text()
-      const cleanMsg = parseApiErrorMessage(errText, res.status)
+      const cleanMsg = parseApiErrorMessage(errText, res.status, isUserKey)
       lastErrorMsg = cleanMsg
 
-      if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key')) {
+      if (res.status === 400 || res.status === 401 || res.status === 403 || cleanMsg.includes('API Key') || cleanMsg.includes('otentikasi')) {
         return { ok: false, message: cleanMsg }
       }
     } catch (err) {
@@ -537,18 +563,11 @@ export async function parseTransactionFromText(userMessage, context) {
     rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
   } = context
 
-  // Fast-Path NLP heuristic: instant match for simple text like "bakso 20k", "kopi 25rb", "gaji 5jt"
-  // Also matches multi-day patterns instantly without network overhead even during active conversation
+  // Fast-Path NLP heuristic: instant match for Indonesian financial text without network latency
   if (!imageData) {
-    const isMultiDay =
-      /\b(masing-masing|tiap\s+hari|setiap\s+hari|per\s+hari)\b/i.test(userMessage) ||
-      (/\b(sabtu|jumat|senin|selasa|rabu|kamis|minggu)\b/i.test(userMessage) &&
-        /(\bdan\b|\bsama\b|\bserta\b|&|,)/.test(userMessage))
-    if (!previousMessages || previousMessages.length === 0 || isMultiDay) {
-      const fastTx = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
-      if (fastTx) {
-        return fastTx
-      }
+    const fastTx = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
+    if (fastTx) {
+      return fastTx
     }
   }
 
@@ -727,6 +746,12 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
      * "hwri" / "hri" = typo dari kata "hari". "kmrn" / "kemaren" = kemarin.
      * SELALU hitung tanggal hari tersebut ke masa lalu terdekat relatif terhadap tanggal hari ini (${today})!
        Contoh: Jika hari ini adalah Senin 14 September 2026, maka "sabtu" adalah 12 September 2026, dan "jumat" / "jumwt" adalah 11 September 2026!
+   - PENANGGALAN KALENDER & TANGGAL TERTENTU (misal: "9 september", "12 sep", "tgl 15"):
+     * Angka yang mendahului atau mengikuti nama bulan atau kata "tgl"/"tanggal" adalah TANGGAL ('date'), BUKAN NOMINAL 'amount' dan BUKAN 'merchant'!
+     * DILARANG KERAS mengekstrak angka tanggal kalender (seperti 9 atau 12) sebagai nominal pengeluaran/pemasukan!
+     * Contoh: "9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)":
+       - Transaksi 1: date = "${today.slice(0, 4)}-09-09", type = "income", amount = 60000, category = "uang_jajan/uang_saku", notes = "Uang saku"
+       - Transaksi 2: date = "${today.slice(0, 4)}-09-12", type = "expense", amount = 25000, category = "tagihan/paket_data", notes = "Beli paketan"
    - SELALU isi properti 'date' dalam format standar YYYY-MM-DD.
 
 3. PENCATATAN TRANSAKSI (PEMASUKAN, PENGELUARAN, TRANSFER):
@@ -948,18 +973,14 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   }
 
   const callApiStreamWithFallback = async (reqContents) => {
-    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
-    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
-    const keysToTry = []
-    if (userKey && userKey.length > 5) keysToTry.push(userKey)
-    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    const { keysToTry } = getApiKeysToTry()
     if (keysToTry.length === 0) {
       throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
     }
 
     let lastError = null
 
-    for (const key of keysToTry) {
+    for (const keyObj of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
@@ -967,7 +988,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': key.trim(),
+              'x-goog-api-key': keyObj.key.trim(),
             },
             body: JSON.stringify({ contents: reqContents, tools: getTools(), generationConfig: { temperature: 0.1 } })
           })
@@ -975,7 +996,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           if (!res.ok) {
             const errText = await res.text()
             console.warn(`[${model}] API Error:`, errText)
-            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            const cleanMsg = parseApiErrorMessage(errText, res.status, keyObj.isUserKey)
             lastError = new Error(cleanMsg)
             continue
           }
@@ -1332,17 +1353,13 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
 `
 
   const callApiWithFallback = async (reqContents) => {
-    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
-    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
-    const keysToTry = []
-    if (userKey && userKey.length > 5) keysToTry.push(userKey)
-    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    const { keysToTry } = getApiKeysToTry()
     if (keysToTry.length === 0) {
       throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
     }
 
     let lastError = null
-    for (const key of keysToTry) {
+    for (const keyObj of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
@@ -1350,7 +1367,7 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': key.trim(),
+              'x-goog-api-key': keyObj.key.trim(),
             },
             body: JSON.stringify({ 
               contents: reqContents, 
@@ -1360,7 +1377,7 @@ Berikan analisis keuangan dalam format JSON murni TANPA markdown block. Format J
           
           if (!res.ok) {
             const errText = await res.text()
-            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            const cleanMsg = parseApiErrorMessage(errText, res.status, keyObj.isUserKey)
             lastError = new Error(cleanMsg)
             continue
           }
@@ -1426,17 +1443,13 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
 }
 `
   const callApiWithFallback = async (reqContents) => {
-    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
-    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
-    const keysToTry = []
-    if (userKey && userKey.length > 5) keysToTry.push(userKey)
-    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    const { keysToTry } = getApiKeysToTry()
     if (keysToTry.length === 0) {
       throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
     }
 
     let lastError = null
-    for (const key of keysToTry) {
+    for (const keyObj of keysToTry) {
       for (const model of CHAT_ADVISOR_MODELS) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
@@ -1444,7 +1457,7 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': key.trim(),
+              'x-goog-api-key': keyObj.key.trim(),
             },
             body: JSON.stringify({ 
               contents: reqContents, 
@@ -1454,7 +1467,7 @@ Berikan prediksi pencapaian tabungan dalam format JSON murni TANPA markdown bloc
           
           if (!res.ok) {
             const errText = await res.text()
-            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            const cleanMsg = parseApiErrorMessage(errText, res.status, keyObj.isUserKey)
             lastError = new Error(cleanMsg)
             continue
           }
@@ -1546,17 +1559,13 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 `
 
   const callApiWithFallback = async (reqContents) => {
-    const userKey = (useSettingsStore.getState().geminiApiKey || '').trim().replace(/^["']|["']$/g, '')
-    const envKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '')
-    const keysToTry = []
-    if (userKey && userKey.length > 5) keysToTry.push(userKey)
-    if (envKey && envKey.length > 5 && !keysToTry.includes(envKey)) keysToTry.push(envKey)
+    const { keysToTry } = getApiKeysToTry()
     if (keysToTry.length === 0) {
       throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
     }
 
     let lastError = null
-    for (const key of keysToTry) {
+    for (const keyObj of keysToTry) {
       for (const model of FAST_TRANSACTION_MODELS) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
@@ -1564,7 +1573,7 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': key.trim(),
+              'x-goog-api-key': keyObj.key.trim(),
             },
             body: JSON.stringify({
               contents: reqContents,
@@ -1577,7 +1586,7 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 
           if (!res.ok) {
             const errText = await res.text()
-            const cleanMsg = parseApiErrorMessage(errText, res.status)
+            const cleanMsg = parseApiErrorMessage(errText, res.status, keyObj.isUserKey)
             lastError = new Error(cleanMsg)
             continue
           }
