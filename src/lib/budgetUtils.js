@@ -27,8 +27,7 @@ export function normalizeCategoryKey(value) {
 export function isTxMatchingBudget(budgetCategory, txCategory) {
   const b = normalizeCategoryKey(budgetCategory)
   const raw = normalizeCategoryKey(txCategory)
-  if (!b || !raw) return false
-  if (b === 'all' || raw === b) return true
+  if (b === 'all' || b === 'semua' || raw === b) return true
 
   // Parent / Child path matching (e.g. "makanan_minuman" matches "makanan_minuman/restoran")
   if (raw.startsWith(`${b}/`)) return true
@@ -51,6 +50,8 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
   if (!budgetCategory || !Array.isArray(monthExpenseTxs)) return 0
 
   const total = monthExpenseTxs.reduce((sum, tx) => {
+    if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1) return sum
+
     if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
       let splitSum = 0
       tx.splitItems.forEach((item) => {
@@ -62,13 +63,13 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
           category: item.category || tx.category,
           isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
           excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
-          isExcludeAnalyticsTx: false,
+          isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
         }
         if (isExcludeAnalyticsTx(itemTx)) return
         if (isTxMatchingBudget(budgetCategory, item.category || tx.category)) {
           splitSum += convertCurrency(
             toSafeNumber(item.amount),
-            tx.currency || defaultCurrency,
+            item.currency || tx.currency || defaultCurrency,
             defaultCurrency,
             rates,
           )

@@ -34,7 +34,7 @@ export default function Reports() {
   const [compactDonut, setCompactDonut] = useState(false)
   const [isAddTxOpen, setIsAddTxOpen] = useState(false)
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false)
-  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD'))
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
 
@@ -105,7 +105,7 @@ export default function Reports() {
             category: si.category || t.category,
             isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
             excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-            isExcludeAnalyticsTx: false,
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
           })
         )
       }
@@ -158,7 +158,7 @@ export default function Reports() {
             category: si.category || tx.category,
             isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
             excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-            isExcludeAnalyticsTx: false,
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
           }
           if (isExcludeAnalyticsTx(itemTx)) return
 
@@ -186,8 +186,9 @@ export default function Reports() {
 
           const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
           let val = toSafeNumber(si.amount)
-          if (tx.currency && tx.currency !== defaultCurrency && rates) {
-            val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+          const itemCurrency = si.currency || tx.currency || defaultCurrency
+          if (itemCurrency !== defaultCurrency) {
+            val = convertCurrency(val, itemCurrency, defaultCurrency, rates || FALLBACK_EXCHANGE_RATES)
           }
           current.value += val
           categoryMap.set(key, current)
@@ -222,8 +223,8 @@ export default function Reports() {
 
       const current = categoryMap.get(key) || { key, label, value: 0, isParent, parentId }
       let val = toSafeNumber(tx.amount)
-      if (tx.currency && tx.currency !== defaultCurrency && rates) {
-        val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+      if (tx.currency && tx.currency !== defaultCurrency) {
+        val = convertCurrency(val, tx.currency, defaultCurrency, rates || FALLBACK_EXCHANGE_RATES)
       }
       current.value += val
       categoryMap.set(key, current)
@@ -244,14 +245,15 @@ export default function Reports() {
             category: si.category || tx.category,
             isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
             excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-            isExcludeAnalyticsTx: false,
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
           }
           if (isExcludeAnalyticsTx(itemTx)) return
           const key = si.category || tx.category || ''
           const current = categoryMap.get(key) ?? 0
           let val = toSafeNumber(si.amount)
-          if (tx.currency && tx.currency !== defaultCurrency && rates) {
-            val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+          const itemCurrency = si.currency || tx.currency || defaultCurrency
+          if (itemCurrency !== defaultCurrency) {
+            val = convertCurrency(val, itemCurrency, defaultCurrency, rates || FALLBACK_EXCHANGE_RATES)
           }
           categoryMap.set(key, current + val)
         })
@@ -263,8 +265,8 @@ export default function Reports() {
       const key = tx.category || ''
       const current = categoryMap.get(key) ?? 0
       let val = toSafeNumber(tx.amount)
-      if (tx.currency && tx.currency !== defaultCurrency && rates) {
-        val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+      if (tx.currency && tx.currency !== defaultCurrency) {
+        val = convertCurrency(val, tx.currency, defaultCurrency, rates || FALLBACK_EXCHANGE_RATES)
       }
       categoryMap.set(key, current + val)
     })

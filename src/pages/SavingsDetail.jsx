@@ -182,7 +182,7 @@ export default function SavingsDetail() {
     })
 
     if (walletIdNum) {
-      void invalidateWalletBalance([walletIdNum])
+      await invalidateWalletBalance([walletIdNum])
     }
 
     const targetAmt = Number(goal?.targetAmount || 0)
@@ -243,7 +243,7 @@ export default function SavingsDetail() {
       })
     })
 
-    void invalidateWalletBalance([walletIdNum])
+    await invalidateWalletBalance([walletIdNum])
 
     setIsCashoutSheetOpen(false)
     setIsCelebrationModalOpen(false)

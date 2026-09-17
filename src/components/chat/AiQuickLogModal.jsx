@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { Sparkles, X, Mic, MicOff, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
-import { parseTransactionFromText } from '../../lib/gemini'
+import { parseTransactionFromText, distributeReceiptTransactions } from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
 import { createTransaction as addTransaction } from '../../services/transactionService'
@@ -287,7 +287,7 @@ export default function AiQuickLogModal() {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [], [])
 
   const sampleChips = useMemo(
     () => generateSampleChips(wallets || [], defaultCurrency, locale),
@@ -617,8 +617,10 @@ function isObviousNonTransaction(text) {
 
     setModalMode('analyzing')
 
+    const clampedText = cleanText ? String(cleanText).slice(0, 4000) : ''
+
     try {
-      const result = await parseTransactionFromText(cleanText || 'Lihat gambar struk ini', {
+      const result = await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
         locale,
         defaultCurrency,
         wallets,
@@ -632,34 +634,18 @@ function isObviousNonTransaction(text) {
 
       // Check Intent: Is this a Transaction Creation?
       if (result.type === 'transactions' && result.action === 'create' && result.transactions?.length > 0) {
-        let transactionsToProcess = result.transactions
-
-        // If user chose per_item mode but AI returned 1 summary transaction containing items array, unroll into individual transactions!
-        if (
-          modeToUse === 'per_item' &&
-          transactionsToProcess.length === 1 &&
-          Array.isArray(transactionsToProcess[0].items) &&
-          transactionsToProcess[0].items.length > 1
-        ) {
-          const parent = transactionsToProcess[0]
-          transactionsToProcess = parent.items.map((it) => ({
-            type: 'expense',
-            category: sanitizeCategoryPath(it.name, 'expense') || parent.category || 'kebutuhan_harian/belanja_bulanan',
-            amount: Number(it.price) || 0,
-            notes: it.qty && it.qty > 1 ? `${it.name} (x${it.qty})` : it.name,
-            date: parent.date,
-            currency: parent.currency,
-            merchant: parent.merchant || result.merchant,
-            walletId: parent.walletId,
-            paymentMethod: parent.paymentMethod,
-          }))
-        }
+        let transactionsToProcess = distributeReceiptTransactions(result.transactions, result, modeToUse)
 
         const savedTxs = []
         for (const tx of transactionsToProcess) {
-          let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null))
+          const numericAmount = Number(tx.amount || 0)
+          if (!Number.isFinite(numericAmount) || numericAmount <= 0) continue
+
+          const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
+          const primaryDefaultWalletId = wallets.find((w) => w.id === configuredDefaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
+          let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : primaryDefaultWalletId)
           if (finalWalletId !== null && !wallets.find((w) => w.id === finalWalletId)) {
-            finalWalletId = wallets.length > 0 ? wallets[0].id : null
+            finalWalletId = primaryDefaultWalletId
           }
 
           const matchedWallet = wallets.find((w) => w.id === finalWalletId)
@@ -670,9 +656,14 @@ function isObviousNonTransaction(text) {
             ? sanitizeCategoryPath(tx.category || tx.notes, tx.type || 'expense')
             : sanitizeCategoryPath(tx.category, tx.type)
 
+          const txEngine = tx.engine || result.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
+          const txEngineLabel = tx.engineLabel || result.engineLabel || (txEngine === 'offline_nlp' ? 'NLP Lokal (Offline)' : 'AI Gemini (Online)')
+
           const txToSave = {
             ...tx,
-            amount: Math.abs(Number(tx.amount || 0)),
+            engine: txEngine,
+            engineLabel: txEngineLabel,
+            amount: numericAmount,
             date: tx.date || format(new Date(), 'yyyy-MM-dd'),
             category: itemCategory,
             walletId: finalWalletId,
@@ -696,18 +687,17 @@ function isObviousNonTransaction(text) {
           savedTxs.push(txToSave)
         }
 
-        setRecordedTransactions(savedTxs)
-        setRecordedMerchant(result.merchant || (savedTxs[0]?.merchant) || '')
-        setModalMode('receipt')
-        setInputValue('')
-        setSelectedImage(null)
+        if (savedTxs.length > 0) {
+          setRecordedTransactions(savedTxs)
+          setRecordedMerchant(result.merchant || (savedTxs[0]?.merchant) || '')
+          setModalMode('receipt')
+          setInputValue('')
+          setSelectedImage(null)
 
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          try {
-            navigator.vibrate([25, 40, 25])
-          } catch {
-            // ignore
-          }
+          triggerHaptic('success')
+        } else {
+          setErrorMessage(locale === 'en' ? 'No valid transactions to record (amount must be greater than 0).' : 'Tidak ada transaksi valid untuk dicatat (nominal harus lebih dari 0).')
+          setModalMode('input')
         }
       } else {
         // Non-Transaction Intent Detected (question, database query, advice, etc.)
@@ -875,6 +865,7 @@ function isObviousNonTransaction(text) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
+                      triggerHaptic('light')
                       handleSubmit()
                     }
                   }}
@@ -935,7 +926,10 @@ function isObviousNonTransaction(text) {
                   {/* Submit Button */}
                   <button
                     type="button"
-                    onClick={() => handleSubmit()}
+                    onClick={() => {
+                      triggerHaptic('light')
+                      handleSubmit()
+                    }}
                     disabled={!inputValue.trim() && !selectedImage}
                     className="ft-btn-primary py-2.5 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none cursor-pointer active:scale-95 transition shadow-sm"
                   >
@@ -963,6 +957,7 @@ function isObviousNonTransaction(text) {
                         key={idx}
                         type="button"
                         onClick={() => {
+                          triggerHaptic('light')
                           setInputValue(chip)
                           handleSubmit(chip)
                         }}
@@ -1021,6 +1016,7 @@ function isObviousNonTransaction(text) {
               wallets={wallets}
               locale={locale}
               onConfirm={(mode, walletId) => {
+                triggerHaptic('light')
                 setScanMode(mode)
                 handleSubmit(inputValue, selectedImage, mode, walletId)
               }}

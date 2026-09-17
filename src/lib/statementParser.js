@@ -227,9 +227,19 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
     // Date normalization
     let isoDate = format(new Date(), 'yyyy-MM-dd')
     try {
-      const parsed = new Date(rawDate)
-      if (isValid(parsed)) {
-        isoDate = format(parsed, 'yyyy-MM-dd')
+      const trimmedDate = String(rawDate || '').trim()
+      const ddmmyyyyMatch = trimmedDate.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+      if (ddmmyyyyMatch) {
+        const [, d, m, y] = ddmmyyyyMatch
+        const constructedDate = new Date(Number(y), Number(m) - 1, Number(d))
+        if (isValid(constructedDate)) {
+          isoDate = format(constructedDate, 'yyyy-MM-dd')
+        }
+      } else {
+        const parsed = new Date(trimmedDate)
+        if (isValid(parsed)) {
+          isoDate = format(parsed, 'yyyy-MM-dd')
+        }
       }
     } catch {
       /* fallback */

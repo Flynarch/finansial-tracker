@@ -542,15 +542,18 @@ export async function syncNotificationQueue(options = {}) {
 
       // Single mutation: match best wallet
       const matchResult = findBestMatchingWallet(item.institution, availableWallets, item.rawDescription)
-      let resolvedWalletId = matchResult.wallet?.id || (defaultWalletId ? Number(defaultWalletId) : undefined)
+      const fallbackWallet = defaultWalletId ? availableWallets.find((w) => Number(w.id) === Number(defaultWalletId)) : null
+      const matchedWallet = matchResult.wallet || fallbackWallet
+      let resolvedWalletId = matchedWallet?.id ? Number(matchedWallet.id) : undefined
       let isPendingReview = matchResult.isAmbiguous || (!matchResult.wallet && !defaultWalletId)
+      const resolvedCurrency = matchedWallet?.currency || defaultCurrency
 
       toInsert.push({
         date: item.date,
         type: item.type,
         category: item.category,
         amount: item.amount,
-        currency: defaultCurrency,
+        currency: resolvedCurrency,
         walletId: resolvedWalletId,
         notes: `[Auto: ${item.institution}] ${item.notes}`,
         source: 'notification_listener',
@@ -574,7 +577,7 @@ export async function syncNotificationQueue(options = {}) {
       // Invalidate balance cache so dynamic computeWalletBalance immediately reflects inserted transactions
       const affectedWalletIds = Array.from(walletBalanceDeltas.keys()).map(Number).filter(Boolean)
       if (affectedWalletIds.length > 0) {
-        void invalidateWalletBalance(affectedWalletIds)
+        await invalidateWalletBalance(affectedWalletIds)
       }
 
       if (typeof window !== 'undefined') {

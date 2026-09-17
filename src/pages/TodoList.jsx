@@ -17,6 +17,13 @@ import useSwipeAction from '../hooks/useSwipeAction'
 import { triggerHaptic } from '../lib/haptics'
 import { TodoItemCard } from '../components/todos/TodoItemCard'
 import TodoCreateModal from '../components/todos/TodoCreateModal'
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_ACTION_TYPES,
+  FINTRACK_NOTIFICATION_COLOR,
+  NOTIFICATION_SMALL_ICON,
+  NOTIFICATION_LARGE_ICON,
+} from '../lib/smartNotifications'
 
 const TODO_SORT_PREF_KEY = 'todo_sort_pref'
 const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'
@@ -188,10 +195,17 @@ function TodoList() {
     if (scheduleDate > now) {
       notifs.push({
         id: id * 10 + 1,
-        title: t('todo.notif.dueTodayTitle', 'Tenggat Tugas Hari Ini'),
-        body: todo.title,
+        title: t('todo.notif.dueTodayTitle', 'Tenggat Komitmen Hari Ini'),
+        body: `${todo.title} • ${t('todo.notif.dueTodayBadge', 'Jatuh tempo hari ini')}`,
+        largeBody: `${t('notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')}\n${todo.title}\n• ${t('todo.notif.dueTodayDetail', 'Komitmen dijadwalkan selesai hari ini.')}\n• ${t('notifications.todoDueBullet2', 'Selesaikan tugas atau tandai lunas setelah transaksi.')}`,
+        summaryText: t('notifications.summaryCommitment', 'Jadwal & Komitmen'),
+        channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+        actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
         schedule: { at: scheduleDate },
-        extra: { route: `/todos/${id}`, todoId: id },
+        extra: { route: `/todos/${id}`, todoId: id, type: 'todo' },
+        smallIcon: NOTIFICATION_SMALL_ICON,
+        largeIcon: NOTIFICATION_LARGE_ICON,
+        iconColor: FINTRACK_NOTIFICATION_COLOR,
       })
     }
 
@@ -200,10 +214,17 @@ function TodoList() {
     if (dMinus1 > now) {
       notifs.push({
         id: id * 10 + 2,
-        title: t('todo.notif.dueTomorrowTitle', 'Pengingat Tugas Besok'),
-        body: t('todo.notif.dueTomorrowBody', 'Besok: {{title}}', { title: todo.title }),
+        title: t('todo.notif.dueTomorrowTitle', 'Pengingat Komitmen Besok'),
+        body: `${todo.title} • ${t('todo.notif.dueTomorrowBadge', 'Jatuh tempo besok')}`,
+        largeBody: `${t('notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')}\n${todo.title}\n• ${t('todo.notif.dueTomorrowDetail', 'Komitmen dijadwalkan jatuh tempo besok.')}\n• ${t('notifications.todoDueBullet2', 'Siapkan alokasi dana sebelum tenggat waktu.')}`,
+        summaryText: t('notifications.summaryCommitment', 'Jadwal & Komitmen'),
+        channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+        actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
         schedule: { at: dMinus1 },
-        extra: { route: `/todos/${id}`, todoId: id },
+        extra: { route: `/todos/${id}`, todoId: id, type: 'todo' },
+        smallIcon: NOTIFICATION_SMALL_ICON,
+        largeIcon: NOTIFICATION_LARGE_ICON,
+        iconColor: FINTRACK_NOTIFICATION_COLOR,
       })
     }
 

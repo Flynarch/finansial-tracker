@@ -109,7 +109,7 @@ export default function SavingsFundSheetModal({
       })
 
       if (walletIdNum) {
-        void invalidateWalletBalance([walletIdNum])
+        await invalidateWalletBalance([walletIdNum])
       }
 
       const targetAmt = Number(goal.targetAmount || 0)

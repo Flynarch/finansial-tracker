@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
+import { convertCurrency } from '../lib/utils'
+import { getCachedCurrencyRates } from '../lib/api'
+import useSettingsStore from './useSettingsStore'
 
 const useLoanStore = create(() => ({
   loans: [],
@@ -10,6 +13,12 @@ const useLoanStore = create(() => ({
   addLoan: async (loanData) => {
     const total = Number(loanData.totalAmount) || 0
     const principal = loanData.principalAmount !== undefined ? Number(loanData.principalAmount) : total
+    if (!Number.isFinite(total) || total <= 0) {
+      throw new Error('Nominal total pinjaman harus lebih dari 0.')
+    }
+    if (!Number.isFinite(principal) || principal <= 0) {
+      throw new Error('Nominal pokok pinjaman harus lebih dari 0.')
+    }
     if (!loanData.walletId) {
       throw new Error('Dompet / akun wajib dipilih untuk pencatatan pinjaman.')
     }
@@ -56,6 +65,7 @@ const useLoanStore = create(() => ({
         notes: txNotes,
         walletId,
         loanId,
+        isExcludeAnalyticsTx: true,
         isExcludeFromAnalytics: true,
         excludeFromAnalytics: true,
         createdAt: Date.now(),
@@ -64,7 +74,7 @@ const useLoanStore = create(() => ({
       await db.loans.update(loanId, { initialTransactionId: initialTxId })
     })
 
-    void invalidateWalletBalance([walletId])
+    await invalidateWalletBalance([walletId])
     return loanId
   },
 
@@ -143,7 +153,7 @@ const useLoanStore = create(() => ({
     })
 
     if (affectedWallets.length > 0) {
-      void invalidateWalletBalance(affectedWallets)
+      await invalidateWalletBalance(affectedWallets)
     }
   },
 
@@ -172,12 +182,10 @@ const useLoanStore = create(() => ({
 
         if (friendsTx) {
           if (friendsTx.walletId) affectedWallets.add(Number(friendsTx.walletId))
-          if (siblingLoans.length > 0) {
-            const loanDeduction = Number(loan.totalAmount) || 0
-            const nextAmount = Math.max(0, (Number(friendsTx.amount) || 0) - loanDeduction)
-            await db.transactions.update(friendsTx.id, { amount: nextAmount })
-          } else {
-            await db.transactions.delete(friendsTx.id)
+          // Immutable ledger invariant: Never modify historical cash outflow amount.
+          // Outflows represent physical money that left the account at the merchant.
+          if (siblingLoans.length === 0) {
+            await db.transactions.update(friendsTx.id, { splitBillId: null })
           }
         }
       }
@@ -201,29 +209,49 @@ const useLoanStore = create(() => ({
     })
 
     if (affectedWallets.size > 0) {
-      void invalidateWalletBalance(Array.from(affectedWallets))
+      await invalidateWalletBalance(Array.from(affectedWallets))
     }
   },
 
-  recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null) => {
+  recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null, inputCurrency = null) => {
     const loan = await db.loans.get(loanId)
     if (!loan) throw new Error('Catatan pinjaman tidak ditemukan.')
 
     const payAmt = Number(amount) || 0
     if (payAmt <= 0) throw new Error('Nominal pembayaran harus lebih dari 0.')
+
+    let effectiveDate = date
+    let effectiveNotes = notes
+    let effectivePaymentWalletId = paymentWalletId
+
+    if (typeof effectiveDate === 'number' && effectivePaymentWalletId === null) {
+      effectivePaymentWalletId = effectiveDate
+      effectiveDate = getLocalDateString()
+    }
+
+    const effectiveWalletId = effectivePaymentWalletId || loan.walletId
+    const targetWallet = effectiveWalletId ? await db.wallets.get(Number(effectiveWalletId)) : null
+    const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
+    const loanCurrency = loan.currency || defaultCurrency
+    const walletCurrency = targetWallet?.currency || loanCurrency
+    const paymentCurrency = inputCurrency || loanCurrency
+    const rates = getCachedCurrencyRates('USD')
+
+    const payAmtInLoanCurrency = convertCurrency(payAmt, paymentCurrency, loanCurrency, rates)
+    const payAmtInWalletCurrency = convertCurrency(payAmt, paymentCurrency, walletCurrency, rates)
+
     const roundedLoanRemaining = Math.round((Number(loan.remainingAmount) || 0) * 100) / 100
-    const roundedPayAmt = Math.round(payAmt * 100) / 100
+    const roundedPayAmt = Math.round(payAmtInLoanCurrency * 100) / 100
     if (roundedPayAmt > roundedLoanRemaining) {
       throw new Error(`Nominal pembayaran tidak boleh melebihi sisa tagihan (${loan.remainingAmount}).`)
     }
 
-    let newRemaining = Math.max(0, loan.remainingAmount - payAmt)
+    let newRemaining = Math.max(0, loan.remainingAmount - payAmtInLoanCurrency)
     newRemaining = Math.round(newRemaining * 100) / 100
     const newStatus = newRemaining <= 0 ? 'paid' : 'partially_paid'
-    const payDate = date || getLocalDateString()
+    const payDate = (typeof effectiveDate === 'string' && effectiveDate) ? effectiveDate : getLocalDateString()
 
     let generatedTxId = null
-    const effectiveWalletId = paymentWalletId || loan.walletId
 
     await db.transaction('rw', db.transactions, db.loans, db.loanPayments, async () => {
       // Generate transaction in ledger if loan has connected walletId
@@ -231,17 +259,18 @@ const useLoanStore = create(() => ({
         const isDebt = loan.type === 'debt'
         const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
         const txType = isDebt ? 'expense' : 'income' // Debt payment reduces wallet cash; Receivable receipt increases wallet cash
-        const txNotes = notes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
+        const txNotes = effectiveNotes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
 
         generatedTxId = await db.transactions.add({
           date: payDate,
           type: txType,
           category: txCategory,
-          amount: payAmt,
-          currency: loan.currency || 'IDR',
+          amount: payAmtInWalletCurrency,
+          currency: walletCurrency,
           notes: txNotes,
           walletId: Number(effectiveWalletId),
           loanId,
+          isExcludeAnalyticsTx: true,
           isExcludeFromAnalytics: true,
           excludeFromAnalytics: true,
           createdAt: Date.now(),
@@ -250,9 +279,9 @@ const useLoanStore = create(() => ({
 
       await db.loanPayments.add({
         loanId,
-        amount: payAmt,
+        amount: payAmtInLoanCurrency,
         date: payDate,
-        notes,
+        notes: effectiveNotes,
         transactionId: generatedTxId || null,
         createdAt: Date.now(),
       })
@@ -270,7 +299,7 @@ const useLoanStore = create(() => ({
     })
 
     if (effectiveWalletId) {
-      void invalidateWalletBalance([Number(effectiveWalletId)])
+      await invalidateWalletBalance([Number(effectiveWalletId)])
     }
   },
 
@@ -308,7 +337,7 @@ const useLoanStore = create(() => ({
     })
 
     if (loan.walletId) {
-      void invalidateWalletBalance([Number(loan.walletId)])
+      await invalidateWalletBalance([Number(loan.walletId)])
     }
   },
 }))

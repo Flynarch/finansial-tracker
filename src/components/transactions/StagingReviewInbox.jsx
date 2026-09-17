@@ -37,7 +37,7 @@ export default function StagingReviewInbox({
       })
 
       const affectedWallets = [tx.walletId, Number(targetWalletId)].filter(Boolean)
-      void invalidateWalletBalance(affectedWallets)
+      await invalidateWalletBalance(affectedWallets)
     } catch (err) {
       console.error('Failed to approve staged transaction:', err)
     } finally {
@@ -50,7 +50,7 @@ export default function StagingReviewInbox({
     try {
       await db.transactions.delete(tx.id)
       if (tx.walletId) {
-        void invalidateWalletBalance([Number(tx.walletId)])
+        await invalidateWalletBalance([Number(tx.walletId)])
       }
     } catch (err) {
       console.error('Failed to dismiss staged transaction:', err)

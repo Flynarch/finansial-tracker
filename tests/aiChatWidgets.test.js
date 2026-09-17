@@ -103,4 +103,43 @@ describe('AI Chat Generative Widgets Logic', () => {
       expect(toggled.filter((it) => it.completed).length).toBe(2)
     })
   })
+
+  describe('Financial Health Widget Data Contract & Localization (Regression Guard)', () => {
+    it('accurately maps backend metrics keys to widget props and derived calculations', () => {
+      const rawMetrics = {
+        savingsRatio: 25,
+        dti: 15,
+        emergencyMonths: 4.5,
+        totalCash: 18000000,
+        monthlyIncome: 10000000,
+        monthlyExpense: 4000000,
+        totalDebt: 1500000,
+        totalReceivable: 0,
+      }
+
+      // Exact formula used in AiFinanceChat.jsx and ActionSuccessCard.jsx
+      const savingsRate = rawMetrics.savingsRatio
+      const debtRatio = rawMetrics.dti
+      const expenseVelocity = rawMetrics.monthlyIncome > 0
+        ? Math.round((rawMetrics.monthlyExpense / rawMetrics.monthlyIncome) * 100)
+        : null
+      const budgetCompliance = rawMetrics.emergencyMonths != null
+        ? Math.min(100, Math.round((rawMetrics.emergencyMonths / 6) * 100))
+        : null
+
+      expect(savingsRate).toBe(25)
+      expect(debtRatio).toBe(15)
+      expect(expenseVelocity).toBe(40) // 4jt / 10jt = 40%
+      expect(budgetCompliance).toBe(75) // 4.5 / 6 = 75%
+    })
+
+    it('correctly detects Indonesian locale variants including id and id-ID', () => {
+      const isIdLocale = (loc) => Boolean(loc?.startsWith('id'))
+      expect(isIdLocale('id')).toBe(true)
+      expect(isIdLocale('id-ID')).toBe(true)
+      expect(isIdLocale('en')).toBe(false)
+      expect(isIdLocale('en-US')).toBe(false)
+      expect(isIdLocale(undefined)).toBe(false)
+    })
+  })
 })

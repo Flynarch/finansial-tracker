@@ -102,23 +102,23 @@ export function calculatePeriodStats(safeTx, period, defaultCurrency = 'IDR', ra
     return { income: 0, expense: 0 }
   }
 
-  return safeTx.reduce(
+  const raw = safeTx.reduce(
     (acc, tx) => {
       const txDate = (tx?.date || '').slice(0, 10)
       if (!txDate || txDate < period.startDate || txDate > period.endDate) return acc
 
       if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
         tx.splitItems.forEach((si) => {
-        const itemTx = {
-          ...tx,
-          ...si,
-          category: si.category || tx.category,
-          isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
-          excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-          isExcludeAnalyticsTx: false,
-        }
+          const itemTx = {
+            ...tx,
+            ...si,
+            category: si.category || tx.category,
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+          }
           if (isExcludeAnalyticsTx(itemTx)) return
-          const amount = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+          const amount = convertCurrency(toSafeNumber(si.amount), si.currency || tx.currency || defaultCurrency, defaultCurrency, rates)
           const itemType = si.type || tx.type
           if (itemType === 'income') acc.income += amount
           if (itemType === 'expense') acc.expense += amount
@@ -136,6 +136,57 @@ export function calculatePeriodStats(safeTx, period, defaultCurrency = 'IDR', ra
     },
     { income: 0, expense: 0 },
   )
+
+  return {
+    income: Math.round((raw.income + Number.EPSILON) * 100) / 100,
+    expense: Math.round((raw.expense + Number.EPSILON) * 100) / 100,
+  }
+}
+
+export function calculate1DHourlyFlow(
+  normalizedTransactions,
+  todayKey,
+  activeWalletIdSet,
+  walletCurrencyMap,
+  defaultCurrency = 'IDR',
+  rates = null,
+) {
+  const hourNet = Array.from({ length: 24 }, () => 0)
+  if (!Array.isArray(normalizedTransactions)) return hourNet
+
+  normalizedTransactions.forEach((tx) => {
+    if (tx?.isPendingReview === true || tx?.isPendingReview === 1) return
+    if (String(tx?.date || '') !== todayKey) return
+    const isAdj = tx.type === 'balance_adjustment'
+    const amount = tx.convertedAmount || 0
+    const isSrcActive = activeWalletIdSet ? activeWalletIdSet.has(String(tx?.walletId)) : true
+    const isTgtActive = tx?.targetWalletId && activeWalletIdSet ? activeWalletIdSet.has(String(tx.targetWalletId)) : false
+
+    let signed = 0
+    if (tx.type === 'transfer') {
+      if (isSrcActive && !isTgtActive) signed = -amount
+      else if (!isSrcActive && isTgtActive) {
+        const tgtCurrency =
+          tx.targetCurrency || (tx.targetWalletId != null && walletCurrencyMap ? walletCurrencyMap.get(String(tx.targetWalletId)) : null) || defaultCurrency
+        signed =
+          tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
+            ? convertCurrency(toSafeNumber(tx.targetAmount), tgtCurrency, defaultCurrency, rates)
+            : amount
+      }
+    } else if (isSrcActive) {
+      if (tx.type === 'income' || isAdj) signed = amount
+      else if (tx.type === 'expense') signed = -amount
+    }
+
+    if (signed === 0) return
+
+    const fallbackMs = Number(new Date(`${todayKey}T12:00:00`).getTime())
+    const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
+    const hour = new Date(txMs).getHours()
+    if (hour >= 0 && hour <= 23) hourNet[hour] += signed
+  })
+
+  return hourNet
 }
 
 export function useDashboardData() {
@@ -276,16 +327,30 @@ export function useDashboardData() {
     return new Set(walletsWithBalance.filter((w) => !w.isArchived).map((w) => String(w.id)))
   }, [walletsWithBalance])
 
+  const walletCurrencyMap = useMemo(() => {
+    const map = new Map()
+    if (Array.isArray(walletsWithBalance)) {
+      for (const w of walletsWithBalance) {
+        if (w?.id != null) map.set(String(w.id), w.currency || defaultCurrency)
+      }
+    }
+    return map
+  }, [walletsWithBalance, defaultCurrency])
+
   const normalizedTransactions = useMemo(() => {
     if (!transactions) return []
     return transactions.map((tx) => {
-      const amount = convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+      const walletCurrency = (tx.walletId != null ? walletCurrencyMap.get(String(tx.walletId)) : null) || defaultCurrency
+      const txCurrency = tx.currency || walletCurrency
+      const amount = convertCurrency(toSafeNumber(tx.amount), txCurrency, defaultCurrency, rates)
       return {
         ...tx,
+        currency: txCurrency,
+        walletCurrency,
         convertedAmount: amount,
       }
     })
-  }, [transactions, defaultCurrency, rates])
+  }, [transactions, walletCurrencyMap, defaultCurrency, rates])
 
   const monthStats = useMemo(() => {
     if (transactions === null || investments === null) {
@@ -309,18 +374,19 @@ export function useDashboardData() {
     const thisMonth = calculatePeriodStats(safeTx, currentPeriod, defaultCurrency, rates)
     const lastMonth = calculatePeriodStats(safeTx, lastPeriod, defaultCurrency, rates)
 
-    const monthDelta = thisMonth.income - thisMonth.expense
+    const rawMonthDelta = thisMonth.income - thisMonth.expense
+    const monthDelta = Math.round((rawMonthDelta + Number.EPSILON) * 100) / 100
     return {
       monthIncome: thisMonth.income,
       monthExpense: thisMonth.expense,
       monthDelta,
       monthDeltaTone: monthDelta >= 0 ? 'success' : 'danger',
-      monthDeltaPct: thisMonth.income > 0 ? (monthDelta / thisMonth.income) * 100 : 0,
+      monthDeltaPct: thisMonth.income > 0 ? Math.round(((monthDelta / thisMonth.income) * 100 + Number.EPSILON) * 100) / 100 : 0,
       incomeDeltaPct: lastMonth.income > 0
-        ? ((thisMonth.income - lastMonth.income) / lastMonth.income) * 100
+        ? Math.round((((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 + Number.EPSILON) * 100) / 100
         : thisMonth.income > 0 ? 100 : 0,
       expenseDeltaPct: lastMonth.expense > 0
-        ? ((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100
+        ? Math.round((((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 + Number.EPSILON) * 100) / 100
         : thisMonth.expense > 0 ? 100 : 0,
     }
   }, [transactions, investments, currentMonthKey, budgetCycleStartDay, locale, currentPeriod, normalizedTransactions, defaultCurrency, rates])
@@ -358,9 +424,16 @@ export function useDashboardData() {
         if (tx?.date !== todayKey) return acc
         if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
           tx.splitItems.forEach((si) => {
-            const itemTx = { ...tx, ...si, category: si.category || tx.category }
+            const itemTx = {
+              ...tx,
+              ...si,
+              category: si.category || tx.category,
+              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            }
             if (isExcludeAnalyticsTx(itemTx)) return
-            const amount = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+            const amount = convertCurrency(toSafeNumber(si.amount), si.currency || tx.currency || defaultCurrency, defaultCurrency, rates)
             const itemType = si.type || tx.type
             if (itemType === 'income') acc.income += amount
             if (itemType === 'expense') acc.expense += amount
@@ -434,6 +507,7 @@ export function useDashboardData() {
     const { arr: dataAll, map: mapAll } = generateMonthly(totalMonths)
 
     safeTx.forEach((tx) => {
+      if (tx?.isPendingReview === true || tx?.isPendingReview === 1) return
       const isAdj = tx.type === 'balance_adjustment'
       const amount = tx.convertedAmount || 0
       const txDate = tx?.date
@@ -446,9 +520,11 @@ export function useDashboardData() {
       if (tx.type === 'transfer') {
         if (isSrcActive && !isTgtActive) cashChange = -amount
         else if (!isSrcActive && isTgtActive) {
+          const tgtCurrency =
+            tx.targetCurrency || (tx.targetWalletId != null ? walletCurrencyMap.get(String(tx.targetWalletId)) : null) || defaultCurrency
           cashChange =
             tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
-              ? convertCurrency(toSafeNumber(tx.targetAmount), tx.targetCurrency || defaultCurrency, defaultCurrency, rates)
+              ? convertCurrency(toSafeNumber(tx.targetAmount), tgtCurrency, defaultCurrency, rates)
               : amount
         }
       } else if (isSrcActive) {
@@ -466,9 +542,16 @@ export function useDashboardData() {
         } else if (isSrcActive) {
           if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
             tx.splitItems.forEach((si) => {
-              const itemTx = { ...tx, ...si, category: si.category || tx.category }
+              const itemTx = {
+                ...tx,
+                ...si,
+                category: si.category || tx.category,
+                isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+                isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+                excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+              }
               if (isExcludeAnalyticsTx(itemTx)) return
-              const itemAmt = convertCurrency(toSafeNumber(si.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
+              const itemAmt = convertCurrency(toSafeNumber(si.amount), si.currency || tx.currency || defaultCurrency, defaultCurrency, rates)
               const itemType = si.type || tx.type
               row[itemType] = (row[itemType] || 0) + itemAmt
             })
@@ -507,7 +590,7 @@ export function useDashboardData() {
       data1y,
       dataAll,
     }
-  }, [transactions, normalizedTransactions, activeWalletIdSet, defaultCurrency, rates])
+  }, [transactions, normalizedTransactions, activeWalletIdSet, defaultCurrency, rates, walletCurrencyMap])
 
   const { data1w, data1m, data3m, dataYtd, data1y, dataAll } = chartData
 
@@ -629,7 +712,7 @@ export function useDashboardData() {
     const safeGoals = goals ?? []
 
     const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
-    const periodExpenseTxs = (transactions || []).filter(
+    const periodExpenseTxs = (normalizedTransactions || []).filter(
       (tx) =>
         tx?.date &&
         tx.date >= budgetPeriod.startDate &&
@@ -640,7 +723,8 @@ export function useDashboardData() {
     const budgetRows = safeBudgets
       .filter((b) => b.month === currentMonthKey)
       .map((b) => {
-        const spent = calculateBudgetSpent(b.category, periodExpenseTxs, defaultCurrency, rates)
+        const budgetCurrency = b.currency || defaultCurrency
+        const spent = calculateBudgetSpent(b.category, periodExpenseTxs, budgetCurrency, rates)
         const limit = toSafeNumber(b.limit)
         const pct = limit > 0 ? (spent / limit) * 100 : 0
         const remaining = Math.max(0, limit - spent)
@@ -671,7 +755,7 @@ export function useDashboardData() {
       budgetRows,
       goalRows,
     }
-  }, [budgets, goals, currentMonthKey, budgetCycleStartDay, locale, transactions, defaultCurrency, rates])
+  }, [budgets, goals, currentMonthKey, budgetCycleStartDay, locale, normalizedTransactions, defaultCurrency, rates])
 
   const computeCashBalanceBeforeDate = useCallback(
     (dateKey) => {
@@ -680,6 +764,7 @@ export function useDashboardData() {
       if (!target) return totalWalletBalance || 0
 
       const netFlowSinceTarget = safeTx.reduce((acc, tx) => {
+        if (tx?.isPendingReview === true || tx?.isPendingReview === 1) return acc
         const d = String(tx?.date || '')
         if (!d || d < target) return acc
         const isSrcActive = activeWalletIdSet.has(String(tx?.walletId))
@@ -690,9 +775,11 @@ export function useDashboardData() {
             return acc - (tx.convertedAmount || 0)
           }
           if (!isSrcActive && isTgtActive) {
+            const tgtCurrency =
+              tx.targetCurrency || (tx.targetWalletId != null ? walletCurrencyMap.get(String(tx.targetWalletId)) : null) || defaultCurrency
             const tgtAmt =
               tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
-                ? convertCurrency(toSafeNumber(tx.targetAmount), tx.targetCurrency || defaultCurrency, defaultCurrency, rates)
+                ? convertCurrency(toSafeNumber(tx.targetAmount), tgtCurrency, defaultCurrency, rates)
                 : (tx.convertedAmount || 0)
             return acc + tgtAmt
           }
@@ -710,7 +797,7 @@ export function useDashboardData() {
 
       return (totalWalletBalance || 0) - netFlowSinceTarget
     },
-    [normalizedTransactions, totalWalletBalance, activeWalletIdSet, defaultCurrency, rates],
+    [normalizedTransactions, totalWalletBalance, activeWalletIdSet, walletCurrencyMap, defaultCurrency, rates],
   )
 
   const buildRevenueSeries = useCallback(
@@ -718,25 +805,14 @@ export function useDashboardData() {
       if (rangeId === '1d') {
         const todayKey = format(new Date(), 'yyyy-MM-dd')
         const startBalance = computeCashBalanceBeforeDate(todayKey) + portfolioValue + netLoanPosition + totalSavings
-        const hourNet = Array.from({ length: 24 }, () => 0)
-        normalizedTransactions.forEach((tx) => {
-          if (String(tx?.date || '') !== todayKey) return
-          if (tx.type === 'transfer') return
-          const isAdj = tx.type === 'balance_adjustment'
-          const amount = tx.convertedAmount || 0
-          const signed =
-            tx.type === 'income'
-              ? amount
-              : tx.type === 'expense'
-                ? -amount
-                : isAdj
-                  ? amount
-                  : 0
-          const fallbackMs = Number(new Date(`${todayKey}T12:00:00`).getTime())
-          const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
-          const hour = new Date(txMs).getHours()
-          if (hour >= 0 && hour <= 23) hourNet[hour] += signed
-        })
+        const hourNet = calculate1DHourlyFlow(
+          normalizedTransactions,
+          todayKey,
+          activeWalletIdSet,
+          walletCurrencyMap,
+          defaultCurrency,
+          rates,
+        )
 
         const startOfToday = new Date(`${todayKey}T00:00:00`).getTime()
         const currentHour = new Date().getHours()
@@ -777,7 +853,23 @@ export function useDashboardData() {
         return { time: timeMs, value: running }
       })
     },
-    [computeCashBalanceBeforeDate, data1w, data1m, data3m, dataYtd, data1y, dataAll, portfolioValue, netLoanPosition, totalSavings, normalizedTransactions],
+    [
+      computeCashBalanceBeforeDate,
+      data1w,
+      data1m,
+      data3m,
+      dataYtd,
+      data1y,
+      dataAll,
+      portfolioValue,
+      netLoanPosition,
+      totalSavings,
+      normalizedTransactions,
+      activeWalletIdSet,
+      walletCurrencyMap,
+      defaultCurrency,
+      rates,
+    ],
   )
 
   const computeRevenueValue = useCallback(() => {
@@ -1014,7 +1106,7 @@ export function useDashboardData() {
         const totalMonths = currentSeries.length || 12
         const today = new Date()
         const prevMonths = Array.from({ length: totalMonths }, (_, idx) => {
-          const d = subMonths(today, totalMonths * 2 - 1 - idx)
+          const d = subMonths(startOfMonth(today), totalMonths * 2 - 1 - idx)
           return format(d, 'yyyy-MM')
         })
 

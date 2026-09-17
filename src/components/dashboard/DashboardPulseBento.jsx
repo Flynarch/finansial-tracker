@@ -1,12 +1,13 @@
 import { memo } from 'react'
 import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
-import { formatCompactCurrency } from '../../lib/utils'
+import { formatCompactCurrency, convertCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
   isDbLoading = false,
   budgetGoalSummary,
   defaultCurrency = 'IDR',
+  rates = null,
   locale = 'id',
   onOpenBudgetDetail,
   onOpenSavingsDetail,
@@ -50,8 +51,14 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
 
   // 1. Budget Stats
   const budgetRows = budgetGoalSummary?.budgetRows || []
-  const totalBudgetSpent = budgetRows.reduce((sum, r) => sum + (r.spent || 0), 0)
-  const totalBudgetLimit = budgetRows.reduce((sum, r) => sum + (r.limit || 0), 0)
+  const totalBudgetSpent = budgetRows.reduce(
+    (sum, r) => sum + convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+    0
+  )
+  const totalBudgetLimit = budgetRows.reduce(
+    (sum, r) => sum + convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+    0
+  )
   const budgetPct = totalBudgetLimit > 0 ? Math.min(100, Math.round((totalBudgetSpent / totalBudgetLimit) * 100)) : 0
   const budgetWarnings = budgetRows.filter((r) => r.pct >= 80)
   const isOverBudget = totalBudgetSpent > totalBudgetLimit && totalBudgetLimit > 0
@@ -59,8 +66,14 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
 
   // 2. Goals Stats
   const goalRows = budgetGoalSummary?.goalRows || []
-  const totalGoalCurrent = goalRows.reduce((sum, r) => sum + (r.current || 0), 0)
-  const totalGoalTarget = goalRows.reduce((sum, r) => sum + (r.target || 0), 0)
+  const totalGoalCurrent = goalRows.reduce(
+    (sum, r) => sum + convertCurrency(r.current || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+    0
+  )
+  const totalGoalTarget = goalRows.reduce(
+    (sum, r) => sum + convertCurrency(r.target || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+    0
+  )
   const goalPct = totalGoalTarget > 0 ? Math.min(100, Math.round((totalGoalCurrent / totalGoalTarget) * 100)) : 0
   const hasGoals = goalRows.length > 0
 

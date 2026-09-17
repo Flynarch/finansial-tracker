@@ -101,7 +101,16 @@ export function formatMoneyInput(value, currency = 'IDR') {
     return formatGroupedIntegerInput(raw)
   }
 
-  const sanitized = raw.replace(/[^\d,]/g, '')
+  // Support both '.' and ',' as decimal separators on foreign currencies
+  let normalizedRaw = raw
+  if (raw.includes('.') && !raw.includes(',')) {
+    const lastDotIdx = raw.lastIndexOf('.')
+    const intPart = raw.slice(0, lastDotIdx).replace(/\./g, '')
+    const decPart = raw.slice(lastDotIdx + 1)
+    normalizedRaw = `${intPart},${decPart}`
+  }
+
+  const sanitized = normalizedRaw.replace(/[^\d,]/g, '')
   const hasComma = sanitized.includes(',')
   const [rawInt = '', ...rawRest] = sanitized.split(',')
   const intDigits = rawInt.replace(/[^\d]/g, '').slice(0, 15)
@@ -123,8 +132,23 @@ export function parseMoneyInput(value, currency = 'IDR') {
     return isNegative ? -num : num
   }
 
-  const normalized = raw.replace(/\./g, '').replace(',', '.')
-  return toSafeNumber(normalized)
+  // Foreign currency: support both '1.234,50' (id-ID) and '1,234.50' (en-US) or '10.50' / '10,50'
+  const clean = raw.replace(/[^\d.,]/g, '')
+  let normalized = clean
+  if (clean.includes(',') && clean.includes('.')) {
+    if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+      normalized = clean.replace(/\./g, '').replace(',', '.')
+    } else {
+      normalized = clean.replace(/,/g, '')
+    }
+  } else if (clean.includes(',')) {
+    normalized = clean.replace(',', '.')
+  } else if (clean.includes('.')) {
+    normalized = clean
+  }
+
+  const num = toSafeNumber(normalized)
+  return isNegative ? -num : num
 }
 
 export function formatMoneyValueForInput(value, currency = 'IDR') {
@@ -173,9 +197,13 @@ export function convertCurrency(amount, fromCurrency = 'IDR', toCurrency = 'IDR'
   return amountInUsd * toRate
 }
 
-function escapeCsvValue(value) {
-  const text = String(value ?? '')
-  if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+export function escapeCsvValue(value) {
+  if (value === null || value === undefined) return ''
+  let text = String(value)
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`
+  }
+  if (text.includes('"') || text.includes(',') || text.includes('\n') || text.includes('\r') || text.startsWith("'")) {
     return `"${text.replaceAll('"', '""')}"`
   }
   return text
@@ -183,25 +211,57 @@ function escapeCsvValue(value) {
 
 export function toTransactionsCsv(rows) {
   const header = ['id', 'date', 'type', 'category', 'amount', 'currency', 'notes', 'walletId', 'walletName', 'targetWalletId', 'loanId', 'isExcludeFromAnalytics', 'tags']
-  const body = rows.map((row) =>
-    [
-      row.id,
-      row.date,
-      row.type,
-      row.category,
-      row.amount,
-      row.currency,
-      row.notes,
-      row.walletId ?? '',
-      row.walletName ?? '',
-      row.targetWalletId ?? '',
-      row.loanId ?? '',
-      row.isExcludeFromAnalytics ? '1' : '0',
-      Array.isArray(row.tags) ? row.tags.join(';') : '',
-    ]
-      .map(escapeCsvValue)
-      .join(','),
-  )
+  const body = []
+
+  rows.forEach((row) => {
+    if (row.isSplit && Array.isArray(row.splitItems) && row.splitItems.length > 0) {
+      row.splitItems.forEach((item, idx) => {
+        const itemType = item.type || row.type
+        const itemNote = item.notes || row.notes || ''
+        const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}` : `[Split ${idx + 1}]`
+        body.push(
+          [
+            `${row.id}-${idx + 1}`,
+            row.date,
+            itemType,
+            item.category || row.category,
+            item.amount,
+            item.currency || row.currency,
+            splitNote,
+            row.walletId ?? '',
+            row.walletName ?? '',
+            row.targetWalletId ?? '',
+            row.loanId ?? '',
+            item.isExcludeAnalyticsTx || row.isExcludeFromAnalytics ? '1' : '0',
+            Array.isArray(row.tags) ? row.tags.join(';') : '',
+          ]
+            .map(escapeCsvValue)
+            .join(',')
+        )
+      })
+    } else {
+      body.push(
+        [
+          row.id,
+          row.date,
+          row.type,
+          row.category,
+          row.amount,
+          row.currency,
+          row.notes,
+          row.walletId ?? '',
+          row.walletName ?? '',
+          row.targetWalletId ?? '',
+          row.loanId ?? '',
+          row.isExcludeFromAnalytics ? '1' : '0',
+          Array.isArray(row.tags) ? row.tags.join(';') : '',
+        ]
+          .map(escapeCsvValue)
+          .join(',')
+      )
+    }
+  })
+
   return [header.join(','), ...body].join('\n')
 }
 

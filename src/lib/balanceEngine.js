@@ -7,6 +7,12 @@ import { scheduleNativeWidgetSync } from './nativeWidgetSync'
 const memoryBalanceCache = new Map()
 
 /**
+ * Set of wallet IDs currently undergoing invalidation.
+ * Queries for wallets in this set must bypass the cache and compute fresh from transactions.
+ */
+const pendingInvalidations = new Set()
+
+/**
  * Gets the current dynamic balance of a single wallet, using cache when available.
  *
  * @param {number|string} walletId - ID of the wallet
@@ -17,23 +23,25 @@ export async function getWalletBalance(walletId, rates = null) {
   const cleanId = Number(walletId)
   if (!cleanId) return 0
 
-  // 1. Check in-memory cache
-  if (memoryBalanceCache.has(cleanId)) {
-    return memoryBalanceCache.get(cleanId)
-  }
-
-  // 2. Check IndexedDB cache table
-  try {
-    const cachedRow = await db.walletBalanceCache?.get(cleanId)
-    if (cachedRow && Number.isFinite(cachedRow.balance)) {
-      memoryBalanceCache.set(cleanId, cachedRow.balance)
-      return cachedRow.balance
+  if (!pendingInvalidations.has(cleanId)) {
+    // 1. Check in-memory cache
+    if (memoryBalanceCache.has(cleanId)) {
+      return memoryBalanceCache.get(cleanId)
     }
-  } catch {
-    // Cache table might not exist yet or query failed
+
+    // 2. Check IndexedDB cache table
+    try {
+      const cachedRow = await db.walletBalanceCache?.get(cleanId)
+      if (cachedRow && Number.isFinite(cachedRow.balance)) {
+        memoryBalanceCache.set(cleanId, cachedRow.balance)
+        return cachedRow.balance
+      }
+    } catch {
+      // Cache table might not exist yet or query failed
+    }
   }
 
-  // 3. Cache miss: recompute from source transactions
+  // 3. Cache miss or pending invalidation: recompute from source transactions
   return await recomputeAndCacheWalletBalance(cleanId, rates)
 }
 
@@ -103,6 +111,7 @@ export async function invalidateWalletBalance(walletIds) {
     const cleanId = Number(rawId)
     if (!cleanId) continue
 
+    pendingInvalidations.add(cleanId)
     memoryBalanceCache.delete(cleanId)
     try {
       if (db.walletBalanceCache) {
@@ -110,6 +119,8 @@ export async function invalidateWalletBalance(walletIds) {
       }
     } catch {
       // Ignore
+    } finally {
+      pendingInvalidations.delete(cleanId)
     }
   }
   scheduleNativeWidgetSync()
@@ -146,7 +157,7 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
   // 1. Check in-memory cache
   for (const w of wallets) {
     const cleanId = Number(w.id)
-    if (cleanId && memoryBalanceCache.has(cleanId)) {
+    if (cleanId && !pendingInvalidations.has(cleanId) && memoryBalanceCache.has(cleanId)) {
       results.set(cleanId, memoryBalanceCache.get(cleanId))
     } else {
       uncachedWallets.push(w)
@@ -159,6 +170,10 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
     await Promise.all(
       uncachedWallets.map(async (w) => {
         const cleanId = Number(w.id)
+        if (pendingInvalidations.has(cleanId)) {
+          stillUncached.push(w)
+          return
+        }
         try {
           const cachedRow = await db.walletBalanceCache.get(cleanId)
           if (cachedRow && Number.isFinite(cachedRow.balance)) {
@@ -177,13 +192,14 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
   }
 
   // 3. Batch recompute for remaining uncached wallets
+  const allWalletsInDb = await db.wallets.toArray()
   if (uncachedWallets.length === 1) {
     const w = uncachedWallets[0]
-    const bal = await recomputeAndCacheWalletBalance(w.id, rates, wallets)
+    const bal = await recomputeAndCacheWalletBalance(w.id, rates, allWalletsInDb)
     results.set(Number(w.id), bal)
   } else if (uncachedWallets.length > 1) {
     const allTxs = await db.transactions.toArray()
-    const computedWallets = computeAllWalletBalances(wallets, allTxs, rates)
+    const computedWallets = computeAllWalletBalances(wallets, allTxs, rates, allWalletsInDb)
     const cacheRows = []
 
     for (const cw of computedWallets) {

@@ -11,7 +11,7 @@ import { useTransactionFilters } from '../hooks/useTransactionFilters'
 import useSettingsStore from '../store/useSettingsStore'
 import useTransactionStore from '../store/useTransactionStore'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import { MoreVertical } from 'lucide-react'
+import { Filter, MoreVertical, Search } from 'lucide-react'
 import {
   getCategoryColorClass,
   getTransactionCategoryLabels,
@@ -19,13 +19,14 @@ import {
 } from '../lib/categoryIcon'
 import {
   convertCurrency,
-  downloadTextFile,
   FALLBACK_EXCHANGE_RATES,
   formatCurrency,
   formatMoneyValueForInput,
+  isExcludeAnalyticsTx,
   parseMoneyInput,
-  toTransactionsCsv,
+  toSafeNumber,
 } from '../lib/utils'
+import { exportTransactionsToCsv } from '../lib/exportReports'
 
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import PageHeader from '../components/ui/PageHeader'
@@ -273,14 +274,39 @@ function Transactions() {
       let totalExpense = 0
 
       for (const item of items) {
-        const convertedAmount = convertCurrency(
-          item.amount,
-          item.currency || defaultCurrency,
-          defaultCurrency,
-          rates
-        )
-        if (item.type === 'income') totalIncome += convertedAmount
-        else if (item.type === 'expense') totalExpense += convertedAmount
+        if (item.isSplit && Array.isArray(item.splitItems) && item.splitItems.length > 0) {
+          for (const si of item.splitItems) {
+            const splitTxItem = {
+              ...item,
+              ...si,
+              amount: toSafeNumber(si.amount),
+              type: si.type || item.type,
+              category: si.category || item.category,
+              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+            }
+            if (isExcludeAnalyticsTx(splitTxItem)) continue
+            const convertedAmount = convertCurrency(
+              splitTxItem.amount,
+              splitTxItem.currency || item.currency || defaultCurrency,
+              defaultCurrency,
+              rates
+            )
+            if (splitTxItem.type === 'income') totalIncome += convertedAmount
+            else if (splitTxItem.type === 'expense') totalExpense += convertedAmount
+          }
+        } else {
+          if (isExcludeAnalyticsTx(item)) continue
+          const convertedAmount = convertCurrency(
+            toSafeNumber(item.amount),
+            item.currency || defaultCurrency,
+            defaultCurrency,
+            rates
+          )
+          if (item.type === 'income') totalIncome += convertedAmount
+          else if (item.type === 'expense') totalExpense += convertedAmount
+        }
       }
 
       const net = totalIncome - totalExpense
@@ -405,6 +431,8 @@ function Transactions() {
       targetWalletId: transaction.targetWalletId || '',
       receiptImage: receipt,
       receipt: receipt,
+      isSplit: Boolean(transaction.isSplit),
+      splitItems: Array.isArray(transaction.splitItems) ? JSON.parse(JSON.stringify(transaction.splitItems)) : [],
     })
   }, [allWallets, defaultCurrency])
 
@@ -417,6 +445,8 @@ function Transactions() {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
         receiptImage: editFormData.receiptImage || null,
+        isSplit: Boolean(editFormData.isSplit),
+        splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
       })
       setEditingTransaction(null)
     } catch {
@@ -447,10 +477,9 @@ function Transactions() {
     [addTransaction, t]
   )
 
-  const handleExportCsv = () => {
-    const csvContent = toTransactionsCsv(filteredTransactions)
-    const filename = `transactions-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`
-    downloadTextFile(filename, csvContent, 'text/csv;charset=utf-8;')
+  const handleExportCsv = async () => {
+    setIsMenuOpen(false)
+    await exportTransactionsToCsv(filteredTransactions, allWallets, defaultCurrency, locale)
   }
 
   return (
@@ -481,10 +510,7 @@ function Transactions() {
                 aria-label={t('tx.search.placeholder') || 'Cari'}
                 title={t('tx.search.placeholder', 'Cari Transaksi')}
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
-                  <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
-                </svg>
+                <Search className="h-4 w-4" />
               </button>
 
               {/* Filter Modal Trigger Button */}
@@ -502,11 +528,7 @@ function Transactions() {
                 aria-label={t('tx.filter.open')}
                 title={t('tx.filter.open', 'Filter Lengkap')}
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 6h16" strokeLinecap="round" />
-                  <path d="M7 12h10" strokeLinecap="round" />
-                  <path d="M10 18h4" strokeLinecap="round" />
-                </svg>
+                <Filter className="h-4 w-4" />
                 {activeFilterCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]" />
                 )}

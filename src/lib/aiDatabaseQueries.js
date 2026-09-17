@@ -1,8 +1,13 @@
 import { db } from './db'
+import { isExcludeAnalyticsTx, convertCurrency, formatCurrency, FALLBACK_EXCHANGE_RATES } from './utils'
+import { getCachedCurrencyRates } from './api'
+import useSettingsStore from '../store/useSettingsStore'
+import { subMonths, format } from 'date-fns'
+import { getCurrentBudgetMonthKey, getBudgetPeriodDateRange } from './budgetUtils'
 
 /**
  * Executes a query against the local Dexie DB on behalf of the AI.
- * Returns summarized data to prevent prompt context limits.
+ * Unpacks split transactions, excludes non-analytics items, and normalizes multi-currency amounts.
  * 
  * @param {object} params
  * @param {string} [params.startDate] YYYY-MM-DD
@@ -11,66 +16,96 @@ import { db } from './db'
  * @param {string} [params.category]
  */
 export async function queryTransactions({ startDate, endDate, type, category }) {
-  let txs = await db.transactions.toArray()
+  const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
+  const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+
+  let rawTxs = await db.transactions.toArray()
 
   if (startDate) {
-    txs = txs.filter(tx => tx.date && tx.date >= startDate)
+    rawTxs = rawTxs.filter((tx) => tx.date && tx.date >= startDate)
   }
   if (endDate) {
-    txs = txs.filter(tx => tx.date && tx.date <= endDate)
+    rawTxs = rawTxs.filter((tx) => tx.date && tx.date <= endDate)
   }
 
   // Sort chronologically ascending
-  txs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+  rawTxs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+
+  // Unpack split transactions and filter out analytics exclusions
+  const flattenedTxs = []
+  rawTxs.forEach((tx) => {
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      tx.splitItems.forEach((si) => {
+        const itemTx = {
+          ...tx,
+          ...si,
+          category: si.category || tx.category,
+          amount: si.amount,
+          type: si.type || tx.type,
+          currency: si.currency || tx.currency || defaultCurrency,
+          isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+          isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+        }
+        if (!isExcludeAnalyticsTx(itemTx)) {
+          flattenedTxs.push(itemTx)
+        }
+      })
+    } else {
+      if (!isExcludeAnalyticsTx(tx)) {
+        flattenedTxs.push(tx)
+      }
+    }
+  })
+
+  let filteredTxs = flattenedTxs
 
   if (type) {
-    txs = txs.filter(tx => tx.type === type)
+    filteredTxs = filteredTxs.filter((tx) => tx.type === type)
   }
 
   if (category) {
     const catLower = category.toLowerCase()
-    txs = txs.filter(tx => tx.category && tx.category.toLowerCase().includes(catLower))
+    filteredTxs = filteredTxs.filter((tx) => tx.category && tx.category.toLowerCase().includes(catLower))
   }
 
-  // Calculate summaries
+  // Calculate summaries with currency normalization
   let totalIncome = 0
   let totalExpense = 0
-  
-  txs.forEach(tx => {
-    const amt = Number(tx.amount) || 0
-    if (tx.type === 'income') totalIncome += amt
-    if (tx.type === 'expense') totalExpense += amt
-  })
-
-  // Group by category
   const expenseByCategory = {}
   const incomeByCategory = {}
-  txs.forEach(tx => {
-    const amt = Number(tx.amount) || 0
-    if (tx.type === 'expense') {
-      expenseByCategory[tx.category] = (expenseByCategory[tx.category] || 0) + amt
-    } else if (tx.type === 'income') {
+
+  filteredTxs.forEach((tx) => {
+    const rawAmt = Number(tx.amount) || 0
+    const amt = convertCurrency(rawAmt, tx.currency || defaultCurrency, defaultCurrency, activeRates)
+    if (tx.type === 'income') {
+      totalIncome += amt
       incomeByCategory[tx.category] = (incomeByCategory[tx.category] || 0) + amt
+    } else if (tx.type === 'expense') {
+      totalExpense += amt
+      expenseByCategory[tx.category] = (expenseByCategory[tx.category] || 0) + amt
     }
   })
 
   // Return a structured summary to the AI
   return {
     queryParameters: { startDate, endDate, type, category },
-    totalTransactionsFound: txs.length,
+    totalTransactionsFound: filteredTxs.length,
+    currency: defaultCurrency,
     totalIncome,
     totalExpense,
     netBalance: totalIncome - totalExpense,
     expenseByCategory,
     incomeByCategory,
-    // Only return the 10 most recent transactions to avoid exceeding AI context window
-    recentSampleTransactions: txs.slice(-10).map(tx => ({
+    // Only return the 10 most recent sample transactions to avoid exceeding AI context window
+    recentSampleTransactions: filteredTxs.slice(-10).map((tx) => ({
       date: tx.date,
       type: tx.type,
       category: tx.category,
       amount: tx.amount,
-      notes: tx.notes
-    }))
+      currency: tx.currency || defaultCurrency,
+      notes: tx.notes,
+    })),
   }
 }
 
@@ -81,99 +116,148 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
 export async function getMonthSummaryForPrompt() {
   try {
     const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() // 0-indexed
-    
-    const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`
-    
-    // Calculate previous month prefix
-    const prevDate = new Date(currentYear, currentMonth - 1, 1)
-    const prevMonthPrefix = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-    
+    const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
+    const budgetCycleStartDay = useSettingsStore.getState().budgetCycleStartDay || 1
+    const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+
+    const currentMonthKey = getCurrentBudgetMonthKey(now, budgetCycleStartDay)
+    const currentPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay)
+
+    const [cYear, cMonth] = currentMonthKey.split('-').map(Number)
+    const currentMonthDate = new Date(cYear, cMonth - 1, 1)
+    const prevMonthKey = format(subMonths(currentMonthDate, 1), 'yyyy-MM')
+    const prevPeriod = getBudgetPeriodDateRange(prevMonthKey, budgetCycleStartDay)
+
     const allTxs = await db.transactions.toArray()
-    
+
+    const currentMonthTxs = []
+    const prevMonthTxs = []
+
+    allTxs.forEach((tx) => {
+      const txDate = (tx.date || '').slice(0, 10)
+      const isCurrent = txDate >= currentPeriod.startDate && txDate <= currentPeriod.endDate
+      const isPrev = txDate >= prevPeriod.startDate && txDate <= prevPeriod.endDate
+      if (!isCurrent && !isPrev) return
+
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+          const itemTx = {
+            ...tx,
+            ...si,
+            category: si.category || tx.category,
+            amount: si.amount,
+            type: si.type || tx.type,
+            currency: si.currency || tx.currency || defaultCurrency,
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+          }
+          if (isExcludeAnalyticsTx(itemTx)) return
+          if (isCurrent) currentMonthTxs.push(itemTx)
+          if (isPrev) prevMonthTxs.push(itemTx)
+        })
+      } else {
+        if (isExcludeAnalyticsTx(tx)) return
+        if (isCurrent) currentMonthTxs.push(tx)
+        if (isPrev) prevMonthTxs.push(tx)
+      }
+    })
+
     // Current month metrics
-    const currentMonthTxs = allTxs.filter(t => t.date && t.date.startsWith(currentMonthPrefix))
     let currentIncome = 0
     let currentExpense = 0
     const currentCatMap = {}
-    
-    currentMonthTxs.forEach(t => {
-      const amt = Number(t.amount) || 0
+
+    currentMonthTxs.forEach((t) => {
+      const rawAmt = Number(t.amount) || 0
+      const amt = convertCurrency(rawAmt, t.currency || defaultCurrency, defaultCurrency, activeRates)
       if (t.type === 'income') currentIncome += amt
       if (t.type === 'expense') {
         currentExpense += amt
         currentCatMap[t.category] = (currentCatMap[t.category] || 0) + amt
       }
     })
-    
+
     const currentTopCats = Object.entries(currentCatMap)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([cat, val]) => `${cat}: Rp ${val.toLocaleString('id-ID')}`)
+      .map(([cat, val]) => `${cat}: ${formatCurrency(val, defaultCurrency)}`)
       .join(', ')
 
     // Previous month metrics
-    const prevMonthTxs = allTxs.filter(t => t.date && t.date.startsWith(prevMonthPrefix))
     let prevIncome = 0
     let prevExpense = 0
     const prevCatMap = {}
-    
-    prevMonthTxs.forEach(t => {
-      const amt = Number(t.amount) || 0
+
+    prevMonthTxs.forEach((t) => {
+      const rawAmt = Number(t.amount) || 0
+      const amt = convertCurrency(rawAmt, t.currency || defaultCurrency, defaultCurrency, activeRates)
       if (t.type === 'income') prevIncome += amt
       if (t.type === 'expense') {
         prevExpense += amt
         prevCatMap[t.category] = (prevCatMap[t.category] || 0) + amt
       }
     })
-    
+
     const prevTopCats = Object.entries(prevCatMap)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([cat, val]) => `${cat}: Rp ${val.toLocaleString('id-ID')}`)
+      .map(([cat, val]) => `${cat}: ${formatCurrency(val, defaultCurrency)}`)
       .join(', ')
 
     // Comparisons
     const expenseDiff = currentExpense - prevExpense
     const expensePct = prevExpense > 0 ? Math.round((expenseDiff / prevExpense) * 100) : null
     const expenseDiffStr = expensePct !== null
-      ? `${expenseDiff >= 0 ? '+' : ''}Rp ${expenseDiff.toLocaleString('id-ID')} (${expenseDiff >= 0 ? '+' : ''}${expensePct}%)`
+      ? `${expenseDiff >= 0 ? '+' : ''}${formatCurrency(expenseDiff, defaultCurrency)} (${expenseDiff >= 0 ? '+' : ''}${expensePct}%)`
       : 'Bulan lalu belum ada data'
 
     // Loans / Debts
     const loans = await db.loans.toArray().catch(() => [])
-    const activeDebts = loans.filter(l => l.type === 'debt' && l.status !== 'paid')
-    const activeReceivables = loans.filter(l => l.type === 'receivable' && l.status !== 'paid')
-    const totalDebt = activeDebts.reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount ?? 0), 0)
-    const totalReceivable = activeReceivables.reduce((s, l) => s + (l.remainingAmount ?? l.totalAmount ?? 0), 0)
+    const activeDebts = loans.filter((l) => !l.isArchived && l.type === 'debt' && l.status !== 'paid' && l.status !== 'forgiven')
+    const activeReceivables = loans.filter((l) => !l.isArchived && l.type === 'receivable' && l.status !== 'paid' && l.status !== 'forgiven')
+    const totalDebt = activeDebts.reduce((s, l) => {
+      const raw = Number(l.remainingAmount ?? l.totalAmount ?? l.amount ?? 0)
+      return s + convertCurrency(raw, l.currency || defaultCurrency, defaultCurrency, activeRates)
+    }, 0)
+    const totalReceivable = activeReceivables.reduce((s, l) => {
+      const raw = Number(l.remainingAmount ?? l.totalAmount ?? l.amount ?? 0)
+      return s + convertCurrency(raw, l.currency || defaultCurrency, defaultCurrency, activeRates)
+    }, 0)
 
     // Goals / Savings
     const goals = await db.goals.toArray().catch(() => [])
-    const goalsSummary = goals.map(g => `${g.name}: Rp ${(g.currentAmount || 0).toLocaleString('id-ID')} / Rp ${(g.targetAmount || 0).toLocaleString('id-ID')}`).join('; ')
+    const goalsSummary = goals
+      .map((g) => {
+        const safeGoalName = String(g.name || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 40)
+        const cur = convertCurrency(Number(g.currentAmount || 0), g.currency || defaultCurrency, defaultCurrency, activeRates)
+        const tgt = convertCurrency(Number(g.targetAmount || 0), g.currency || defaultCurrency, defaultCurrency, activeRates)
+        return `${safeGoalName}: ${formatCurrency(cur, defaultCurrency)} / ${formatCurrency(tgt, defaultCurrency)}`
+      })
+      .join('; ')
 
     // Habits & Todos
     const habits = await db.habits.toArray().catch(() => [])
-    const activeTodos = await db.todos.where('completed').equals(0).toArray().catch(() => [])
+    const activeTodos = await db.todos.filter((t) => !t.completed).toArray().catch(() => [])
 
     return `
-1. BULAN INI (${currentMonthPrefix}):
-   - Pemasukan: Rp ${currentIncome.toLocaleString('id-ID')} (${currentMonthTxs.filter(t => t.type === 'income').length} transaksi)
-   - Pengeluaran: Rp ${currentExpense.toLocaleString('id-ID')} (${currentMonthTxs.filter(t => t.type === 'expense').length} transaksi)
-   - Selisih Bersih (Pemasukan - Pengeluaran): Rp ${(currentIncome - currentExpense).toLocaleString('id-ID')}
+1. BULAN INI (${currentPeriod.label || currentMonthKey}):
+   - Pemasukan: ${formatCurrency(currentIncome, defaultCurrency)} (${currentMonthTxs.filter((t) => t.type === 'income').length} transaksi)
+   - Pengeluaran: ${formatCurrency(currentExpense, defaultCurrency)} (${currentMonthTxs.filter((t) => t.type === 'expense').length} transaksi)
+   - Selisih Bersih (Pemasukan - Pengeluaran): ${formatCurrency(currentIncome - currentExpense, defaultCurrency)}
    - Kategori Terbesar Bulan Ini: ${currentTopCats || 'Belum ada'}
 
-2. BULAN LALU (${prevMonthPrefix}):
-   - Pemasukan: Rp ${prevIncome.toLocaleString('id-ID')}
-   - Pengeluaran: Rp ${prevExpense.toLocaleString('id-ID')}
+2. BULAN LALU (${prevPeriod.label || prevMonthKey}):
+   - Pemasukan: ${formatCurrency(prevIncome, defaultCurrency)}
+   - Pengeluaran: ${formatCurrency(prevExpense, defaultCurrency)}
    - Kategori Terbesar Bulan Lalu: ${prevTopCats || 'Belum ada'}
 
 3. PERBANDINGAN BULAN INI VS BULAN LALU:
    - Perubahan Pengeluaran: ${expenseDiffStr} ${expenseDiff > 0 ? '(Pengeluaran Naik/Boros)' : expenseDiff < 0 ? '(Pengeluaran Turun/Hemat)' : '(Stabil)'}
 
 4. UTANG & PIUTANG:
-   - Total Hutang Anda: Rp ${totalDebt.toLocaleString('id-ID')} (${activeDebts.length} item aktif)
-   - Total Piutang Anda: Rp ${totalReceivable.toLocaleString('id-ID')} (${activeReceivables.length} item aktif)
+   - Total Hutang Anda: ${formatCurrency(totalDebt, defaultCurrency)} (${activeDebts.length} item aktif)
+   - Total Piutang Anda: ${formatCurrency(totalReceivable, defaultCurrency)} (${activeReceivables.length} item aktif)
 
 5. TARGET TABUNGAN:
    - ${goalsSummary || 'Belum ada target tabungan.'}

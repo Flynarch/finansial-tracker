@@ -10,6 +10,7 @@ import {
   getMoneyInputCaret,
   parseMoneyInput,
   toSafeNumber,
+  convertCurrency,
 } from '../../lib/utils'
 import { formatExpenseCategory, getMergedExpenseTree, parseExpenseCategoryPath } from '../../lib/expenseCategories'
 import { getCategoryColorClass, resolveExpenseParentIconKey, resolveTransactionIconKey } from '../../lib/categoryIcon'
@@ -118,6 +119,7 @@ export default function BudgetSavingsDetailSheet({
   initialMode = 'budget',
   budgetGoalSummary,
   defaultCurrency = 'IDR',
+  rates = null,
   locale = 'id',
 }) {
   const { t } = useTranslation()
@@ -293,8 +295,14 @@ export default function BudgetSavingsDetailSheet({
   const budgetCalc = useMemo(() => {
     const rows = budgetGoalSummary?.budgetRows || []
     if (!rows.length) return null
-    const totalSpent = rows.reduce((sum, r) => sum + (r.spent || 0), 0)
-    const totalLimit = rows.reduce((sum, r) => sum + (r.limit || 0), 0)
+    const totalSpent = rows.reduce(
+      (sum, r) => sum + convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+      0
+    )
+    const totalLimit = rows.reduce(
+      (sum, r) => sum + convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+      0
+    )
     const totalRemaining = Math.max(0, totalLimit - totalSpent)
     const overallPct = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0
     const warningItems = rows.filter((r) => r.pct >= 80).sort((a, b) => b.pct - a.pct)
@@ -310,14 +318,20 @@ export default function BudgetSavingsDetailSheet({
       isOverBudget,
       rows,
     }
-  }, [budgetGoalSummary])
+  }, [budgetGoalSummary, defaultCurrency, rates])
 
   // Savings calculations
   const goalCalc = useMemo(() => {
     const rows = budgetGoalSummary?.goalRows || []
     if (!rows.length) return null
-    const totalCurrent = rows.reduce((sum, r) => sum + (r.current || 0), 0)
-    const totalTarget = rows.reduce((sum, r) => sum + (r.target || 0), 0)
+    const totalCurrent = rows.reduce(
+      (sum, r) => sum + convertCurrency(r.current || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+      0
+    )
+    const totalTarget = rows.reduce(
+      (sum, r) => sum + convertCurrency(r.target || 0, r.currency || defaultCurrency, defaultCurrency, rates),
+      0
+    )
     const overallPct = totalTarget > 0 ? Math.min(100, Math.round((totalCurrent / totalTarget) * 100)) : 0
     const topGoals = [...rows].sort((a, b) => b.pct - a.pct)
 
@@ -329,7 +343,7 @@ export default function BudgetSavingsDetailSheet({
       topGoals,
       rows,
     }
-  }, [budgetGoalSummary])
+  }, [budgetGoalSummary, defaultCurrency, rates])
 
   if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
 
@@ -557,8 +571,8 @@ export default function BudgetSavingsDetailSheet({
                                   <div className="min-w-0 flex-1">
                                     <p className="font-bold text-[var(--fg)] truncate text-xs">{formatExpenseCategory(row.category, locale)}</p>
                                     <p className="text-[10.5px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
-                                      {formatCurrency(row.spent, defaultCurrency, locale)}{' '}
-                                      <span className="opacity-75">/ {formatCurrency(row.limit, defaultCurrency, locale)}</span>
+                                      {formatCurrency(row.spent, row.currency || defaultCurrency, locale)}{' '}
+                                      <span className="opacity-75">/ {formatCurrency(row.limit, row.currency || defaultCurrency, locale)}</span>
                                     </p>
                                   </div>
                                 </div>
@@ -665,8 +679,8 @@ export default function BudgetSavingsDetailSheet({
                                       {String(row.name || '').replace(/_/g, ' ')}
                                     </p>
                                     <p className="text-[10.5px] font-semibold text-[var(--muted)] tabular-nums mt-0.5">
-                                      {formatCurrency(row.current, defaultCurrency, locale)}{' '}
-                                      <span className="opacity-75">/ {formatCurrency(row.target, defaultCurrency, locale)}</span>
+                                      {formatCurrency(row.current, row.currency || defaultCurrency, locale)}{' '}
+                                      <span className="opacity-75">/ {formatCurrency(row.target, row.currency || defaultCurrency, locale)}</span>
                                     </p>
                                   </div>
                                 </div>

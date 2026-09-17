@@ -4,6 +4,7 @@ import { formatCurrency, isExcludeAnalyticsTx, convertCurrency, FALLBACK_EXCHANG
 import { getCachedCurrencyRates } from './api'
 import { FinTrackNotificationPlugin } from './notificationIngestion'
 import { db, computeAllWalletBalances } from './db'
+import { getCurrentBudgetMonthKey, getBudgetPeriodDateRange } from './budgetUtils'
 import useSettingsStore from '../store/useSettingsStore'
 
 let syncDebounceTimer = null
@@ -31,13 +32,21 @@ export async function syncNativeWidgetData({
   }
 
   try {
+    const locale = useSettingsStore?.getState?.()?.locale || 'id'
+    const isEn = locale === 'en'
+
     const cleanBalNum = typeof totalBalance === 'number' ? totalBalance : Number(totalBalance) || 0
     const cleanIncNum = typeof monthIncome === 'number' ? monthIncome : Number(monthIncome) || 0
     const cleanExpNum = typeof monthExpense === 'number' ? monthExpense : Number(monthExpense) || 0
 
-    const formattedBalance = formatCurrency(cleanBalNum, defaultCurrency)
-    const formattedIncome = `Masuk: ${formatCurrency(cleanIncNum, defaultCurrency)}`
-    const formattedExpense = `Keluar: ${formatCurrency(cleanExpNum, defaultCurrency)}`
+    const formattedBalance = formatCurrency(cleanBalNum, defaultCurrency, locale)
+    const incomePrefix = isEn ? 'In: ' : 'Masuk: '
+    const expensePrefix = isEn ? 'Out: ' : 'Keluar: '
+    const formattedIncome = `${incomePrefix}${formatCurrency(cleanIncNum, defaultCurrency, locale)}`
+    const formattedExpense = `${expensePrefix}${formatCurrency(cleanExpNum, defaultCurrency, locale)}`
+    const effectivePeriod = period || (isEn ? 'This Month' : 'Bulan Ini')
+    const btnText = isEn ? '+ Add' : '+ Catat'
+    const balanceLabel = isEn ? 'Net Worth' : 'Kekayaan Bersih'
     const safePoints = Array.isArray(sparklinePoints) ? sparklinePoints.map((p) => Number(p) || 0) : []
     const sparklineJson = JSON.stringify(safePoints)
 
@@ -47,8 +56,10 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_balance', formattedBalance)
         localStorage.setItem('fintrack_widget_income', formattedIncome)
         localStorage.setItem('fintrack_widget_expense', formattedExpense)
-        localStorage.setItem('fintrack_widget_period', period)
+        localStorage.setItem('fintrack_widget_period', effectivePeriod)
         localStorage.setItem('fintrack_widget_sparkline', sparklineJson)
+        localStorage.setItem('fintrack_widget_btn_text', btnText)
+        localStorage.setItem('fintrack_widget_balance_label', balanceLabel)
       }
     } catch {
       /* ignore */
@@ -64,9 +75,11 @@ export async function syncNativeWidgetData({
       monthIncome: formattedIncome,
       expense: formattedExpense,
       monthExpense: formattedExpense,
-      period: period || 'Bulan Ini',
+      period: effectivePeriod,
       sparklineData: sparklineJson,
       sparklinePoints: safePoints,
+      btnText,
+      balanceLabel,
     })
   } catch (err) {
     // Non-blocking fallback
@@ -86,6 +99,8 @@ export async function syncNativeWidgetFromDb() {
   try {
     const settings = useSettingsStore?.getState?.() || {}
     const defaultCurrency = settings.defaultCurrency || 'IDR'
+    const locale = settings.locale || 'id'
+    const isEn = locale === 'en'
     const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
 
     const wallets = await db.wallets.toArray()
@@ -96,26 +111,41 @@ export async function syncNativeWidgetFromDb() {
       .filter((w) => !w.isArchived)
       .reduce((sum, w) => sum + convertCurrency(Number(w.currentBalance) || 0, w.currency || defaultCurrency, defaultCurrency, activeRates), 0)
 
-    const currentMonthPrefix = format(new Date(), 'yyyy-MM')
+    const budgetCycleStartDay = settings.budgetCycleStartDay || 1
+    const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
+    const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay)
+    const periodLabel = isEn ? 'This Month' : 'Bulan Ini'
     let monthIncome = 0
     let monthExpense = 0
 
     for (const tx of allTxs) {
-      const txDateStr = (tx.date || '').slice(0, 7)
-      if (txDateStr === currentMonthPrefix && !isExcludeAnalyticsTx(tx)) {
-        const txCurrency = tx.currency || defaultCurrency
-        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-          for (const item of tx.splitItems) {
-            if (item.isExcludeFromAnalytics || item.excludeFromAnalytics) continue
-            const amt = convertCurrency(Number(item.amount) || 0, txCurrency, defaultCurrency, activeRates)
-            if (item.type === 'income') monthIncome += amt
-            else if (item.type === 'expense') monthExpense += amt
+      if (!tx?.date || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
+
+      const txCurrency = tx.currency || defaultCurrency
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        for (const item of tx.splitItems) {
+          const itemTx = {
+            ...tx,
+            ...item,
+            category: item.category || tx.category,
+            amount: item.amount,
+            type: item.type || tx.type,
+            currency: item.currency || txCurrency,
+            isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+            isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
           }
-        } else {
-          const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-          if (tx.type === 'income') monthIncome += amt
-          else if (tx.type === 'expense') monthExpense += amt
+          if (isExcludeAnalyticsTx(itemTx)) continue
+          const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
+          const itemType = item.type || tx.type
+          if (itemType === 'income') monthIncome += amt
+          else if (itemType === 'expense') monthExpense += amt
         }
+      } else {
+        if (isExcludeAnalyticsTx(tx)) continue
+        const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
+        if (tx.type === 'income') monthIncome += amt
+        else if (tx.type === 'expense') monthExpense += amt
       }
     }
 
@@ -127,20 +157,33 @@ export async function syncNativeWidgetFromDb() {
       const dStr = format(d, 'yyyy-MM-dd')
       let dayNet = 0
       for (const tx of allTxs) {
-        if ((tx.date || '').slice(0, 10) === dStr && !isExcludeAnalyticsTx(tx)) {
-          const txCurrency = tx.currency || defaultCurrency
-          if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-            for (const item of tx.splitItems) {
-              if (item.isExcludeFromAnalytics || item.excludeFromAnalytics) continue
-              const amt = convertCurrency(Number(item.amount) || 0, txCurrency, defaultCurrency, activeRates)
-              if (item.type === 'income') dayNet += amt
-              else if (item.type === 'expense') dayNet -= amt
+        if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || (tx.date || '').slice(0, 10) !== dStr) continue
+
+        const txCurrency = tx.currency || defaultCurrency
+        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+          for (const item of tx.splitItems) {
+            const itemTx = {
+              ...tx,
+              ...item,
+              category: item.category || tx.category,
+              amount: item.amount,
+              type: item.type || tx.type,
+              currency: item.currency || txCurrency,
+              isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+              isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
             }
-          } else {
-            const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-            if (tx.type === 'income') dayNet += amt
-            else if (tx.type === 'expense') dayNet -= amt
+            if (isExcludeAnalyticsTx(itemTx)) continue
+            const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
+            const itemType = item.type || tx.type
+            if (itemType === 'income') dayNet += amt
+            else if (itemType === 'expense') dayNet -= amt
           }
+        } else {
+          if (isExcludeAnalyticsTx(tx)) continue
+          const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
+          if (tx.type === 'income') dayNet += amt
+          else if (tx.type === 'expense') dayNet -= amt
         }
       }
       sparklinePoints.push(dayNet)
@@ -151,7 +194,7 @@ export async function syncNativeWidgetFromDb() {
       monthIncome,
       monthExpense,
       defaultCurrency,
-      period: 'Bulan Ini',
+      period: periodLabel,
       sparklinePoints,
     })
   } catch (err) {

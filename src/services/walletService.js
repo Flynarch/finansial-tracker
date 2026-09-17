@@ -13,7 +13,7 @@ export async function createWallet(payload) {
     createdAt: payload.createdAt || Date.now(),
     balance: payload.balance || 0,
   })
-  void invalidateWalletBalance([id])
+  await invalidateWalletBalance([id])
   return id
 }
 
@@ -27,7 +27,7 @@ export async function createWallet(payload) {
 export async function updateWallet(id, payload) {
   const walletId = Number(id)
   const res = await db.wallets.update(walletId, payload)
-  void invalidateWalletBalance([walletId])
+  await invalidateWalletBalance([walletId])
   return res
 }
 
@@ -53,7 +53,7 @@ export async function deleteWallet(id) {
 export async function archiveWallet(id) {
   const walletId = Number(id)
   const res = await db.wallets.update(walletId, { isArchived: 1 })
-  void invalidateWalletBalance([walletId])
+  await invalidateWalletBalance([walletId])
   return res
 }
 
@@ -66,6 +66,6 @@ export async function archiveWallet(id) {
 export async function unarchiveWallet(id) {
   const walletId = Number(id)
   const res = await db.wallets.update(walletId, { isArchived: 0 })
-  void invalidateWalletBalance([walletId])
+  await invalidateWalletBalance([walletId])
   return res
 }

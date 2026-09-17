@@ -1,6 +1,7 @@
 import { getDownloadURL, ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage'
 import { doc, getDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore'
 import { getFirebaseDb, getFirebaseStorage } from './firebase'
+import { firebaseErrorToI18nKey } from './firebaseErrors'
 
 function latestBackupPath(uid) {
   return `fintrack-backups/${uid}/latest.json`
@@ -38,32 +39,39 @@ export async function uploadLatestBackup(uid, payload, options = {}) {
   const storage = getFirebaseStorage()
   const db = getFirebaseDb()
 
-  const json = JSON.stringify(payload)
-  const blob = new Blob([json], { type: 'application/json' })
-  const fileRef = storageRef(storage, latestBackupPath(uid))
-  await uploadBytes(fileRef, blob, {
-    contentType: 'application/json',
-    customMetadata: {
-      exportedAt: String(payload?.exportedAt || ''),
-      isEncrypted: String(Boolean(isEncrypted)),
-      app: 'FinTrack',
-    },
-  })
-  const url = await getDownloadURL(fileRef)
+  try {
+    const json = JSON.stringify(payload)
+    const blob = new Blob([json], { type: 'application/json' })
+    const fileRef = storageRef(storage, latestBackupPath(uid))
+    await uploadBytes(fileRef, blob, {
+      contentType: 'application/json',
+      customMetadata: {
+        exportedAt: String(payload?.exportedAt || ''),
+        isEncrypted: String(Boolean(isEncrypted)),
+        app: 'FinTrack',
+      },
+    })
+    const url = await getDownloadURL(fileRef)
 
-  await setDoc(
-    doc(db, 'users', uid),
-    {
-      lastBackupAt: serverTimestamp(),
-      lastBackupExportedAt: payload?.exportedAt || null,
-      lastBackupUrl: url,
-      isEncrypted: Boolean(isEncrypted),
-      app: 'FinTrack',
-    },
-    { merge: true },
-  )
+    await setDoc(
+      doc(db, 'users', uid),
+      {
+        lastBackupAt: serverTimestamp(),
+        lastBackupExportedAt: payload?.exportedAt || null,
+        lastBackupUrl: url,
+        isEncrypted: Boolean(isEncrypted),
+        app: 'FinTrack',
+      },
+      { merge: true },
+    )
 
-  return { url }
+    return { url }
+  } catch (err) {
+    if (err) {
+      err.i18nKey = firebaseErrorToI18nKey(err)
+    }
+    throw err
+  }
 }
 
 export async function getLatestBackupMeta(uid) {
@@ -81,7 +89,10 @@ export async function downloadLatestBackupJson(uid) {
     const res = await fetch(url)
     if (!res.ok) return null
     return await res.json()
-  } catch {
+  } catch (err) {
+    if (err) {
+      err.i18nKey = firebaseErrorToI18nKey(err)
+    }
     return null
   }
 }

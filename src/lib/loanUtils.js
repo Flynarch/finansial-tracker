@@ -1,4 +1,4 @@
-import { addMonths, differenceInDays, format, parseISO } from 'date-fns'
+import { addMonths, differenceInDays, format, parseISO, startOfMonth } from 'date-fns'
 
 /**
  * Generate installment schedule breakdown for a loan.
@@ -23,14 +23,12 @@ export function generateInstallmentSchedule(loan, payments = []) {
     }
   }
 
-  const baseInstallment = monthlyPayment > 0 ? monthlyPayment : Math.round(totalAmount / tenor)
+  const baseInstallment = monthlyPayment > 0
+    ? monthlyPayment
+    : (tenor > 0 ? Math.round(totalAmount / tenor) : totalAmount)
 
-  // Calculate accumulated paid amount
-  const totalPaid = Array.isArray(payments) && payments.length > 0
-    ? payments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0)
-    : Math.max(0, totalAmount - (Number(loan.remainingAmount) || 0))
-
-  const isFullyPaid = loan.status === 'paid' || (loan.remainingAmount !== undefined && loan.remainingAmount <= 0)
+  const isFullyPaid = loan.status === 'paid' || (Number(loan.remainingAmount) <= 0 && totalAmount > 0)
+  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 
   let baseDate = new Date()
   if (loan.startDate) {
@@ -42,6 +40,20 @@ export function generateInstallmentSchedule(loan, payments = []) {
     }
   }
 
+  let targetDueDay = null
+  let firstDueBaseDate = null
+  if (loan.dueDate) {
+    try {
+      const parsedDue = parseISO(loan.dueDate)
+      if (!isNaN(parsedDue.getTime())) {
+        targetDueDay = parsedDue.getDate()
+        firstDueBaseDate = parsedDue
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   let remainingToAllocate = isFullyPaid ? Infinity : totalPaid
 
@@ -49,9 +61,18 @@ export function generateInstallmentSchedule(loan, payments = []) {
   const schedule = []
 
   for (let i = 1; i <= tenor; i++) {
-    const dueDateStr = tenor === 1 && loan.dueDate
-      ? loan.dueDate
-      : format(addMonths(baseDate, i), 'yyyy-MM-dd')
+    let dueDateStr
+    if (tenor === 1 && loan.dueDate) {
+      dueDateStr = loan.dueDate
+    } else if (targetDueDay !== null && firstDueBaseDate) {
+      const targetMonthDate = addMonths(startOfMonth(firstDueBaseDate), i - 1)
+      const maxDays = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() + 1, 0).getDate()
+      const clampedDay = Math.min(targetDueDay, maxDays)
+      const stepDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), clampedDay)
+      dueDateStr = format(stepDate, 'yyyy-MM-dd')
+    } else {
+      dueDateStr = format(addMonths(baseDate, i), 'yyyy-MM-dd')
+    }
 
     let instAmount
     if (i === tenor) {

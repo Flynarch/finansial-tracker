@@ -117,16 +117,27 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             sparklineJson = getSafeString(prefs, "sparklineData", "[]");
         }
 
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson);
+        String btnText = getSafeString(prefs, "fintrack_widget_btn_text", "+ Catat");
+        String balanceLabel = getSafeString(prefs, "fintrack_widget_balance_label", "Kekayaan Bersih");
+
+        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, btnText, balanceLabel);
     }
 
     public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
                                       String balance, String income, String expense, String period, String sparklineJson) {
+        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, "+ Catat", "Kekayaan Bersih");
+    }
+
+    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
+                                      String balance, String income, String expense, String period, String sparklineJson,
+                                      String btnText, String balanceLabel) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_fintrack_balance);
         views.setTextViewText(R.id.widget_total_balance, balance != null ? balance : "Rp 0");
         views.setTextViewText(R.id.widget_income_text, income != null ? income : "Masuk: Rp 0");
         views.setTextViewText(R.id.widget_expense_text, expense != null ? expense : "Keluar: Rp 0");
         views.setTextViewText(R.id.widget_period_label, period != null ? period : "Bulan Ini");
+        views.setTextViewText(R.id.widget_balance_label, balanceLabel != null ? balanceLabel : "Kekayaan Bersih");
+        views.setTextViewText(R.id.widget_btn_add, btnText != null ? btnText : "+ Catat");
 
         // Render trend sparkline
         Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson);
@@ -165,7 +176,9 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * Generate an offscreen Bitmap containing a smooth sparkline trend chart
+     * Generate an offscreen Bitmap containing a smooth sparkline trend chart.
+     * Features high-DPI ARGB_8888 rendering, anti-aliasing/dithering, horizontal breathing room
+     * to prevent right-edge pulse dot clipping, and seamless single-datapoint support.
      */
     private static Bitmap createSparklineBitmap(String sparklineJson) {
         if (sparklineJson == null || sparklineJson.trim().isEmpty()) {
@@ -175,7 +188,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         try {
             JSONArray arr = new JSONArray(sparklineJson);
             int len = arr.length();
-            if (len < 2) {
+            if (len < 1) {
                 return null;
             }
 
@@ -190,17 +203,20 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                 if (values[i] > maxVal) maxVal = values[i];
             }
 
-            int width = 400;
-            int height = 100;
-            float topPadding = 14f;
-            float bottomPadding = 12f;
+            int width = 800;
+            int height = 180;
+            float leftPadding = 20f;
+            float rightPadding = 24f;
+            float topPadding = 24f;
+            float bottomPadding = 22f;
+            float usableWidth = width - leftPadding - rightPadding;
             float usableHeight = height - topPadding - bottomPadding;
             float range = maxVal - minVal;
 
             Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
 
-            float stepX = (float) width / (len - 1);
+            float stepX = len > 1 ? usableWidth / (len - 1) : 0f;
             float[] pointsY = new float[len];
 
             for (int i = 0; i < len; i++) {
@@ -216,59 +232,65 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             Path linePath = new Path();
             Path fillPath = new Path();
 
-            linePath.moveTo(0f, pointsY[0]);
-            fillPath.moveTo(0f, height);
-            fillPath.lineTo(0f, pointsY[0]);
+            linePath.moveTo(leftPadding, pointsY[0]);
+            fillPath.moveTo(leftPadding, height);
+            fillPath.lineTo(leftPadding, pointsY[0]);
 
-            for (int i = 1; i < len; i++) {
-                float prevX = (i - 1) * stepX;
-                float prevY = pointsY[i - 1];
-                float curX = i * stepX;
-                float curY = pointsY[i];
-                float midX = (prevX + curX) / 2f;
+            if (len == 1) {
+                float endX = leftPadding + usableWidth;
+                linePath.lineTo(endX, pointsY[0]);
+                fillPath.lineTo(endX, pointsY[0]);
+                fillPath.lineTo(endX, height);
+            } else {
+                for (int i = 1; i < len; i++) {
+                    float prevX = leftPadding + (i - 1) * stepX;
+                    float prevY = pointsY[i - 1];
+                    float curX = leftPadding + i * stepX;
+                    float curY = pointsY[i];
+                    float midX = (prevX + curX) / 2f;
 
-                linePath.cubicTo(midX, prevY, midX, curY, curX, curY);
-                fillPath.cubicTo(midX, prevY, midX, curY, curX, curY);
+                    linePath.cubicTo(midX, prevY, midX, curY, curX, curY);
+                    fillPath.cubicTo(midX, prevY, midX, curY, curX, curY);
+                }
+                fillPath.lineTo(leftPadding + (len - 1) * stepX, height);
             }
-
-            fillPath.lineTo(width, height);
             fillPath.close();
 
-            // 1. Draw subtle area fill with Emerald gradient (app brand accent)
-            int fillStart = Color.argb(75, 16, 185, 129); // 30% alpha emerald #10B981
-            int fillEnd = Color.argb(0, 16, 185, 129);    // 0% alpha
+            // 1. Draw subtle area fill with Sage gradient (FinTrack brand accent token)
+            int fillStart = Color.argb(65, 107, 124, 94); // 25% alpha sage #6B7C5E
+            int fillEnd = Color.argb(0, 107, 124, 94);     // 0% alpha
             LinearGradient gradient = new LinearGradient(
                     0f, topPadding, 0f, height,
                     fillStart, fillEnd, Shader.TileMode.CLAMP
             );
 
-            Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             fillPaint.setStyle(Paint.Style.FILL);
             fillPaint.setShader(gradient);
             canvas.drawPath(fillPath, fillPaint);
 
-            // 2. Draw stroke line with crisp emerald-400 (#34D399)
-            Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            // 2. Draw stroke line with smooth sage (#86A879)
+            Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             linePaint.setStyle(Paint.Style.STROKE);
-            linePaint.setColor(Color.rgb(52, 211, 153));
-            linePaint.setStrokeWidth(5f);
+            linePaint.setColor(Color.rgb(134, 168, 121));
+            linePaint.setStrokeWidth(6f);
             linePaint.setStrokeCap(Paint.Cap.ROUND);
             linePaint.setStrokeJoin(Paint.Join.ROUND);
             canvas.drawPath(linePath, linePaint);
 
-            // 3. Draw highlighted pulse dot on the latest point
-            float lastX = (len - 1) * stepX;
+            // 3. Draw highlighted pulse dot on the latest point with guaranteed non-clipped boundary
+            float lastX = leftPadding + (len > 1 ? (len - 1) * stepX : usableWidth);
             float lastY = pointsY[len - 1];
 
-            Paint outerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            Paint outerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             outerDotPaint.setStyle(Paint.Style.FILL);
-            outerDotPaint.setColor(Color.argb(100, 16, 185, 129));
-            canvas.drawCircle(lastX, lastY, 11f, outerDotPaint);
+            outerDotPaint.setColor(Color.argb(90, 107, 124, 94));
+            canvas.drawCircle(lastX, lastY, 14f, outerDotPaint);
 
-            Paint innerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            Paint innerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             innerDotPaint.setStyle(Paint.Style.FILL);
             innerDotPaint.setColor(Color.WHITE);
-            canvas.drawCircle(lastX, lastY, 5f, innerDotPaint);
+            canvas.drawCircle(lastX, lastY, 6f, innerDotPaint);
 
             return bitmap;
         } catch (Exception e) {

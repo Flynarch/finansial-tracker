@@ -25,6 +25,7 @@ import {
 import { downloadExecutiveReportPdf, shareExecutiveReportPdf } from '../../lib/pdfReportGenerator'
 import { exportTransactionsToCsv } from '../../lib/exportReports'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { id as idLocale, enUS } from 'date-fns/locale'
 
 const TABS = [
   { id: 'summary', labelId: 'reports.tabSummary', fallback: 'Ringkasan KPI' },
@@ -38,7 +39,7 @@ export default function ReportStatementModal({
   isOpen,
   onClose,
   transactions: propTransactions,
-  wallets = [],
+  wallets: propWallets = [],
   savings = [],
   loans = [],
   investments = [],
@@ -60,64 +61,65 @@ export default function ReportStatementModal({
   const { startDate, endDate, periodLabel } = useMemo(() => {
     const now = new Date()
     const curYear = now.getFullYear()
+    const isEn = String(locale || '').toLowerCase().startsWith('en')
 
     switch (periodType) {
       case 'this_month':
         return {
           startDate: format(startOfMonth(now), 'yyyy-MM-dd'),
           endDate: format(endOfMonth(now), 'yyyy-MM-dd'),
-          periodLabel: format(now, 'MMMM yyyy'),
+          periodLabel: format(now, 'MMMM yyyy', { locale: isEn ? enUS : idLocale }),
         }
       case 'last_month': {
-        const lastM = subMonths(now, 1)
+        const lastM = subMonths(startOfMonth(now), 1)
         return {
           startDate: format(startOfMonth(lastM), 'yyyy-MM-dd'),
           endDate: format(endOfMonth(lastM), 'yyyy-MM-dd'),
-          periodLabel: format(lastM, 'MMMM yyyy'),
+          periodLabel: format(lastM, 'MMMM yyyy', { locale: isEn ? enUS : idLocale }),
         }
       }
       case 'q1':
         return {
           startDate: `${curYear}-01-01`,
           endDate: `${curYear}-03-31`,
-          periodLabel: `Kuartal 1 (Jan - Mar ${curYear})`,
+          periodLabel: isEn ? `Quarter 1 (Jan - Mar ${curYear})` : `Kuartal 1 (Jan - Mar ${curYear})`,
         }
       case 'q2':
         return {
           startDate: `${curYear}-04-01`,
           endDate: `${curYear}-06-30`,
-          periodLabel: `Kuartal 2 (Apr - Jun ${curYear})`,
+          periodLabel: isEn ? `Quarter 2 (Apr - Jun ${curYear})` : `Kuartal 2 (Apr - Jun ${curYear})`,
         }
       case 'q3':
         return {
           startDate: `${curYear}-07-01`,
           endDate: `${curYear}-09-30`,
-          periodLabel: `Kuartal 3 (Jul - Sep ${curYear})`,
+          periodLabel: isEn ? `Quarter 3 (Jul - Sep ${curYear})` : `Kuartal 3 (Jul - Sep ${curYear})`,
         }
       case 'q4':
         return {
           startDate: `${curYear}-10-01`,
           endDate: `${curYear}-12-31`,
-          periodLabel: `Kuartal 4 (Okt - Des ${curYear})`,
+          periodLabel: isEn ? `Quarter 4 (Oct - Dec ${curYear})` : `Kuartal 4 (Okt - Des ${curYear})`,
         }
       case 'ytd':
         return {
           startDate: `${curYear}-01-01`,
           endDate: format(now, 'yyyy-MM-dd'),
-          periodLabel: `Tahun Berjalan (YTD ${curYear})`,
+          periodLabel: isEn ? `Year-to-Date (YTD ${curYear})` : `Tahun Berjalan (YTD ${curYear})`,
         }
       case 'full_year':
         return {
           startDate: `${curYear}-01-01`,
           endDate: `${curYear}-12-31`,
-          periodLabel: `Tahun Penuh ${curYear}`,
+          periodLabel: isEn ? `Full Year ${curYear}` : `Tahun Penuh ${curYear}`,
         }
       case 'last_year': {
         const prevY = curYear - 1
         return {
           startDate: `${prevY}-01-01`,
           endDate: `${prevY}-12-31`,
-          periodLabel: `Tahun ${prevY}`,
+          periodLabel: isEn ? `Year ${prevY}` : `Tahun ${prevY}`,
         }
       }
       case 'custom':
@@ -125,10 +127,10 @@ export default function ReportStatementModal({
         return {
           startDate: customStartDate,
           endDate: customEndDate,
-          periodLabel: `${customStartDate} s/d ${customEndDate}`,
+          periodLabel: isEn ? `${customStartDate} to ${customEndDate}` : `${customStartDate} s/d ${customEndDate}`,
         }
     }
-  }, [periodType, customStartDate, customEndDate])
+  }, [periodType, customStartDate, customEndDate, locale])
 
   const queriedTransactions = useLiveQuery(
     async () => {
@@ -144,6 +146,20 @@ export default function ReportStatementModal({
     if (Array.isArray(propTransactions) && propTransactions.length > 0) return propTransactions
     return queriedTransactions || []
   }, [propTransactions, queriedTransactions])
+
+  const queriedWallets = useLiveQuery(
+    async () => {
+      if (!isOpen || (Array.isArray(propWallets) && propWallets.length > 0)) return []
+      return await db.wallets.toArray()
+    },
+    [isOpen, propWallets],
+    []
+  )
+
+  const wallets = useMemo(() => {
+    if (Array.isArray(propWallets) && propWallets.length > 0) return propWallets
+    return queriedWallets || []
+  }, [propWallets, queriedWallets])
 
   const postDateTransactions = useLiveQuery(
     async () => {
@@ -298,7 +314,7 @@ export default function ReportStatementModal({
 
   const handleExportCsv = () => {
     triggerHaptic('light')
-    exportTransactionsToCsv(filteredTxs, defaultCurrency)
+    exportTransactionsToCsv(filteredTxs, wallets, defaultCurrency, locale)
   }
 
   const handlePrint = () => {
@@ -686,7 +702,7 @@ export default function ReportStatementModal({
                           <span className="text-[10.5px] text-[var(--muted)] block truncate">{tx.category}</span>
                         </div>
                         <span className={`font-mono font-bold shrink-0 ${isIncome ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {isIncome ? '+' : '-'}{formatCurrency(tx.amount, defaultCurrency)}
+                          {isIncome ? '+' : '-'}{formatCurrency(tx.amount, tx.currency || defaultCurrency)}
                         </span>
                       </div>
                     )

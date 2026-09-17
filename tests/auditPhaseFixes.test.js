@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { db } from '../src/lib/db'
 import { createTransaction } from '../src/services/transactionService'
 import { recomputeAndCacheWalletBalance, getAllWalletBalances } from '../src/lib/balanceEngine'
@@ -9,6 +9,9 @@ import { cascadeDeleteSubcategory, cascadeDeleteParentCategory } from '../src/li
 import { computeWalletBalance, computeAllWalletBalances } from '../src/lib/db'
 import { computeFilteredTransactions } from '../src/hooks/useTransactionFilters'
 import useLoanStore from '../src/store/useLoanStore'
+import useSettingsStore from '../src/store/useSettingsStore'
+import { exportTransactionsToCsv } from '../src/lib/exportReports'
+import { checkBudgetAlertsAfterExpense } from '../src/lib/smartNotifications'
 
 describe('Audit Phase 1-3 Fixes Verification', () => {
   beforeEach(async () => {
@@ -20,6 +23,7 @@ describe('Audit Phase 1-3 Fixes Verification', () => {
     await db.goalLogs.clear()
     await db.budgets.clear()
     await db.recurringTransactions.clear()
+    if (db.notifications) await db.notifications.clear()
   })
 
   describe('Phase 1: Transfer Validation & Loan Math', () => {
@@ -487,6 +491,341 @@ describe('Audit Phase 1-3 Fixes Verification', () => {
       // No goal logs created
       const logs = await db.goalLogs.where('goalId').equals(goalId).toArray()
       expect(logs.length).toBe(0)
+    })
+  })
+
+  describe('Phases 1-3 Hotfixes & Remediation Suite', () => {
+    it('exportTransactionsToCsv uses provided wallets and localizes headers and types for English', async () => {
+      let sharedPayload = null
+      const origCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare')
+      const origShare = Object.getOwnPropertyDescriptor(navigator, 'share')
+      Object.defineProperty(navigator, 'canShare', {
+        value: vi.fn(() => true),
+        configurable: true,
+        writable: true,
+      })
+      Object.defineProperty(navigator, 'share', {
+        value: vi.fn(async (data) => {
+          sharedPayload = data
+          return true
+        }),
+        configurable: true,
+        writable: true,
+      })
+
+      const dummyWallets = [{ id: 42, name: 'Bank Jago Primary' }]
+      const dummyTxs = [
+        {
+          id: 1,
+          date: '2026-03-15',
+          type: 'expense',
+          category: 'Food',
+          walletId: 42,
+          amount: 50000,
+          currency: 'IDR',
+          notes: 'Lunch',
+        },
+        {
+          id: 2,
+          date: '2026-03-15',
+          type: 'income',
+          category: 'Salary',
+          walletId: 42,
+          amount: 5000000,
+          currency: 'IDR',
+          notes: 'Bonus',
+        },
+      ]
+
+      try {
+        await exportTransactionsToCsv(dummyTxs, dummyWallets, 'IDR', 'en')
+
+        expect(sharedPayload).not.toBeNull()
+        expect(sharedPayload.title).toBe('FinTrack Transaction Report')
+        const csvText = await sharedPayload.files[0].text()
+        expect(csvText).toContain('"Date","Type","Category","Account / Wallet","Amount","Currency","Notes"')
+        expect(csvText).toContain('"Expense"')
+        expect(csvText).toContain('"Income"')
+        expect(csvText).toContain('"Bank Jago Primary"')
+        expect(csvText).not.toContain('Dompet Utama')
+      } finally {
+        if (origCanShare) {
+          Object.defineProperty(navigator, 'canShare', origCanShare)
+        } else {
+          delete navigator.canShare
+        }
+        if (origShare) {
+          Object.defineProperty(navigator, 'share', origShare)
+        } else {
+          delete navigator.share
+        }
+      }
+    })
+
+    it('exportTransactionsToCsv localizes headers and types for Indonesian by default', async () => {
+      let sharedPayload = null
+      const origCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare')
+      const origShare = Object.getOwnPropertyDescriptor(navigator, 'share')
+      Object.defineProperty(navigator, 'canShare', {
+        value: vi.fn(() => true),
+        configurable: true,
+        writable: true,
+      })
+      Object.defineProperty(navigator, 'share', {
+        value: vi.fn(async (data) => {
+          sharedPayload = data
+          return true
+        }),
+        configurable: true,
+        writable: true,
+      })
+
+      const dummyWallets = [{ id: 99, name: 'BCA Prioritas' }]
+      const dummyTxs = [
+        {
+          id: 1,
+          date: '2026-03-15',
+          type: 'expense',
+          category: 'Makanan',
+          walletId: 99,
+          amount: 30000,
+          currency: 'IDR',
+          notes: 'Makan Siang',
+        },
+      ]
+
+      try {
+        await exportTransactionsToCsv(dummyTxs, dummyWallets, 'IDR', 'id')
+
+        expect(sharedPayload).not.toBeNull()
+        expect(sharedPayload.title).toBe('Laporan Transaksi FinTrack')
+        const csvText = await sharedPayload.files[0].text()
+        expect(csvText).toContain('"Tanggal","Tipe","Kategori","Akun / Dompet","Nominal","Mata Uang","Catatan"')
+        expect(csvText).toContain('"Pengeluaran"')
+        expect(csvText).toContain('"BCA Prioritas"')
+      } finally {
+        if (origCanShare) {
+          Object.defineProperty(navigator, 'canShare', origCanShare)
+        } else {
+          delete navigator.canShare
+        }
+        if (origShare) {
+          Object.defineProperty(navigator, 'share', origShare)
+        } else {
+          delete navigator.share
+        }
+      }
+    })
+
+    it('checkBudgetAlertsAfterExpense persists in-app notification to db.notifications with deduplication', async () => {
+      useSettingsStore.setState({ budgetAlertsEnabled: true, locale: 'id', defaultCurrency: 'IDR', budgetCycleStartDay: 1 })
+
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const monthKey = `${year}-${month}`
+      const todayStr = `${monthKey}-10`
+
+      await db.budgets.add({
+        category: 'Belanja',
+        limit: 100000,
+        amount: 100000,
+        month: monthKey,
+        currency: 'IDR',
+      })
+
+      await db.transactions.add({
+        date: todayStr,
+        type: 'expense',
+        category: 'Belanja',
+        amount: 110000,
+        currency: 'IDR',
+      })
+
+      await checkBudgetAlertsAfterExpense({
+        category: 'Belanja',
+        amount: 110000,
+        date: todayStr,
+      })
+
+      const notifs = await db.notifications.toArray()
+      expect(notifs.length).toBe(1)
+      expect(notifs[0].type).toBe('alert')
+      expect(notifs[0].route).toBe('/budget')
+      expect(notifs[0].title).toBe('Budget Jebol!')
+
+      // Second check should be deduplicated within 24h
+      await checkBudgetAlertsAfterExpense({
+        category: 'Belanja',
+        amount: 5000,
+        date: todayStr,
+      })
+
+      const notifsAfter = await db.notifications.toArray()
+      expect(notifsAfter.length).toBe(1)
+    })
+
+    it('exportTransactionsToCsv localizes properly for regional English locales like en-US', async () => {
+      let sharedPayload = null
+      const origCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare')
+      const origShare = Object.getOwnPropertyDescriptor(navigator, 'share')
+      Object.defineProperty(navigator, 'canShare', {
+        value: vi.fn(() => true),
+        configurable: true,
+        writable: true,
+      })
+      Object.defineProperty(navigator, 'share', {
+        value: vi.fn(async (data) => {
+          sharedPayload = data
+          return true
+        }),
+        configurable: true,
+        writable: true,
+      })
+
+      const dummyWallets = [{ id: 7, name: 'Chase Checking' }]
+      const dummyTxs = [
+        {
+          id: 10,
+          date: '2026-04-01',
+          type: 'expense',
+          category: 'Coffee',
+          walletId: 7,
+          amount: 5.5,
+          currency: 'USD',
+          notes: 'Latte',
+        },
+      ]
+
+      try {
+        await exportTransactionsToCsv(dummyTxs, dummyWallets, 'USD', 'en-US')
+
+        expect(sharedPayload).not.toBeNull()
+        expect(sharedPayload.title).toBe('FinTrack Transaction Report')
+        const csvText = await sharedPayload.files[0].text()
+        expect(csvText).toContain('"Date","Type","Category","Account / Wallet","Amount","Currency","Notes"')
+        expect(csvText).toContain('"Expense"')
+        expect(csvText).toContain('"Chase Checking"')
+      } finally {
+        if (origCanShare) {
+          Object.defineProperty(navigator, 'canShare', origCanShare)
+        } else {
+          delete navigator.canShare
+        }
+        if (origShare) {
+          Object.defineProperty(navigator, 'share', origShare)
+        } else {
+          delete navigator.share
+        }
+      }
+    })
+
+    it('checkBudgetAlertsAfterExpense deduplicates when subsequent expenses change the percentage within 24h', async () => {
+      useSettingsStore.setState({ budgetAlertsEnabled: true, locale: 'id', defaultCurrency: 'IDR', budgetCycleStartDay: 1 })
+
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const monthKey = `${year}-${month}`
+      const todayStr = `${monthKey}-12`
+
+      await db.budgets.add({
+        category: 'Hiburan',
+        limit: 100000,
+        amount: 100000,
+        month: monthKey,
+        currency: 'IDR',
+      })
+
+      // First expense: 110k (110%)
+      await db.transactions.add({
+        date: todayStr,
+        type: 'expense',
+        category: 'Hiburan',
+        amount: 110000,
+        currency: 'IDR',
+      })
+      await checkBudgetAlertsAfterExpense({
+        category: 'Hiburan',
+        amount: 110000,
+        date: todayStr,
+      })
+
+      const notifs1 = await db.notifications.toArray()
+      const hiburanNotifs1 = notifs1.filter((n) => n.category === 'Hiburan' || n.message?.includes('Hiburan'))
+      expect(hiburanNotifs1.length).toBe(1)
+
+      // Second expense: +10k making total 120k (120%). Even though message text has 120% instead of 110%, it should deduplicate
+      await db.transactions.add({
+        date: todayStr,
+        type: 'expense',
+        category: 'Hiburan',
+        amount: 10000,
+        currency: 'IDR',
+      })
+      await checkBudgetAlertsAfterExpense({
+        category: 'Hiburan',
+        amount: 10000,
+        date: todayStr,
+      })
+
+      const notifs2 = await db.notifications.toArray()
+      const hiburanNotifs2 = notifs2.filter((n) => n.category === 'Hiburan' || n.message?.includes('Hiburan'))
+      expect(hiburanNotifs2.length).toBe(1)
+    })
+
+    it('checkBudgetAlertsAfterExpense escalates from warning (80%) to alert (100%+) within 24h', async () => {
+      useSettingsStore.setState({ budgetAlertsEnabled: true, locale: 'id', defaultCurrency: 'IDR', budgetCycleStartDay: 1 })
+
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const monthKey = `${year}-${month}`
+      const todayStr = `${monthKey}-14`
+
+      await db.budgets.add({
+        category: 'Transport',
+        limit: 100000,
+        amount: 100000,
+        month: monthKey,
+        currency: 'IDR',
+      })
+
+      // First expense: 85k (85% warning)
+      await db.transactions.add({
+        date: todayStr,
+        type: 'expense',
+        category: 'Transport',
+        amount: 85000,
+        currency: 'IDR',
+      })
+      await checkBudgetAlertsAfterExpense({
+        category: 'Transport',
+        amount: 85000,
+        date: todayStr,
+      })
+
+      const notifs1 = await db.notifications.toArray()
+      const transportWarning = notifs1.find((n) => (n.category === 'Transport' || n.message?.includes('Transport')) && n.type === 'warning')
+      expect(transportWarning).toBeDefined()
+
+      // Second expense: +30k (total 115k, exceeds budget limit -> should trigger alert)
+      await db.transactions.add({
+        date: todayStr,
+        type: 'expense',
+        category: 'Transport',
+        amount: 30000,
+        currency: 'IDR',
+      })
+      await checkBudgetAlertsAfterExpense({
+        category: 'Transport',
+        amount: 30000,
+        date: todayStr,
+      })
+
+      const notifs2 = await db.notifications.toArray()
+      const transportAlert = notifs2.find((n) => (n.category === 'Transport' || n.message?.includes('Transport')) && n.type === 'alert')
+      expect(transportAlert).toBeDefined()
     })
   })
 })

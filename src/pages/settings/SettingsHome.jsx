@@ -38,6 +38,7 @@ import {
 import { db } from '../../lib/db'
 import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import { uploadLatestBackup } from '../../lib/cloudBackup'
+import { firebaseErrorToI18nKey } from '../../lib/firebaseErrors'
 import PageHeader from '../../components/ui/PageHeader'
 import Modal from '../../components/ui/Modal'
 import UserAvatar from '../../components/ui/UserAvatar'
@@ -213,7 +214,20 @@ export default function SettingsHome() {
               await Promise.race([
                 uploadLatestBackup(authUserId, uploadPayload, { isEncrypted: true }),
                 new Promise((resolve) => setTimeout(resolve, 7000)),
-              ]).catch(() => {})
+              ]).catch((err) => {
+                if (typeof window !== 'undefined') {
+                  const errorKey = err ? (err.i18nKey || firebaseErrorToI18nKey(err)) : 'profile.cloud.err.generic'
+                  window.dispatchEvent(
+                    new CustomEvent('ft-show-toast', {
+                      detail: {
+                        title: t('common.error', 'Terjadi Kesalahan'),
+                        message: t(errorKey),
+                        type: 'danger',
+                      },
+                    })
+                  )
+                }
+              })
             }
           }
         }

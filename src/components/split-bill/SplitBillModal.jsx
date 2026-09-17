@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
@@ -17,7 +17,8 @@ import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
 import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { createTransaction } from '../../services/transactionService'
-import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
+import { formatCurrency, formatMoneyInput, parseMoneyInput, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
+import { fetchCurrencyRates, getCachedCurrencyRates } from '../../lib/api'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 
@@ -52,13 +53,21 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     { id: '2', name: 'Teman 2', amount: '', isPayer: false },
   ])
 
+  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
+
+  useEffect(() => {
+    fetchCurrencyRates('USD')
+      .then((r) => r && setRates(r))
+      .catch(() => {})
+  }, [])
+
   const wallets = useLiveQuery(
     async () => {
-      const raw = await db.wallets.toArray()
+      const raw = await db.wallets.filter((w) => !w.isArchived).toArray()
       if (!raw || raw.length === 0) return []
-      return await getAllWalletBalances(raw)
+      return await getAllWalletBalances(raw, rates)
     },
-    [],
+    [rates],
     []
   )
 

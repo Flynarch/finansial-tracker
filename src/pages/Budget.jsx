@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, subMonths, startOfMonth } from 'date-fns'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -84,7 +84,11 @@ function Budget() {
       db.transactions
         .where('date')
         .between(budgetPeriod.startDate, `${budgetPeriod.endDate}\uffff`, true, true)
-        .filter((tx) => tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
+        .filter((tx) =>
+          tx.isPendingReview !== true &&
+          tx.isPendingReview !== 1 &&
+          (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
+        )
         .toArray(),
     [budgetPeriod.startDate, budgetPeriod.endDate],
     []
@@ -92,13 +96,15 @@ function Budget() {
 
   const sortedMonthBudgets = useMemo(() => {
     const list = (monthBudgets ?? []).map((b) => {
-      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, defaultCurrency, rates)
+      const budgetCurrency = b.currency || defaultCurrency
+      const spent = calculateBudgetSpent(b.category, monthExpenseTxs, budgetCurrency, rates)
       const limit = toSafeNumber(b.limit)
       const pct = limit > 0 ? (spent / limit) * 100 : 0
       const remaining = Math.max(0, limit - spent)
       const isOver = spent > limit
       return {
         ...b,
+        currency: budgetCurrency,
         spent,
         limit,
         pct,
@@ -110,23 +116,33 @@ function Budget() {
   }, [monthBudgets, monthExpenseTxs, defaultCurrency, rates])
 
   const summary = useMemo(() => {
+    const allBudget = sortedMonthBudgets.find((b) => b.category === 'all' || b.category === 'semua')
+    const categoryBudgets = sortedMonthBudgets.filter((b) => b.category !== 'all' && b.category !== 'semua')
+
     let totalSpent = 0
     let totalLimit = 0
-    sortedMonthBudgets.forEach((b) => {
-      totalSpent += b.spent
-      totalLimit += b.limit
-    })
+
+    if (allBudget) {
+      totalSpent = convertCurrency(allBudget.spent, allBudget.currency || defaultCurrency, defaultCurrency, rates)
+      totalLimit = convertCurrency(allBudget.limit, allBudget.currency || defaultCurrency, defaultCurrency, rates)
+    } else {
+      categoryBudgets.forEach((b) => {
+        totalSpent += convertCurrency(b.spent, b.currency || defaultCurrency, defaultCurrency, rates)
+        totalLimit += convertCurrency(b.limit, b.currency || defaultCurrency, defaultCurrency, rates)
+      })
+    }
+
     const pct = totalLimit > 0 ? clampPercent((totalSpent / totalLimit) * 100) : 0
     const remaining = Math.max(0, totalLimit - totalSpent)
     const isOver = totalSpent > totalLimit && totalLimit > 0
     const overAmount = isOver ? totalSpent - totalLimit : 0
     return { totalSpent, totalLimit, pct, remaining, isOver, overAmount }
-  }, [sortedMonthBudgets])
+  }, [sortedMonthBudgets, defaultCurrency, rates])
 
   const prevMonthKey = useMemo(() => {
     try {
       const [y, m] = month.split('-').map(Number)
-      const d = new Date(y, m - 2, 1)
+      const d = subMonths(startOfMonth(new Date(y, m - 1, 1)), 1)
       return format(d, 'yyyy-MM')
     } catch {
       return ''
@@ -148,6 +164,7 @@ function Budget() {
         newBudgets.push({
           category: b.category,
           limit: b.limit,
+          currency: b.currency || defaultCurrency,
           month: month,
         })
       }
@@ -185,7 +202,7 @@ function Budget() {
               category: si.category || tx.category,
               isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
               excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-              isExcludeAnalyticsTx: false,
+              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
             }
             processItem(si.category || tx.category, si.amount, itemTx)
           }

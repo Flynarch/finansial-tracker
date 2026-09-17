@@ -21,6 +21,7 @@ import {
   computeNetWorthGrowth,
   generateMonthlyData,
   calculatePeriodStats,
+  calculate1DHourlyFlow,
 } from '../src/hooks/useDashboardData'
 import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../src/lib/budgetUtils'
 
@@ -243,5 +244,210 @@ describe('useDashboardData - Unit Tests', () => {
       // Only the 200k expense should be counted; 300k tabungan is excluded from analytics
       expect(stats.expense).toBe(200000)
     })
+
+    it('converts multi-currency split transactions using parent tx.currency when si.currency is omitted', () => {
+      const currentPeriod = { startDate: '2026-03-25', endDate: '2026-04-24' }
+      const mockRates = { USD: 1, IDR: 16000 }
+      const mockTxs = [
+        {
+          id: 11,
+          date: '2026-03-29',
+          type: 'expense',
+          amount: 50, // 50 USD total
+          currency: 'USD', // Resolved from wallet in normalizedTransactions
+          isSplit: true,
+          splitItems: [
+            { category: 'makanan', amount: 30, type: 'expense' }, // 30 USD -> 480,000 IDR
+            { category: 'transportasi', amount: 20, type: 'expense' }, // 20 USD -> 320,000 IDR
+          ],
+        },
+      ]
+
+      const stats = calculatePeriodStats(mockTxs, currentPeriod, 'IDR', mockRates)
+      // 30 USD * 16,000 + 20 USD * 16,000 = 800,000 IDR
+      expect(stats.expense).toBe(800000)
+      expect(stats.income).toBe(0)
+    })
+
+    it('correctly handles distinct per-item currencies within a split transaction', () => {
+      const currentPeriod = { startDate: '2026-03-25', endDate: '2026-04-24' }
+      const mockRates = { USD: 1, SGD: 1.35, IDR: 16000 }
+      const mockTxs = [
+        {
+          id: 12,
+          date: '2026-03-30',
+          type: 'expense',
+          amount: 100,
+          currency: 'USD',
+          isSplit: true,
+          splitItems: [
+            { category: 'belanja', amount: 10, currency: 'USD', type: 'expense' }, // 10 USD = 160,000 IDR
+            { category: 'hiburan', amount: 13.5, currency: 'SGD', type: 'expense' }, // 13.5 SGD = 10 USD = 160,000 IDR
+            { category: 'donasi', amount: 50000, currency: 'IDR', type: 'expense' }, // 50,000 IDR
+          ],
+        },
+      ]
+
+      const stats = calculatePeriodStats(mockTxs, currentPeriod, 'IDR', mockRates)
+      // 160,000 + 160,000 + 50,000 = 370,000 IDR
+      expect(stats.expense).toBeCloseTo(370000, -1)
+    })
+  })
+
+  describe('calculate1DHourlyFlow (1D Timeline Invariant Integrity)', () => {
+    const todayKey = '2026-09-17'
+    const activeWalletIdSet = new Set(['1', '2'])
+    const walletCurrencyMap = new Map([
+      ['1', 'IDR'],
+      ['2', 'USD'],
+      ['3', 'IDR'], // Archived wallet
+    ])
+
+    it('places active wallet income and expense at appropriate hour', () => {
+      const txs = [
+        {
+          id: 1,
+          date: todayKey,
+          type: 'income',
+          convertedAmount: 500000,
+          walletId: 1,
+          createdAt: new Date(`${todayKey}T09:15:00`).getTime(),
+        },
+        {
+          id: 2,
+          date: todayKey,
+          type: 'expense',
+          convertedAmount: 150000,
+          walletId: 1,
+          createdAt: new Date(`${todayKey}T14:30:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[9]).toBe(500000)
+      expect(flow[14]).toBe(-150000)
+      expect(flow[0]).toBe(0)
+    })
+
+    it('ignores transactions in archived wallets to prevent active cash leakage', () => {
+      const txs = [
+        {
+          id: 3,
+          date: todayKey,
+          type: 'income',
+          convertedAmount: 1000000,
+          walletId: 3, // Archived wallet (not in activeWalletIdSet)
+          createdAt: new Date(`${todayKey}T10:00:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[10]).toBe(0)
+    })
+
+    it('ignores intra-active transfers as they do not change total active cash', () => {
+      const txs = [
+        {
+          id: 4,
+          date: todayKey,
+          type: 'transfer',
+          convertedAmount: 200000,
+          walletId: 1, // Active wallet
+          targetWalletId: 2, // Active wallet
+          createdAt: new Date(`${todayKey}T11:00:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[11]).toBe(0)
+    })
+
+    it('decreases active cash on transfer from active wallet to archived wallet', () => {
+      const txs = [
+        {
+          id: 5,
+          date: todayKey,
+          type: 'transfer',
+          convertedAmount: 250000,
+          walletId: 1, // Active
+          targetWalletId: 3, // Archived
+          createdAt: new Date(`${todayKey}T13:00:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[13]).toBe(-250000)
+    })
+
+    it('increases active cash on transfer from archived wallet to active wallet', () => {
+      const txs = [
+        {
+          id: 6,
+          date: todayKey,
+          type: 'transfer',
+          convertedAmount: 300000,
+          targetAmount: 300000,
+          walletId: 3, // Archived
+          targetWalletId: 1, // Active
+          createdAt: new Date(`${todayKey}T15:00:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[15]).toBe(300000)
+    })
+
+    it('ignores transactions flagged as isPendingReview', () => {
+      const txs = [
+        {
+          id: 7,
+          date: todayKey,
+          type: 'income',
+          convertedAmount: 999999,
+          walletId: 1,
+          isPendingReview: true,
+          createdAt: new Date(`${todayKey}T08:00:00`).getTime(),
+        },
+      ]
+
+      const flow = calculate1DHourlyFlow(txs, todayKey, activeWalletIdSet, walletCurrencyMap, 'IDR', null)
+      expect(flow[8]).toBe(0)
+    })
+  })
+
+  describe('calculatePeriodStats', () => {
+    it('returns 0 for invalid or empty inputs', () => {
+      expect(calculatePeriodStats([], null)).toEqual({ income: 0, expense: 0 })
+      expect(calculatePeriodStats(null, { startDate: '2026-03-01', endDate: '2026-03-31' })).toEqual({ income: 0, expense: 0 })
+    })
+
+    it('rounds floating point income and expense values to 2 decimals to prevent IEEE 754 precision drift', () => {
+      const txs = [
+        { date: '2026-03-05', type: 'expense', amount: 0.1, currency: 'USD' },
+        { date: '2026-03-06', type: 'expense', amount: 0.2, currency: 'USD' },
+        { date: '2026-03-07', type: 'income', amount: 0.14, currency: 'USD' },
+        { date: '2026-03-08', type: 'income', amount: 0.28, currency: 'USD' },
+      ]
+      const stats = calculatePeriodStats(txs, { startDate: '2026-03-01', endDate: '2026-03-31' }, 'USD')
+      expect(stats.expense).toBe(0.3)
+      expect(stats.income).toBe(0.42)
+    })
+
+    it('unpacks split transactions properly and rounds results', () => {
+      const txs = [
+        {
+          date: '2026-03-05',
+          isSplit: true,
+          splitItems: [
+            { type: 'expense', amount: 0.1, currency: 'USD' },
+            { type: 'expense', amount: 0.2, currency: 'USD' },
+          ],
+        },
+      ]
+      const stats = calculatePeriodStats(txs, { startDate: '2026-03-01', endDate: '2026-03-31' }, 'USD')
+      expect(stats.expense).toBe(0.3)
+    })
   })
 })
+
+

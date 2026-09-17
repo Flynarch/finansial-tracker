@@ -232,6 +232,12 @@ const useSettingsStore = create((set, get) => ({
     }
     set(updates)
     await get().persist(updates)
+    try {
+      const { initNotificationChannels } = await import('../lib/smartNotifications')
+      await initNotificationChannels()
+    } catch {
+      /* ignore */
+    }
   },
   unlock: () => set({ isUnlocked: true }),
   lock: () => set({ isUnlocked: false }),

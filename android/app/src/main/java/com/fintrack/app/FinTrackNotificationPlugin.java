@@ -220,6 +220,9 @@ public class FinTrackNotificationPlugin extends Plugin {
                 }
             }
 
+            String btnText = call.getString("btnText", "+ Catat");
+            String balanceLabel = call.getString("balanceLabel", "Kekayaan Bersih");
+
             SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
             prefs.edit()
                 .putString("fintrack_widget_balance", balance)
@@ -235,6 +238,8 @@ public class FinTrackNotificationPlugin extends Plugin {
                 .putString("period", period)
                 .putString("fintrack_widget_sparkline", sparklineData)
                 .putString("sparklineData", sparklineData)
+                .putString("fintrack_widget_btn_text", btnText)
+                .putString("fintrack_widget_balance_label", balanceLabel)
                 .commit();
 
             // Direct in-process update to all active widget instances
@@ -243,7 +248,7 @@ public class FinTrackNotificationPlugin extends Plugin {
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
             if (appWidgetIds != null && appWidgetIds.length > 0) {
                 for (int appWidgetId : appWidgetIds) {
-                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData);
+                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, btnText, balanceLabel);
                 }
             }
 

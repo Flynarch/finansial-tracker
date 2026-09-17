@@ -121,7 +121,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, initial
     }
 
     try {
-      await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId)
+      await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId, currency)
       hapticSuccess()
       onSaved?.()
       onClose?.()

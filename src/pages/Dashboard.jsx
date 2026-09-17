@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useDashboardData } from '../hooks/useDashboardData'
 import { formatCurrency } from '../lib/utils'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
@@ -7,7 +7,7 @@ import DashboardNetWorthChart from '../components/dashboard/DashboardNetWorthCha
 import DashboardHabitWidget from '../components/dashboard/DashboardHabitWidget'
 import DashboardPulseBento from '../components/dashboard/DashboardPulseBento'
 import DashboardLoanWidget from '../components/dashboard/DashboardLoanWidget'
-import DashboardZoomOverlay from '../components/dashboard/DashboardZoomOverlay'
+const DashboardZoomOverlay = lazy(() => import('../components/dashboard/DashboardZoomOverlay'))
 import BudgetSavingsDetailSheet from '../components/dashboard/BudgetSavingsDetailSheet'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
@@ -220,6 +220,7 @@ export default function Dashboard() {
             isDbLoading={isDbLoading}
             budgetGoalSummary={budgetGoalSummary}
             defaultCurrency={defaultCurrency}
+            rates={rates}
             locale={locale}
             onOpenBudgetDetail={() => setDetailSheetMode('budget')}
             onOpenSavingsDetail={() => setDetailSheetMode('savings')}
@@ -246,6 +247,7 @@ export default function Dashboard() {
           initialMode={detailSheetMode || 'budget'}
           budgetGoalSummary={budgetGoalSummary}
           defaultCurrency={defaultCurrency}
+          rates={rates}
           locale={locale}
           t={t}
           onOpenQuickBudget={() => setIsOpenQuickBudget(true)}
@@ -253,34 +255,36 @@ export default function Dashboard() {
         />
 
         {/* Zoom Details Modal Overlay */}
-        <DashboardZoomOverlay
-          zoomedChart={zoomedChart}
-          zoomVisible={zoomVisible}
-          onCloseZoom={closeZoom}
-          defaultCurrency={defaultCurrency}
-          locale={locale}
-          t={t}
-          reduceMotion={reduceMotion}
-          zoomRevenueRange={zoomRevenueRange}
-          setZoomRevenueRange={setZoomRevenueRange}
-          zoomRevenueValue={zoomRevenueValue}
-          netWorthGrowth={netWorthGrowth}
-          comparePrevious={comparePrevious}
-          setComparePrevious={setComparePrevious}
-          comparisonSummary={comparisonSummary}
-          zoomCombinedChartSeries={zoomCombinedChartSeries}
-          zoomRevenueChartDomain={zoomRevenueChartDomain}
-          zoomRevenueAxisTicks={zoomRevenueAxisTicks}
-          formatAxisCurrency={formatAxisCurrency}
-          rangedSummaryStats={rangedSummaryStats}
-          zoomPeakAndFloor={zoomPeakAndFloor}
-          assetBreakdownData={assetBreakdownData}
-          zoomTooltipDismissed={zoomTooltipDismissed}
-          setZoomTooltipDismissed={setZoomTooltipDismissed}
-          globalWeeklyTrend={globalWeeklyTrend}
-          budgetGoalSummary={budgetGoalSummary}
-          currentMonthLabel={currentMonthLabel}
-        />
+        <Suspense fallback={null}>
+          <DashboardZoomOverlay
+            zoomedChart={zoomedChart}
+            zoomVisible={zoomVisible}
+            onCloseZoom={closeZoom}
+            defaultCurrency={defaultCurrency}
+            locale={locale}
+            t={t}
+            reduceMotion={reduceMotion}
+            zoomRevenueRange={zoomRevenueRange}
+            setZoomRevenueRange={setZoomRevenueRange}
+            zoomRevenueValue={zoomRevenueValue}
+            netWorthGrowth={netWorthGrowth}
+            comparePrevious={comparePrevious}
+            setComparePrevious={setComparePrevious}
+            comparisonSummary={comparisonSummary}
+            zoomCombinedChartSeries={zoomCombinedChartSeries}
+            zoomRevenueChartDomain={zoomRevenueChartDomain}
+            zoomRevenueAxisTicks={zoomRevenueAxisTicks}
+            formatAxisCurrency={formatAxisCurrency}
+            rangedSummaryStats={rangedSummaryStats}
+            zoomPeakAndFloor={zoomPeakAndFloor}
+            assetBreakdownData={assetBreakdownData}
+            zoomTooltipDismissed={zoomTooltipDismissed}
+            setZoomTooltipDismissed={setZoomTooltipDismissed}
+            globalWeeklyTrend={globalWeeklyTrend}
+            budgetGoalSummary={budgetGoalSummary}
+            currentMonthLabel={currentMonthLabel}
+          />
+        </Suspense>
 
         {/* Action Modals */}
         <BudgetSheetModal

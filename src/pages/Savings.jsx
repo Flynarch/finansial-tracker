@@ -607,6 +607,7 @@ function Savings() {
                   walletId: targetWalletIdNum,
                   goalId: deletingGoal.id,
                   createdAt: Date.now(),
+                  isExcludeAnalyticsTx: true,
                   isExcludeFromAnalytics: true,
                   excludeFromAnalytics: true,
                 })
@@ -618,10 +619,13 @@ function Savings() {
               if (logsToDelete.length > 0) {
                 await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
               }
+              await db.transactions
+                .filter((tx) => String(tx.goalId) === String(deletingGoal.id))
+                .modify({ goalId: null })
             })
 
             if (currentAmt > 0 && targetWalletIdNum) {
-              void invalidateWalletBalance([targetWalletIdNum])
+              await invalidateWalletBalance([targetWalletIdNum])
             }
             setDeletingGoal(null)
           }

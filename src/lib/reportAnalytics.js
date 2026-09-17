@@ -181,12 +181,13 @@ export function aggregateMonthlyIncomeExpense(
           category: si.category || tx.category,
           isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
           excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-          isExcludeAnalyticsTx: false,
+          isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
         }
         if (isExcludeAnalyticsTx(itemTx)) return
         let val = toSafeNumber(si.amount)
-        if (tx.currency && tx.currency !== defaultCurrency) {
-          val = convertCurrency(val, tx.currency, defaultCurrency, rates)
+        const itemCurrency = si.currency || tx.currency || defaultCurrency
+        if (itemCurrency !== defaultCurrency) {
+          val = convertCurrency(val, itemCurrency, defaultCurrency, rates)
         }
         const itemType = si.type || tx.type
         if (itemType === 'income') row.income += val
@@ -225,20 +226,23 @@ export function calculateNetWorthSummary(
   loans = [],
   rates = null,
   defaultCurrency = 'IDR',
-  savings = []
+  savings = [],
+  allWallets = null
 ) {
-  const computedWallets = computeAllWalletBalances(wallets || [], allTransactions || [], rates)
-  const totalCash = computedWallets.reduce((sum, w) => {
-    return (
-      sum +
-      convertCurrency(
-        toSafeNumber(w.currentBalance),
-        w.currency || defaultCurrency,
-        defaultCurrency,
-        rates
+  const computedWallets = computeAllWalletBalances(wallets || [], allTransactions || [], rates, allWallets || wallets)
+  const totalCash = computedWallets
+    .filter((w) => !w.isArchived)
+    .reduce((sum, w) => {
+      return (
+        sum +
+        convertCurrency(
+          toSafeNumber(w.currentBalance),
+          w.currency || defaultCurrency,
+          defaultCurrency,
+          rates
+        )
       )
-    )
-  }, 0)
+    }, 0)
 
   const investmentValue = (investments || []).reduce((acc, row) => {
     return (

@@ -337,7 +337,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                           </span>
                         </div>
                         <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--muted)]">
-                          {formatCurrency(row.spent, defaultCurrency, locale)} / <span className="text-[var(--fg)]">{formatCurrency(row.limit, defaultCurrency, locale)}</span>
+                          {formatCurrency(row.spent, row.currency || defaultCurrency, locale)} / <span className="text-[var(--fg)]">{formatCurrency(row.limit, row.currency || defaultCurrency, locale)}</span>
                         </p>
                         <ProgressBar value={row.pct} tone="budget" className="mt-2" />
                       </div>

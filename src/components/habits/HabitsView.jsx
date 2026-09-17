@@ -11,6 +11,13 @@ import HabitColorPicker from './HabitColorPicker'
 import { db } from '../../lib/db'
 import useSwipeAction from '../../hooks/useSwipeAction'
 import useTranslation from '../../hooks/useTranslation'
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_ACTION_TYPES,
+  FINTRACK_NOTIFICATION_COLOR,
+  NOTIFICATION_SMALL_ICON,
+  NOTIFICATION_LARGE_ICON,
+} from '../../lib/smartNotifications'
 
 const HABIT_COLORS = ['#34d399', '#38bdf8', '#a855f7', '#fb7185', '#fcd34d', '#fb923c']
 const HABIT_CATEGORIES = ['Kesehatan', 'Belajar', 'Produktivitas', 'Keuangan', 'Lainnya']
@@ -226,13 +233,21 @@ export default function HabitsView() {
       await LocalNotifications.schedule({
         notifications: [
           {
-            title: "Waktunya Habit: " + title,
-            body: `Jangan lupa untuk menyelesaikan habit "${title}" hari ini!`,
             id: habitId,
+            title: t('habits.reminderNotifTitle', 'Pengingat Kebiasaan'),
+            body: `${title} • ${t('habits.reminderNotifBody', 'Waktunya menyelesaikan target kebiasaan hari ini')}`,
+            largeBody: `${t('notifications.habitHeader', 'Pelacak Kebiasaan • FinTrack')}\n${title}\n• ${t('notifications.habitBullet1', 'Target: Konsistensi harian memperkuat kontrol finansial Anda.')}\n• ${t('notifications.habitBullet2', 'Aksi: Buka aplikasi dan tandai progres kebiasaan Anda.')}`,
+            summaryText: t('notifications.summaryHabit', 'Disiplin Finansial'),
+            channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+            actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
+            extra: { route: '/todos' },
             schedule: {
               on: { hour, minute },
               allowWhileIdle: true,
-            }
+            },
+            smallIcon: NOTIFICATION_SMALL_ICON,
+            largeIcon: NOTIFICATION_LARGE_ICON,
+            iconColor: FINTRACK_NOTIFICATION_COLOR,
           }
         ]
       })

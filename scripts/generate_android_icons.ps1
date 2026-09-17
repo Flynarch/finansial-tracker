@@ -1,5 +1,28 @@
 Add-Type -AssemblyName System.Drawing
 
+function Draw-RoundedRectangle {
+    param(
+        [System.Drawing.Graphics]$g,
+        [System.Drawing.Brush]$brush,
+        [float]$x,
+        [float]$y,
+        [float]$width,
+        [float]$height,
+        [float]$radius
+    )
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $d = $radius * 2
+    if ($d -gt $width) { $d = $width }
+    if ($d -gt $height) { $d = $height }
+    $path.AddArc($x, $y, $d, $d, 180, 90)
+    $path.AddArc($x + $width - $d, $y, $d, $d, 270, 90)
+    $path.AddArc($x + $width - $d, $y + $height - $d, $d, $d, 0, 90)
+    $path.AddArc($x, $y + $height - $d, $d, $d, 90, 90)
+    $path.CloseFigure()
+    $g.FillPath($brush, $path)
+    $path.Dispose()
+}
+
 function Draw-FinTrackIcon {
     param(
         [int]$width,
@@ -44,27 +67,27 @@ function Draw-FinTrackIcon {
         $g.TranslateTransform($offsetX, $offsetY)
     }
 
-    # Bar 1: rect x="15" y="65" width="18" height="20" rx="3" fill="#4C6B54"
+    # Bar 1: rect x="15" y="65" width="18" height="20" rx="4"
     $b1 = New-Object System.Drawing.SolidBrush($c1)
-    $g.FillRectangle($b1, [float](15 * $scale), [float](65 * $scale), [float](18 * $scale), [float](20 * $scale))
+    Draw-RoundedRectangle -g $g -brush $b1 -x (15 * $scale) -y (65 * $scale) -width (18 * $scale) -height (20 * $scale) -radius (4 * $scale)
     $b1.Dispose()
 
-    # Bar 2: rect x="41" y="50" width="18" height="35" rx="3" fill="#8AA68F"
+    # Bar 2: rect x="41" y="50" width="18" height="35" rx="4"
     $b2 = New-Object System.Drawing.SolidBrush($c2)
-    $g.FillRectangle($b2, [float](41 * $scale), [float](50 * $scale), [float](18 * $scale), [float](35 * $scale))
+    Draw-RoundedRectangle -g $g -brush $b2 -x (41 * $scale) -y (50 * $scale) -width (18 * $scale) -height (35 * $scale) -radius (4 * $scale)
     $b2.Dispose()
 
-    # Bar 3: rect x="67" y="30" width="18" height="55" rx="3" fill="#A15A42"
+    # Bar 3: rect x="67" y="30" width="18" height="55" rx="4"
     $b3 = New-Object System.Drawing.SolidBrush($c3)
-    $g.FillRectangle($b3, [float](67 * $scale), [float](30 * $scale), [float](18 * $scale), [float](55 * $scale))
+    Draw-RoundedRectangle -g $g -brush $b3 -x (67 * $scale) -y (30 * $scale) -width (18 * $scale) -height (55 * $scale) -radius (4 * $scale)
     $b3.Dispose()
 
-    # Apex cut: path d="M75,30 L85,30 L85,40 Z" fill="#F3EEE2"
+    # Apex cut: path d="M74,30 L85,30 L85,41 Z" fill="#F3EEE2"
     $pLight = New-Object System.Drawing.SolidBrush($cLight)
     $points = @(
-        (New-Object System.Drawing.PointF([float](75 * $scale), [float](30 * $scale))),
+        (New-Object System.Drawing.PointF([float](74 * $scale), [float](30 * $scale))),
         (New-Object System.Drawing.PointF([float](85 * $scale), [float](30 * $scale))),
-        (New-Object System.Drawing.PointF([float](85 * $scale), [float](40 * $scale)))
+        (New-Object System.Drawing.PointF([float](85 * $scale), [float](41 * $scale)))
     )
     $g.FillPolygon($pLight, $points)
     $pLight.Dispose()

@@ -330,6 +330,17 @@ describe('Indonesian Finance NLP Parser & Heuristics', () => {
       expect(findWalletInText('beli bakso tanpa dompet', mockWalletsWithDana, 1)).toBe(1)
     })
 
+    it('prioritizes longer wallet names to prevent shorter names from shadowing (Regression Guard)', () => {
+      // "BCA" is placed BEFORE "BCA Syariah" in array order
+      const walletsWithShadowing = [
+        { id: 1, name: 'BCA', currency: 'IDR' },
+        { id: 2, name: 'BCA Syariah', currency: 'IDR' },
+      ]
+      // Should match BCA Syariah (id 2), not BCA (id 1)
+      expect(findWalletInText('transfer ke bca syariah 500k', walletsWithShadowing, 1)).toBe(2)
+      expect(findWalletInText('bayar bca 100k', walletsWithShadowing, 1)).toBe(1)
+    })
+
     it('supports multiple clauses connected by lalu, terus, kemudian, serta', () => {
       const text = 'dapet gaji 5jt terus bayar kosan 1.5jt bca serta beli kopi 25rb gopay'
       const result = parseIndonesianFinancialText(text, mockWalletsWithDana, 'IDR', refDateMonday)
@@ -375,6 +386,150 @@ describe('Indonesian Finance NLP Parser & Heuristics', () => {
       expect(result).not.toBeNull()
       expect(result.error).toBe(true)
       expect(result.message).toMatch(/nominal/i)
+    })
+  })
+
+  describe('Transfer & Balance Movement Heuristic Parsing', () => {
+    const transferWallets = [
+      { id: 1, name: 'BCA', currency: 'IDR', institutionType: 'bank' },
+      { id: 2, name: 'GoPay', currency: 'IDR', institutionType: 'e-wallet' },
+      { id: 3, name: 'Dompet Tunai', currency: 'IDR', institutionType: 'cash' },
+    ]
+
+    it('parses transfer between two explicit wallets', () => {
+      const res = parseIndonesianFinancialText('transfer 50rb dari bca ke gopay', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.type).toBe('transactions')
+      expect(res.transactions).toHaveLength(1)
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(50000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(2)
+    })
+
+    it('parses pindah saldo keyword', () => {
+      const res = parseIndonesianFinancialText('pindah saldo 100k dari bca ke dompet tunai', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(100000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(3)
+    })
+
+    it('parses tarik tunai keyword defaulting destination to cash wallet', () => {
+      const res = parseIndonesianFinancialText('tarik tunai 200rb dari bca', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(200000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(3)
+    })
+
+    it('parses top up keyword with target e-wallet and funding source', () => {
+      const res = parseIndonesianFinancialText('top up gopay 50k dari bca', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(50000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(2)
+    })
+
+    it('parses top up into multi-word wallet containing stop words', () => {
+      const res = parseIndonesianFinancialText('top up dompet tunai 50k dari bca', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(50000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(3)
+    })
+
+    it('parses top up funded from multi-word wallet', () => {
+      const res = parseIndonesianFinancialText('top up gopay 50k pakai dompet tunai', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(50000)
+      expect(res.transactions[0].walletId).toBe(3)
+      expect(res.transactions[0].targetWalletId).toBe(2)
+    })
+
+    it('parses simple transfer between multi-word wallets', () => {
+      const res = parseIndonesianFinancialText('transfer bca ke dompet tunai 75k', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].type).toBe('transfer')
+      expect(res.transactions[0].amount).toBe(75000)
+      expect(res.transactions[0].walletId).toBe(1)
+      expect(res.transactions[0].targetWalletId).toBe(3)
+    })
+
+    it('returns error when transfer nominal is missing', () => {
+      const res = parseIndonesianFinancialText('transfer dari bca ke gopay', transferWallets, 'IDR', refDateMonday)
+      expect(res).not.toBeNull()
+      expect(res.error).toBe(true)
+      expect(res.message).toMatch(/nominal/i)
+    })
+  })
+
+  describe('Category Sanitizer Fallback', () => {
+    it('does not force makan_siang onto non-food expense categories', () => {
+      const sanitizedTransport = sanitizeCategoryPath('transportasi', 'expense')
+      expect(sanitizedTransport).not.toContain('makan_siang')
+      expect(sanitizedTransport.startsWith('transportasi/')).toBe(true)
+
+      const sanitizedHealth = sanitizeCategoryPath('kesehatan', 'expense')
+      expect(sanitizedHealth).not.toContain('makan_siang')
+      expect(sanitizedHealth.startsWith('kesehatan/')).toBe(true)
+    })
+  })
+
+  describe('LOW-01 & MED-04: DANA Lookahead & Missing Nominal Income Interception', () => {
+    const danaWallets = [
+      { id: 1, name: 'BCA', currency: 'IDR' },
+      { id: 2, name: 'DANA', currency: 'IDR' },
+    ]
+
+    it('does not match DANA wallet when conceptual phrase like dana darurat is used', () => {
+      const res = parseIndonesianFinancialText('tabung ke dana darurat 500rb', danaWallets, 'IDR')
+      expect(res).not.toBeNull()
+      // Should NOT match DANA wallet (id: 2), should fallback to default (id: 1)
+      expect(res.transactions[0].walletId).toBe(1)
+    })
+
+    it('does not match DANA wallet for dana pensiun or dana cadangan', () => {
+      const resPensiun = parseIndonesianFinancialText('alokasi dana pensiun 1jt', danaWallets, 'IDR')
+      expect(resPensiun).not.toBeNull()
+      expect(resPensiun.transactions[0].walletId).toBe(1)
+
+      const resCadangan = parseIndonesianFinancialText('simpan di dana cadangan 200rb', danaWallets, 'IDR')
+      expect(resCadangan).not.toBeNull()
+      expect(resCadangan.transactions[0].walletId).toBe(1)
+    })
+
+    it('correctly matches DANA wallet when used as payment method', () => {
+      const res = parseIndonesianFinancialText('beli kopi 25rb pakai dana', danaWallets, 'IDR')
+      expect(res).not.toBeNull()
+      expect(res.transactions[0].walletId).toBe(2)
+    })
+
+    it('intercepts income verbs without amount and prompts user locally (MED-04)', () => {
+      const gajiRes = parseIndonesianFinancialText('gaji bulanan', danaWallets, 'IDR')
+      expect(gajiRes).not.toBeNull()
+      expect(gajiRes.error).toBe(true)
+      expect(gajiRes.message).toContain('Nominal transaksi belum disebutkan')
+
+      const terimaRes = parseIndonesianFinancialText('terima uang', danaWallets, 'IDR')
+      expect(terimaRes).not.toBeNull()
+      expect(terimaRes.error).toBe(true)
+      expect(terimaRes.message).toContain('Nominal transaksi belum disebutkan')
+
+      const kirimanRes = parseIndonesianFinancialText('dapat kiriman', danaWallets, 'IDR')
+      expect(kirimanRes).not.toBeNull()
+      expect(kirimanRes.error).toBe(true)
+      expect(kirimanRes.message).toContain('Nominal transaksi belum disebutkan')
+
+      const sakuRes = parseIndonesianFinancialText('uang saku', danaWallets, 'IDR')
+      expect(sakuRes).not.toBeNull()
+      expect(sakuRes.error).toBe(true)
+      expect(sakuRes.message).toContain('Nominal transaksi belum disebutkan')
     })
   })
 })

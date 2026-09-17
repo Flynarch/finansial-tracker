@@ -87,7 +87,7 @@ export default function ProfileScreen() {
 
         {/* Version Footer */}
         <View style={styles.footer}>
-          <Text style={styles.versionText}>FinTrack v4.9.0 • React Native Edition</Text>
+          <Text style={styles.versionText}>FinTrack v4.9.1 • React Native Edition</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

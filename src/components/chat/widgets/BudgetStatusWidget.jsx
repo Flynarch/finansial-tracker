@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { CircleDollarSign, ArrowUpRight, AlertTriangle, CheckCircle2, AlertOctagon } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
 import useChatStore from '../../../store/useChatStore'
+import useSettingsStore from '../../../store/useSettingsStore'
 import { formatCurrency, toSafeNumber } from '../../../lib/utils'
 import { getTransactionCategoryLabels } from '../../../lib/categoryIcon'
+import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../../../lib/budgetUtils'
+import { parseISO, differenceInCalendarDays } from 'date-fns'
 
 export default function BudgetStatusWidget({
   category = 'makanMinum',
@@ -16,6 +19,7 @@ export default function BudgetStatusWidget({
   const navigate = useNavigate()
   const { locale, t } = useTranslation()
   const onClose = useChatStore((s) => s.closeChat)
+  const budgetCycleStartDay = useSettingsStore((s) => s.budgetCycleStartDay) || 1
 
   const numLimit = toSafeNumber(limit)
   const numSpent = toSafeNumber(spent)
@@ -32,12 +36,26 @@ export default function BudgetStatusWidget({
     navigate('/budget')
   }
 
+  // Pacing calculations (Day of Cycle vs Spend %) respecting custom payday cycle
+  const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
+  const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
+  const now = new Date()
+  const startDate = parseISO(budgetPeriod.startDate)
+  const endDate = parseISO(budgetPeriod.endDate)
+  const totalCycleDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1)
+  const daysElapsed = Math.min(totalCycleDays, Math.max(1, differenceInCalendarDays(now, startDate) + 1))
+  const daysRemaining = Math.max(1, totalCycleDays - daysElapsed)
+  const monthElapsedPct = Math.min(100, Math.max(1, Math.round((daysElapsed / totalCycleDays) * 100)))
+  const dailyAllowance = remaining > 0 ? Math.round(remaining / daysRemaining) : 0
+  const pacingDiff = percentage - monthElapsedPct
+
   // Status Theme & Badge
   let statusBadge = {
     label: t('budget.status.safe', 'Aman'),
     colorClass: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
     barClass: 'bg-emerald-500',
     Icon: CheckCircle2,
+    pacingText: locale === 'en' ? 'On Track' : 'Terkendali',
   }
 
   if (isOverbudget) {
@@ -46,6 +64,15 @@ export default function BudgetStatusWidget({
       colorClass: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
       barClass: 'bg-rose-500',
       Icon: AlertOctagon,
+      pacingText: locale === 'en' ? 'Over Budget' : 'Melebihi Limit',
+    }
+  } else if (pacingDiff > 10) {
+    statusBadge = {
+      label: locale === 'en' ? `Overpacing (+${pacingDiff}%)` : `Boros (+${pacingDiff}%)`,
+      colorClass: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+      barClass: 'bg-rose-500',
+      Icon: AlertTriangle,
+      pacingText: locale === 'en' ? 'High Velocity' : 'Pengeluaran Cepat',
     }
   } else if (isNearLimit) {
     statusBadge = {
@@ -53,13 +80,14 @@ export default function BudgetStatusWidget({
       colorClass: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
       barClass: 'bg-amber-500',
       Icon: AlertTriangle,
+      pacingText: locale === 'en' ? 'Near Limit' : 'Mendekati Limit',
     }
   }
 
   const StatusIcon = statusBadge.Icon
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm my-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm my-1.5 ft-msg-enter">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--border)]/40">
         <div className="flex items-center gap-2 min-w-0">
@@ -80,49 +108,51 @@ export default function BudgetStatusWidget({
         </div>
       </div>
 
-      {/* Numerical Stats */}
-      <div className="grid grid-cols-2 gap-2 my-3">
-        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/70 p-2.5">
-          <div className="text-[10px] font-medium text-[var(--muted)]">{t('budget.spent', 'Terpakai')}</div>
-          <div className="text-xs sm:text-sm font-black text-[var(--fg)] mt-0.5">
+      {/* Numerical Stats Hero */}
+      <div className="flex items-baseline justify-between mt-3 mb-2">
+        <div>
+          <span className="text-lg sm:text-xl font-black tabular-nums text-[var(--fg)] font-mono">
             {formatCurrency(numSpent, currency)}
-          </div>
+          </span>
+          <span className="text-xs text-[var(--muted)] font-medium"> / {formatCurrency(numLimit, currency)}</span>
         </div>
-
-        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/70 p-2.5">
-          <div className="text-[10px] font-medium text-[var(--muted)]">{t('budget.limit', 'Batas Anggaran')}</div>
-          <div className="text-xs sm:text-sm font-black text-[var(--fg)] mt-0.5">
-            {formatCurrency(numLimit, currency)}
-          </div>
-        </div>
+        <span className="text-xs font-bold text-[var(--muted)]">
+          {percentage}% {locale === 'en' ? 'spent' : 'terpakai'}
+        </span>
       </div>
 
-      {/* Dynamic Progress Bar */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[11px] font-bold">
-          <span className="text-[var(--muted)]">{t('budget.progress', 'Progres')}</span>
-          <span className={isOverbudget ? 'text-rose-500' : isNearLimit ? 'text-amber-500' : 'text-emerald-500'}>
-            {percentage}%
-          </span>
-        </div>
-        <div className="h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden border border-[var(--border)]/60">
+      {/* Dual-Marker Progress Track */}
+      <div className="space-y-1.5 my-2">
+        <div className="relative h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden border border-[var(--border)]/60">
           <div
             className={`h-full rounded-full transition-all duration-500 ${statusBadge.barClass}`}
             style={{ width: `${Math.min(percentage, 100)}%` }}
           />
+          {/* Day of cycle marker */}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-[var(--fg)]/40 pointer-events-none"
+            style={{ left: `${monthElapsedPct}%` }}
+            title={`Hari ke-${daysElapsed} (${monthElapsedPct}%)`}
+          />
+        </div>
+        <div className="flex justify-between text-[9.5px] text-[var(--muted)] font-semibold">
+          <span>{locale === 'en' ? `Day ${daysElapsed} of ${totalCycleDays} (${monthElapsedPct}%)` : `Hari ke-${daysElapsed} dari ${totalCycleDays} (${monthElapsedPct}%)`}</span>
+          <span>{statusBadge.pacingText}</span>
         </div>
       </div>
 
-      {/* Footer Info & Quick CTA */}
-      <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-[var(--border)]/40">
-        <div className="text-[10.5px] font-medium text-[var(--muted)]">
+      {/* Daily Allowance & Footer */}
+      <div className="flex items-center justify-between gap-2 pt-2.5 mt-2 border-t border-[var(--border)]/40">
+        <div className="text-[10.5px] font-medium text-[var(--muted)] min-w-0">
           {isOverbudget ? (
             <span className="text-rose-500 font-bold">
               +{formatCurrency(numSpent - numLimit, currency)} {t('budget.over', 'lebih')}
             </span>
           ) : (
-            <span>
-              {t('budget.remaining', 'Sisa')}: <strong className="text-[var(--fg)]">{formatCurrency(remaining, currency)}</strong>
+            <span className="truncate block">
+              {locale === 'en'
+                ? `Left: ${formatCurrency(remaining, currency)} (${formatCurrency(dailyAllowance, currency)}/day)`
+                : `Sisa: ${formatCurrency(remaining, currency)} (${formatCurrency(dailyAllowance, currency)}/hari)`}
             </span>
           )}
         </div>
@@ -132,7 +162,7 @@ export default function BudgetStatusWidget({
           onClick={handleNavigate}
           className="inline-flex items-center gap-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
         >
-          <span>{t('budget.manage', 'Kelola Anggaran')}</span>
+          <span>{t('budget.manage', 'Kelola')}</span>
           <ArrowUpRight size={12} strokeWidth={2.5} />
         </button>
       </div>

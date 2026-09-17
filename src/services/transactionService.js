@@ -1,13 +1,11 @@
 import { format } from 'date-fns'
 import { db } from '../lib/db'
-import { formatExpenseCategory } from '../lib/expenseCategories'
-import { isExcludeAnalyticsTx } from '../lib/utils'
+import { convertCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
 import { checkBudgetAlertsAfterExpense } from '../lib/smartNotifications'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
 import useSettingsStore from '../store/useSettingsStore'
-import { getBudgetPeriodDateRange, calculateBudgetSpent } from '../lib/budgetUtils'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 
 /**
@@ -46,6 +44,16 @@ export async function createTransaction(payload) {
     if (!payload?.targetWalletId || String(payload.targetWalletId) === String(resolvedWalletId)) {
       throw new Error('Dompet tujuan transfer wajib dipilih dan harus berbeda dengan dompet asal.')
     }
+    const [srcWallet, tgtWallet] = await Promise.all([
+      db.wallets.get(Number(resolvedWalletId)),
+      db.wallets.get(Number(payload.targetWalletId)),
+    ])
+    if (!srcWallet || srcWallet.isArchived) {
+      throw new Error('Dompet asal tidak valid atau sudah diarsipkan.')
+    }
+    if (!tgtWallet || tgtWallet.isArchived) {
+      throw new Error('Dompet tujuan transfer tidak valid atau sudah diarsipkan.')
+    }
   }
 
   const cleanCreatedAt = Number.isFinite(Number(payload?.createdAt))
@@ -82,91 +90,30 @@ export async function createTransaction(payload) {
   // Invalidate balance cache for affected wallets
   const affectedWallets = [cleanWalletId, cleanTargetWalletId].filter(Boolean)
   if (affectedWallets.length > 0) {
-    void invalidateWalletBalance(affectedWallets)
+    await invalidateWalletBalance(affectedWallets)
   }
 
   // Auto-check budget for new expenses
   if (payload?.type === 'expense' && cleanAmount > 0 && cleanDate) {
     try {
-      const budgetCycleStartDay = useSettingsStore.getState?.()?.budgetCycleStartDay || 1
-      let txMonth = cleanDate.substring(0, 7) // "YYYY-MM"
-      if (budgetCycleStartDay > 1) {
-        const [y, m, d] = cleanDate.split('-').map(Number)
-        if (d >= budgetCycleStartDay) {
-          const nextMonthDate = new Date(y, m, 1)
-          txMonth = format(nextMonthDate, 'yyyy-MM')
-        }
-      }
-      const budgetPeriod = getBudgetPeriodDateRange(txMonth, budgetCycleStartDay)
-      const txCategory = String(payload.category || '')
-      const parentCategory = txCategory.includes('/') ? txCategory.split('/')[0] : txCategory
-
-      const budgets = await db.budgets.where({ month: txMonth }).toArray()
-      const matchingBudgets = budgets.filter(
-        (b) => b.category === txCategory || b.category === parentCategory || b.category === 'all'
-      )
-
-      if (matchingBudgets.length > 0) {
-        const monthTxs = await db.transactions
-          .filter(
-            (t) =>
-              typeof t.date === 'string' &&
-              t.date >= budgetPeriod.startDate &&
-              t.date <= budgetPeriod.endDate &&
-              t.type === 'expense' &&
-              !isExcludeAnalyticsTx(t)
-          )
-          .toArray()
-
-        const rates = getCachedCurrencyRates('USD')
-        for (const b of matchingBudgets) {
-          const spent = calculateBudgetSpent(b.category, monthTxs, b.currency || 'IDR', rates)
-          const limit = Number(b.limit ?? b.amount ?? 0)
-          if (limit > 0) {
-            const pct = (spent / limit) * 100
-            if (pct >= 80) {
-              const isDanger = pct >= 100
-              const catLabel = b.category === 'all' ? 'Total Anggaran' : formatExpenseCategory(b.category)
-              const title = isDanger ? 'Budget Jebol!' : 'Peringatan Budget'
-              const message = isDanger
-                ? `Pengeluaran kategori ${catLabel} melebihi batas anggaran (${Math.round(pct)}%).`
-                : `Pengeluaran kategori ${catLabel} hampir habis (${Math.round(pct)}%).`
-
-              const recentNotifs = await db.notifications
-                .orderBy('createdAt')
-                .reverse()
-                .limit(10)
-                .toArray()
-
-              const alreadyNotified = recentNotifs.some(
-                (n) =>
-                  n.title === title &&
-                  n.message === message &&
-                  Date.now() - n.createdAt < 24 * 3600 * 1000
-              )
-
-              if (!alreadyNotified) {
-                await db.notifications.add({
-                  title,
-                  message,
-                  type: isDanger ? 'alert' : 'warning',
-                  read: false,
-                  isRead: 0,
-                  route: '/budget',
-                  createdAt: Date.now(),
-                })
-              }
-            }
+      if (payload.isSplit && Array.isArray(payload.splitItems) && payload.splitItems.length > 0) {
+        for (const item of payload.splitItems) {
+          const itemType = item.type || payload.type
+          if (itemType === 'expense' && item.category) {
+            await checkBudgetAlertsAfterExpense({
+              category: item.category,
+              amount: Number(item.amount) || 0,
+              date: cleanDate,
+            }).catch(() => {})
           }
         }
+      } else {
+        await checkBudgetAlertsAfterExpense({
+          category: payload.category,
+          amount: cleanAmount,
+          date: cleanDate,
+        }).catch(() => {})
       }
-
-      // Fire Native / Browser Push Notification
-      await checkBudgetAlertsAfterExpense({
-        category: payload.category,
-        amount: cleanAmount,
-        date: cleanDate,
-      }).catch(() => {})
     } catch (e) {
       console.error('Failed to check budget:', e)
     }
@@ -208,11 +155,25 @@ export async function updateTransaction(id, fields) {
     if (!effectiveTargetWalletId || String(effectiveTargetWalletId) === String(effectiveWalletId)) {
       throw new Error('Dompet tujuan transfer wajib dipilih dan harus berbeda dengan dompet asal.')
     }
+    const [srcWallet, tgtWallet] = await Promise.all([
+      db.wallets.get(Number(effectiveWalletId)),
+      db.wallets.get(Number(effectiveTargetWalletId)),
+    ])
+    if (!srcWallet || srcWallet.isArchived) {
+      throw new Error('Dompet asal tidak valid atau sudah diarsipkan.')
+    }
+    if (!tgtWallet || tgtWallet.isArchived) {
+      throw new Error('Dompet tujuan transfer tidak valid atau sudah diarsipkan.')
+    }
   }
 
   await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
+    const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
+    const rates = getCachedCurrencyRates('USD')
     const oldAmt = Number(existing.amount) || 0
     const newAmt = fields.amount !== undefined ? Number(fields.amount) : oldAmt
+    const oldCurrency = existing.currency || defaultCurrency
+    const newCurrency = fields.currency || existing.currency || defaultCurrency
 
     // 1. Guard: Parent Split Bill Transaction Update
     if (existing.splitBillId) {
@@ -233,14 +194,17 @@ export async function updateTransaction(id, fields) {
     if (existing.loanId) {
       const loan = await db.loans.get(existing.loanId)
       if (loan) {
+        const loanCurrency = loan.currency || defaultCurrency
+        const oldAmtNorm = convertCurrency(oldAmt, oldCurrency, loanCurrency, rates)
+        const newAmtNorm = convertCurrency(newAmt, newCurrency, loanCurrency, rates)
         const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
         if (payment) {
-          const delta = newAmt - oldAmt
+          const delta = newAmtNorm - oldAmtNorm
           const newRemaining = Math.max(0, Math.min(loan.totalAmount, (Number(loan.remainingAmount) || 0) - delta))
           const isNowActive = newRemaining > 0
 
           await db.loanPayments.update(payment.id, {
-            amount: newAmt,
+            amount: newAmtNorm,
             ...(fields.date ? { date: fields.date } : {}),
             ...(fields.notes !== undefined ? { notes: fields.notes } : {}),
           })
@@ -257,8 +221,8 @@ export async function updateTransaction(id, fields) {
               : { paidDate: fields.date || existing.date, paidAt: Date.now() }),
           })
         } else if (loan.initialTransactionId === cleanId && loan.status === 'active') {
-          if (newAmt !== oldAmt) {
-            const delta = newAmt - oldAmt
+          if (newAmtNorm !== oldAmtNorm) {
+            const delta = newAmtNorm - oldAmtNorm
             const newTotal = Math.max(0, (Number(loan.totalAmount) || 0) + delta)
             const newRemaining = Math.max(0, (Number(loan.remainingAmount) || 0) + delta)
             await db.loans.update(loan.id, {
@@ -274,7 +238,10 @@ export async function updateTransaction(id, fields) {
     if (existing.goalId) {
       const goal = await db.goals.get(existing.goalId)
       if (goal) {
-        const delta = newAmt - oldAmt
+        const goalCurrency = goal.currency || defaultCurrency
+        const oldAmtNorm = convertCurrency(oldAmt, oldCurrency, goalCurrency, rates)
+        const newAmtNorm = convertCurrency(newAmt, newCurrency, goalCurrency, rates)
+        const delta = newAmtNorm - oldAmtNorm
 
         if (delta !== 0 || fields.notes !== undefined || fields.date !== undefined) {
           const isDeposit = existing.category === 'tabungan' || existing.type === 'expense'
@@ -295,7 +262,7 @@ export async function updateTransaction(id, fields) {
           const goalLogs = await db.goalLogs.where('goalId').equals(existing.goalId).toArray()
           let targetLog = goalLogs.find((l) => l.transactionId === cleanId)
           if (!targetLog) {
-            const expectedAmt = isDeposit ? oldAmt : -oldAmt
+            const expectedAmt = isDeposit ? oldAmtNorm : -oldAmtNorm
             targetLog =
               goalLogs.find(
                 (l) =>
@@ -303,12 +270,12 @@ export async function updateTransaction(id, fields) {
                   Boolean(existing.date && l.date?.startsWith(existing.date)),
               ) ||
               goalLogs.find(
-                (l) => Math.abs(Number(l.amount)) === oldAmt && Math.sign(Number(l.amount)) === Math.sign(expectedAmt),
+                (l) => Math.abs(Number(l.amount)) === oldAmtNorm && Math.sign(Number(l.amount)) === Math.sign(expectedAmt),
               )
           }
 
           if (targetLog) {
-            const logAmt = isDeposit ? newAmt : -newAmt
+            const logAmt = isDeposit ? newAmtNorm : -newAmtNorm
             const updatePayload = {
               amount: logAmt,
               transactionId: cleanId,
@@ -353,7 +320,7 @@ export async function updateTransaction(id, fields) {
     fields?.targetWalletId,
   ].filter(Boolean)
   if (affectedWallets.length > 0) {
-    void invalidateWalletBalance(affectedWallets)
+    await invalidateWalletBalance(affectedWallets)
   }
 
   scheduleNativeWidgetSync()
@@ -385,6 +352,9 @@ export async function deleteTransaction(id) {
       }
     }
 
+    const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
+    const rates = getCachedCurrencyRates('USD')
+
     // 2. If transaction is linked to a loan, synchronize remaining amount and payment records
     if (existing.loanId) {
       const loan = await db.loans.get(existing.loanId)
@@ -392,9 +362,16 @@ export async function deleteTransaction(id) {
         const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
         if (payment) {
           await db.loanPayments.delete(payment.id)
+          const loanCurrency = loan.currency || defaultCurrency
+          const normalizedExistingAmt = convertCurrency(
+            Number(existing.amount || 0),
+            existing.currency || defaultCurrency,
+            loanCurrency,
+            rates,
+          )
           const restoredRemaining = Math.min(
             loan.totalAmount,
-            (Number(loan.remainingAmount) || 0) + Number(existing.amount || 0),
+            (Number(loan.remainingAmount) || 0) + normalizedExistingAmt,
           )
           const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
             ? loan.paymentTransactionIds
@@ -421,11 +398,17 @@ export async function deleteTransaction(id) {
     if (existing.goalId) {
       const goal = await db.goals.get(existing.goalId)
       if (goal) {
+        const goalCurrency = goal.currency || defaultCurrency
         const isDeposit = existing.category === 'tabungan' || existing.type === 'expense'
-        const txAmt = Number(existing.amount) || 0
+        const normalizedExistingAmt = convertCurrency(
+          Number(existing.amount || 0),
+          existing.currency || defaultCurrency,
+          goalCurrency,
+          rates,
+        )
         const newGoalAmount = isDeposit
-          ? Math.max(0, (Number(goal.currentAmount) || 0) - txAmt)
-          : (Number(goal.currentAmount) || 0) + txAmt
+          ? Math.max(0, (Number(goal.currentAmount) || 0) - normalizedExistingAmt)
+          : (Number(goal.currentAmount) || 0) + normalizedExistingAmt
         const targetAmt = Number(goal.targetAmount) || 0
         const isCompleted = targetAmt > 0 ? newGoalAmount >= targetAmt : false
 
@@ -442,7 +425,7 @@ export async function deleteTransaction(id) {
           await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
         } else {
           // Fallback if log was created before transactionId was tracked: match amount & date
-          const expectedAmt = isDeposit ? txAmt : -txAmt
+          const expectedAmt = isDeposit ? normalizedExistingAmt : -normalizedExistingAmt
           const fallbackLog = goalLogs.find(
             (l) => Math.abs(Number(l.amount) - expectedAmt) < 0.01 && l.date?.startsWith(existing.date),
           )
@@ -459,7 +442,7 @@ export async function deleteTransaction(id) {
 
   const affectedWallets = [existing?.walletId, existing?.targetWalletId].filter(Boolean)
   if (affectedWallets.length > 0) {
-    void invalidateWalletBalance(affectedWallets)
+    await invalidateWalletBalance(affectedWallets)
   }
 
   scheduleNativeWidgetSync()

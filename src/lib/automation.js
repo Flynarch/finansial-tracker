@@ -5,6 +5,14 @@ import { db } from './db'
 import { createTransaction } from '../services/transactionService'
 import useSettingsStore from '../store/useSettingsStore'
 import { formatCurrency } from './utils'
+import { translate } from './i18n'
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_ACTION_TYPES,
+  FINTRACK_NOTIFICATION_COLOR,
+  NOTIFICATION_SMALL_ICON,
+  NOTIFICATION_LARGE_ICON,
+} from './smartNotifications'
 
 export function nextDateByFrequency(dateValue, frequency, anchorDay = null) {
   const freq = String(frequency || '').toLowerCase()
@@ -41,16 +49,31 @@ function dateKey(dateValue) {
   return format(dateValue, 'yyyy-MM-dd')
 }
 
-async function notifyIfAllowed(title, body) {
+async function notifyIfAllowed(title, body, route = '/settings/recurring', extraData = {}) {
   if (Capacitor.isNativePlatform()) {
     try {
+      const locale = useSettingsStore.getState?.()?.locale || 'id'
+      const largeHeader = translate(locale, 'notifications.recurringHeader', 'Eksekusi Transaksi Terjadwal • FinTrack')
+      const line1 = translate(locale, 'notifications.recurringLine1', '• Status: Transaksi terjadwal berhasil dieksekusi.')
+      const line2 = translate(locale, 'notifications.recurringLine2', '• Tindakan: Tinjau mutasi dan saldo akun di menu Transaksi.')
+      const largeBody = `${largeHeader}\n${title}\n${body}\n${line1}\n${line2}`
+      const summaryText = translate(locale, 'notifications.summaryRecurring', 'Transaksi Otomatis')
+
       await LocalNotifications.schedule({
         notifications: [
           {
             id: Math.floor(Math.random() * 100000),
-            title,
+            title: title.startsWith('FinTrack') ? title : `FinTrack • ${title}`,
             body,
+            largeBody,
+            summaryText,
+            channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+            actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
+            extra: { route, ...extraData },
             schedule: { at: new Date(Date.now() + 1000) },
+            smallIcon: NOTIFICATION_SMALL_ICON,
+            largeIcon: NOTIFICATION_LARGE_ICON,
+            iconColor: FINTRACK_NOTIFICATION_COLOR,
           },
         ],
       })
@@ -62,12 +85,12 @@ async function notifyIfAllowed(title, body) {
 
   if (typeof window === 'undefined' || !('Notification' in window)) return
   if (Notification.permission === 'granted') {
-    new Notification(title, { body })
+    new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, { body })
     return
   }
   if (Notification.permission !== 'denied') {
     const permission = await Notification.requestPermission()
-    if (permission === 'granted') new Notification(title, { body })
+    if (permission === 'granted') new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, { body })
   }
 }
 
@@ -159,18 +182,19 @@ export async function notifyTodayEvents() {
     db.recurringTransactions.where('nextDate').equals(todayKey).toArray(),
   ])
 
+  const isEn = useSettingsStore.getState().locale === 'en'
   for (const event of events) {
-    await notifyIfAllowed('FinTrack Reminder', event.title)
+    const title = isEn ? 'Calendar Reminder' : 'Pengingat Agenda'
+    await notifyIfAllowed(title, event.title, '/calendar', { type: 'calendar' })
   }
 
   const activeRecurring = recurring.filter((item) => item.enabled === true || item.enabled === 1)
-  const isEn = useSettingsStore.getState().locale === 'en'
   for (const item of activeRecurring) {
     const title = isEn ? 'Recurring Bill Reminder' : 'Pengingat Tagihan Rutin'
     const body = isEn
       ? `${item.title} (${item.frequency}) is due today!`
       : `${item.title} (${item.frequency}) jatuh tempo hari ini!`
-    await notifyIfAllowed(title, body)
+    await notifyIfAllowed(title, body, '/settings/recurring', { recurringId: item.id, type: 'recurring' })
   }
 
   localStorage.setItem(marker, '1')

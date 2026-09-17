@@ -3,7 +3,20 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- FinTrack Financial Growth Mark: Bar 1 (Short, Left) -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,2L2,7l10,5 10,-5 -10,-5zM2,17l10,5 10,-5M2,12l10,5 10,-5" />
+        android:pathData="M5,14 L6,14 C6.83,14 7.5,14.67 7.5,15.5 L7.5,18.5 C7.5,19.33 6.83,20 6,20 L5,20 C4.17,20 3.5,19.33 3.5,18.5 L3.5,15.5 C3.5,14.67 4.17,14 5,14 Z" />
+    <!-- FinTrack Financial Growth Mark: Bar 2 (Medium, Center) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.5,9 L12.5,9 C13.33,9 14,9.67 14,10.5 L14,18.5 C14,19.33 13.33,20 12.5,20 L11.5,20 C10.67,20 10,19.33 10,18.5 L10,10.5 C10,9.67 10.67,9 11.5,9 Z" />
+    <!-- FinTrack Financial Growth Mark: Bar 3 Body (Tall, Right with negative space apex cut) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,5.5 L20.5,9.5 L20.5,18.5 C20.5,19.33 19.83,20 19,20 L18,20 C17.17,20 16.5,19.33 16.5,18.5 Z" />
+    <!-- FinTrack Financial Growth Mark: Bar 3 Signature Apex Growth Chevron -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,4 L19.5,4 C20.05,4 20.5,4.45 20.5,5 L20.5,8 Z" />
 </vector>

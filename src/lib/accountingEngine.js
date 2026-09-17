@@ -82,7 +82,14 @@ export function generateIncomeStatement(
     const items = isSplit
       ? tx.splitItems
           .map((si) => {
-            const itemTx = { ...tx, ...si, category: si.category || tx.category }
+            const itemTx = {
+              ...tx,
+              ...si,
+              category: si.category || tx.category,
+              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            }
             if (isExcludeAnalyticsTx(itemTx) || si.isExcluded) return null
             return {
               amount: toSafeNumber(si.amount),
@@ -470,7 +477,14 @@ export function generateCashFlowStatement(
     const isSplit = tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0
     const items = isSplit
       ? tx.splitItems.map((si) => {
-          const itemTx = { ...tx, ...si, category: si.category || tx.category }
+          const itemTx = {
+            ...tx,
+            ...si,
+            category: si.category || tx.category,
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+          }
           return {
             amount: toSafeNumber(si.amount),
             category: si.category || tx.category,

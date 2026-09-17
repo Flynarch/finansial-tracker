@@ -4,7 +4,7 @@
 
 **Enterprise-Grade Personal Finance Intelligence & Native Android Asset Management System**
 
-[![Version](https://img.shields.io/badge/Version-v4.9.0-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.0)
+[![Version](https://img.shields.io/badge/Version-v4.9.1-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.1)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.1-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -15,7 +15,7 @@
 
 *A privacy-first, offline-capable financial operations engine equipped with native Android home screen widgets, live sparkline trend analysis, Google Gemini AI receipt perception, local IndexedDB persistence, bank-grade biometric security, and 120 FPS mobile performance.*
 
-[Download Latest APK (v4.9.0)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.0) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
+[Download Latest APK (v4.9.1)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.1) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
 
 ---
 
@@ -110,7 +110,7 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 - **Status Bar Icon Integration**: Persistent or scheduled local alarms notify users of due dates and upcoming recurring obligations.
 
 ### 4. Google Gemini AI Perception Engine & Conversational Advisor
-- **Dual-Model AI Architecture**: Employs ultra-fast `gemini-2.5-flash-lite` for instantaneous natural language parsing and multimodal receipt OCR, paired with deep analytical `gemini-2.5-flash` for conversational financial chat, debt strategies, and financial health diagnostics.
+- **Dual-Model AI Architecture**: Employs ultra-fast `gemini-3.5-flash-lite` for instantaneous natural language parsing and multimodal receipt OCR, paired with deep analytical `gemini-3.8-flash` for conversational financial chat, debt strategies, and financial health diagnostics.
 - **Shielded Calendar Date NLP**: Advanced Indonesian finance heuristic masks calendar date numbers (*e.g., "9 september", "12 sep"*) so calendar day digits are never mistakenly captured as monetary amounts.
 - **Multi-Clause Sentence Splitting**: Automatically parses compound prompts connected by conjunctions (*"dan", "lalu", "terus", "kemudian", "serta"*) into separate, independent transactions with distinct dates, nominals, income/expense classifications, and target wallets (*e.g., `(dana)`*).
 - **Missing Nominal Interception**: Proactively detects incomplete financial prompts and provides immediate friendly guidance instead of triggering failed remote API calls.
@@ -310,7 +310,7 @@ cmd.exe /c "cd android && gradlew.bat assembleDebug"
 cd android && ./gradlew assembleDebug
 ```
 
-The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v4.9.0.apk` in the repository root.
+The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v4.9.1.apk` in the repository root.
 
 ---
 
@@ -319,7 +319,7 @@ The compiled APK will be located at `android/app/build/outputs/apk/debug/app-deb
 To ensure zero regressions and maintain enterprise-grade reliability, all changes must pass the sequential verification pipeline:
 
 ```bash
-# 1. Run unit test suite (257 unit tests across 30 test files)
+# 1. Run unit test suite (482 unit tests across 37 test files)
 npm test
 
 # 2. Run code style and syntax linter

@@ -187,3 +187,24 @@ When requested to **Debug**, **Audit**, or **Improve** a feature (or when trigge
 - Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v<version>.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
 - **Explicit User Confirmation Required**: Always ask for explicit user confirmation before building the APK and before handling its upload/placement into Google Drive. Do not run APK assembly or cloud distribution automatically without permission.
 
+---
+
+## 14. Autonomous MCP (Model Context Protocol) Usage Directives
+
+Coding agents must autonomously and proactively leverage installed MCP servers without waiting for manual user prompting whenever a task benefits from their capabilities:
+
+### A. Autonomous Codebase & Architecture Analysis (`repomix`)
+- Automatically invoke `repomix` (`pack_codebase` or `grep_repomix_output`) before initiating broad refactoring, system-wide architectural audits, or multi-module dependency analysis to maintain full context awareness.
+
+### B. Autonomous Structured Reasoning (`sequential-thinking`)
+- Automatically engage `sequential-thinking` when tackling complex algorithmic logic, accounting invariants, financial balance reconciliations, or multi-step debugging plans before editing code.
+
+### C. Autonomous Knowledge Persistence (`memory`)
+- Automatically record architectural decisions, verified domain invariants, entity relations, and user design preferences into the `memory` knowledge graph so context remains continuous across development sessions.
+
+### D. Autonomous UI/UX Verification (`chrome-devtools-mcp` / `puppeteer`)
+- Automatically utilize browser automation MCP tools to perform frontend vibe-checks, take screenshots of mobile viewports, inspect DOM state, and capture console messages during verification gates.
+
+### E. Autonomous Upstream Documentation Lookup (`gemini-api-docs`)
+- Automatically retrieve official SDK and API reference documentation from `gemini-api-docs` when working with Gemini models, prompt schemas, or multimodal configurations in `src/lib/gemini.js` or `src/lib/ai/`.
+

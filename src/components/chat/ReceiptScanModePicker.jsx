@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import WalletSelectModal from '../ui/WalletSelectModal'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
+import { triggerHaptic } from '../../lib/haptics'
 
 export default function ReceiptScanModePicker({
   image,
@@ -29,6 +30,7 @@ export default function ReceiptScanModePicker({
   const selectedWalletLogo = selectedWallet ? getWalletLogoUrl(selectedWallet) : null
 
   const handleConfirm = () => {
+    triggerHaptic('light')
     onConfirm(selectedMode, selectedWallet?.id || selectedWalletId)
   }
 
@@ -96,7 +98,10 @@ export default function ReceiptScanModePicker({
         {/* Mode 1: Scan Semua (Ringkasan Total) */}
         <button
           type="button"
-          onClick={() => setSelectedMode('all')}
+          onClick={() => {
+            triggerHaptic('light')
+            setSelectedMode('all')
+          }}
           className={`ft-scan-mode-card text-left p-3.5 rounded-2xl cursor-pointer flex flex-col justify-between gap-3 ${
             selectedMode === 'all' ? 'ft-scan-mode-card--active' : ''
           }`}
@@ -150,7 +155,10 @@ export default function ReceiptScanModePicker({
         {/* Mode 2: Scan Per Item (Rincian Detail) */}
         <button
           type="button"
-          onClick={() => setSelectedMode('per_item')}
+          onClick={() => {
+            triggerHaptic('light')
+            setSelectedMode('per_item')
+          }}
           className={`ft-scan-mode-card text-left p-3.5 rounded-2xl cursor-pointer flex flex-col justify-between gap-3 ${
             selectedMode === 'per_item' ? 'ft-scan-mode-card--active' : ''
           }`}

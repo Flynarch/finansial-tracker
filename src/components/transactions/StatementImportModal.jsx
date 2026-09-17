@@ -180,12 +180,14 @@ export default function StatementImportModal({
 
     try {
       const selectedTxs = parsedItems.filter((i) => i.selected)
+      const targetWallet = wallets.find((w) => w.id === Number(selectedWalletId))
+      const txCurrency = targetWallet?.currency || defaultCurrency
       const formattedForDb = selectedTxs.map((tx) => ({
         date: tx.date || format(new Date(), 'yyyy-MM-dd'),
         type: tx.type || 'expense',
         category: tx.category || 'lainnya/pengeluaran_lain',
         amount: toSafeNumber(tx.amount),
-        currency: defaultCurrency,
+        currency: tx.currency || txCurrency,
         walletId: Number(selectedWalletId),
         notes: tx.notes || tx.cleanMerchant || 'Impor Rekening Koran',
         source: 'e_statement_import',
@@ -196,7 +198,7 @@ export default function StatementImportModal({
       await db.transactions.bulkAdd(formattedForDb)
 
       // Invalidate balance cache so computeWalletBalance reflects new transactions
-      void invalidateWalletBalance([Number(selectedWalletId)])
+      await invalidateWalletBalance([Number(selectedWalletId)])
 
       if (onImportComplete) onImportComplete(formattedForDb.length)
       handleReset()

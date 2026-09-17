@@ -31,54 +31,92 @@ export function escapeCsv(str) {
  * Includes UTF-8 BOM (\uFEFF) for seamless opening in Microsoft Excel
  * and standard RFC 4180 parsers.
  */
-export async function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR') {
+export async function exportTransactionsToCsv(transactions = [], wallets = [], defaultCurrency = 'IDR', locale = 'id') {
   if (!transactions || transactions.length === 0) {
     return false
   }
+
+  const isEn = String(locale || '').toLowerCase().startsWith('en')
 
   const walletMap = new Map()
   if (Array.isArray(wallets)) {
     wallets.forEach((w) => walletMap.set(String(w.id), w.name))
   }
+  const defaultWalletName = isEn ? 'Main Wallet' : 'Dompet Utama'
 
-  const headers = [
-    escapeCsv('Tanggal'),
-    escapeCsv('Tipe'),
-    escapeCsv('Kategori'),
-    escapeCsv('Akun / Dompet'),
-    escapeCsv('Nominal'),
-    escapeCsv('Mata Uang'),
-    escapeCsv('Catatan'),
-  ]
+  const headers = isEn
+    ? [
+        escapeCsv('Date'),
+        escapeCsv('Type'),
+        escapeCsv('Category'),
+        escapeCsv('Account / Wallet'),
+        escapeCsv('Amount'),
+        escapeCsv('Currency'),
+        escapeCsv('Notes'),
+      ]
+    : [
+        escapeCsv('Tanggal'),
+        escapeCsv('Tipe'),
+        escapeCsv('Kategori'),
+        escapeCsv('Akun / Dompet'),
+        escapeCsv('Nominal'),
+        escapeCsv('Mata Uang'),
+        escapeCsv('Catatan'),
+      ]
 
-  const rows = transactions.map((tx) => {
-    const typeLabel =
-      tx.type === 'income'
-        ? 'Pemasukan'
-        : tx.type === 'expense'
-          ? 'Pengeluaran'
-          : tx.type === 'transfer'
-            ? 'Transfer'
-            : 'Penyesuaian'
+  const getTypeLabel = (type) => {
+    if (type === 'income') return isEn ? 'Income' : 'Pemasukan'
+    if (type === 'expense') return isEn ? 'Expense' : 'Pengeluaran'
+    if (type === 'transfer') return isEn ? 'Transfer' : 'Transfer'
+    return isEn ? 'Adjustment' : 'Penyesuaian'
+  }
 
-    const walletName = walletMap.get(String(tx.walletId)) || 'Dompet Utama'
+  const rows = []
+  transactions.forEach((tx) => {
+    const walletName = walletMap.get(String(tx.walletId)) || defaultWalletName
 
-    return [
-      escapeCsv(tx.date || ''),
-      escapeCsv(typeLabel),
-      escapeCsv(tx.category || ''),
-      escapeCsv(walletName),
-      escapeCsv(toSafeNumber(tx.amount)),
-      escapeCsv(tx.currency || defaultCurrency),
-      escapeCsv(tx.notes || ''),
-    ].join(',')
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      tx.splitItems.forEach((item, idx) => {
+        const itemType = item.type || tx.type
+        const typeLabel = getTypeLabel(itemType)
+
+        const itemNote = item.notes || tx.notes || ''
+        const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}` : `[Split ${idx + 1}]`
+
+        rows.push(
+          [
+            escapeCsv(tx.date || ''),
+            escapeCsv(typeLabel),
+            escapeCsv(item.category || tx.category || ''),
+            escapeCsv(walletName),
+            escapeCsv(toSafeNumber(item.amount)),
+            escapeCsv(item.currency || tx.currency || defaultCurrency),
+            escapeCsv(splitNote),
+          ].join(',')
+        )
+      })
+    } else {
+      const typeLabel = getTypeLabel(tx.type)
+
+      rows.push(
+        [
+          escapeCsv(tx.date || ''),
+          escapeCsv(typeLabel),
+          escapeCsv(tx.category || ''),
+          escapeCsv(walletName),
+          escapeCsv(toSafeNumber(tx.amount)),
+          escapeCsv(tx.currency || defaultCurrency),
+          escapeCsv(tx.notes || ''),
+        ].join(',')
+      )
+    }
   })
 
   // Prepend UTF-8 BOM (\uFEFF)
   const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const dateStr = getLocalDateString()
-  const filename = `fintrack-laporan-transaksi-${dateStr}.csv`
+  const filename = isEn ? `fintrack-transaction-report-${dateStr}.csv` : `fintrack-laporan-transaksi-${dateStr}.csv`
 
   // On mobile/Android WebView, try Web Share API with File
   if (typeof navigator !== 'undefined' && navigator.canShare) {
@@ -86,7 +124,7 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
       const file = new File([blob], filename, { type: 'text/csv;charset=utf-8;' })
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: 'Laporan Transaksi FinTrack',
+          title: isEn ? 'FinTrack Transaction Report' : 'Laporan Transaksi FinTrack',
           files: [file],
         })
         return true
@@ -94,6 +132,10 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
     } catch (err) {
       if (err?.name === 'AbortError') return true
     }
+  }
+
+  if (typeof document === 'undefined') {
+    return true
   }
 
   const url = URL.createObjectURL(blob)

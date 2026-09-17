@@ -40,11 +40,10 @@ import {
   formatMoneyValueForInput,
   parseMoneyInput,
   convertCurrency,
-  toTransactionsCsv,
-  downloadTextFile,
   FALLBACK_EXCHANGE_RATES,
   safeFormatDate,
 } from '../lib/utils'
+import { exportTransactionsToCsv } from '../lib/exportReports'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../lib/categoryIcon'
@@ -162,6 +161,8 @@ export default function WalletDetailPage() {
       targetWalletId: transaction.targetWalletId || '',
       receiptImage: receipt,
       receipt: receipt,
+      isSplit: Boolean(transaction.isSplit),
+      splitItems: Array.isArray(transaction.splitItems) ? JSON.parse(JSON.stringify(transaction.splitItems)) : [],
     })
   }, [wallet?.currency, defaultCurrency])
 
@@ -173,6 +174,8 @@ export default function WalletDetailPage() {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
         receiptImage: editFormData.receiptImage || null,
+        isSplit: Boolean(editFormData.isSplit),
+        splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
       })
       setEditingTransaction(null)
     } catch (err) {
@@ -190,11 +193,9 @@ export default function WalletDetailPage() {
   }
 
 
-  const handleExportWalletCsv = () => {
-    const csvContent = toTransactionsCsv(allTransactions || [])
-    const filename = `transactions-${wallet?.name || 'wallet'}-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`
-    downloadTextFile(filename, csvContent, 'text/csv;charset=utf-8;')
+  const handleExportWalletCsv = async () => {
     setIsActionMenuOpen(false)
+    await exportTransactionsToCsv(allTransactions || [], wallet ? [wallet] : [], wallet?.currency || defaultCurrency, locale)
   }
 
   const handleOpenEditWallet = () => {
@@ -256,6 +257,18 @@ export default function WalletDetailPage() {
         const notes = (tx.notes || '').toLowerCase()
         const amountStr = String(tx.amount || '')
         matchesSearch = catName.includes(query) || subName.includes(query) || notes.includes(query) || amountStr.includes(query)
+
+        if (!matchesSearch && tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+          matchesSearch = tx.splitItems.some((si) => {
+            if (!si) return false
+            const siLabels = getTransactionCategoryLabels(si.category, si.type || tx.type, locale)
+            const siCat = (siLabels?.main || si.category || '').toLowerCase()
+            const siSub = (siLabels?.sub || si.subcategory || '').toLowerCase()
+            const siNotes = (si.notes || '').toLowerCase()
+            const siAmount = String(si.amount || '')
+            return siCat.includes(query) || siSub.includes(query) || siNotes.includes(query) || siAmount.includes(query)
+          })
+        }
       }
 
       return matchesTab && matchesSearch
@@ -298,12 +311,29 @@ export default function WalletDetailPage() {
         const items = groups[dateKey]
         let net = 0
         items.forEach((tx) => {
-          const amt = convertCurrency(tx.amount, tx.currency || defaultCurrency, wallet?.currency || defaultCurrency, rates)
-          if (tx.type === 'income' || (tx.type === 'transfer' && String(tx.targetWalletId) === String(walletId))) {
+          if (tx.isPendingReview === true || tx.isPendingReview === 1) return
+          const walletCurrency = wallet?.currency || defaultCurrency
+          if (tx.type === 'income') {
+            const amt = convertCurrency(tx.amount, tx.currency || walletCurrency, walletCurrency, rates)
             net += amt
-          } else if (tx.type === 'expense' || (tx.type === 'transfer' && String(tx.walletId) === String(walletId))) {
+          } else if (tx.type === 'expense') {
+            const amt = convertCurrency(tx.amount, tx.currency || walletCurrency, walletCurrency, rates)
             net -= amt
+          } else if (tx.type === 'transfer') {
+            if (String(tx.targetWalletId) === String(walletId)) {
+              const sourceWallet = allWallets.find((w) => String(w.id) === String(tx.walletId))
+              const sourceCurrency = tx.currency || sourceWallet?.currency || defaultCurrency
+              const targetAmount =
+                tx.targetAmount != null && Number(tx.targetAmount) > 0
+                  ? Number(tx.targetAmount)
+                  : convertCurrency(tx.amount, sourceCurrency, walletCurrency, rates)
+              net += targetAmount
+            } else if (String(tx.walletId) === String(walletId)) {
+              const amt = convertCurrency(tx.amount, tx.currency || walletCurrency, walletCurrency, rates)
+              net -= amt
+            }
           } else if (tx.type === 'balance_adjustment') {
+            const amt = convertCurrency(tx.amount, tx.currency || walletCurrency, walletCurrency, rates)
             net += amt
           }
         })
@@ -318,7 +348,7 @@ export default function WalletDetailPage() {
           isPositive: net > 0,
         }
       })
-  }, [filteredTransactions, t, defaultCurrency, wallet?.currency, rates, walletId])
+  }, [filteredTransactions, t, defaultCurrency, wallet?.currency, rates, walletId, allWallets])
 
   const currentFilterKey = `${activeTab}-${searchQuery}-${walletId}`
   const [extraCount, setExtraCount] = useState(0)

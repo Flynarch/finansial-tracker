@@ -1370,6 +1370,34 @@ img, svg, a, button {
   animation: ft-swush-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Chat message spring entrance - slide up with subtle scale */
+@keyframes ft-msg-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ft-msg-enter {
+  animation: ft-msg-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Expandable section grid animation for smooth height transition */
+.ft-expand {
+  display: grid;
+  transition: grid-template-rows 250ms ease-out;
+}
+.ft-expand[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+.ft-expand[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
 /* Quick-log modal: staggered children fade-up */
 @keyframes ft-stagger-up {
   from {

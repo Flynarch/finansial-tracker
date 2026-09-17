@@ -80,6 +80,16 @@ describe('utils - parseMoneyInput & formatMoneyInput', () => {
     expect(parsed).toBe(1250.5)
   })
 
+  it('formats and parses dot-based decimal inputs on Android keyboards for foreign currency', () => {
+    const formatted = formatMoneyInput('10.50', 'USD')
+    expect(formatted).toBe('10,50')
+    expect(parseMoneyInput('10.50', 'USD')).toBe(10.5)
+    expect(parseMoneyInput('10.5', 'USD')).toBe(10.5)
+    expect(parseMoneyInput('-10.50', 'USD')).toBe(-10.5)
+    expect(parseMoneyInput('1,250.50', 'USD')).toBe(1250.5)
+    expect(parseMoneyInput('1.250,50', 'USD')).toBe(1250.5)
+  })
+
   it('handles empty and null inputs safely', () => {
     expect(parseMoneyInput('', 'IDR')).toBe(0)
     expect(parseMoneyInput(null, 'IDR')).toBe(0)
@@ -123,6 +133,49 @@ describe('utils - toTransactionsCsv & numeric helpers', () => {
     const csv = toTransactionsCsv(rows)
     expect(csv).toContain('Lunch with ""team"", delicious')
     expect(csv).toContain('2026-08-28')
+  })
+
+  it('protects against CSV/Excel formula injection (DDE)', () => {
+    const maliciousRows = [
+      {
+        id: 2,
+        date: '2026-08-28',
+        type: 'expense',
+        category: '=SUM(A1:A10)',
+        amount: 50000,
+        currency: 'IDR',
+        notes: '+cmd|"/C calc"!A0',
+        walletId: 1,
+      },
+    ]
+    const csv = toTransactionsCsv(maliciousRows)
+    expect(csv).toContain("'=SUM(A1:A10)")
+    expect(csv).toContain("'+cmd|")
+  })
+
+  it('unpacks split items in toTransactionsCsv', () => {
+    const splitRows = [
+      {
+        id: 3,
+        date: '2026-08-28',
+        type: 'expense',
+        category: 'split',
+        amount: 150000,
+        currency: 'IDR',
+        notes: 'Grocery haul',
+        walletId: 1,
+        isSplit: true,
+        splitItems: [
+          { category: 'makanan', amount: 100000, type: 'expense', notes: 'Food items' },
+          { category: 'kebersihan', amount: 50000, type: 'expense', notes: 'Soap & shampoo' },
+        ],
+      },
+    ]
+    const csv = toTransactionsCsv(splitRows)
+    expect(csv).toContain('makanan')
+    expect(csv).toContain('kebersihan')
+    expect(csv).toContain('Food items')
+    expect(csv).toContain('Soap & shampoo')
   })
 
   it('clampPercent bounds values between 0 and 100', () => {

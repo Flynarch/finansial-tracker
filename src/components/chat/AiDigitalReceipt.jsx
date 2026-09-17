@@ -14,11 +14,14 @@ import {
   Pencil,
   Store,
   Layers,
+  Sparkles,
+  WifiOff,
 } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import TransactionEditSheet from '../transactions/TransactionEditSheet'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
-import { formatCurrency, formatMoneyValueForInput, parseMoneyInput } from '../../lib/utils'
+import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
+import { getCachedCurrencyRates } from '../../lib/api'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
 import { deleteTransaction, updateTransaction } from '../../services/transactionService'
@@ -74,6 +77,8 @@ export default function AiDigitalReceipt({
   const txList = localTxs
   const isSingle = txList.length === 1
   const singleTx = txList[0] || {}
+  const engine = singleTx.engine || txList[0]?.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
+  const isOnlineAi = engine === 'online_ai'
 
   const contextualTheme = useMemo(() => {
     if (isSingle) {
@@ -135,22 +140,24 @@ export default function AiDigitalReceipt({
     }
   }, [isSingle, singleTx.type, txList, t])
 
+  const activeRates = useMemo(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }, [])
+  const allSameCurrency = txList.length > 0 && txList.every((t) => (t.currency || defaultCurrency) === (txList[0]?.currency || defaultCurrency))
+  const displayCurrency = allSameCurrency ? (txList[0]?.currency || defaultCurrency) : defaultCurrency
+
   const totalExpense = txList
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+    .reduce((sum, t) => sum + convertCurrency(Number(t.amount) || 0, t.currency || defaultCurrency, displayCurrency, activeRates), 0)
   const totalIncome = txList
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+    .reduce((sum, t) => sum + convertCurrency(Number(t.amount) || 0, t.currency || defaultCurrency, displayCurrency, activeRates), 0)
   const netTotal = totalIncome - totalExpense
 
   const handleUndo = async () => {
     setIsUndoing(true)
     try {
-      for (const tx of txList) {
-        if (tx.id) {
-          await deleteTransaction(tx.id)
-        }
-      }
+      await Promise.all(
+        txList.filter((tx) => tx.id).map((tx) => deleteTransaction(tx.id))
+      )
       setIsUndone(true)
     } catch {
       // ignore
@@ -289,9 +296,22 @@ export default function AiDigitalReceipt({
               <span className="block text-xs font-black text-[var(--fg)] truncate leading-tight">
                 {activeMerchant || contextualTheme.title}
               </span>
-              <span className="block text-[9px] font-semibold text-[var(--muted)] truncate">
-                {t('ai.digitalReceiptHeader', 'Struk Digital FinTrack AI')}
-              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {isOnlineAi ? (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-500 shrink-0">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    <span>AI Gemini (Online)</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-amber-500 shrink-0">
+                    <WifiOff className="h-2.5 w-2.5" />
+                    <span>NLP Lokal (Offline)</span>
+                  </span>
+                )}
+                <span className="block text-[9px] font-semibold text-[var(--muted)] truncate">
+                  {t('ai.digitalReceiptHeader', 'Struk Digital FinTrack')}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -555,7 +575,7 @@ export default function AiDigitalReceipt({
               </span>
               <span className={`text-xs font-black tabular-nums ${netTotal >= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
                 {netTotal >= 0 ? '+' : '-'}
-                {formatCurrency(Math.abs(netTotal || totalExpense || totalIncome), txList[0]?.currency || defaultCurrency)}
+                {formatCurrency(Math.abs(netTotal || totalExpense || totalIncome), displayCurrency)}
               </span>
             </div>
           </div>

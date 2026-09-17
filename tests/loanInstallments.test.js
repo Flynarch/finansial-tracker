@@ -104,6 +104,23 @@ describe('Loan Installments Utility', () => {
       expect(schedule[0].dueDate).toBe('2026-04-01')
       expect(schedule[0].amount).toBe(500000)
     })
+
+    it('honors recurring target day of month across multi-tenor loans with explicit dueDate', () => {
+      const multiTenorLoanWithDueDate = {
+        totalAmount: 3000000,
+        remainingAmount: 3000000,
+        currency: 'IDR',
+        startDate: '2026-01-10',
+        dueDate: '2026-01-25',
+        tenorMonths: 3,
+        monthlyPayment: 1000000,
+      }
+      const schedule = generateInstallmentSchedule(multiTenorLoanWithDueDate)
+      expect(schedule).toHaveLength(3)
+      expect(schedule[0].dueDate).toBe('2026-01-25')
+      expect(schedule[1].dueDate).toBe('2026-02-25')
+      expect(schedule[2].dueDate).toBe('2026-03-25')
+    })
   })
 
   describe('getLoanInstallmentSummary', () => {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { translate } from '../lib/i18n'
 import useSettingsStore from '../store/useSettingsStore'
@@ -9,8 +9,9 @@ import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getCachedCurrencyRates } from '../lib/api'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { parseTransactionFromText } from '../lib/gemini'
+import { parseTransactionFromText, distributeReceiptTransactions } from '../lib/gemini'
 import { sanitizeCategoryPath } from '../lib/categorySanitizer'
+import { getMergedExpenseTree } from '../lib/expenseCategories'
 import { format } from 'date-fns'
 import { getLocalDateString } from '../lib/dateUtils'
 import {
@@ -23,7 +24,12 @@ import {
   Paintbrush,
   Check,
 } from 'lucide-react'
-import { UserBubble, AiBubble, TypingIndicator, ChartBubble } from '../components/chat/ChatBubble'
+import { UserBubble, AiBubble, ReasoningIndicator, ChartBubble } from '../components/chat/ChatBubble'
+import WelcomeHero from '../components/chat/WelcomeHero'
+import ScrollToBottomFAB from '../components/chat/ScrollToBottomFAB'
+import MessageContextMenu from '../components/chat/MessageContextMenu'
+import FinancialHealthWidget from '../components/chat/widgets/FinancialHealthWidget'
+import CardCarousel from '../components/chat/CardCarousel'
 import TransactionSuccess from '../components/chat/TransactionSuccess'
 import ActionSuccessCard from '../components/chat/ActionSuccessCard'
 import QuickChips from '../components/chat/QuickChips'
@@ -33,8 +39,15 @@ import MediaSourcePickerModal from '../components/chat/MediaSourcePickerModal'
 import useChatStore from '../store/useChatStore'
 import useBackButton from '../hooks/useBackButton'
 import { triggerHaptic } from '../lib/haptics'
-import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../lib/utils'
+import { formatCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
+import { calculateBudgetSpent, getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../lib/budgetUtils'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
+import {
+  validateTransferWallets,
+  findMatchingTransactionForAction,
+  findMatchingLoanForAction,
+  prepareUnifiedMessage,
+} from '../lib/ai/aiChatHelpers'
 
 const BG_TEXTURE_OPTIONS = [
   { id: 'paper', labelKey: 'aiChat.texture.paper', defaultLabel: 'Kertas Jurnal' },
@@ -53,7 +66,46 @@ export default function AiFinanceChat() {
   const recordPayment = useLoanStore((s) => s.recordPayment)
   const updateLoan = useLoanStore((s) => s.updateLoan)
   const deleteLoan = useLoanStore((s) => s.deleteLoan)
-  const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
+  const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), []) || []
+
+  // Today's total expense for WelcomeHero live snapshot
+  const todayStr = useMemo(() => getLocalDateString(), [])
+  const todayExpense = useLiveQuery(async () => {
+    try {
+      const txs = await db.transactions.where('date').equals(todayStr).toArray()
+      const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+      let total = 0
+      txs.forEach((tx) => {
+        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+          tx.splitItems.forEach((si) => {
+            const itemTx = {
+              ...tx,
+              ...si,
+              category: si.category || tx.category,
+              amount: si.amount,
+              type: si.type || tx.type,
+              currency: si.currency || tx.currency || defaultCurrency,
+              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
+              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
+            }
+            if (isExcludeAnalyticsTx(itemTx)) return
+            if ((si.type || tx.type) === 'expense') {
+              total += convertCurrency(Number(si.amount || 0), si.currency || tx.currency || defaultCurrency, defaultCurrency, activeRates)
+            }
+          })
+          return
+        }
+        if (isExcludeAnalyticsTx(tx)) return
+        if (tx.type === 'expense') {
+          total += convertCurrency(Number(tx.amount || 0), tx.currency || defaultCurrency, defaultCurrency, activeRates)
+        }
+      })
+      return Math.round(total * 100) / 100
+    } catch {
+      return 0
+    }
+  }, [todayStr, defaultCurrency]) || 0
 
   // Chat Store
   const messages = useChatStore((s) => s.messages)
@@ -72,12 +124,33 @@ export default function AiFinanceChat() {
   const [showTexturePicker, setShowTexturePicker] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [showScrollFAB, setShowScrollFAB] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [contextMenuMsg, setContextMenuMsg] = useState(null)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
   const textureDropdownRef = useRef(null)
   const deletingMsgIdsRef = useRef(new Set())
+  const longPressTimerRef = useRef(null)
 
   useBackButton(() => {
+    if (contextMenuMsg) {
+      setContextMenuMsg(null)
+      return
+    }
     if (showMediaSourcePicker) {
       setShowMediaSourcePicker(false)
       return
@@ -113,9 +186,54 @@ export default function AiFinanceChat() {
   const recognitionRef = useRef(null)
   const baseInputBeforeRecordingRef = useRef('')
 
+  const handleScroll = useCallback(() => {
+    const el = chatScrollContainerRef.current
+    if (!el) return
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const isFar = distanceToBottom > 150
+    setShowScrollFAB(isFar)
+    if (!isFar) {
+      setUnreadCount(0)
+    }
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    triggerHaptic('light')
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setShowScrollFAB(false)
+    setUnreadCount(0)
+  }, [])
+
+  const handleMsgTouchStart = useCallback((msg) => {
+    longPressTimerRef.current = setTimeout(() => {
+      triggerHaptic('medium')
+      setContextMenuMsg(msg)
+    }, 450)
+  }, [])
+
+  const handleMsgTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  const handleMsgContextMenu = useCallback((e, msg) => {
+    e.preventDefault()
+    triggerHaptic('medium')
+    setContextMenuMsg(msg)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (streamRafRef.current) cancelAnimationFrame(streamRafRef.current)
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
     }
   }, [])
 
@@ -136,18 +254,68 @@ export default function AiFinanceChat() {
     return undefined
   }, [showTexturePicker])
 
+  // Lifecycle retention: prune db.chatMessages older than 90 days and rehydrate on mount
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: Date.now(),
-          role: 'ai',
-          type: 'welcome',
-          content: translate(locale, 'aiChat.welcome') || 'Halo! Saya asisten AI keuangan Anda. Ada yang bisa saya bantu catat atau analisis hari ini?',
-        },
-      ])
+    let isMounted = true
+    const initChatMessages = async () => {
+      try {
+        if (db.chatMessages) {
+          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000
+          await db.chatMessages.where('timestamp').below(ninetyDaysAgo).delete()
+
+          if (useChatStore.getState().messages.length === 0) {
+            const stored = await db.chatMessages.orderBy('timestamp').toArray()
+            if (isMounted && stored.length > 0) {
+              setMessages(stored)
+              return
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to init chat messages from DB:', err)
+      }
+
+      if (isMounted && useChatStore.getState().messages.length === 0) {
+        setMessages([
+          {
+            id: Date.now(),
+            timestamp: Date.now(),
+            role: 'ai',
+            type: 'welcome',
+            content: translate(locale, 'aiChat.welcome') || 'Halo! Saya asisten AI keuangan Anda. Ada yang bisa saya bantu catat atau analisis hari ini?',
+          },
+        ])
+      }
     }
-  }, [messages.length, setMessages, locale])
+    initChatMessages()
+    return () => {
+      isMounted = false
+    }
+  }, [locale, setMessages])
+
+  // Persist messages to db.chatMessages when not streaming
+  useEffect(() => {
+    if (isStreamingRef.current || isLoading) return
+    if (!messages || messages.length === 0) return
+
+    const persistTimeout = setTimeout(async () => {
+      try {
+        if (!db.chatMessages) return
+        const toSave = messages.map((m) => ({
+          ...m,
+          timestamp: m.timestamp || m.id || Date.now(),
+        }))
+        await db.transaction('rw', db.chatMessages, async () => {
+          await db.chatMessages.clear()
+          await db.chatMessages.bulkAdd(toSave)
+        })
+      } catch (err) {
+        console.warn('Failed to persist chat messages to DB:', err)
+      }
+    }, 400)
+
+    return () => clearTimeout(persistTimeout)
+  }, [messages, isLoading])
 
   useEffect(() => {
     if (initialInput) {
@@ -164,12 +332,21 @@ export default function AiFinanceChat() {
   }, [initialInput, setInitialInput])
 
   useEffect(() => {
+    const el = chatScrollContainerRef.current
+    if (!el) return
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const isNear = distanceToBottom < 150
+
     if (isStreamingRef.current) {
-      if (chatScrollContainerRef.current) {
-        chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
+      if (isNear) {
+        el.scrollTop = el.scrollHeight
       }
     } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      if (isNear) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      } else {
+        setUnreadCount((c) => c + 1)
+      }
     }
   }, [messages, isLoading])
 
@@ -289,12 +466,15 @@ export default function AiFinanceChat() {
 
   const handleSend = async (text = inputValue, image = selectedImage, scanMode = 'all', targetWalletId = null) => {
     if (!text?.trim() && !image) return
+    triggerHaptic('light')
     
+    const clampedText = text ? String(text).slice(0, 4000) : ''
+
     const userMsg = {
       id: Date.now(),
       role: 'user',
       type: 'text',
-      content: text,
+      content: clampedText,
       image: image
     }
     
@@ -312,7 +492,7 @@ export default function AiFinanceChat() {
 
     try {
       const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
-      const result = await parseTransactionFromText(text || "Lihat gambar struk ini", {
+      const result = await parseTransactionFromText(clampedText || "Lihat gambar struk ini", {
         locale,
         defaultCurrency,
         previousMessages: messages,
@@ -351,18 +531,30 @@ export default function AiFinanceChat() {
 
       if (result.type === 'transactions') {
         if (result.action === 'create' && result.transactions?.length > 0) {
+          let transactionsToProcess = distributeReceiptTransactions(result.transactions, result, scanMode)
           const savedTxs = []
-          for (const tx of result.transactions) {
-             let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : (wallets.length > 0 ? wallets[0].id : null))
-             if (finalWalletId !== null && !wallets.find(w => w.id === finalWalletId)) {
-                finalWalletId = wallets.length > 0 ? wallets[0].id : null
-             }
+          for (const tx of transactionsToProcess) {
+              const numericAmount = Number(tx.amount || 0)
+              if (!Number.isFinite(numericAmount) || numericAmount <= 0) continue
+
+              const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
+              const primaryDefaultWalletId = wallets.find((w) => w.id === configuredDefaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
+              let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : primaryDefaultWalletId)
+              if (finalWalletId !== null && !wallets.find(w => w.id === finalWalletId)) {
+                 finalWalletId = primaryDefaultWalletId
+              }
              const matchedWallet = wallets.find(w => w.id === finalWalletId)
-             const txCurrency = matchedWallet?.currency || tx.currency || defaultCurrency
+             const txCurrency = tx.currency || matchedWallet?.currency || defaultCurrency
              
+             const txEngine = tx.engine || result.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
+             const txEngineLabel = tx.engineLabel || result.engineLabel || (txEngine === 'offline_nlp' ? 'NLP Lokal (Offline)' : 'AI Gemini (Online)')
+
              const txToSave = {
                ...tx,
-               amount: Math.abs(Number(tx.amount || 0)),
+               merchant: tx.merchant || result.merchant || undefined,
+               engine: txEngine,
+               engineLabel: txEngineLabel,
+               amount: numericAmount,
                date: tx.date || format(new Date(), 'yyyy-MM-dd'),
                category: sanitizeCategoryPath(tx.category, tx.type),
                walletId: finalWalletId,
@@ -379,30 +571,28 @@ export default function AiFinanceChat() {
              txToSave.id = newTxId
              savedTxs.push(txToSave)
           }
-          newMsgs.push({ id: Date.now() + 2, role: 'ai', type: 'success', data: savedTxs })
+          if (savedTxs.length > 0) {
+            triggerHaptic('success')
+            newMsgs.push({ id: Date.now() + 2, role: 'ai', type: 'success', data: savedTxs })
+          } else {
+            newMsgs.push({
+              id: Date.now() + 2,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? 'No valid transactions to record (amount must be greater than 0).'
+                : 'Tidak ada transaksi valid untuk dicatat (nominal harus lebih dari 0).'
+            })
+          }
         }
         
         if (result.action === 'update' || result.action === 'delete') {
           const allFreshTxs = await db.transactions.toArray()
           allFreshTxs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0))
 
-          let matchedTx = null
-          if (result.transactionId) {
-            matchedTx = allFreshTxs.find((t) => t.id === Number(result.transactionId))
-          }
-
+          const matchedTx = findMatchingTransactionForAction(allFreshTxs, result)
           const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
-          if (!matchedTx && sq) {
-            if (sq === 'terakhir' || sq === 'latest' || sq === 'tadi' || sq === 'barusan') {
-              matchedTx = allFreshTxs[0]
-            } else {
-              matchedTx = allFreshTxs.find((t) =>
-                (t.notes && t.notes.toLowerCase().includes(sq)) ||
-                (t.category && t.category.toLowerCase().includes(sq)) ||
-                (result.date && t.date === result.date)
-              )
-            }
-          }
 
           if (!matchedTx) {
             const isVagueDelete = result.action === 'delete' && !result.transactionId && !sq
@@ -430,6 +620,9 @@ export default function AiFinanceChat() {
               }
               if (updatedPayload.targetWalletId !== undefined) {
                 updatedPayload.targetWalletId = updatedPayload.targetWalletId ? Number(updatedPayload.targetWalletId) : undefined
+              }
+              if (updatedPayload.category) {
+                updatedPayload.category = sanitizeCategoryPath(updatedPayload.category, matchedTx.type || 'expense')
               }
 
               await updateTransaction(matchedTx.id, updatedPayload)
@@ -547,12 +740,15 @@ export default function AiFinanceChat() {
         
         if (result.action === 'create') {
           const targetAmt = Number(result.amount) || 0
+          const goalCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
+            ? result.currency.trim().toUpperCase()
+            : defaultCurrency
           await db.goals.add({
             name: result.name,
             targetAmount: targetAmt,
             currentAmount: 0,
             deadline: null,
-            currency: defaultCurrency
+            currency: goalCurrency
           })
           newMsgs.push({
             id: Date.now()+3,
@@ -566,7 +762,7 @@ export default function AiFinanceChat() {
                 title: result.name,
                 targetAmount: targetAmt,
                 currentAmount: 0,
-                currency: defaultCurrency
+                currency: goalCurrency
               }
             }
           })
@@ -608,32 +804,42 @@ export default function AiFinanceChat() {
                 })
               } else {
                 const walletIdNum = Number(chosenWallet.id)
-                const newCurrent = (matched.currentAmount || 0) + depositAmt
+                const inputCurrency = result.currency || matched.currency || chosenWallet?.currency || defaultCurrency
+                const goalCurrency = matched.currency || defaultCurrency
+                const walletCurrency = chosenWallet?.currency || defaultCurrency
+                const rates = getCachedCurrencyRates('USD')
+                const depositAmtInGoalCurrency = convertCurrency(depositAmt, inputCurrency, goalCurrency, rates)
+                const depositAmtInWalletCurrency = convertCurrency(depositAmt, inputCurrency, walletCurrency, rates)
+                const newCurrent = (matched.currentAmount || 0) + depositAmtInGoalCurrency
+                const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
 
-                const createdTxId = await db.transactions.add({
-                  date: getLocalDateString(),
-                  amount: depositAmt,
-                  type: 'expense',
-                  category: 'tabungan',
-                  notes: `Setor ke Tabungan: ${matched.name}`,
-                  currency: matched.currency || chosenWallet?.currency || defaultCurrency,
-                  walletId: walletIdNum,
-                  goalId: matched.id,
-                  createdAt: Date.now(),
-                  isExcludeFromAnalytics: true,
-                  excludeFromAnalytics: true,
-                })
-                void invalidateWalletBalance([walletIdNum])
+                await db.transaction('rw', [db.transactions, db.goals, db.goalLogs], async () => {
+                  const createdTxId = await db.transactions.add({
+                    date: getLocalDateString(),
+                    amount: depositAmtInWalletCurrency,
+                    type: 'expense',
+                    category: 'tabungan',
+                    notes: `Setor ke Tabungan: ${matched.name}`,
+                    currency: walletCurrency,
+                    walletId: walletIdNum,
+                    goalId: matched.id,
+                    createdAt: Date.now(),
+                    isExcludeFromAnalytics: true,
+                    excludeFromAnalytics: true,
+                  })
 
-                await db.goals.update(matched.id, { currentAmount: newCurrent })
-                await db.goalLogs.add({
-                  goalId: matched.id,
-                  amount: depositAmt,
-                  notes: 'Dicatat oleh AI',
-                  date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-                  walletName: chosenWallet?.name || null,
-                  transactionId: createdTxId || null,
+                  await db.goals.update(matched.id, { currentAmount: newCurrent })
+                  await db.goalLogs.add({
+                    goalId: matched.id,
+                    amount: depositAmtInGoalCurrency,
+                    notes: 'Dicatat oleh AI',
+                    date: logDate,
+                    walletName: chosenWallet?.name || null,
+                    transactionId: createdTxId || null,
+                  })
                 })
+                await invalidateWalletBalance([walletIdNum])
+                triggerHaptic('success')
 
                 const walletSubtitle = locale === 'en'
                   ? `Deducted from ${chosenWallet.name}`
@@ -646,6 +852,128 @@ export default function AiFinanceChat() {
                   data: {
                     type: 'savings',
                     action: 'add',
+                    title: matched.name,
+                    subtitle: walletSubtitle,
+                    data: {
+                      title: matched.name,
+                      targetAmount: matched.targetAmount,
+                      currentAmount: newCurrent,
+                      currency: matched.currency || defaultCurrency,
+                      walletName: chosenWallet?.name,
+                    }
+                  }
+                })
+              }
+            }
+          } else {
+            newMsgs.push({
+              id: Date.now() + 3,
+              role: 'ai',
+              type: 'text',
+              content: locale === 'en'
+                ? `Savings goal matching "${result.name || ''}" not found.`
+                : `Tabungan yang mirip dengan "${result.name || ''}" tidak ditemukan.`
+            })
+          }
+        } else if (result.action === 'withdraw') {
+          const matched = goals.find(g => fuzzyMatch(g.name, result.name))
+          if (matched) {
+            const withdrawAmt = Number(result.amount) || 0
+            const currentSavings = Number(matched.currentAmount) || 0
+            if (withdrawAmt <= 0) {
+              newMsgs.push({
+                id: Date.now() + 3,
+                role: 'ai',
+                type: 'text',
+                content: locale === 'en'
+                  ? 'Withdrawal amount must be greater than 0.'
+                  : 'Nominal pencairan tabungan harus lebih dari 0.',
+              })
+            } else if (withdrawAmt > currentSavings) {
+              newMsgs.push({
+                id: Date.now() + 3,
+                role: 'ai',
+                type: 'text',
+                content: locale === 'en'
+                  ? `Insufficient savings in "${matched.name}". Current balance is ${formatCurrency(currentSavings, matched.currency || defaultCurrency)}.`
+                  : `Saldo tabungan "${matched.name}" tidak mencukupi. Saldo saat ini adalah ${formatCurrency(currentSavings, matched.currency || defaultCurrency)}.`,
+              })
+            } else {
+              const activeWallets = (wallets || []).filter(w => !w.isArchived)
+              let chosenWallet = null
+              if (result.walletId) {
+                chosenWallet = activeWallets.find(w => w.id === Number(result.walletId)) || null
+              }
+              if (!chosenWallet && defaultWalletId) {
+                chosenWallet = activeWallets.find(w => w.id === Number(defaultWalletId)) || null
+              }
+              if (!chosenWallet) {
+                chosenWallet = activeWallets.find(w => w.institutionType === 'cash') || activeWallets[0] || null
+              }
+
+              if (!chosenWallet) {
+                newMsgs.push({
+                  id: Date.now() + 3,
+                  role: 'ai',
+                  type: 'text',
+                  content: locale === 'en'
+                    ? 'Cannot withdraw savings: no active destination wallet found. Please create a wallet first.'
+                    : 'Gagal mencairkan tabungan: tidak ditemukan dompet tujuan aktif. Silakan buat dompet terlebih dahulu.',
+                })
+              } else {
+                const walletIdNum = Number(chosenWallet.id)
+                const inputCurrency = result.currency || matched.currency || chosenWallet?.currency || defaultCurrency
+                const goalCurrency = matched.currency || defaultCurrency
+                const walletCurrency = chosenWallet?.currency || defaultCurrency
+                const rates = getCachedCurrencyRates('USD')
+                const withdrawAmtInGoalCurrency = convertCurrency(withdrawAmt, inputCurrency, goalCurrency, rates)
+                const withdrawAmtInWalletCurrency = convertCurrency(withdrawAmt, inputCurrency, walletCurrency, rates)
+                const newCurrent = Math.max(0, currentSavings - withdrawAmtInGoalCurrency)
+                const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
+
+                await db.transaction('rw', [db.transactions, db.goals, db.goalLogs], async () => {
+                  const createdTxId = await db.transactions.add({
+                    date: getLocalDateString(),
+                    amount: withdrawAmtInWalletCurrency,
+                    type: 'income',
+                    category: 'cairkan_tabungan',
+                    notes: `Pencairan Tabungan: ${matched.name}`,
+                    currency: walletCurrency,
+                    walletId: walletIdNum,
+                    goalId: matched.id,
+                    createdAt: Date.now(),
+                    isExcludeFromAnalytics: true,
+                    excludeFromAnalytics: true,
+                  })
+
+                  const targetAmt = Number(matched.targetAmount) || 0
+                  await db.goals.update(matched.id, {
+                    currentAmount: newCurrent,
+                    isCompleted: targetAmt > 0 ? newCurrent >= targetAmt : false,
+                  })
+                  await db.goalLogs.add({
+                    goalId: matched.id,
+                    amount: -withdrawAmtInGoalCurrency,
+                    notes: 'Dicatat oleh AI',
+                    date: logDate,
+                    walletName: chosenWallet?.name || null,
+                    transactionId: createdTxId || null,
+                  })
+                })
+                await invalidateWalletBalance([walletIdNum])
+                triggerHaptic('success')
+
+                const walletSubtitle = locale === 'en'
+                  ? `Deposited to ${chosenWallet.name}`
+                  : `Masuk ke dompet ${chosenWallet.name}`
+
+                newMsgs.push({
+                  id: Date.now() + 3,
+                  role: 'ai',
+                  type: 'action_success',
+                  data: {
+                    type: 'savings',
+                    action: 'withdraw',
                     title: matched.name,
                     subtitle: walletSubtitle,
                     data: {
@@ -748,15 +1076,43 @@ export default function AiFinanceChat() {
         const budgets = await db.budgets.toArray()
         const allTxs = await db.transactions.toArray()
         const fuzzyMatch = (str, query) => str?.toLowerCase().includes((query || '').toLowerCase())
-        const monthStr = format(new Date(), 'yyyy-MM')
+        const budgetCycleStartDay = useSettingsStore.getState().budgetCycleStartDay || 1
+        const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
+        const period = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
+        const monthExpenseTxs = allTxs.filter((tx) => (tx.date || '') >= period.startDate && (tx.date || '') <= period.endDate)
+        const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
         
-        const catTarget = result.category || 'Semua'
-        const spentThisMonth = allTxs
-          .filter(tx => tx.type === 'expense' && (tx.date || '').startsWith(monthStr) && (catTarget === 'Semua' || (tx.category || '').toLowerCase().includes(catTarget.toLowerCase())))
-          .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
+        const rawCategory = (result.category || '').trim()
+        const isAllCategory = !rawCategory || rawCategory.toLowerCase() === 'semua' || rawCategory.toLowerCase() === 'all'
+
+        // Check if rawCategory matches a parent category
+        const expenseTree = getMergedExpenseTree()
+        const cleanRawCat = rawCategory.toLowerCase().replace(/[_-\s]+/g, ' ')
+        const matchedParent = !isAllCategory ? expenseTree.find((p) => {
+          const pId = p.id.toLowerCase().replace(/[_-\s]+/g, ' ')
+          const pNameId = (p.names?.id || '').toLowerCase().replace(/[_-\s]+/g, ' ')
+          const pNameEn = (p.names?.en || '').toLowerCase().replace(/[_-\s]+/g, ' ')
+          return pId === cleanRawCat || pNameId === cleanRawCat || pNameEn === cleanRawCat
+        }) : null
+
+        const budgetCatKey = isAllCategory ? 'all' : (matchedParent ? matchedParent.id : sanitizeCategoryPath(rawCategory, 'expense'))
+        const displayTitle = isAllCategory ? 'Semua' : (matchedParent ? (matchedParent.names?.[locale === 'en' ? 'en' : 'id'] || matchedParent.id) : rawCategory)
+        const isBudgetCategoryMatch = (bCat) => {
+          if (isAllCategory) {
+            const bLower = (bCat || '').toLowerCase()
+            return bLower === 'all' || bLower === 'semua'
+          }
+          const bLower = (bCat || '').toLowerCase()
+          return bLower === budgetCatKey.toLowerCase() || fuzzyMatch(bCat, budgetCatKey) || fuzzyMatch(bCat, rawCategory)
+        }
+
+        const matched = budgets.find(b => b.month === currentMonthKey && isBudgetCategoryMatch(b.category))
+        const effectiveCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
+          ? result.currency.trim().toUpperCase()
+          : (matched?.currency || defaultCurrency)
+        const spentThisMonth = calculateBudgetSpent(budgetCatKey, monthExpenseTxs, effectiveCurrency, activeRates)
 
         if (result.action === 'status') {
-          const matched = budgets.find(b => b.month === monthStr && (catTarget === 'Semua' || fuzzyMatch(b.category, catTarget)))
           const foundLimit = matched ? Number(matched.limit) : (Number(result.limit) || 0)
           newMsgs.push({
             id: Date.now()+3,
@@ -765,20 +1121,22 @@ export default function AiFinanceChat() {
             data: {
               type: 'budget',
               action: 'status',
-              title: catTarget,
+              title: displayTitle,
               data: {
-                category: catTarget,
+                category: budgetCatKey,
                 limit: foundLimit,
                 spent: spentThisMonth,
-                currency: defaultCurrency
+                currency: effectiveCurrency
               }
             }
           })
         } else if (result.action === 'create' || result.action === 'update') {
-          const matched = budgets.find(b => b.month === monthStr && fuzzyMatch(b.category, catTarget))
           const numLimit = Number(result.limit) || 0
           if (matched) {
-            await db.budgets.update(matched.id, { limit: numLimit })
+            await db.budgets.update(matched.id, {
+              limit: numLimit,
+              ...(result.currency ? { currency: effectiveCurrency } : {}),
+            })
             newMsgs.push({
               id: Date.now()+3,
               role: 'ai',
@@ -791,15 +1149,16 @@ export default function AiFinanceChat() {
                   category: matched.category,
                   limit: numLimit,
                   spent: spentThisMonth,
-                  currency: defaultCurrency
+                  currency: matched.currency || effectiveCurrency
                 }
               }
             })
           } else {
             await db.budgets.add({
-              category: catTarget,
+              category: budgetCatKey,
               limit: numLimit,
-              month: monthStr
+              month: currentMonthKey,
+              currency: effectiveCurrency
             })
             newMsgs.push({
               id: Date.now()+3,
@@ -808,12 +1167,12 @@ export default function AiFinanceChat() {
               data: {
                 type: 'budget',
                 action: 'create',
-                title: catTarget,
+                title: displayTitle,
                 data: {
-                  category: catTarget,
+                  category: budgetCatKey,
                   limit: numLimit,
                   spent: spentThisMonth,
-                  currency: defaultCurrency
+                  currency: effectiveCurrency
                 }
               }
             })
@@ -839,10 +1198,11 @@ export default function AiFinanceChat() {
         
         if (result.action === 'create') {
           const recAmt = Number(result.amount) || 0
+          const recCategory = sanitizeCategoryPath(result.category, 'expense') || 'kebutuhan_harian/umum'
           await db.recurringTransactions.add({
             title: result.title,
             type: 'expense',
-            category: result.category || 'Lainnya',
+            category: recCategory,
             amount: recAmt,
             currency: defaultCurrency,
             frequency: result.frequency || 'monthly',
@@ -861,28 +1221,30 @@ export default function AiFinanceChat() {
                 title: result.title,
                 amount: recAmt,
                 frequency: result.frequency || 'monthly',
-                category: result.category || 'Lainnya',
+                category: recCategory,
                 currency: defaultCurrency
               }
             }
           })
         } else if (result.action === 'update' || result.action === 'delete') {
-          if (result.action === 'delete' && (!result.title || !result.title.trim())) {
+          const recTitle = (result.title || '').trim()
+          if (!recTitle) {
             newMsgs.push({
               id: Date.now() + 3,
               role: 'ai',
               type: 'text',
               content: locale === 'en'
-                ? 'Please specify which recurring subscription you would like to cancel.'
-                : 'Mohon sebutkan langganan berulang mana yang ingin Anda batalkan.',
+                ? `Please specify which recurring subscription you would like to ${result.action === 'delete' ? 'cancel' : 'update'}.`
+                : `Mohon sebutkan langganan berulang mana yang ingin Anda ${result.action === 'delete' ? 'batalkan' : 'ubah'}.`,
             })
           } else {
-            const matched = recurrings.find(r => fuzzyMatch(r.title, result.title))
+            const matched = recurrings.find(r => fuzzyMatch(r.title, recTitle))
             if (matched) {
               if (result.action === 'update') {
                 const updates = {}
                 if (result.amount) updates.amount = Number(result.amount)
                 if (result.frequency) updates.frequency = result.frequency
+                if (result.category) updates.category = sanitizeCategoryPath(result.category, 'expense') || 'kebutuhan_harian/umum'
                 await db.recurringTransactions.update(matched.id, updates)
                 newMsgs.push({
                   id: Date.now()+3,
@@ -896,7 +1258,7 @@ export default function AiFinanceChat() {
                       title: matched.title,
                       amount: updates.amount ?? matched.amount,
                       frequency: updates.frequency ?? matched.frequency,
-                      category: matched.category,
+                      category: updates.category ?? matched.category,
                       currency: defaultCurrency
                     }
                   }
@@ -937,7 +1299,7 @@ export default function AiFinanceChat() {
 
       if (result.type === 'export') {
         const txs = await db.transactions.toArray()
-        const filtered = result.month ? txs.filter(t => t.date.startsWith(result.month)) : txs
+        const filtered = result.month ? txs.filter(t => (t?.date || '').startsWith(result.month)) : txs
         
         if (filtered.length === 0) {
            newMsgs.push({ id: Date.now()+3, role: 'ai', type: 'text', content: "Tidak ada data transaksi untuk diekspor." })
@@ -967,16 +1329,23 @@ export default function AiFinanceChat() {
         if (result.action === 'create') {
           const walletName = result.name || 'Dompet Baru'
           const initialBal = result.initialBalance || 0
-          const wType = result.walletType || 'bank'
-          await createWallet({
+          const rawType = (result.walletType || 'bank').toLowerCase().replace('-', '')
+          const wType = ['bank', 'ewallet', 'cash', 'credit_card', 'investment', 'other'].includes(rawType) ? rawType : 'bank'
+          const walletCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
+            ? result.currency.trim().toUpperCase()
+            : defaultCurrency
+          const createdId = await createWallet({
             name: walletName,
             institutionType: wType,
-            currency: defaultCurrency,
+            currency: walletCurrency,
             balance: initialBal,
             logoUrl: null,
             createdAt: Date.now()
           })
-          const balFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(initialBal)
+          if (createdId) {
+            await invalidateWalletBalance([createdId])
+          }
+          const balFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: walletCurrency, maximumFractionDigits: 0 }).format(initialBal)
           newMsgs.push({ 
             id: Date.now()+3, 
             role: 'ai', 
@@ -984,49 +1353,77 @@ export default function AiFinanceChat() {
             data: { type: 'wallet', action: 'create', title: walletName, subtitle: `Saldo awal: ${balFormatted}` } 
           })
         } else if (result.action === 'transfer') {
-          let fromWallet = wallets.find(w => w.id === Number(result.fromWalletId))
-          let toWallet = wallets.find(w => w.id === Number(result.toWalletId))
-          
-          if (!fromWallet && wallets.length > 0) fromWallet = wallets[0]
-          if (!toWallet && wallets.length > 1) toWallet = wallets[1]
+          const { isValid, fromWallet, toWallet, errorMessageKey } = validateTransferWallets(
+            result.fromWalletId,
+            result.toWalletId,
+            wallets
+          )
 
-          const transferAmt = result.amount || 0
-          const amtFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0 }).format(transferAmt)
-          
-          const txToSave = {
-            type: 'transfer',
-            category: 'transfer/out',
-            amount: transferAmt,
-            date: format(new Date(), 'yyyy-MM-dd'),
-            notes: `Transfer AI: ${fromWallet ? fromWallet.name : 'Dompet Asal'} ke ${toWallet ? toWallet.name : 'Dompet Tujuan'}`,
-            walletId: fromWallet ? fromWallet.id : null,
-            targetWalletId: toWallet ? toWallet.id : null,
-            currency: defaultCurrency,
-            createdAt: Date.now()
+          if (!isValid) {
+            newMsgs.push({
+              id: Date.now() + 3,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              preserveContent: true,
+              content: errorMessageKey === 'missing_wallets'
+                ? (locale === 'en'
+                    ? 'Transfer requires two different valid wallets. Please specify both source and destination wallets.'
+                    : 'Transfer membutuhkan dua dompet yang berbeda dan valid. Mohon tentukan dompet asal dan dompet tujuan.')
+                : (locale === 'en'
+                    ? 'Source wallet and destination wallet cannot be the same.'
+                    : 'Dompet asal dan dompet tujuan transfer tidak boleh sama.')
+            })
+          } else {
+            const transferAmt = result.amount || 0
+            const transferCurrency = fromWallet?.currency || defaultCurrency
+            const targetCurrency = toWallet?.currency || transferCurrency
+            const rates = getCachedCurrencyRates('USD')
+            const targetAmount = convertCurrency(transferAmt, transferCurrency, targetCurrency, rates)
+            const amtFormatted = new Intl.NumberFormat(locale, { style: 'currency', currency: transferCurrency, maximumFractionDigits: 0 }).format(transferAmt)
+            
+            const txToSave = {
+              type: 'transfer',
+              category: 'transfer/umum',
+              amount: transferAmt,
+              targetAmount: targetAmount,
+              targetCurrency: targetCurrency,
+              date: format(new Date(), 'yyyy-MM-dd'),
+              notes: `Transfer AI: ${fromWallet ? fromWallet.name : 'Dompet Asal'} ke ${toWallet ? toWallet.name : 'Dompet Tujuan'}`,
+              walletId: fromWallet ? fromWallet.id : null,
+              targetWalletId: toWallet ? toWallet.id : null,
+              currency: transferCurrency,
+              createdAt: Date.now()
+            }
+            await addTransaction(txToSave)
+            triggerHaptic('success')
+            
+            newMsgs.push({ 
+              id: Date.now()+3, 
+              role: 'ai', 
+              type: 'action_success', 
+              data: { 
+                type: 'wallet', 
+                action: 'transfer', 
+                title: `Transfer ${amtFormatted}`, 
+                subtitle: `${fromWallet ? fromWallet.name : 'Asal'} -> ${toWallet ? toWallet.name : 'Tujuan'}` 
+              } 
+            })
           }
-          const transferTxId = await addTransaction(txToSave)
-          txToSave.id = transferTxId
-          
-          newMsgs.push({ 
-            id: Date.now()+3, 
-            role: 'ai', 
-            type: 'action_success', 
-            data: { 
-              type: 'wallet', 
-              action: 'transfer', 
-              title: `Transfer ${amtFormatted}`, 
-              subtitle: `${fromWallet ? fromWallet.name : 'Dompet Asal'} → ${toWallet ? toWallet.name : 'Dompet Tujuan'}` 
-            } 
-          })
         }
       }
 
-      if (result.type === 'loan') {
+      if (result.type === 'loan' || result.type === 'loans') {
         if (result.action === 'create') {
           let selectedWalletId = result.walletId ? Number(result.walletId) : null
           if (!selectedWalletId || !wallets.find((w) => w.id === selectedWalletId)) {
-            selectedWalletId = wallets.length > 0 ? wallets[0].id : null
+            const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
+            selectedWalletId = wallets.find((w) => w.id === configuredDefaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
           }
+          const matchedWallet = wallets.find((w) => w.id === selectedWalletId)
+          const loanCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
+            ? result.currency.trim().toUpperCase()
+            : (matchedWallet?.currency || defaultCurrency)
           await addLoan({
             type: result.loanType || 'debt',
             personName: result.personName || 'Pihak Terkait',
@@ -1034,7 +1431,7 @@ export default function AiFinanceChat() {
             totalAmount: result.amount,
             dueDate: result.dueDate || null,
             walletId: selectedWalletId,
-            currency: defaultCurrency,
+            currency: loanCurrency,
           })
           newMsgs.push({
             id: Date.now() + 4,
@@ -1050,114 +1447,223 @@ export default function AiFinanceChat() {
                 loanType: result.loanType || 'debt',
                 amount: Number(result.amount) || 0,
                 dueDate: result.dueDate || null,
-                currency: defaultCurrency
+                currency: loanCurrency
               }
             },
           })
         } else if (result.action === 'pay') {
           const allLoans = await db.loans.toArray()
-          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()) && l.status !== 'paid')
-          if (matched) {
-            let payWalletId = result.walletId ? Number(result.walletId) : matched.walletId
-            if (payWalletId && !wallets.find((w) => w.id === payWalletId)) {
-              payWalletId = matched.walletId || (wallets.length > 0 ? wallets[0].id : null)
-            }
-            if (payWalletId && matched.walletId !== payWalletId) {
-              await db.loans.update(matched.id, { walletId: payWalletId })
-            }
-            await recordPayment(matched.id, result.amount, getLocalDateString(), 'Dicatat via AI Assistant', payWalletId)
-            newMsgs.push({
-              id: Date.now() + 4,
-              role: 'ai',
-              type: 'action_success',
-              data: {
-                type: 'loan',
-                action: 'pay',
-                title: matched.title,
-                data: {
-                  title: matched.title,
-                  personName: matched.personName,
-                  loanType: matched.type,
-                  amount: Number(result.amount) || 0,
-                  dueDate: matched.dueDate,
-                  currency: defaultCurrency
-                }
-              },
-            })
-          }
-        } else if (result.action === 'mark_paid') {
-          const allLoans = await db.loans.toArray()
-          const matched = allLoans.find((l) => l.title?.toLowerCase().includes((result.title || '').toLowerCase()))
-          if (matched) {
-            const payWalletId = result.walletId ? Number(result.walletId) : (matched.walletId || (wallets.length > 0 ? wallets[0].id : null))
-            const remaining = Number(matched.remainingAmount) || 0
-            if (remaining > 0) {
-              await recordPayment(matched.id, remaining, getLocalDateString(), 'Pelunasan pinjaman via AI Assistant', payWalletId)
-            } else {
-              await updateLoan(matched.id, { status: 'paid', remainingAmount: 0 })
-            }
-            newMsgs.push({
-              id: Date.now() + 4,
-              role: 'ai',
-              type: 'action_success',
-              data: {
-                type: 'loan',
-                action: 'pay',
-                title: matched.title,
-                subtitle: 'Pinjaman berhasil dilunasi',
-                data: {
-                  title: matched.title,
-                  personName: matched.personName,
-                  loanType: matched.type,
-                  amount: remaining,
-                  currency: matched.currency || defaultCurrency,
-                },
-              },
-            })
-          }
-        } else if (result.action === 'delete') {
-          if (!result.title || !result.title.trim()) {
+          const { filterTerm, matched } = findMatchingLoanForAction(allLoans, result, { includePaid: false })
+          if (!filterTerm) {
             newMsgs.push({
               id: Date.now() + 4,
               role: 'ai',
               type: 'text',
+              isError: true,
               content: locale === 'en'
-                ? 'Please specify which loan record you would like to delete (for example: "delete loan Motor").'
-                : 'Mohon sebutkan catatan pinjaman mana yang ingin Anda hapus (contoh: "hapus pinjaman Motor").',
+                ? 'Please specify the loan title or person name to record a payment.'
+                : 'Mohon sebutkan judul pinjaman atau nama pihak terkait untuk mencatat pembayaran.',
             })
-          } else {
-            const allLoans = await db.loans.toArray()
-            const matched = allLoans.find((l) => l.title?.toLowerCase().includes(result.title.toLowerCase()))
-            if (matched) {
-              newMsgs.push({
-                id: Date.now() + 4,
-                role: 'ai',
-                type: 'delete_confirm',
-                data: {
-                  id: matched.id,
-                  entityType: 'loan',
-                  title: matched.title,
-                  notes: matched.title,
-                  personName: matched.personName,
-                  amount: matched.remainingAmount ?? matched.totalAmount ?? matched.amount,
-                  currency: matched.currency || defaultCurrency,
-                  loanType: matched.type,
-                },
-                content: locale === 'en'
-                  ? `Are you sure you want to delete the loan "${matched.title}"?`
-                  : `Apakah Anda yakin ingin menghapus catatan pinjaman "${matched.title}"?`,
-              })
-            } else {
+          } else if (matched) {
+            const matchedActiveWallet = wallets.find((w) => !w.isArchived && w.id === (result.walletId ? Number(result.walletId) : matched.walletId))
+            if (!matchedActiveWallet) {
               newMsgs.push({
                 id: Date.now() + 4,
                 role: 'ai',
                 type: 'text',
+                isError: true,
                 content: locale === 'en'
-                  ? `Loan "${result.title || ''}" not found.`
-                  : `Catatan pinjaman "${result.title || ''}" tidak ditemukan.`,
+                  ? 'Please specify or choose an active wallet to record the loan payment.'
+                  : 'Mohon pilih atau sebutkan dompet aktif untuk mencatat pembayaran pinjaman.',
+              })
+            } else {
+              const payWalletId = matchedActiveWallet.id
+              await recordPayment(matched.id, result.amount, getLocalDateString(), 'Dicatat via AI Assistant', payWalletId, result.currency)
+              newMsgs.push({
+                id: Date.now() + 4,
+                role: 'ai',
+                type: 'action_success',
+                data: {
+                  type: 'loan',
+                  action: 'pay',
+                  title: matched.title,
+                  data: {
+                    title: matched.title,
+                    personName: matched.personName,
+                    loanType: matched.type,
+                    amount: Number(result.amount) || 0,
+                    dueDate: matched.dueDate,
+                    currency: result.currency || matchedActiveWallet.currency || matched.currency || defaultCurrency
+                  }
+                },
               })
             }
+          } else {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? `Active loan "${result.title || result.personName || ''}" not found or already paid off.`
+                : `Catatan pinjaman aktif "${result.title || result.personName || ''}" tidak ditemukan atau sudah lunas.`,
+            })
           }
+        } else if (result.action === 'mark_paid') {
+          const allLoans = await db.loans.toArray()
+          const { filterTerm, matched } = findMatchingLoanForAction(allLoans, result, { includePaid: false })
+          if (!filterTerm) {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? 'Please specify the loan title or person name to mark as paid.'
+                : 'Mohon sebutkan judul pinjaman atau nama pihak terkait untuk menandai lunas.',
+            })
+          } else if (matched) {
+            const matchedActiveWallet = wallets.find((w) => !w.isArchived && w.id === (result.walletId ? Number(result.walletId) : matched.walletId))
+            if (!matchedActiveWallet) {
+              newMsgs.push({
+                id: Date.now() + 4,
+                role: 'ai',
+                type: 'text',
+                isError: true,
+                content: locale === 'en'
+                  ? 'Please specify or choose an active wallet to settle the loan.'
+                  : 'Mohon pilih atau sebutkan dompet aktif untuk melunasi pinjaman.',
+              })
+            } else {
+              const payWalletId = matchedActiveWallet.id
+              const remaining = Number(matched.remainingAmount) || 0
+              if (remaining > 0) {
+                await recordPayment(matched.id, remaining, getLocalDateString(), 'Pelunasan pinjaman via AI Assistant', payWalletId, matched.currency)
+              } else {
+                await updateLoan(matched.id, { status: 'paid', remainingAmount: 0 })
+              }
+              newMsgs.push({
+                id: Date.now() + 4,
+                role: 'ai',
+                type: 'action_success',
+                data: {
+                  type: 'loan',
+                  action: 'pay',
+                  title: matched.title,
+                  subtitle: 'Pinjaman berhasil dilunasi',
+                  data: {
+                    title: matched.title,
+                    personName: matched.personName,
+                    loanType: matched.type,
+                    amount: remaining,
+                    currency: matchedActiveWallet.currency || matched.currency || defaultCurrency,
+                  },
+                },
+              })
+            }
+          } else {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? `Active loan "${result.title || result.personName || ''}" not found or already paid off.`
+                : `Catatan pinjaman aktif "${result.title || result.personName || ''}" tidak ditemukan atau sudah lunas.`,
+            })
+          }
+        } else if (result.action === 'delete') {
+          const allLoans = await db.loans.toArray()
+          const { filterTerm, matched } = findMatchingLoanForAction(allLoans, result, { includePaid: true })
+          if (!filterTerm) {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? 'Please specify which loan record you would like to delete (for example: "delete loan Motor").'
+                : 'Mohon sebutkan catatan pinjaman mana yang ingin Anda hapus (contoh: "hapus pinjaman Motor").',
+            })
+          } else if (matched) {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'delete_confirm',
+              data: {
+                id: matched.id,
+                entityType: 'loan',
+                title: matched.title,
+                notes: matched.title,
+                personName: matched.personName,
+                amount: matched.remainingAmount ?? matched.totalAmount ?? matched.amount,
+                currency: matched.currency || defaultCurrency,
+                loanType: matched.type,
+              },
+              content: locale === 'en'
+                ? `Are you sure you want to delete the loan "${matched.title}"?`
+                : `Apakah Anda yakin ingin menghapus catatan pinjaman "${matched.title}"?`,
+            })
+          } else {
+            newMsgs.push({
+              id: Date.now() + 4,
+              role: 'ai',
+              type: 'text',
+              isError: true,
+              content: locale === 'en'
+                ? `Loan "${result.title || result.personName || ''}" not found.`
+                : `Catatan pinjaman "${result.title || result.personName || ''}" tidak ditemukan.`,
+            })
+          }
+        } else if (result.action === 'query') {
+          const allLoans = await db.loans.toArray()
+          const activeLoans = allLoans.filter((l) => l.status !== 'paid' && !l.isArchived)
+          const filterTitle = (result.title || result.personName || '').toLowerCase().trim()
+          const matchedLoans = filterTitle
+            ? activeLoans.filter((l) => (l.title || '').toLowerCase().includes(filterTitle) || (l.personName || '').toLowerCase().includes(filterTitle))
+            : activeLoans
+
+          const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+          let totalDebt = 0
+          let totalReceivable = 0
+
+          matchedLoans.forEach((l) => {
+            const rem = Number(l.remainingAmount ?? l.totalAmount ?? l.amount) || 0
+            const inDef = convertCurrency(rem, l.currency || defaultCurrency, defaultCurrency, activeRates)
+            if (l.type === 'debt') {
+              totalDebt += inDef
+            } else {
+              totalReceivable += inDef
+            }
+          })
+
+          const formatMoney = (val, curr = defaultCurrency) => new Intl.NumberFormat(locale, { style: 'currency', currency: curr, maximumFractionDigits: 0 }).format(val)
+
+          let summaryText = ''
+          if (matchedLoans.length === 0) {
+            summaryText = locale === 'en'
+              ? (filterTitle ? `No active loans found matching "${filterTitle}".` : 'You currently have no active debts or receivables.')
+              : (filterTitle ? `Tidak ditemukan catatan pinjaman aktif untuk "${filterTitle}".` : 'Saat ini Anda tidak memiliki catatan utang maupun piutang aktif.')
+          } else {
+            const listLines = matchedLoans.map((l) => {
+              const rem = Number(l.remainingAmount ?? l.totalAmount ?? l.amount) || 0
+              const typeLabel = l.type === 'debt' ? (locale === 'en' ? 'Debt' : 'Utang') : (locale === 'en' ? 'Receivable' : 'Piutang')
+              const personStr = l.personName ? ` (${l.personName})` : ''
+              return `- [${typeLabel}] **${l.title}**${personStr}: ${formatMoney(rem, l.currency || defaultCurrency)}`
+            }).join('\n')
+
+            summaryText = locale === 'en'
+              ? `### Loan Summary\n${listLines}\n\n- **Total Debt**: ${formatMoney(totalDebt)}\n- **Total Receivable**: ${formatMoney(totalReceivable)}`
+              : `### Ringkasan Utang & Piutang\n${listLines}\n\n- **Total Utang**: ${formatMoney(totalDebt)}\n- **Total Piutang**: ${formatMoney(totalReceivable)}`
+          }
+
+          newMsgs.push({
+            id: Date.now() + 4,
+            role: 'ai',
+            type: 'text',
+            preserveContent: true,
+            content: summaryText,
+          })
         }
       }
 
@@ -1183,11 +1689,7 @@ export default function AiFinanceChat() {
       }
 
       if (newMsgs.length > 0) {
-         const unifiedMsg = newMsgs[0]
-         unifiedMsg.content = result.text || unifiedMsg.content || unifiedMsg.customMsg || ''
-         if (result.chips && result.chips.length > 0) {
-            unifiedMsg.chips = result.chips
-         }
+         const unifiedMsg = prepareUnifiedMessage(newMsgs, result)
          setMessages(prev => {
             const exists = prev.some(m => m.id === aiMsgId)
             if (exists) {
@@ -1211,13 +1713,14 @@ export default function AiFinanceChat() {
       const offlineMsg = locale === 'en'
         ? 'No internet connection. Please check your network connection and try again.'
         : 'Tidak ada koneksi internet. Silakan periksa jaringan Anda dan coba lagi.'
+      const displayMsg = err?.message || (isOffline ? offlineMsg : translate(locale, 'aiChat.error'))
       setMessages(prev => {
          const filtered = prev.filter(m => m.id !== aiMsgId)
          return [...filtered, {
            id: Date.now() + 1,
            role: 'ai',
            type: 'text',
-           content: isOffline ? offlineMsg : (err?.message || translate(locale, 'aiChat.error'))
+           content: displayMsg
          }]
       })
     } finally {
@@ -1234,6 +1737,9 @@ export default function AiFinanceChat() {
   const handleClear = () => {
     triggerHaptic('medium')
     setShowClearConfirm(false)
+    if (db.chatMessages) {
+      db.chatMessages.clear().catch(() => {})
+    }
     setMessages([
       {
         id: Date.now(),
@@ -1381,7 +1887,7 @@ export default function AiFinanceChat() {
             <div className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
               <Sparkles size={16} strokeWidth={2.2} />
               <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--panel-strong)]" />
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ring-2 ring-[var(--panel-strong)]`} />
               </span>
             </div>
             <div className="min-w-0">
@@ -1389,9 +1895,11 @@ export default function AiFinanceChat() {
                 {translate(locale, 'aiChat.title') || 'AI Finance Advisor'}
               </h1>
               <p className="text-[10.5px] font-semibold text-[var(--muted)] truncate flex items-center gap-1">
-                <span>Gemini 2.5 Flash</span>
+                <span>{isOnline ? 'Gemini 3.8 Flash' : 'NLP Lokal'}</span>
                 <span className="inline-block h-1 w-1 rounded-full bg-[var(--muted-2)]" />
-                <span className="text-emerald-500 font-bold">{locale === 'en' ? 'Online' : 'Aktif'}</span>
+                <span className={isOnline ? 'text-emerald-500 font-bold' : 'text-amber-500 font-bold'}>
+                  {isOnline ? (locale === 'en' ? 'Online' : 'Aktif') : (locale === 'en' ? 'Offline' : 'Offline')}
+                </span>
               </p>
             </div>
           </div>
@@ -1482,6 +1990,7 @@ export default function AiFinanceChat() {
           wallets={wallets}
           locale={locale}
           onConfirm={(mode, walletId) => {
+            triggerHaptic('light')
             setShowScanModePicker(false)
             handleSend(inputValue, selectedImage, mode, walletId)
           }}
@@ -1524,120 +2033,204 @@ export default function AiFinanceChat() {
       {/* ── Message List Container ── */}
       <main
         ref={chatScrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-3.5 ft-hide-scrollbar"
+        onScroll={handleScroll}
+        className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-3.5 ft-hide-scrollbar"
       >
-        {messages.filter((m) => m.type !== 'hidden').map((msg, index) => {
+        {(() => {
           const visibleMessages = messages.filter((m) => m.type !== 'hidden')
-          const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
-          const isLatestMessage = index === visibleMessages.length - 1
+          const isOnlyWelcome = visibleMessages.length <= 1 && (visibleMessages.length === 0 || visibleMessages[0]?.type === 'welcome')
 
-          return (
-            <div key={msg.id || index} className="flex flex-col gap-2 w-full min-w-0 max-w-full">
-              {msg.role === 'user' && (
-                <div className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full">
-                  {msg.image && <img src={msg.image} alt="Upload" className="max-w-[200px] rounded-2xl border border-[var(--border)] shadow-xs" />}
-                  {msg.content && <UserBubble content={msg.content} />}
-                </div>
-              )}
+          if (isOnlyWelcome && !isLoading) {
+            return (
+              <WelcomeHero
+                onSelectPrompt={handleSend}
+                todayExpense={todayExpense}
+                todayCurrency={defaultCurrency}
+              />
+            )
+          }
 
-              {msg.role === 'ai' && (
-                <>
-                  <AiBubble
-                    content={msg.content || (msg.type === 'welcome' ? translate(locale, 'aiChat.welcome') : '')}
-                    timestamp={msg.timestamp}
-                    isNew={isLatestMessage}
-                    isStreaming={isLoading && isLatestMessage}
-                    embeddedWidget={
-                      msg.type === 'chart' && msg.data ? (
-                        <ChartBubble data={msg.data} chartType={msg.chartType} embedded={true} />
-                      ) : msg.type === 'success' ? (
-                        <TransactionSuccess
-                          data={msg.data}
-                          embedded={true}
-                          onUndo={() => {
-                            if (Array.isArray(msg.data)) {
-                              msg.data.forEach((tx) => deleteTransaction(tx.id))
-                            } else {
-                              deleteTransaction(msg.data.id)
-                            }
-                            setMessages((prev) => prev.filter((m) => m.id !== msg.id))
-                          }}
-                          contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
-                        />
-                      ) : msg.type === 'action_success' && msg.data ? (
-                        <ActionSuccessCard
-                          type={msg.data.type}
-                          action={msg.data.action}
-                          title={msg.data.title}
-                          subtitle={msg.data.subtitle}
-                          data={msg.data.data || msg.data}
-                          embedded={true}
-                        />
-                      ) : msg.type === 'delete_confirm' && msg.data ? (
-                        <div className="mt-2 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3.5 space-y-3">
-                          <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-[var(--fg)] truncate">
-                                {msg.data.title || msg.data.notes || msg.data.category || (locale === 'en' ? 'Item' : 'Data')}
-                              </p>
-                              <p className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
-                                {msg.data.entityType === 'loan' ? (
-                                  <span>{msg.data.loanType === 'debt' ? (locale === 'en' ? 'Debt' : 'Hutang') : (locale === 'en' ? 'Receivable' : 'Piutang')}{msg.data.personName ? ` • ${msg.data.personName}` : ''}</span>
-                                ) : msg.data.entityType === 'recurring' ? (
-                                  <span>{msg.data.frequency || (locale === 'en' ? 'Recurring' : 'Berulang')}{msg.data.category ? ` • ${msg.data.category}` : ''}</span>
-                                ) : (
-                                  <>
-                                    <span>{msg.data.date}</span>
-                                    {msg.data.category && <span>• {msg.data.category}</span>}
-                                  </>
+          const getMessagePosition = (all, i) => {
+            const curr = all[i]
+            const prev = all[i - 1]
+            const next = all[i + 1]
+            const isPrevSame = prev && prev.role === curr.role
+            const isNextSame = next && next.role === curr.role
+            if (!isPrevSame && !isNextSame) return 'single'
+            if (!isPrevSame && isNextSame) return 'first'
+            if (isPrevSame && isNextSame) return 'middle'
+            if (isPrevSame && !isNextSame) return 'last'
+            return 'single'
+          }
+
+          return visibleMessages.map((msg, index) => {
+            const isLastAi = msg.role === 'ai' && msg.id === visibleMessages[visibleMessages.length - 1].id
+            const isLatestMessage = index === visibleMessages.length - 1
+            const position = getMessagePosition(visibleMessages, index)
+
+            return (
+              <div key={msg.id || index} className="flex flex-col gap-2 w-full min-w-0 max-w-full">
+                {msg.role === 'user' && (
+                  <div
+                    className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full cursor-pointer"
+                    onTouchStart={() => handleMsgTouchStart(msg)}
+                    onTouchEnd={handleMsgTouchEnd}
+                    onContextMenu={(e) => handleMsgContextMenu(e, msg)}
+                  >
+                    {msg.image && <img src={msg.image} alt="Upload" className="max-w-[200px] rounded-2xl border border-[var(--border)] shadow-xs" />}
+                    {msg.content && (
+                      <UserBubble
+                        content={msg.content}
+                        timestamp={msg.timestamp}
+                        status={isLoading && isLatestMessage ? 'sent' : 'confirmed'}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {msg.role === 'ai' && (
+                  <>
+                    <div
+                      className="w-full min-w-0 max-w-full cursor-pointer"
+                      onTouchStart={() => handleMsgTouchStart(msg)}
+                      onTouchEnd={handleMsgTouchEnd}
+                      onContextMenu={(e) => handleMsgContextMenu(e, msg)}
+                    >
+                      <AiBubble
+                        content={msg.content || (msg.type === 'welcome' ? translate(locale, 'aiChat.welcome') : '')}
+                        timestamp={msg.timestamp}
+                        position={position}
+                        isNew={isLatestMessage}
+                        isStreaming={isLoading && isLatestMessage}
+                        expandableDetails={msg.expandableDetails || null}
+                        embeddedWidget={
+                          msg.type === 'carousel' && Array.isArray(msg.items) ? (
+                            <CardCarousel>
+                              {msg.items.map((item, idx) => (
+                                <ActionSuccessCard
+                                  key={idx}
+                                  type={item.type}
+                                  action={item.action}
+                                  title={item.title}
+                                  subtitle={item.subtitle}
+                                  data={item.data || item}
+                                  embedded={true}
+                                />
+                              ))}
+                            </CardCarousel>
+                          ) : msg.type === 'financial_health' ? (
+                            <FinancialHealthWidget
+                              score={msg.score}
+                              rating={msg.rating}
+                              savingsRate={msg.metrics?.savingsRatio}
+                              expenseVelocity={msg.metrics?.monthlyIncome > 0 ? Math.round((msg.metrics?.monthlyExpense / msg.metrics?.monthlyIncome) * 100) : null}
+                              debtRatio={msg.metrics?.dti}
+                              budgetCompliance={msg.metrics?.emergencyMonths != null ? Math.min(100, Math.round(msg.metrics.emergencyMonths / 6 * 100)) : null}
+                              onAction={handleSend}
+                            />
+                          ) : msg.type === 'chart' && msg.data ? (
+                            <ChartBubble data={msg.data} chartType={msg.chartType} embedded={true} />
+                          ) : msg.type === 'success' ? (
+                            <TransactionSuccess
+                              data={msg.data}
+                              embedded={true}
+                              onUndo={async () => {
+                                try {
+                                  if (Array.isArray(msg.data)) {
+                                    await Promise.all(msg.data.map((tx) => deleteTransaction(tx.id)))
+                                  } else if (msg.data?.id) {
+                                    await deleteTransaction(msg.data.id)
+                                  }
+                                  setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+                                } catch (err) {
+                                  console.error('Failed to undo transactions:', err)
+                                }
+                              }}
+                              contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
+                            />
+                          ) : msg.type === 'action_success' && msg.data ? (
+                            <ActionSuccessCard
+                              type={msg.data.type}
+                              action={msg.data.action}
+                              title={msg.data.title}
+                              subtitle={msg.data.subtitle}
+                              data={msg.data.data || msg.data}
+                              embedded={true}
+                            />
+                          ) : msg.type === 'delete_confirm' && msg.data ? (
+                            <div className="mt-2 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3.5 space-y-3">
+                              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-[var(--fg)] truncate">
+                                    {msg.data.title || msg.data.notes || msg.data.category || (locale === 'en' ? 'Item' : 'Data')}
+                                  </p>
+                                  <p className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
+                                    {msg.data.entityType === 'loan' ? (
+                                      <span>{msg.data.loanType === 'debt' ? (locale === 'en' ? 'Debt' : 'Hutang') : (locale === 'en' ? 'Receivable' : 'Piutang')}{msg.data.personName ? ` • ${msg.data.personName}` : ''}</span>
+                                    ) : msg.data.entityType === 'recurring' ? (
+                                      <span>{msg.data.frequency || (locale === 'en' ? 'Recurring' : 'Berulang')}{msg.data.category ? ` • ${msg.data.category}` : ''}</span>
+                                    ) : (
+                                      <>
+                                        <span>{msg.data.date}</span>
+                                        {msg.data.category && <span>• {msg.data.category}</span>}
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                                {msg.data.amount != null && (
+                                  <span className={`text-xs font-black shrink-0 ${msg.data.type === 'income' ? 'text-[var(--income)]' : 'text-[var(--expense)]'}`}>
+                                    {formatCurrency(msg.data.amount, msg.data.currency)}
+                                  </span>
                                 )}
-                              </p>
+                              </div>
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelDelete(msg.id, msg.data.entityType)}
+                                  className="flex-1 py-2 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer text-center"
+                                >
+                                  {locale === 'en' ? 'Cancel' : 'Batal'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmDelete(msg.data.id, msg.id, msg.data.entityType)}
+                                  className="flex-1 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <Trash2 size={13} strokeWidth={2.2} />
+                                  <span>{locale === 'en' ? 'Delete' : 'Hapus'}</span>
+                                </button>
+                              </div>
                             </div>
-                            {msg.data.amount != null && (
-                              <span className={`text-xs font-black shrink-0 ${msg.data.type === 'income' ? 'text-[var(--income)]' : 'text-[var(--expense)]'}`}>
-                                {formatCurrency(msg.data.amount, msg.data.currency)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 pt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => handleCancelDelete(msg.id, msg.data.entityType)}
-                              className="flex-1 py-2 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition active:scale-95 cursor-pointer text-center"
-                            >
-                              {locale === 'en' ? 'Cancel' : 'Batal'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmDelete(msg.data.id, msg.id, msg.data.entityType)}
-                              className="flex-1 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                            >
-                              <Trash2 size={13} strokeWidth={2.2} />
-                              <span>{locale === 'en' ? 'Delete' : 'Hapus'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      ) : null
-                    }
-                  />
-                  {isLastAi && !isLoading && (
-                    <QuickChips
-                      chips={msg.type === 'welcome' ? null : msg.chips}
-                      onSelect={handleSend}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )
-        })}
+                          ) : null
+                        }
+                      />
+                    </div>
+                    {isLastAi && !isLoading && (
+                      <QuickChips
+                        chips={msg.type === 'welcome' ? null : msg.chips}
+                        onSelect={handleSend}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })
+        })()}
 
         {isLoading && !messages.some((m) => m.id === (messages[messages.length - 1]?.id) && m.role === 'ai' && m.content) && (
-          <TypingIndicator />
+          <ReasoningIndicator />
         )}
 
         <div ref={messagesEndRef} className="h-2" />
       </main>
+
+      {/* Floating Scroll to Bottom FAB */}
+      <ScrollToBottomFAB
+        isVisible={showScrollFAB}
+        unreadCount={unreadCount}
+        onClick={scrollToBottom}
+      />
 
       {/* ── Footer / Input Controls ── */}
       <footer className="shrink-0 border-t border-[var(--border)] bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] pt-2 px-3 shadow-2xl z-20 space-y-2">
@@ -1734,6 +2327,47 @@ export default function AiFinanceChat() {
           </button>
         </form>
       </footer>
+
+      {/* ── Message Long-Press Context Menu ── */}
+      <MessageContextMenu
+        isOpen={Boolean(contextMenuMsg)}
+        onClose={() => setContextMenuMsg(null)}
+        messageContent={contextMenuMsg?.content || ''}
+        messageType={contextMenuMsg?.role === 'user' ? 'user' : contextMenuMsg?.type === 'success' ? 'transaction' : 'ai'}
+        onCopyText={(text) => {
+          if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(text)
+            window.dispatchEvent(
+              new CustomEvent('ft-show-toast', {
+                detail: {
+                  title: locale === 'en' ? 'Copied' : 'Disalin',
+                  message: locale === 'en' ? 'Text copied to clipboard' : 'Teks berhasil disalin ke papan klip',
+                  type: 'info',
+                },
+              })
+            )
+          }
+        }}
+        onCopyAmount={(amt) => {
+          if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(amt)
+            window.dispatchEvent(
+              new CustomEvent('ft-show-toast', {
+                detail: {
+                  title: locale === 'en' ? 'Copied' : 'Disalin',
+                  message: locale === 'en' ? 'Amount copied' : 'Nominal berhasil disalin',
+                  type: 'info',
+                },
+              })
+            )
+          }
+        }}
+        onDeleteMessage={() => {
+          if (contextMenuMsg) {
+            setMessages((prev) => prev.filter((m) => m.id !== contextMenuMsg.id))
+          }
+        }}
+      />
     </div>
   )
 }

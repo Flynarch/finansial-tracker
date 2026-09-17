@@ -1,84 +1,39 @@
-import { useMemo } from 'react'
-import useSettingsStore from '../../store/useSettingsStore'
-import { Sparkles, DollarSign, ListChecks, TrendingUp, Target, Flame, HandCoins, ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, PieChart, Target, HandCoins, TrendingUp, Receipt, Flame, ListChecks } from 'lucide-react'
+
+// Detect contextual icon based on chip text keywords
+function getChipIcon(text) {
+  const lower = (text || '').toLowerCase()
+  if (lower.includes('budget') || lower.includes('anggaran')) return <PieChart size={13} className="text-sky-500 shrink-0" />
+  if (lower.includes('tabungan') || lower.includes('saving') || lower.includes('target')) return <Target size={13} className="text-[var(--accent)] shrink-0" />
+  if (lower.includes('utang') || lower.includes('piutang') || lower.includes('loan') || lower.includes('lunas')) return <HandCoins size={13} className="text-teal-500 shrink-0" />
+  if (lower.includes('analisis') || lower.includes('tren') || lower.includes('pengeluaran') || lower.includes('trend')) return <TrendingUp size={13} className="text-amber-500 shrink-0" />
+  if (lower.includes('catat') || lower.includes('record') || lower.includes('transaksi')) return <Receipt size={13} className="text-emerald-500 shrink-0" />
+  if (lower.includes('habit') || lower.includes('kebiasaan')) return <Flame size={13} className="text-rose-500 shrink-0" />
+  if (lower.includes('tugas') || lower.includes('task') || lower.includes('todo')) return <ListChecks size={13} className="text-amber-500 shrink-0" />
+  return <ArrowUpRight size={13} className="text-[var(--muted)] shrink-0" />
+}
 
 export default function QuickChips({ chips: aiChips, onSelect }) {
-  const locale = useSettingsStore((s) => s.locale)
-  const isId = locale === 'id'
-
-  const defaultCategoryChips = useMemo(() => {
-    return [
-      {
-        icon: <DollarSign size={13} className="text-emerald-500 shrink-0" />,
-        label: isId ? 'Catat Pengeluaran' : 'Record Expense',
-        triggerText: isId ? 'Saya ingin mencatat pengeluaran baru' : 'I want to record a new expense',
-      },
-      {
-        icon: <TrendingUp size={13} className="text-sky-500 shrink-0" />,
-        label: isId ? 'Analisis Keuangan' : 'Financial Insights',
-        triggerText: isId ? 'Analisis pengeluaran dan pemasukan saya bulan ini' : 'Analyze my income and expenses this month',
-      },
-      {
-        icon: <Target size={13} className="text-[var(--accent)] shrink-0" />,
-        label: isId ? 'Target Tabungan' : 'Savings Goal',
-        triggerText: isId ? 'Bagaimana progres target tabungan saya saat ini?' : 'How is my savings goal progress?',
-      },
-      {
-        icon: <HandCoins size={13} className="text-teal-500 shrink-0" />,
-        label: isId ? 'Utang & Piutang' : 'Loans & Debts',
-        triggerText: isId ? 'Siapa saja yang punya utang ke saya dan berapa total utang saya?' : 'Who owes me money and what is my total debt?',
-      },
-      {
-        icon: <Sparkles size={13} className="text-purple-500 shrink-0" />,
-        label: isId ? 'Tips Hemat AI' : 'AI Saving Tips',
-        triggerText: isId ? 'Berikan tips hemat berdasarkan riwayat transaksi saya' : 'Give me saving tips based on my transaction history',
-      },
-      {
-        icon: <ListChecks size={13} className="text-amber-500 shrink-0" />,
-        label: isId ? 'Tugas Baru' : 'New Task',
-        triggerText: isId ? 'Saya ingin membuat tugas baru' : 'I want to create a new task',
-      },
-      {
-        icon: <Flame size={13} className="text-rose-500 shrink-0" />,
-        label: isId ? 'Habit Hari Ini' : 'Daily Habit',
-        triggerText: isId ? 'Bagaimana status habit harian saya hari ini?' : 'What is my habit status today?',
-      },
-    ]
-  }, [isId])
-
   const chipsList = aiChips && aiChips.length > 0 ? aiChips : null
 
-  if (chipsList) {
-    return (
-      <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar w-full min-w-0 max-w-full">
-        {chipsList.map((chipText, idx) => (
-          <button
-            key={idx}
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer"
-            onClick={() => onSelect(chipText)}
-          >
-            <span>{chipText}</span>
-            <ArrowUpRight className="h-3 w-3 text-[var(--muted)] shrink-0" />
-          </button>
-        ))}
-      </div>
-    )
-  }
+  // If no AI chips provided, render nothing (WelcomeHero handles the empty/welcome state)
+  if (!chipsList) return null
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar mt-1 w-full min-w-0 max-w-full">
-      {defaultCategoryChips.map((item, idx) => (
+    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar w-full min-w-0 max-w-full">
+      {chipsList.map((chipText, idx) => (
         <button
           key={idx}
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer"
-          onClick={() => onSelect(item.triggerText)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer opacity-0 ft-msg-enter"
+          style={{ animationDelay: `${idx * 50}ms`, animationFillMode: 'forwards' }}
+          onClick={() => onSelect(chipText)}
         >
-          {item.icon}
-          <span>{item.label}</span>
+          {getChipIcon(chipText)}
+          <span>{chipText}</span>
         </button>
       ))}
     </div>
   )
 }
+

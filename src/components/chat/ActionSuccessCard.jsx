@@ -13,6 +13,7 @@ import TodoCardWidget from './widgets/TodoCardWidget'
 import SavingsCardWidget from './widgets/SavingsCardWidget'
 import RecurringCardWidget from './widgets/RecurringCardWidget'
 import LoanCardWidget from './widgets/LoanCardWidget'
+import FinancialHealthWidget from './widgets/FinancialHealthWidget'
 
 const CONFIG = {
   wallet: {
@@ -114,6 +115,20 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
         dueDate={data?.dueDate}
         currency={data?.currency}
         action={action}
+      />
+    )
+  }
+
+  if (type === 'financial_health' || type === 'health') {
+    return (
+      <FinancialHealthWidget
+        score={data?.score}
+        rating={data?.rating}
+        savingsRate={data?.metrics?.savingsRatio ?? data?.savingsRatio ?? data?.savingsRate}
+        expenseVelocity={data?.metrics?.monthlyIncome > 0 ? Math.round((data.metrics.monthlyExpense / data.metrics.monthlyIncome) * 100) : null}
+        debtRatio={data?.metrics?.dti ?? data?.dti ?? data?.debtRatio}
+        budgetCompliance={data?.metrics?.emergencyMonths != null ? Math.min(100, Math.round(data.metrics.emergencyMonths / 6 * 100)) : null}
+        onAction={data?.onAction}
       />
     )
   }

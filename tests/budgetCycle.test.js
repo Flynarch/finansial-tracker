@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getBudgetPeriodDateRange } from '../src/lib/budgetUtils'
+import { getBudgetPeriodDateRange, isTxMatchingBudget } from '../src/lib/budgetUtils'
 
 describe('budgetUtils - getBudgetPeriodDateRange', () => {
   it('returns standard month calendar range when startDay is 1', () => {
@@ -51,5 +51,22 @@ describe('budgetUtils - getBudgetPeriodDateRange', () => {
     expect(resEn.label).toBeTruthy()
     expect(resEn.label).toContain('25')
     expect(resEn.label).toContain('24')
+  })
+})
+
+describe('budgetUtils - isTxMatchingBudget', () => {
+  it('matches all transactions when budget category is "all" or "semua"', () => {
+    expect(isTxMatchingBudget('all', 'makanan/makan_siang')).toBe(true)
+    expect(isTxMatchingBudget('all', 'transportasi/bensin')).toBe(true)
+    expect(isTxMatchingBudget('semua', 'makanan/makan_siang')).toBe(true)
+    expect(isTxMatchingBudget('semua', 'tagihan/listrik')).toBe(true)
+    expect(isTxMatchingBudget('Semua', 'kesehatan/obat')).toBe(true)
+  })
+
+  it('matches specific parent or exact category path', () => {
+    expect(isTxMatchingBudget('makanan', 'makanan/makan_siang')).toBe(true)
+    expect(isTxMatchingBudget('makanan/makan_siang', 'makanan/makan_siang')).toBe(true)
+    expect(isTxMatchingBudget('makanan/makan_malam', 'makanan/makan_siang')).toBe(false)
+    expect(isTxMatchingBudget('transportasi', 'makanan/makan_siang')).toBe(false)
   })
 })

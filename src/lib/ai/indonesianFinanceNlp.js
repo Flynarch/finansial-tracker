@@ -1,6 +1,7 @@
 import { format, subDays } from 'date-fns'
 import { sanitizeCategoryPath } from '../categorySanitizer'
 import { formatCurrency } from '../utils'
+import useSettingsStore from '../../store/useSettingsStore'
 
 /**
  * Common Indonesian day definitions and typos
@@ -293,6 +294,24 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
     }
   }
 
+  // 2.5. Standalone Day of Current Month: "tanggal 25", "tgl 1"
+  const standaloneDayMatch = lower.match(/\b(?:tanggal|tgl)\s+(\d{1,2})\b/i)
+  if (standaloneDayMatch) {
+    const day = parseInt(standaloneDayMatch[1], 10)
+    if (day >= 1 && day <= 31) {
+      const month = ref.getMonth() + 1
+      const year = refYear
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      return {
+        dateStr,
+        matchedText: standaloneDayMatch[0].trim(),
+        day,
+        month,
+        year,
+      }
+    }
+  }
+
   // 3. Day of week name (senin, selasa, rabu, kamis, jumat, sabtu, minggu)
   for (const def of DAY_DEFINITIONS) {
     if (def.regex.test(lower)) {
@@ -483,17 +502,50 @@ export function extractMerchantAndCategory(text) {
  * @param {number|string} defaultWalletId
  * @returns {number|string}
  */
-export function findWalletInText(text, wallets = [], defaultWalletId = 1) {
-  if (!wallets || wallets.length === 0) return defaultWalletId
+export function findWalletInText(text, wallets = [], defaultWalletId = undefined) {
+  const fallbackWalletId = defaultWalletId !== undefined
+    ? defaultWalletId
+    : (useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1)
+  if (!wallets || wallets.length === 0) return fallbackWalletId
   const cleanText = text.toLowerCase()
-  for (const w of wallets) {
+
+  // Sort wallets by name length descending to prevent shorter names from shadowing longer ones
+  // (e.g. "BCA" matching before "BCA Syariah")
+  const sortedWallets = [...wallets].sort((a, b) =>
+    (b.name || '').length - (a.name || '').length
+  )
+
+  // 1. Exact full-name match first
+  for (const w of sortedWallets) {
     const wName = String(w.name || '').trim().toLowerCase()
     if (!wName) continue
     const escaped = escapeRegExp(wName)
-    const regex = new RegExp(`(?:\\(|\\b)${escaped}(?:\\)|\\b)`, 'i')
+    const lookahead = wName === 'dana' ? '(?!\\s+(?:darurat|pensiun|cadangan|abadi|hibah|pendidikan|sosial|desa|alokasi))' : ''
+    const regex = new RegExp(`(?:\\(|\\b)${escaped}${lookahead}(?:\\)|\\b)`, 'i')
     if (regex.test(cleanText)) {
       return w.id
     }
+  }
+
+  // 2. Token-based matching for compound names (tokens >= 3 chars, e.g. "BCA", "Jago", "Mandiri", "BRI", "BNI")
+  const STOP_WORDS = new Set(['bank', 'rekening', 'akun', 'dompet', 'wallet', 'tabungan', 'utama', 'pribadi'])
+  for (const w of sortedWallets) {
+    const wName = String(w.name || '').trim().toLowerCase()
+    if (!wName) continue
+    const tokens = wName.split(/[\s_\-/]+/).filter((t) => t.length >= 3 && !STOP_WORDS.has(t))
+    for (const token of tokens) {
+      const escapedToken = escapeRegExp(token)
+      const lookahead = token === 'dana' ? '(?!\\s+(?:darurat|pensiun|cadangan|abadi|hibah|pendidikan|sosial|desa|alokasi))' : ''
+      const tokenRegex = new RegExp(`(?:\\(|\\b)${escapedToken}${lookahead}(?:\\)|\\b)`, 'i')
+      if (tokenRegex.test(cleanText)) {
+        return w.id
+      }
+    }
+  }
+
+  // 3. Cash / Tunai type matching
+  for (const w of sortedWallets) {
+    const wName = String(w.name || '').trim().toLowerCase()
     const wType = String(w.institutionType || w.type || '').toLowerCase()
     if (
       (wType === 'cash' || wName.includes('cash') || wName.includes('tunai')) &&
@@ -502,7 +554,200 @@ export function findWalletInText(text, wallets = [], defaultWalletId = 1) {
       return w.id
     }
   }
-  return defaultWalletId
+
+  return fallbackWalletId
+}
+
+/**
+ * Intelligent heuristic parser for Indonesian balance transfers, top-ups, and cash withdrawals.
+ * Recognizes keywords: transfer, pindah saldo, tarik tunai, top up
+ *
+ * @param {string} normalizedText
+ * @param {Array} [wallets]
+ * @param {string} [defaultCurrency='IDR']
+ * @param {Date} [referenceDate=new Date()]
+ * @returns {object|null}
+ */
+export function parseTransferTransaction(
+  normalizedText,
+  wallets = [],
+  defaultCurrency = 'IDR',
+  referenceDate = new Date()
+) {
+  if (!normalizedText || typeof normalizedText !== 'string') return null
+  const lower = normalizedText.toLowerCase()
+
+  const isTransfer = /\b(transfer|pindah\s+saldo|pindahkan\s+saldo|geser\s+saldo)\b/i.test(lower)
+  const isTarikTunai = /\b(tarik\s+tunai|tariktunai|ambil\s+tunai|tarik\s+uang|ambil\s+uang\s+di\s+atm)\b/i.test(lower)
+  const isTopUp = /\b(top\s*up|topup|isi\s+saldo)\b/i.test(lower)
+
+  if (!isTransfer && !isTarikTunai && !isTopUp) {
+    return null
+  }
+
+  // Guard against analytical questions / explanations
+  const isQuestion =
+    /\?|^(apa|apakah|bagaimana|gimana|kenapa|mengapa|kapan|siapa|cara)\b/i.test(lower) ||
+    /\b(cara\s+transfer|cara\s+tarik|cara\s+top\s*up)\b/i.test(lower)
+  if (isQuestion) return null
+
+  const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
+  const todayStr = format(ref, 'yyyy-MM-dd')
+  const currentTime = format(ref, 'HH:mm')
+  const defaultWalletId = useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1
+
+  const amt = extractMonetaryAmountFromText(lower)
+  if (amt <= 0) {
+    return {
+      error: true,
+      message:
+        'Nominal transfer belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "transfer 50rb dari bca ke gopay" atau "tarik tunai 100k dari bca").',
+    }
+  }
+
+  if (wallets.length < 2) {
+    return {
+      error: true,
+      message: 'Transfer saldo membutuhkan minimal 2 dompet aktif. Silakan buat dompet tujuan terlebih dahulu.',
+    }
+  }
+
+  let sourceWalletId = null
+  let targetWalletId = null
+
+  if (isTarikTunai) {
+    // Tarik tunai: target is physical cash
+    const cashWallet =
+      wallets.find(
+        (w) =>
+          String(w.institutionType || w.type || '').toLowerCase() === 'cash' ||
+          String(w.name || '').toLowerCase().includes('cash') ||
+          String(w.name || '').toLowerCase().includes('tunai')
+      ) || wallets[1] || wallets[0]
+    targetWalletId = cashWallet?.id || wallets[1]?.id
+
+    // Source is the debit bank/e-wallet
+    const cleanForSource = lower.replace(/\b(tarik\s+tunai|tariktunai|ambil\s+tunai|tarik\s+uang|cash|tunai)\b/gi, ' ')
+    const dariMatch = cleanForSource.match(/\bdari\s+([a-zA-Z0-9_\-\s]+)/i)
+    const sourceSnippet = dariMatch ? dariMatch[1] : cleanForSource
+    sourceWalletId = findWalletInText(sourceSnippet, wallets, null)
+
+    if (!sourceWalletId || String(sourceWalletId) === String(targetWalletId)) {
+      const nonCash = wallets.find((w) => String(w.id) !== String(targetWalletId))
+      sourceWalletId = nonCash ? nonCash.id : defaultWalletId
+    }
+  } else if (isTopUp) {
+    // 1. Source is the funding wallet (dari/pakai/lewat/menggunakan/via)
+    const dariMatch =
+      lower.match(/\b(?:dari|pakai|lewat|menggunakan|via)\s+([a-zA-Z0-9_\s-]+?)(?:\s+(?:ke|sebesar|sejumlah|\d)|$)/i) ||
+      lower.match(/\b(?:dari|pakai|lewat|menggunakan|via)\s+([a-zA-Z0-9_\s-]+)/i)
+    if (dariMatch) {
+      sourceWalletId = findWalletInText(dariMatch[1], wallets, null)
+    }
+
+    // 2. Target is destination e-wallet/account
+    const cleanForTarget = lower.replace(/\b(?:dari|pakai|lewat|menggunakan|via)\s+([a-zA-Z0-9_\s-]+)/i, ' ')
+    const keMatch =
+      cleanForTarget.match(/\bke\s+([a-zA-Z0-9_\s-]+?)(?:\s+(?:sebesar|sejumlah|\d)|$)/i) ||
+      cleanForTarget.match(/\bke\s+([a-zA-Z0-9_\s-]+)/i)
+    if (keMatch) {
+      targetWalletId = findWalletInText(keMatch[1], wallets, null)
+    }
+    if (!targetWalletId) {
+      const afterTopUpMatch = cleanForTarget.match(
+        /\b(?:top\s*up|topup|isi\s+saldo)\s+(?:saldo\s+)?([a-zA-Z0-9_\s-]+?)(?:\s+(?:sebesar|sejumlah|\d)|$)/i
+      )
+      if (afterTopUpMatch) {
+        targetWalletId = findWalletInText(afterTopUpMatch[1], wallets, null)
+      }
+    }
+    if (!targetWalletId) {
+      targetWalletId = findWalletInText(cleanForTarget, wallets, null)
+    }
+
+    if (!sourceWalletId || String(sourceWalletId) === String(targetWalletId)) {
+      const fallbackSource = wallets.find((w) => String(w.id) !== String(targetWalletId))
+      sourceWalletId = fallbackSource ? fallbackSource.id : defaultWalletId
+    }
+  } else {
+    // Standard transfer / pindah saldo
+    const dariKeMatch = lower.match(/\bdari\s+([a-zA-Z0-9_\s-]+?)\s+ke\s+([a-zA-Z0-9_\s-]+)/i)
+    const keDariMatch = lower.match(/\bke\s+([a-zA-Z0-9_\s-]+?)\s+dari\s+([a-zA-Z0-9_\s-]+)/i)
+
+    if (dariKeMatch) {
+      sourceWalletId = findWalletInText(dariKeMatch[1], wallets, null)
+      targetWalletId = findWalletInText(dariKeMatch[2], wallets, null)
+    } else if (keDariMatch) {
+      targetWalletId = findWalletInText(keDariMatch[1], wallets, null)
+      sourceWalletId = findWalletInText(keDariMatch[2], wallets, null)
+    } else {
+      const keOnlyMatch = lower.match(/\bke\s+([a-zA-Z0-9_\s-]+)/i)
+      if (keOnlyMatch) {
+        targetWalletId = findWalletInText(keOnlyMatch[1], wallets, null)
+      }
+      const dariOnlyMatch = lower.match(/\bdari\s+([a-zA-Z0-9_\s-]+)/i)
+      if (dariOnlyMatch) {
+        sourceWalletId = findWalletInText(dariOnlyMatch[1], wallets, null)
+      }
+      if (!sourceWalletId || !targetWalletId) {
+        const simpleKeMatch =
+          lower.match(/([a-zA-Z0-9_\s-]+?)\s+ke\s+([a-zA-Z0-9_\s-]+?)(?:\s+(?:sebesar|sejumlah|\d)|$)/i) ||
+          lower.match(/([a-zA-Z0-9_-]+)\s+ke\s+([a-zA-Z0-9_-]+)/i)
+        if (simpleKeMatch) {
+          sourceWalletId = sourceWalletId || findWalletInText(simpleKeMatch[1], wallets, null)
+          targetWalletId = targetWalletId || findWalletInText(simpleKeMatch[2], wallets, null)
+        }
+      }
+    }
+
+    if (!sourceWalletId && wallets.length > 0) {
+      const configured = wallets.find((w) => w.id === defaultWalletId)
+      sourceWalletId = configured ? configured.id : wallets[0].id
+    }
+    if (!targetWalletId) {
+      const other = wallets.find((w) => String(w.id) !== String(sourceWalletId))
+      targetWalletId = other ? other.id : wallets[1]?.id || defaultWalletId
+    }
+  }
+
+  // Ensure source and target are not the exact same wallet
+  if (String(sourceWalletId) === String(targetWalletId)) {
+    const alternative = wallets.find((w) => String(w.id) !== String(sourceWalletId))
+    if (alternative) {
+      targetWalletId = alternative.id
+    }
+  }
+
+  const dateResult = extractDateFromPhrase(normalizedText, ref)
+  const resolvedDate = dateResult ? dateResult.dateStr : todayStr
+
+  const sourceWallet = wallets.find((w) => String(w.id) === String(sourceWalletId))
+  const destWallet = wallets.find((w) => String(w.id) === String(targetWalletId))
+  const txCurrency = sourceWallet?.currency || defaultCurrency
+  const srcName = sourceWallet?.name || 'Dompet Asal'
+  const dstName = destWallet?.name || 'Dompet Tujuan'
+
+  return {
+    type: 'transactions',
+    action: 'create',
+    transactions: [
+      {
+        type: 'transfer',
+        amount: amt,
+        category: 'transfer/umum',
+        currency: txCurrency,
+        walletId: sourceWalletId,
+        targetWalletId: targetWalletId,
+        date: resolvedDate,
+        time: currentTime,
+        notes: `Transfer ${srcName} ke ${dstName}`,
+      },
+    ],
+    currency: txCurrency,
+    text: `Berhasil mencatat transfer sebesar ${formatCurrency(amt, txCurrency)} dari ${srcName} ke ${dstName}.`,
+    chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+    isInstant: true,
+  }
 }
 
 /**
@@ -524,10 +769,10 @@ export function parseMultiClauseTransactions(
   const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
   const todayStr = format(ref, 'yyyy-MM-dd')
   const currentTime = format(ref, 'HH:mm')
-  const defaultWalletId = wallets[0]?.id || 1
+  const defaultWalletId = useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1
 
-  // Split by conjunctions: dan, lalu, terus, kemudian, serta, ;, \n, or non-decimal comma
-  const delimiterRegex = /\s*(?:;|\n+|\s+(?:dan|lalu|terus|kemudian|serta)\s+|(?<!\d),(?!\d)\s*)\s*/i
+  // Split by conjunctions: dan, lalu, terus, kemudian, serta, sama, &, ;, \n, or non-decimal comma
+  const delimiterRegex = /\s*(?:;|\n+|\s+(?:dan|lalu|terus|kemudian|serta|sama|&)\s+|(?<!\d),(?!\d)\s*)\s*/i
   const rawClauses = normalizedText.split(delimiterRegex).map((c) => c.trim()).filter(Boolean)
 
   if (rawClauses.length < 2) return null
@@ -578,7 +823,14 @@ export function parseMultiClauseTransactions(
       cleanNotes = cleanNotes.replace(new RegExp(`\\(?\\b${escapeRegExp(matchedWallet.name)}\\b\\)?`, 'gi'), ' ')
     }
     // Remove standalone parenthesized wallet mentions like (dana) or (cash)
-    cleanNotes = cleanNotes.replace(/\([a-zA-Z0-9\s_-]+\)/g, ' ')
+    const walletCandidates = [
+      ...(wallets || []).map((w) => w.name),
+      'dana', 'cash', 'tunai', 'gopay', 'ovo', 'shopeepay', 'bca', 'bri', 'bni', 'mandiri', 'jago', 'bank', 'rekening', 'dompet'
+    ].filter(Boolean)
+    if (walletCandidates.length > 0) {
+      const walletPattern = walletCandidates.map(escapeRegExp).join('|')
+      cleanNotes = cleanNotes.replace(new RegExp(`\\(\\s*(?:${walletPattern})\\s*\\)`, 'gi'), ' ')
+    }
 
     // Remove amount (e.g. 60k, 25k, rp 50000)
     cleanNotes = cleanNotes.replace(/\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?\b/gi, ' ')
@@ -586,7 +838,6 @@ export function parseMultiClauseTransactions(
 
     // Remove leading action verbs
     cleanNotes = cleanNotes
-      .replace(/[()]/g, ' ')
       .replace(/^(?:dapet|dapat|terima|diterima|buat\s+beli|beli|buat|untuk|bayar|keluar|keluarin)\s+/i, '')
       .replace(/\s+/g, ' ')
       .trim()
@@ -612,7 +863,12 @@ export function parseMultiClauseTransactions(
     } else {
       finalNotes = finalNotes
         .split(' ')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .map((w) => {
+          if (w.startsWith('(') && w.length > 1) {
+            return '(' + w.charAt(1).toUpperCase() + w.slice(2)
+          }
+          return w.charAt(0).toUpperCase() + w.slice(1)
+        })
         .join(' ')
     }
 
@@ -689,12 +945,18 @@ export function parseIndonesianFinancialText(
   const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
   const todayStr = format(ref, 'yyyy-MM-dd')
   const currentTime = format(ref, 'HH:mm')
-  const defaultWalletId = wallets[0]?.id || 1
+  const defaultWalletId = useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1
 
   // 1A. PATTERN 0: Multi-clause transactions connecting multiple items (e.g. "9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)")
   const multiClauseResult = parseMultiClauseTransactions(normalized, wallets, defaultCurrency, ref)
   if (multiClauseResult) {
     return multiClauseResult
+  }
+
+  // 1B. PATTERN TRANSFER: Transfer / pindah saldo / tarik tunai / top up
+  const transferResult = parseTransferTransaction(normalized, wallets, defaultCurrency, ref)
+  if (transferResult) {
+    return transferResult
   }
 
   // 2. PATTERN A: Multi-day spending resolution
@@ -752,14 +1014,7 @@ export function parseIndonesianFinancialText(
     const cleanNotes = merchant || 'Pengeluaran'
 
     // Match wallet if mentioned
-    let resolvedWalletId = defaultWalletId
-    for (const w of wallets) {
-      const wName = String(w.name || '').toLowerCase()
-      if (lower.includes(wName) || (wName.includes('cash') && lower.includes('tunai'))) {
-        resolvedWalletId = w.id
-        break
-      }
-    }
+    const resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)
 
     const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
     const txCurrency = matchedWallet?.currency || defaultCurrency
@@ -833,7 +1088,7 @@ export function parseIndonesianFinancialText(
   }
   clean = clean
     .replace(/^(kemarin\s+|tadi\s+pagi\s+|tadi\s+siang\s+|tadi\s+malam\s+|hari\s+ini\s+|semalam\s+)/i, '')
-    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|dapet|terima|makan|minum)\s+/i, '')
+    .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|dapet|terima|makan(?!\s+(?:siang|pagi|malam))|minum)\s+/i, '')
     .trim()
 
   const match = clean.match(
@@ -858,15 +1113,8 @@ export function parseIndonesianFinancialText(
         const { merchant, category } = extractMerchantAndCategory(rawTail ? `${rawItem} ${rawTail}` : rawItem)
         const capitalizedItem = merchant || rawItem.charAt(0).toUpperCase() + rawItem.slice(1)
 
-        let resolvedWalletId = defaultWalletId
-        const searchTail = `${rawTail} ${rawItem}`.toLowerCase()
-        for (const w of wallets) {
-          const wName = String(w.name || '').toLowerCase()
-          if (searchTail.includes(wName) || (wName.includes('cash') && searchTail.includes('tunai'))) {
-            resolvedWalletId = w.id
-            break
-          }
-        }
+        const searchTarget = rawTail ? `${rawTail} ${rawItem} ${normalized}` : `${rawItem} ${normalized}`
+        const resolvedWalletId = findWalletInText(searchTarget, wallets, defaultWalletId)
 
         const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
         const txCurrency = matchedWallet?.currency || defaultCurrency
@@ -914,7 +1162,8 @@ export function parseIndonesianFinancialText(
       if (amt > 0 && targetWord.length >= 3) {
         const { merchant, category } = extractMerchantAndCategory(amountMatch[2])
         const cleanMerchant = merchant || amountMatch[2].charAt(0).toUpperCase() + amountMatch[2].slice(1)
-        const matchedWallet = wallets.find((w) => String(w.id) === String(defaultWalletId))
+        const resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)
+        const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
         const txCurrency = matchedWallet?.currency || defaultCurrency
 
         return {
@@ -926,7 +1175,7 @@ export function parseIndonesianFinancialText(
               amount: amt,
               category,
               currency: txCurrency,
-              walletId: defaultWalletId,
+              walletId: resolvedWalletId,
               date: resolvedDate,
               time: currentTime,
               merchant: cleanMerchant,
@@ -950,14 +1199,18 @@ export function parseIndonesianFinancialText(
 
   if (!isQuestion && !nonTxQuery) {
     const hasExplicitSpendingAction =
-      /\b(habisin|habiskan|keluarin|ngeluarin|buat\s+beli|beli|bayar|buat\s+maxim|buat\s+gofood|buat\s+grab)\b/i.test(
+      /\b(habisin|habiskan|keluarin|ngeluarin|buat\s+beli|beli|bayar|makan|sarapan|jajan|ngopi|bensin|buat\s+maxim|buat\s+gofood|buat\s+grab)\b/i.test(
+        lower
+      )
+    const hasExplicitIncomeAction =
+      /\b(gaji|terima\s+uang|dapat\s+kiriman|uang\s+saku|dapet\s+kiriman|dapat\s+transferan|dapet\s+transferan|terima\s+transferan|terima\s+gaji|dapat\s+uang|dapet\s+uang)\b/i.test(
         lower
       )
     const totalAmt = extractMonetaryAmountFromText(lower)
-    if (hasExplicitSpendingAction && totalAmt <= 0) {
+    if ((hasExplicitSpendingAction || hasExplicitIncomeAction) && totalAmt <= 0) {
       return {
         error: true,
-        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "beli kopi 20rb" atau "buat maxim 15k").',
+        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "beli kopi 20rb" atau "terima gaji 5jt").',
       }
     }
   }

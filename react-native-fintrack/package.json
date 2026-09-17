@@ -1,6 +1,6 @@
 {
   "name": "react-native-fintrack",
-  "version": "4.9.0",
+  "version": "4.9.1",
   "private": true,
   "scripts": {
     "start": "expo start",

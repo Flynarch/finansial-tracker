@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Check } from 'lucide-react'
+import { ChevronDown, Check, Calendar, ChevronRight } from 'lucide-react'
 import { ALL_TYPES } from '../../hooks/useTransactionFilters'
 import { formatCategoryName, getCategoryColorClass } from '../../lib/categoryIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
@@ -21,6 +21,14 @@ export default function TransactionFilterSheet({
   const [activeFilterSection, setActiveFilterSection] = useState('type')
   const [draftPeriodPreset, setDraftPeriodPreset] = useState(null)
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  const [prevFilters, setPrevFilters] = useState(filters)
+
+  if (filters !== prevFilters) {
+    setPrevFilters(filters)
+    if (filters.startDate !== draftFilters.startDate || filters.endDate !== draftFilters.endDate) {
+      setDraftFilters((p) => ({ ...p, startDate: filters.startDate, endDate: filters.endDate }))
+    }
+  }
 
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen)
@@ -175,9 +183,8 @@ export default function TransactionFilterSheet({
                 { key: 'all', label: t('tx.filter.allTime', 'Semua') },
                 { key: 'custom', label: t('tx.filter.custom', 'Kustom') },
               ].map((preset) => {
-                const isActive = preset.key === 'custom'
-                  ? !isPresetActive('monthly') && !isPresetActive('today') && !isPresetActive('all')
-                  : isPresetActive(preset.key)
+                const isCustomActive = draftPeriodPreset === 'custom' || (!isPresetActive('monthly') && !isPresetActive('today') && !isPresetActive('all'))
+                const isActive = preset.key === 'custom' ? isCustomActive : isPresetActive(preset.key)
 
                 return (
                   <button
@@ -186,7 +193,6 @@ export default function TransactionFilterSheet({
                     onClick={() => {
                       if (preset.key === 'custom') {
                         setDraftPeriodPreset('custom')
-                        if (onOpenDatePickerModal) onOpenDatePickerModal()
                       } else {
                         setDraftPeriodPreset(preset.key)
                         const dates = getDatesForQuickRange(preset.key)
@@ -204,6 +210,36 @@ export default function TransactionFilterSheet({
                 )
               })}
             </div>
+
+            {/* Intentional Trigger Card for Custom Date Range */}
+            {(draftPeriodPreset === 'custom' || (!isPresetActive('monthly') && !isPresetActive('today') && !isPresetActive('all'))) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenDatePickerModal) onOpenDatePickerModal()
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] hover:border-[var(--accent)] transition cursor-pointer active:scale-[0.98] text-left animate-fadeIn"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] shrink-0">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                      {t('tx.filter.customRange', 'Rentang Tanggal Kustom')}
+                    </span>
+                    <span className="text-xs font-bold text-[var(--fg)] truncate block">
+                      {draftFilters?.startDate && draftFilters?.endDate
+                        ? (String(locale || '').toLowerCase().startsWith('en')
+                            ? `${draftFilters.startDate} to ${draftFilters.endDate}`
+                            : `${draftFilters.startDate} s/d ${draftFilters.endDate}`)
+                        : t('tx.filter.selectCustomDate', 'Klik untuk pilih tanggal')}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-[var(--muted)] shrink-0" />
+              </button>
+            )}
           </div>
 
           {/* 2. Tipe Transaksi */}

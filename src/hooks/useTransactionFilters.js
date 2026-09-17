@@ -116,11 +116,21 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
 
   const usedCategories = useMemo(() => {
     const set = new Set()
-    for (const tx of transactions) {
-      if (!tx?.category || tx.isPendingReview === true || tx.isPendingReview === 1) continue
-      const rawCat = String(tx.category).trim()
+    const addCat = (cat) => {
+      if (!cat) return
+      const rawCat = String(cat).trim()
       const parentCat = rawCat.includes('/') ? rawCat.split('/')[0].trim() : rawCat
       if (parentCat) set.add(parentCat)
+    }
+
+    for (const tx of transactions) {
+      if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1) continue
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        for (const si of tx.splitItems) {
+          addCat(si?.category)
+        }
+      }
+      addCat(tx.category)
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [transactions])

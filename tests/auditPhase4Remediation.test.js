@@ -129,19 +129,15 @@ describe('Audit Phase 4 Remediation - Data Integrity & Feature Tests', () => {
       )
     })
 
-    it('adjusts friendsTxId amount when a sibling loan is deleted', async () => {
-      const walletId = await db.wallets.add({
-        name: 'Dompet Utama',
-        balance: 1000000,
-        currency: 'IDR',
-      })
+    it('preserves friendsTxId amount when a sibling loan is deleted (ledger immutability)', async () => {
+      const walletId = await db.wallets.add({ name: 'Kas Utama', balance: 500000, currency: 'IDR' })
+      const splitBillId = 'sb-sibling-test'
 
-      const splitBillId = 'sb_test_456'
-
-      const friendsTxId = await createTransaction({
+      // Fronted 150,000 for two friends (75,000 each)
+      const friendsTxId = await db.transactions.add({
         amount: 150000,
         type: 'expense',
-        category: 'Pinjaman Diberikan',
+        category: 'Makanan',
         walletId,
         splitBillId,
         date: '2026-03-10',
@@ -173,10 +169,10 @@ describe('Audit Phase 4 Remediation - Data Integrity & Feature Tests', () => {
       // Delete loan 1 via useLoanStore
       await useLoanStore.getState().deleteLoan(loan1Id)
 
-      // friendsTxId amount should now be reduced from 150,000 to 75,000
+      // friendsTxId amount should remain 150,000 intact to preserve immutable ledger history
       const tx = await db.transactions.get(friendsTxId)
       expect(tx).toBeDefined()
-      expect(tx.amount).toBe(75000)
+      expect(tx.amount).toBe(150000)
     })
   })
 

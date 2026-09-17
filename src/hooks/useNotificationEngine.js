@@ -5,6 +5,14 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { db } from '../lib/db'
 import { format } from 'date-fns'
 import useSettingsStore from '../store/useSettingsStore'
+import { translate } from '../lib/i18n'
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_ACTION_TYPES,
+  FINTRACK_NOTIFICATION_COLOR,
+  NOTIFICATION_SMALL_ICON,
+  NOTIFICATION_LARGE_ICON,
+} from '../lib/smartNotifications'
 
 export default function useNotificationEngine() {
   const todos = useLiveQuery(() => db.todos.where('completed').equals(0).toArray())
@@ -21,7 +29,6 @@ export default function useNotificationEngine() {
       const currentTimeStr = format(now, 'HH:mm')
       const todayStr = format(now, 'yyyy-MM-dd')
       const locale = useSettingsStore.getState().locale || 'id'
-      const isEn = locale === 'en'
 
       const isCreatedToday = (createdVal) => {
         if (!createdVal) return false
@@ -40,8 +47,8 @@ export default function useNotificationEngine() {
               .toArray()
             
             if (existing.length === 0) {
-              const title = isEn ? 'Task Reminder' : 'Pengingat Tugas'
-              const message = isEn ? `Time for: ${todo.title}` : `Waktunya untuk: ${todo.title}`
+              const title = translate(locale, 'notifications.todoDueTitle', 'Pengingat Komitmen')
+              const message = `${todo.title} • ${translate(locale, 'notifications.todoDueBodySuffix', 'Jatuh tempo hari ini')}`
 
               await db.notifications.add({
                 type: 'todo',
@@ -53,21 +60,32 @@ export default function useNotificationEngine() {
               })
 
               if (Capacitor.isNativePlatform()) {
+                const largeHeader = translate(locale, 'notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')
+                const bullet1 = translate(locale, 'notifications.todoDueBullet1', '• Jadwal: Jatuh tempo hari ini • Prioritas komitmen aktif.')
+                const bullet2 = translate(locale, 'notifications.todoDueBullet2', '• Rekomendasi: Selesaikan tugas atau tandai lunas setelah transaksi.')
+                const largeBody = `${largeHeader}\n${todo.title}\n${bullet1}\n${bullet2}`
+                const summaryText = translate(locale, 'notifications.summaryCommitment', 'Jadwal & Komitmen')
+
                 await LocalNotifications.schedule({
                   notifications: [
                     {
                       id: Number(todo.id) ? Number(todo.id) + 88000 : Math.floor(Math.random() * 10000) + 88000,
-                      title: `FinTrack • ${title}`,
+                      title,
                       body: message,
-                      extra: { route: `/todos/${todo.id}` },
+                      largeBody,
+                      summaryText,
+                      channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+                      actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
+                      extra: { route: `/todos/${todo.id}`, todoId: todo.id, type: 'todo' },
                       schedule: { at: new Date(Date.now() + 500) },
-                      smallIcon: 'ic_stat_fintrack',
-                      iconColor: '#10b981',
+                      smallIcon: NOTIFICATION_SMALL_ICON,
+                      largeIcon: NOTIFICATION_LARGE_ICON,
+                      iconColor: FINTRACK_NOTIFICATION_COLOR,
                     }
                   ]
                 }).catch(() => {})
               } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, {
+                new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
                   body: message
                 })
               }
@@ -86,8 +104,8 @@ export default function useNotificationEngine() {
                 .toArray()
                 
               if (existing.length === 0) {
-                const title = isEn ? 'Habit Reminder' : 'Pengingat Habit'
-                const message = isEn ? `Don't forget: ${habit.title}` : `Jangan lupa untuk: ${habit.title}`
+                const title = translate(locale, 'notifications.habitTitle', 'Pengingat Kebiasaan')
+                const message = `${habit.title} • ${translate(locale, 'notifications.habitBodySuffix', 'Waktunya menyelesaikan target kebiasaan hari ini')}`
 
                 await db.notifications.add({
                   type: 'habit',
@@ -99,21 +117,32 @@ export default function useNotificationEngine() {
                 })
   
                 if (Capacitor.isNativePlatform()) {
+                  const habitHeader = translate(locale, 'notifications.habitHeader', 'Pelacak Kebiasaan • FinTrack')
+                  const habitBullet1 = translate(locale, 'notifications.habitBullet1', '• Target: Konsistensi harian memperkuat kontrol finansial Anda.')
+                  const habitBullet2 = translate(locale, 'notifications.habitBullet2', '• Aksi: Buka aplikasi dan tandai progres kebiasaan Anda.')
+                  const largeBody = `${habitHeader}\n${habit.title}\n${habitBullet1}\n${habitBullet2}`
+                  const summaryText = translate(locale, 'notifications.summaryHabit', 'Disiplin Finansial')
+
                   await LocalNotifications.schedule({
                     notifications: [
                       {
                         id: Number(habit.id) ? Number(habit.id) + 77000 : Math.floor(Math.random() * 10000) + 77000,
-                        title: `FinTrack • ${title}`,
+                        title,
                         body: message,
+                        largeBody,
+                        summaryText,
+                        channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
+                        actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
                         extra: { route: '/todos' },
                         schedule: { at: new Date(Date.now() + 500) },
-                        smallIcon: 'ic_stat_fintrack',
-                        iconColor: '#10b981',
+                        smallIcon: NOTIFICATION_SMALL_ICON,
+                        largeIcon: NOTIFICATION_LARGE_ICON,
+                        iconColor: FINTRACK_NOTIFICATION_COLOR,
                       }
                     ]
                   }).catch(() => {})
                 } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                  new Notification(title, {
+                  new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
                     body: message
                   })
                 }

@@ -28,7 +28,8 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   } else {
     const parsed = parseExpenseCategoryPath(raw)
     if (parsed) {
-      return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/makan_siang`
+      const defaultChild = parsed.parent?.children?.[0]?.id || 'umum'
+      return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/${defaultChild}`
     }
   }
 

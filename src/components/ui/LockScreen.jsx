@@ -47,6 +47,51 @@ function LockScreen({ onUnlock }) {
   const [cursorPos, setCursorPos] = useState(null)
   const patternSvgRef = useRef(null)
 
+  // Track timers and intervals to prevent memory leaks and state updates on unmounted component
+  const timersRef = useRef(new Set())
+  const intervalsRef = useRef(new Set())
+  const isMountedRef = useRef(true)
+
+  const setTrackedTimeout = useCallback((fn, delay) => {
+    let id
+    id = setTimeout(() => {
+      timersRef.current.delete(id)
+      if (isMountedRef.current) {
+        fn()
+      }
+    }, delay)
+    timersRef.current.add(id)
+    return id
+  }, [])
+
+  const setTrackedInterval = useCallback((fn, delay) => {
+    const id = setInterval(() => {
+      if (isMountedRef.current) {
+        fn()
+      }
+    }, delay)
+    intervalsRef.current.add(id)
+    return id
+  }, [])
+
+  const clearTrackedInterval = useCallback((id) => {
+    clearInterval(id)
+    intervalsRef.current.delete(id)
+  }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    const timers = timersRef.current
+    const intervals = intervalsRef.current
+    return () => {
+      isMountedRef.current = false
+      timers.forEach((id) => clearTimeout(id))
+      timers.clear()
+      intervals.forEach((id) => clearInterval(id))
+      intervals.clear()
+    }
+  }, [])
+
   // Biometric Unlock with cascading wave animation
   const handleBiometricUnlock = useCallback(async () => {
     if (isAuthenticating || isSuccessUnlocked || isBioFilling) return
@@ -54,19 +99,20 @@ function LockScreen({ onUnlock }) {
     setError('')
     try {
       const success = await authenticateBiometric()
+      if (!isMountedRef.current) return
       if (success) {
         triggerHaptic('success')
         if (securityMethod === 'pin') {
           // Play sequential pin dot fill animation as requested
           setIsBioFilling(true)
           setBioFillCount(1)
-          setTimeout(() => setBioFillCount(2), 70)
-          setTimeout(() => setBioFillCount(3), 140)
-          setTimeout(() => {
+          setTrackedTimeout(() => setBioFillCount(2), 70)
+          setTrackedTimeout(() => setBioFillCount(3), 140)
+          setTrackedTimeout(() => {
             setBioFillCount(4)
             setIsSuccessUnlocked(true)
           }, 210)
-          setTimeout(() => {
+          setTrackedTimeout(() => {
             onUnlock()
           }, 450)
         } else if (securityMethod === 'pattern' && lockSecret && !lockSecret.includes('$') && lockSecret.length <= 17) {
@@ -74,38 +120,42 @@ function LockScreen({ onUnlock }) {
           if (rawNodes.length > 0 && rawNodes.every((n) => Number.isInteger(n) && n >= 0 && n <= 8)) {
             let idx = 1
             setPatternPath([rawNodes[0]])
-            const interval = setInterval(() => {
+            const interval = setTrackedInterval(() => {
               if (idx < rawNodes.length) {
                 setPatternPath(rawNodes.slice(0, idx + 1))
                 idx++
               } else {
-                clearInterval(interval)
+                clearTrackedInterval(interval)
                 setIsSuccessUnlocked(true)
-                setTimeout(() => onUnlock(), 350)
+                setTrackedTimeout(() => onUnlock(), 350)
               }
             }, 70)
           } else {
             setIsSuccessUnlocked(true)
-            setTimeout(() => onUnlock(), 300)
+            setTrackedTimeout(() => onUnlock(), 300)
           }
         } else {
           setIsSuccessUnlocked(true)
-          setTimeout(() => onUnlock(), 300)
+          setTrackedTimeout(() => onUnlock(), 300)
         }
         return
       }
     } catch {
       /* ignore */
     } finally {
-      setIsAuthenticating(false)
+      if (isMountedRef.current) {
+        setIsAuthenticating(false)
+      }
     }
-  }, [isAuthenticating, isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock])
+  }, [isAuthenticating, isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock, setTrackedTimeout, setTrackedInterval, clearTrackedInterval])
 
   // Automatically prompt native biometric/device passcode on mount if biometric enabled
   useEffect(() => {
     if (!biometricEnabled) return
     const timer = setTimeout(() => {
-      handleBiometricUnlock()
+      if (isMountedRef.current) {
+        handleBiometricUnlock()
+      }
     }, 280)
     return () => clearTimeout(timer)
   }, [biometricEnabled, handleBiometricUnlock])
@@ -124,14 +174,14 @@ function LockScreen({ onUnlock }) {
       if (isMatch) {
         triggerHaptic('success')
         setIsSuccessUnlocked(true)
-        setTimeout(() => {
+        setTrackedTimeout(() => {
           onUnlock()
         }, 300)
       } else {
         triggerHaptic('warning')
         setIsShaking(true)
         setError(t('lock.incorrectPin', 'PIN salah'))
-        setTimeout(() => {
+        setTrackedTimeout(() => {
           setPinInput('')
           setIsShaking(false)
         }, 600)
@@ -204,12 +254,12 @@ function LockScreen({ onUnlock }) {
     if (isMatch) {
       triggerHaptic('success')
       setIsSuccessUnlocked(true)
-      setTimeout(() => onUnlock(), 300)
+      setTrackedTimeout(() => onUnlock(), 300)
     } else {
       triggerHaptic('warning')
       setIsShaking(true)
       setError(t('lock.incorrectPattern', 'Pola salah'))
-      setTimeout(() => {
+      setTrackedTimeout(() => {
         setPatternPath([])
         setIsShaking(false)
       }, 600)

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinTrack Architecture Diagram (Excalidraw Export)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 8px 0;
+      color: #38bdf8;
+    }
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    .canvas-container {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      min-width: 720px;
+    }
+    .card {
+      rx: 8;
+      ry: 8;
+      stroke-width: 2;
+    }
+    .text-title {
+      font-weight: bold;
+      font-size: 15px;
+    }
+    .text-body {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>FinTrack Architecture Diagram</h1>
+    <p>File mentah Excalidraw tersimpan di: <code>docs/architecture-fintrack.excalidraw</code></p>
+  </div>
+
+  <div class="canvas-container">
+    <svg width="740" height="620" viewBox="80 30 640 570" xmlns="http://www.w3.org/2000/svg">
+      <!-- Title -->
+      <text x="100" y="75" fill="#0284c7" font-size="18" font-weight="bold">
+        FinTrack Architecture - Native Android &amp; Offline-First Core
+      </text>
+
+      <!-- UI Layer -->
+      <rect x="100" y="120" width="260" height="120" fill="#e0f2fe" stroke="#0284c7" class="card" />
+      <text x="115" y="150" fill="#0369a1" class="text-title">UI &amp; Presentation Layer</text>
+      <text x="115" y="175" fill="#0f172a" class="text-body">• React 19 + Tailwind CSS v4</text>
+      <text x="115" y="195" fill="#0f172a" class="text-body">• Mobile-First AppShell</text>
+      <text x="115" y="215" fill="#0f172a" class="text-body">• Zustand (Chat, Tx, Loans)</text>
+
+      <!-- Accounting Engine -->
+      <rect x="420" y="120" width="260" height="120" fill="#fef3c7" stroke="#d97706" class="card" />
+      <text x="435" y="150" fill="#b45309" class="text-title">Accounting &amp; Logic Engine</text>
+      <text x="435" y="175" fill="#0f172a" class="text-body">• Split Tx Invariants</text>
+      <text x="435" y="195" fill="#0f172a" class="text-body">• Balance Engine</text>
+      <text x="435" y="215" fill="#0f172a" class="text-body">• Safe Date Stepping (date-fns)</text>
+
+      <!-- Capacitor & Android Native -->
+      <rect x="100" y="300" width="260" height="120" fill="#f3e8ff" stroke="#9333ea" class="card" />
+      <text x="115" y="330" fill="#7e22ce" class="text-title">Capacitor &amp; Android Native</text>
+      <text x="115" y="355" fill="#0f172a" class="text-body">• Hardware Back Button Manager</text>
+      <text x="115" y="375" fill="#0f172a" class="text-body">• Biometric Authentication</text>
+      <text x="115" y="395" fill="#0f172a" class="text-body">• Local Alarms &amp; Notifications</text>
+
+      <!-- Storage Layer -->
+      <rect x="420" y="300" width="260" height="120" fill="#dcfce7" stroke="#16a34a" class="card" />
+      <text x="435" y="330" fill="#15803d" class="text-title">Offline-First Storage</text>
+      <text x="435" y="355" fill="#0f172a" class="text-body">• Dexie.js (IndexedDB)</text>
+      <text x="435" y="375" fill="#0f172a" class="text-body">• Immutable Ledger History</text>
+      <text x="435" y="395" fill="#0f172a" class="text-body">• AES/Mnemonic Crypto Backup</text>
+
+      <!-- AI Core -->
+      <rect x="100" y="460" width="580" height="120" fill="#ffe4e6" stroke="#e11d48" class="card" />
+      <text x="115" y="490" fill="#be123c" class="text-title">AI Intelligence &amp; NLP Core</text>
+      <text x="115" y="515" fill="#0f172a" class="text-body">• Google Gemini SDK (Structured Output, Multimodal OCR)</text>
+      <text x="115" y="535" fill="#0f172a" class="text-body">• Indonesian Financial NLP Parser (indonesianFinanceNlp.js)</text>
+      <text x="115" y="555" fill="#0f172a" class="text-body">• Receipt OCR &amp; AI Chat Assistant (AiFinanceChat, AiQuickLogModal)</text>
+
+      <!-- Connectors (Arrows) -->
+      <!-- UI -> Accounting -->
+      <path d="M 360 180 L 420 180" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <!-- Accounting -> Storage -->
+      <path d="M 550 240 L 550 300" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <!-- UI -> Capacitor -->
+      <path d="M 230 240 L 230 300" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <!-- Capacitor/Storage -> AI Core -->
+      <path d="M 390 420 L 390 460" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- Arrow Marker Definition -->
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#64748b" />
+        </marker>
+      </defs>
+    </svg>
+  </div>
+</body>
+</html>

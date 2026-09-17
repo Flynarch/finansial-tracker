@@ -198,7 +198,7 @@ export async function importAllDataFromJsonPayload(payload) {
 
   // Clear in-memory caches and invalidate balance engine
   clearCachedDashboardState()
-  void invalidateWalletBalance()
+  await invalidateWalletBalance()
 
   // Dynamically reload store if useSettingsStore is loaded
   try {
