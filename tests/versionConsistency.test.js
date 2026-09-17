@@ -60,4 +60,10 @@ describe('Version Consistency Verification', () => {
     expect(rnPkg.version).toBe(APP_VERSION)
     expect(rnApp.expo.version).toBe(APP_VERSION)
   })
+
+  it('declares necessary microphone permissions in android/app/src/main/AndroidManifest.xml', () => {
+    const manifest = readFileSync(path.resolve(process.cwd(), 'android/app/src/main/AndroidManifest.xml'), 'utf8')
+    expect(manifest).toContain('android.permission.RECORD_AUDIO')
+    expect(manifest).toContain('android.permission.MODIFY_AUDIO_SETTINGS')
+  })
 })

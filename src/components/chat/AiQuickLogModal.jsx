@@ -497,7 +497,7 @@ export default function AiQuickLogModal() {
     setInputValue(baseInputBeforeRecordingRef.current.trim())
   }
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (isRecording) {
       handleStopRecording()
       return
@@ -511,6 +511,22 @@ export default function AiQuickLogModal() {
           : 'Browser atau perangkat Anda tidak mendukung Voice Input.',
       )
       return
+    }
+
+    if (navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((track) => track.stop())
+      } catch (micErr) {
+        if (micErr?.name === 'NotAllowedError' || micErr?.name === 'PermissionDeniedError') {
+          setErrorMessage(
+            locale === 'en'
+              ? 'Microphone permission was denied. Please allow microphone access in device settings.'
+              : 'Izin mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan.',
+          )
+          return
+        }
+      }
     }
 
     try {

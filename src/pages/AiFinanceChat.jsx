@@ -396,7 +396,7 @@ export default function AiFinanceChat() {
     setInputValue(baseInputBeforeRecordingRef.current.trim())
   }
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (isRecording) {
       handleStopRecording()
       return
@@ -412,6 +412,28 @@ export default function AiFinanceChat() {
         },
       ])
       return
+    }
+
+    if (navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((track) => track.stop())
+      } catch (micErr) {
+        if (micErr?.name === 'NotAllowedError' || micErr?.name === 'PermissionDeniedError') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              role: 'assistant',
+              content:
+                locale === 'en'
+                  ? 'Microphone permission was denied. Please allow microphone access in device settings.'
+                  : 'Izin mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan.',
+            },
+          ])
+          return
+        }
+      }
     }
 
     try {
