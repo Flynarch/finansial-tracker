@@ -407,7 +407,7 @@ export default function AiFinanceChat() {
         ...prev,
         {
           id: Date.now(),
-          role: 'assistant',
+          role: 'ai',
           content: locale === 'en' ? 'Voice input is not supported on this device.' : 'Perangkat Anda belum mendukung input suara.',
         },
       ])
@@ -424,7 +424,7 @@ export default function AiFinanceChat() {
             ...prev,
             {
               id: Date.now(),
-              role: 'assistant',
+              role: 'ai',
               content:
                 locale === 'en'
                   ? 'Microphone permission was denied. Please allow microphone access in device settings.'
@@ -465,16 +465,28 @@ export default function AiFinanceChat() {
       }
       recognition.onerror = (event) => {
         setIsRecording(false)
-        if (event?.error === 'not-allowed') {
+        if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
           setMessages((prev) => [
             ...prev,
             {
               id: Date.now(),
-              role: 'assistant',
+              role: 'ai',
               content:
                 locale === 'en'
                   ? 'Microphone permission was denied. Please allow microphone access in device settings.'
                   : 'Izin mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan.',
+            },
+          ])
+        } else if (event?.error === 'audio-capture') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              role: 'ai',
+              content:
+                locale === 'en'
+                  ? 'Microphone is unavailable or in use by another app.'
+                  : 'Mikrofon tidak tersedia atau sedang digunakan oleh aplikasi lain.',
             },
           ])
         }
@@ -2110,7 +2122,7 @@ export default function AiFinanceChat() {
                   </div>
                 )}
 
-                {msg.role === 'ai' && (
+                {(msg.role === 'ai' || msg.role === 'assistant') && (
                   <>
                     <div
                       className="w-full min-w-0 max-w-full cursor-pointer"

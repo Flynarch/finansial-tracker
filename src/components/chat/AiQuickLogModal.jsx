@@ -473,6 +473,18 @@ export default function AiQuickLogModal() {
     }
   }, [isOpen])
 
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
+
   // Voice recording toggle
   const handleStopRecording = () => {
     if (recognitionRef.current) {
@@ -559,11 +571,17 @@ export default function AiQuickLogModal() {
       }
       recognition.onerror = (event) => {
         setIsRecording(false)
-        if (event?.error === 'not-allowed') {
+        if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
           setErrorMessage(
             locale === 'en'
               ? 'Microphone access was denied. Please allow microphone permission.'
               : 'Izin mikrofon ditolak. Mohon aktifkan izin mikrofon di pengaturan.',
+          )
+        } else if (event?.error === 'audio-capture') {
+          setErrorMessage(
+            locale === 'en'
+              ? 'Microphone is unavailable or in use by another app.'
+              : 'Mikrofon tidak tersedia atau sedang digunakan oleh aplikasi lain.',
           )
         }
       }
