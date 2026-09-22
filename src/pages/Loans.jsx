@@ -49,7 +49,8 @@ export default function Loans() {
       try {
         const fetchedRates = await fetchCurrencyRates('USD')
         setRates(fetchedRates)
-      } catch {
+      } catch (err){
+      console.warn('[Loans]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -98,7 +99,8 @@ export default function Loans() {
       const d = typeof rawDate === 'number' ? new Date(rawDate) : new Date(rawDate)
       if (isNaN(d.getTime())) return String(rawDate)
       return format(d, 'dd/MM/yyyy')
-    } catch {
+    } catch (err){
+      console.warn('[Loans]', err)
       return String(rawDate)
     }
   }

@@ -35,7 +35,8 @@ export function generateInstallmentSchedule(loan, payments = []) {
     try {
       baseDate = parseISO(loan.startDate)
       if (isNaN(baseDate.getTime())) baseDate = new Date()
-    } catch {
+    } catch (err){
+      console.warn('[loanUtils]', err)
       baseDate = new Date()
     }
   }
@@ -49,7 +50,8 @@ export function generateInstallmentSchedule(loan, payments = []) {
         targetDueDay = parsedDue.getDate()
         firstDueBaseDate = parsedDue
       }
-    } catch {
+    } catch (err){
+      console.warn('[loanUtils]', err)
       // ignore
     }
   }
@@ -106,7 +108,8 @@ export function generateInstallmentSchedule(loan, payments = []) {
     try {
       const parsedDue = parseISO(dueDateStr)
       daysRemaining = differenceInDays(parsedDue, new Date())
-    } catch {
+    } catch (err){
+      console.warn('[loanUtils]', err)
       daysRemaining = 0
     }
 
@@ -208,7 +211,8 @@ export function formatInstallmentRelativeDate(dueDateStr, locale = 'id') {
       return locale === 'id' ? `${days} hari lagi` : `In ${days} days`
     }
     return format(targetDate, 'dd/MM/yyyy')
-  } catch {
+  } catch (err){
+      console.warn('[loanUtils]', err)
     return dueDateStr
   }
 }

@@ -1,12 +1,15 @@
 import { format } from 'date-fns'
 import { db } from '../lib/db'
-import { convertCurrency } from '../lib/utils'
+import { convertCurrency, roundCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
 import { checkBudgetAlertsAfterExpense } from '../lib/smartNotifications'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
 import useSettingsStore from '../store/useSettingsStore'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
+import { AppError, transformDbError } from '../lib/errors'
+
+export { AppError, transformDbError }
 
 /**
  * Creates a new transaction and handles post-creation side effects (e.g. budget alerts).
@@ -24,7 +27,10 @@ export async function createTransaction(payload) {
       : getLocalDateString()
 
   const rawAmount = Number(payload?.amount || 0)
-  const cleanAmount = payload?.type === 'balance_adjustment' ? rawAmount : Math.abs(rawAmount)
+  const cleanAmount =
+    payload?.type === 'balance_adjustment'
+      ? roundCurrency(rawAmount)
+      : roundCurrency(Math.abs(rawAmount))
 
   if (payload?.type !== 'balance_adjustment' && (!Number.isFinite(cleanAmount) || cleanAmount <= 0)) {
     throw new Error('Nominal transaksi harus lebih dari 0.')
@@ -69,23 +75,32 @@ export async function createTransaction(payload) {
       if (srcWallet?.currency) {
         cleanCurrency = srcWallet.currency
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.error('[createTransaction:getWalletCurrency]', err)
     }
   }
 
   const cleanWalletId = Number(resolvedWalletId)
   const cleanTargetWalletId = sanitizedTargetWalletId ? Number(sanitizedTargetWalletId) : null
 
-  const createdId = await db.transactions.add({
-    ...dataWithoutId,
-    walletId: cleanWalletId,
-    currency: cleanCurrency || 'IDR',
-    date: cleanDate,
-    amount: cleanAmount,
-    createdAt: cleanCreatedAt,
-    targetWalletId: cleanTargetWalletId,
-  })
+  let createdId
+  try {
+    await db.transaction('rw', [db.transactions, db.budgets, db.goals, db.goalLogs, db.loans, db.loanPayments], async () => {
+      createdId = await db.transactions.add({
+        ...dataWithoutId,
+        walletId: cleanWalletId,
+        currency: cleanCurrency || 'IDR',
+        date: cleanDate,
+        amount: cleanAmount,
+        createdAt: cleanCreatedAt,
+        targetWalletId: cleanTargetWalletId,
+        deletedAt: null,
+      })
+    })
+  } catch (err) {
+    console.error('[transactionService:createTransaction]', err)
+    throw transformDbError(err, 'createTransaction')
+  }
 
   // Invalidate balance cache for affected wallets
   const affectedWallets = [cleanWalletId, cleanTargetWalletId].filter(Boolean)
@@ -104,7 +119,7 @@ export async function createTransaction(payload) {
               category: item.category,
               amount: Number(item.amount) || 0,
               date: cleanDate,
-            }).catch(() => {})
+            }).catch((err) => console.error('[transactionService:checkBudget]', err))
           }
         }
       } else {
@@ -112,10 +127,10 @@ export async function createTransaction(payload) {
           category: payload.category,
           amount: cleanAmount,
           date: cleanDate,
-        }).catch(() => {})
+        }).catch((err) => console.error('[transactionService:checkBudget]', err))
       }
     } catch (e) {
-      console.error('Failed to check budget:', e)
+      console.error('[transactionService:checkBudget]', e)
     }
   }
 
@@ -167,7 +182,8 @@ export async function updateTransaction(id, fields) {
     }
   }
 
-  await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
+  try {
+    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
     const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
     const rates = getCachedCurrencyRates('USD')
     const oldAmt = Number(existing.amount) || 0
@@ -295,23 +311,30 @@ export async function updateTransaction(id, fields) {
       }
     }
 
-    // 2. Update transaction in ledger with sanitized fields
-    const sanitizedFields = { ...fields }
-    if (sanitizedFields.amount !== undefined) {
-      sanitizedFields.amount = Number(sanitizedFields.amount)
-    }
-    if (sanitizedFields.walletId !== undefined && sanitizedFields.walletId !== null) {
-      sanitizedFields.walletId = Number(sanitizedFields.walletId)
-    }
-    if (sanitizedFields.targetWalletId !== undefined) {
-      sanitizedFields.targetWalletId = sanitizedFields.targetWalletId ? Number(sanitizedFields.targetWalletId) : null
-    }
-    if (sanitizedFields.type !== undefined && sanitizedFields.type !== 'transfer') {
-      sanitizedFields.targetWalletId = null
-    }
+      // Sanitize fields before writing
+      const sanitizedFields = { ...fields }
+      delete sanitizedFields.id
+      if (sanitizedFields.amount !== undefined) {
+        const raw = Number(sanitizedFields.amount)
+        sanitizedFields.amount =
+          effectiveType === 'balance_adjustment' ? roundCurrency(raw) : roundCurrency(Math.abs(raw))
+      }
+      if (sanitizedFields.walletId !== undefined) {
+        sanitizedFields.walletId = Number(sanitizedFields.walletId)
+      }
+      if (sanitizedFields.targetWalletId !== undefined) {
+        sanitizedFields.targetWalletId = sanitizedFields.targetWalletId ? Number(sanitizedFields.targetWalletId) : null
+      }
+      if (sanitizedFields.type !== undefined && sanitizedFields.type !== 'transfer') {
+        sanitizedFields.targetWalletId = null
+      }
 
-    await db.transactions.update(cleanId, sanitizedFields)
-  })
+      await db.transactions.update(cleanId, sanitizedFields)
+    })
+  } catch (err) {
+    console.error('[transactionService:updateTransaction]', err)
+    throw transformDbError(err, 'updateTransaction')
+  }
 
   const affectedWallets = [
     existing?.walletId,
@@ -328,7 +351,7 @@ export async function updateTransaction(id, fields) {
 }
 
 /**
- * Deletes a transaction by ID.
+ * Soft-deletes a transaction by ID and handles ledger reversal side effects.
  *
  * @param {number} id - Transaction ID
  * @returns {Promise<void>}
@@ -340,105 +363,110 @@ export async function deleteTransaction(id) {
   const existing = await db.transactions.get(cleanId)
   if (!existing) return
 
-  await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
-    // 1. Split Bill Bi-Directional Ledger Sync: block deletion if active linked loans exist
-    if (existing.splitBillId) {
-      const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
-      const hasActiveLoans = linkedLoans.some(
-        (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
-      )
-      if (hasActiveLoans) {
-        throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
-      }
-    }
+  try {
+    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
+      const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
+      const rates = getCachedCurrencyRates('USD')
 
-    const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
-    const rates = getCachedCurrencyRates('USD')
-
-    // 2. If transaction is linked to a loan, synchronize remaining amount and payment records
-    if (existing.loanId) {
-      const loan = await db.loans.get(existing.loanId)
-      if (loan) {
-        const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
-        if (payment) {
-          await db.loanPayments.delete(payment.id)
-          const loanCurrency = loan.currency || defaultCurrency
-          const normalizedExistingAmt = convertCurrency(
-            Number(existing.amount || 0),
-            existing.currency || defaultCurrency,
-            loanCurrency,
-            rates,
-          )
-          const restoredRemaining = Math.min(
-            loan.totalAmount,
-            (Number(loan.remainingAmount) || 0) + normalizedExistingAmt,
-          )
-          const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
-            ? loan.paymentTransactionIds
-            : []
-          const nextPaymentIds = existingPaymentIds.filter((txId) => txId !== cleanId)
-          const isNowActive = restoredRemaining > 0
-          await db.loans.update(loan.id, {
-            remainingAmount: restoredRemaining,
-            status: isNowActive
-              ? restoredRemaining >= loan.totalAmount
-                ? 'active'
-                : 'partially_paid'
-              : 'paid',
-            paymentTransactionIds: nextPaymentIds,
-            ...(isNowActive ? { paidDate: null, paidAt: null } : {}),
-          })
-        } else if (loan.initialTransactionId === cleanId) {
-          throw new Error('Transaksi ini merupakan pencairan pokok pinjaman aktif. Silakan kelola atau hapus pinjaman melalui menu Pinjaman.')
+      // 1. Guard: Parent Split Bill Transaction Deletion
+      if (existing.splitBillId) {
+        const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
+        const activeParticipantLoans = linkedLoans.filter(
+          (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
+        )
+        if (activeParticipantLoans.length > 0) {
+          throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
         }
       }
-    }
 
-    // 3. Savings Goal Ledger Reversal on Transaction Deletion
-    if (existing.goalId) {
-      const goal = await db.goals.get(existing.goalId)
-      if (goal) {
-        const goalCurrency = goal.currency || defaultCurrency
-        const isDeposit = existing.category === 'tabungan' || existing.type === 'expense'
-        const normalizedExistingAmt = convertCurrency(
-          Number(existing.amount || 0),
-          existing.currency || defaultCurrency,
-          goalCurrency,
-          rates,
-        )
-        const newGoalAmount = isDeposit
-          ? Math.max(0, (Number(goal.currentAmount) || 0) - normalizedExistingAmt)
-          : (Number(goal.currentAmount) || 0) + normalizedExistingAmt
-        const targetAmt = Number(goal.targetAmount) || 0
-        const isCompleted = targetAmt > 0 ? newGoalAmount >= targetAmt : false
-
-        await db.goals.update(goal.id, {
-          currentAmount: newGoalAmount,
-          isCompleted,
-          ...(isDeposit && newGoalAmount < targetAmt && goal.status === 'completed' ? { status: 'active' } : {}),
-        })
-
-        // Delete corresponding db.goalLogs where transactionId === cleanId
-        const goalLogs = await db.goalLogs.where('goalId').equals(existing.goalId).toArray()
-        const logsToDelete = goalLogs.filter((l) => l.transactionId === cleanId)
-        if (logsToDelete.length > 0) {
-          await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
-        } else {
-          // Fallback if log was created before transactionId was tracked: match amount & date
-          const expectedAmt = isDeposit ? normalizedExistingAmt : -normalizedExistingAmt
-          const fallbackLog = goalLogs.find(
-            (l) => Math.abs(Number(l.amount) - expectedAmt) < 0.01 && l.date?.startsWith(existing.date),
-          )
-          if (fallbackLog) {
-            await db.goalLogs.delete(fallbackLog.id)
+      // 2. If transaction is linked to a loan, synchronize remaining amount and payment records
+      if (existing.loanId) {
+        const loan = await db.loans.get(existing.loanId)
+        if (loan) {
+          const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
+          if (payment) {
+            await db.loanPayments.delete(payment.id)
+            const loanCurrency = loan.currency || defaultCurrency
+            const normalizedExistingAmt = convertCurrency(
+              Number(existing.amount || 0),
+              existing.currency || defaultCurrency,
+              loanCurrency,
+              rates,
+            )
+            const restoredRemaining = Math.min(
+              loan.totalAmount,
+              (Number(loan.remainingAmount) || 0) + normalizedExistingAmt,
+            )
+            const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
+              ? loan.paymentTransactionIds
+              : []
+            const nextPaymentIds = existingPaymentIds.filter((txId) => txId !== cleanId)
+            const isNowActive = restoredRemaining > 0
+            await db.loans.update(loan.id, {
+              remainingAmount: restoredRemaining,
+              status: isNowActive
+                ? restoredRemaining >= loan.totalAmount
+                  ? 'active'
+                  : 'partially_paid'
+                : 'paid',
+              paymentTransactionIds: nextPaymentIds,
+              ...(isNowActive ? { paidDate: null, paidAt: null } : {}),
+            })
+          } else if (loan.initialTransactionId === cleanId) {
+            throw new Error('Transaksi ini merupakan pencairan pokok pinjaman aktif. Silakan kelola atau hapus pinjaman melalui menu Pinjaman.')
           }
         }
       }
-    }
 
-    // 4. Delete transaction from ledger
-    await db.transactions.delete(cleanId)
-  })
+      // 3. Savings Goal Ledger Reversal on Transaction Deletion
+      if (existing.goalId) {
+        const goal = await db.goals.get(existing.goalId)
+        if (goal) {
+          const goalCurrency = goal.currency || defaultCurrency
+          const isDeposit = existing.category === 'tabungan' || existing.type === 'expense'
+          const normalizedExistingAmt = convertCurrency(
+            Number(existing.amount || 0),
+            existing.currency || defaultCurrency,
+            goalCurrency,
+            rates,
+          )
+          const newGoalAmount = isDeposit
+            ? Math.max(0, (Number(goal.currentAmount) || 0) - normalizedExistingAmt)
+            : (Number(goal.currentAmount) || 0) + normalizedExistingAmt
+          const targetAmt = Number(goal.targetAmount) || 0
+          const isCompleted = targetAmt > 0 ? newGoalAmount >= targetAmt : false
+
+          await db.goals.update(goal.id, {
+            currentAmount: newGoalAmount,
+            isCompleted,
+            ...(isDeposit && newGoalAmount < targetAmt && goal.status === 'completed' ? { status: 'active' } : {}),
+          })
+
+          // Delete corresponding db.goalLogs where transactionId === cleanId
+          const goalLogs = await db.goalLogs.where('goalId').equals(existing.goalId).toArray()
+          const logsToDelete = goalLogs.filter((l) => l.transactionId === cleanId)
+          if (logsToDelete.length > 0) {
+            await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
+          } else {
+            // Fallback if log was created before transactionId was tracked: match amount & date
+            const expectedAmt = isDeposit ? normalizedExistingAmt : -normalizedExistingAmt
+            const fallbackLog = goalLogs.find(
+              (l) => Math.abs(Number(l.amount) - expectedAmt) < 0.01 && l.date?.startsWith(existing.date),
+            )
+            if (fallbackLog) {
+              await db.goalLogs.delete(fallbackLog.id)
+            }
+          }
+        }
+      }
+
+      // 4. Soft-delete transaction from ledger
+      await db.transactions.update(cleanId, { deletedAt: Date.now() })
+    })
+  } catch (err) {
+    console.error('[transactionService:deleteTransaction]', err)
+    throw transformDbError(err, 'deleteTransaction')
+  }
 
   const affectedWallets = [existing?.walletId, existing?.targetWalletId].filter(Boolean)
   if (affectedWallets.length > 0) {
@@ -446,4 +474,35 @@ export async function deleteTransaction(id) {
   }
 
   scheduleNativeWidgetSync()
+}
+
+/**
+ * Purges transactions soft-deleted more than `retentionDays` days ago.
+ *
+ * @param {number} [retentionDays=90]
+ * @returns {Promise<number>} Number of transactions permanently purged
+ */
+export async function purgeOldSoftDeletedTransactions(retentionDays = 90) {
+  try {
+    const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000
+    let candidates
+    try {
+      candidates = await db.transactions
+        .where('deletedAt')
+        .between(1, cutoff, true, true)
+        .toArray()
+    } catch (err) {
+      console.error('[TransactionService.purgeDeletedTransactions] Index query failed, using filter fallback:', err)
+      candidates = await db.transactions
+        .filter((tx) => tx.deletedAt && Number(tx.deletedAt) < cutoff)
+        .toArray()
+    }
+    if (candidates && candidates.length > 0) {
+      await db.transactions.bulkDelete(candidates.map((tx) => tx.id))
+    }
+    return candidates ? candidates.length : 0
+  } catch (err) {
+    console.error('[purgeOldSoftDeletedTransactions]', err)
+    throw transformDbError(err, 'purgeOldSoftDeletedTransactions')
+  }
 }

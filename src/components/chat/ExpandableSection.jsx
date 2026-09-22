@@ -1,7 +1,6 @@
 import { memo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { triggerHaptic } from '../../lib/haptics';
-import PropTypes from 'prop-types';
 
 const ExpandableSection = memo(function ExpandableSection({ title, children, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -37,11 +36,5 @@ const ExpandableSection = memo(function ExpandableSection({ title, children, def
     </div>
   );
 });
-
-ExpandableSection.propTypes = {
-  title: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired,
-  defaultOpen: PropTypes.bool
-};
 
 export default ExpandableSection;

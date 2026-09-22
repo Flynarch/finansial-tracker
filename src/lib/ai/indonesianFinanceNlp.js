@@ -188,8 +188,7 @@ export function getRecentPastDayDate(targetDayIndex, refDate = new Date(), force
   if (diff === 0 && forcePastWeek) {
     diff = 7
   }
-  const targetDate = new Date(refDate)
-  targetDate.setDate(targetDate.getDate() - diff)
+  const targetDate = subDays(refDate, diff)
   return format(targetDate, 'yyyy-MM-dd')
 }
 

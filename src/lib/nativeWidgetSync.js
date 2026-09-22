@@ -61,7 +61,8 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_btn_text', btnText)
         localStorage.setItem('fintrack_widget_balance_label', balanceLabel)
       }
-    } catch {
+    } catch (err){
+      console.warn('[nativeWidgetSync]', err)
       /* ignore */
     }
 
@@ -104,7 +105,7 @@ export async function syncNativeWidgetFromDb() {
     const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
 
     const wallets = await db.wallets.toArray()
-    const allTxs = await db.transactions.toArray()
+    const allTxs = (await db.transactions.toArray()).filter((tx) => !tx.deletedAt)
     const computedWallets = computeAllWalletBalances(wallets, allTxs, activeRates)
 
     const totalBalance = computedWallets
@@ -119,7 +120,7 @@ export async function syncNativeWidgetFromDb() {
     let monthExpense = 0
 
     for (const tx of allTxs) {
-      if (!tx?.date || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
+      if (!tx?.date || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
 
       const txCurrency = tx.currency || defaultCurrency
       if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
@@ -198,7 +199,7 @@ export async function syncNativeWidgetFromDb() {
       sparklinePoints,
     })
   } catch (err) {
-    console.debug('Failed to sync widget from DB:', err)
+    console.error('[nativeWidgetSync] Failed to sync widget from DB:', err)
   }
 }
 
@@ -215,7 +216,9 @@ export function scheduleNativeWidgetSync(delay = 250) {
   }
   syncDebounceTimer = setTimeout(() => {
     syncDebounceTimer = null
-    syncNativeWidgetFromDb().catch(() => {})
+    syncNativeWidgetFromDb().catch((err) => {
+      console.error('[nativeWidgetSync] Scheduled sync failed:', err)
+    })
   }, delay)
 }
 

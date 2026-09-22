@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Arrays;
@@ -15,7 +17,8 @@ import java.util.Set;
 
 public class FinTrackNotificationService extends NotificationListenerService {
     private static final String TAG = "FinTrackNotifService";
-    public static final String PREFS_NAME = "FinTrackNotificationPrefs";
+    public static final String PREFS_NAME = "FinTrackEncryptedNotificationPrefs";
+    public static final String LEGACY_PREFS_NAME = "FinTrackNotificationPrefs";
     public static final String KEY_QUEUE = "fintrack_notification_queue";
     public static final Object QUEUE_LOCK = new Object();
 
@@ -75,10 +78,44 @@ public class FinTrackNotificationService extends NotificationListenerService {
         return WHITELISTED_PACKAGES.contains(pkg.toLowerCase());
     }
 
+    public static SharedPreferences getEncryptedPreferences(Context context) {
+        try {
+            MasterKey masterKey = new MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build();
+
+            SharedPreferences encryptedPrefs = EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+
+            // Check if legacy unencrypted preferences exist and migrate
+            SharedPreferences legacyPrefs = context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE);
+            if (legacyPrefs.contains(KEY_QUEUE)) {
+                String legacyQueue = legacyPrefs.getString(KEY_QUEUE, null);
+                if (legacyQueue != null && !legacyQueue.equals("[]")) {
+                    String currentQueue = encryptedPrefs.getString(KEY_QUEUE, "[]");
+                    if (currentQueue.equals("[]")) {
+                        encryptedPrefs.edit().putString(KEY_QUEUE, legacyQueue).commit();
+                    }
+                }
+                legacyPrefs.edit().clear().commit();
+            }
+
+            return encryptedPrefs;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize EncryptedSharedPreferences, falling back to private SharedPreferences", e);
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        }
+    }
+
     private void saveNotificationToQueue(String packageName, String title, String text, long postTime) {
         synchronized (QUEUE_LOCK) {
             try {
-                SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                SharedPreferences prefs = getEncryptedPreferences(this);
                 String currentQueueJson = prefs.getString(KEY_QUEUE, "[]");
                 JSONArray queueArray = new JSONArray(currentQueueJson);
 

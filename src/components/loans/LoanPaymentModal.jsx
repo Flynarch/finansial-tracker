@@ -126,6 +126,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, initial
       onSaved?.()
       onClose?.()
     } catch (err) {
+      console.warn('[LoanPaymentModal]', err)
       hapticWarning()
       setSheetError(err.message || t('loans.payment.saveFailed', 'Gagal mencatat pembayaran. Silakan coba lagi.'))
     }

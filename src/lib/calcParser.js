@@ -1,3 +1,5 @@
+import { roundCurrency } from './utils'
+
 /**
  * Evaluates math expressions and financial shorthand suffixes safely without using raw eval().
  * Supports:
@@ -33,13 +35,28 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
   // If currency is IDR, strip thousand dots before evaluating
   if (currency === 'IDR') {
     // Replace dots that are thousand separators (followed by 3 digits)
-    sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
-    // If multiple thousand dots exist (e.g. 1.000.000 -> 1000000)
     while (/(\d+)\.(\d{3})(?=\D|$|\.)/.test(sanitized)) {
       sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
     }
     // Replace decimal comma with dot
     sanitized = sanitized.replace(/,(\d+)/g, '.$1')
+  } else {
+    // Non-IDR currencies (e.g. USD, EUR, etc.)
+    // If format is European (e.g. 1.000,50): dot is thousand separator, comma is decimal
+    if (/\d+\.\d{3}.*,\d+/.test(sanitized)) {
+      while (/(\d+)\.(\d{3})(?=\D|$|\.)/.test(sanitized)) {
+        sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
+      }
+      sanitized = sanitized.replace(/,(\d+)/g, '.$1')
+    } else {
+      // Standard or mixed format (e.g. 1,000.50 or 1,000 or 50,50 or 1,50 + 2,50)
+      // Strip thousand commas (followed by 3 digits)
+      while (/(\d+),(\d{3})(?=\D|$|,)/.test(sanitized)) {
+        sanitized = sanitized.replace(/(\d+),(\d{3})(?=\D|$|,)/g, '$1$2')
+      }
+      // Any remaining decimal comma (e.g. 50,50 or 1,50 or 2,5k) becomes decimal dot
+      sanitized = sanitized.replace(/,(\d+)/g, '.$1')
+    }
   }
 
   // Expand shorthand suffixes to numbers
@@ -59,14 +76,15 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
     const rawResult = fn()
 
     if (typeof rawResult === 'number' && Number.isFinite(rawResult) && !Number.isNaN(rawResult)) {
-      const rounded = Math.round(rawResult * 100) / 100
+      const rounded = roundCurrency(rawResult)
       return {
         isValid: true,
         result: allowNegative ? rounded : Math.max(0, rounded),
         hasExpression,
       }
     }
-  } catch {
+  } catch (err) {
+    console.error('[calcParser]', err)
     // Math syntax error while user is typing (e.g. "50000 + ")
   }
 

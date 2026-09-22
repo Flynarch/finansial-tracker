@@ -136,14 +136,17 @@ export default function ReportStatementModal({
     async () => {
       if (!isOpen || (Array.isArray(propTransactions) && propTransactions.length > 0)) return []
       if (!startDate || !endDate) return []
-      return await db.transactions.where('date').between(startDate, endDate, true, true).toArray()
+      const list = await db.transactions.where('date').between(startDate, endDate, true, true).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
     },
     [isOpen, startDate, endDate, propTransactions],
     []
   )
 
   const transactions = useMemo(() => {
-    if (Array.isArray(propTransactions) && propTransactions.length > 0) return propTransactions
+    if (Array.isArray(propTransactions) && propTransactions.length > 0) {
+      return propTransactions.filter((tx) => !tx.deletedAt)
+    }
     return queriedTransactions || []
   }, [propTransactions, queriedTransactions])
 
@@ -164,7 +167,8 @@ export default function ReportStatementModal({
   const postDateTransactions = useLiveQuery(
     async () => {
       if (!isOpen || !endDate) return []
-      return await db.transactions.where('date').above(endDate).toArray()
+      const list = await db.transactions.where('date').above(endDate).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
     },
     [isOpen, endDate],
     []

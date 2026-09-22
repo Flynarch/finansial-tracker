@@ -1,24 +1,5 @@
 import { BIP39_WORDLIST } from './bip39Wordlist'
-
-/**
- * Converts ArrayBuffer to Hex String
- */
-function bufferToHex(buffer) {
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-/**
- * Converts Hex String to Uint8Array
- */
-function hexToBuffer(hex) {
-  const bytes = new Uint8Array(Math.ceil(hex.length / 2))
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.substr(i * 2, 2), 16)
-  }
-  return bytes
-}
+import { bufferToHex, hexToBuffer } from './cryptoUtils'
 
 /**
  * Calculates SHA-256 hash using native Web Crypto API.
@@ -238,7 +219,97 @@ export async function decryptPayloadWithMnemonic(envelope = {}, phrase = '') {
     const dec = new TextDecoder()
     const jsonString = dec.decode(decryptedBuffer)
     return JSON.parse(jsonString)
-  } catch {
-    throw new Error('Frasa pemulihan salah. Dekripsi data gagal.')
+  } catch (err) {
+    console.warn('[mnemonicCrypto]', err)
+    throw new Error('Frasa pemulihan salah. Dekripsi data gagal.', { cause: err })
   }
 }
+
+let inMemorySessionPhrase = null
+
+/**
+ * Purges any plaintext 12-word recovery phrases from unencrypted localStorage.
+ */
+export function purgeLegacyMnemonicStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (window.localStorage.getItem('fintrack_e2ee_phrase')) {
+        window.localStorage.removeItem('fintrack_e2ee_phrase')
+      }
+    }
+  } catch (err){
+      console.warn('[mnemonicCrypto]', err)
+    // ignore
+  }
+}
+
+/**
+ * Sets the active in-memory recovery phrase for the current app session.
+ * Never persists to plaintext localStorage.
+ */
+export function setSessionMnemonicPhrase(phrase) {
+  purgeLegacyMnemonicStorage()
+  if (typeof phrase === 'string' && phrase.trim().split(/\s+/).length === 12) {
+    inMemorySessionPhrase = phrase.trim().toLowerCase()
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('fintrack_e2ee_phrase_session', inMemorySessionPhrase)
+      }
+    } catch (err){
+      console.warn('[mnemonicCrypto]', err)
+      // ignore
+    }
+  } else {
+    inMemorySessionPhrase = null
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem('fintrack_e2ee_phrase_session')
+      }
+    } catch (err){
+      console.warn('[mnemonicCrypto]', err)
+      // ignore
+    }
+  }
+}
+
+/**
+ * Retrieves the in-memory recovery phrase for the current app session.
+ * Cleans up legacy localStorage plaintext keys automatically.
+ */
+export function getSessionMnemonicPhrase() {
+  purgeLegacyMnemonicStorage()
+
+  if (inMemorySessionPhrase) return inMemorySessionPhrase
+
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const sess = window.sessionStorage.getItem('fintrack_e2ee_phrase_session')
+      if (sess && sess.trim().split(/\s+/).length === 12) {
+        inMemorySessionPhrase = sess.trim().toLowerCase()
+        return inMemorySessionPhrase
+      }
+    }
+  } catch (err){
+      console.warn('[mnemonicCrypto]', err)
+    // ignore
+  }
+
+  return null
+}
+
+/**
+ * Clears the in-memory recovery phrase and session storage.
+ */
+export function clearSessionMnemonicPhrase() {
+  inMemorySessionPhrase = null
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.removeItem('fintrack_e2ee_phrase_session')
+    }
+  } catch (err){
+      console.warn('[mnemonicCrypto]', err)
+    // ignore
+  }
+  purgeLegacyMnemonicStorage()
+}
+

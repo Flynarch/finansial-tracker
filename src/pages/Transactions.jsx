@@ -68,7 +68,10 @@ function Transactions() {
   const clearUnviewedMutations = useSettingsStore((state) => state.clearUnviewedMutations)
 
   // Live queries from Dexie with zero-latency memory cache fallback
-  const transactionsRaw = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
+  const transactionsRaw = useLiveQuery(async () => {
+    const list = await db.transactions.orderBy('date').reverse().toArray()
+    return (list || []).filter((tx) => !tx.deletedAt)
+  }, [])
   const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
 
   useEffect(() => {
@@ -84,10 +87,13 @@ function Transactions() {
   }, [dbWallets])
 
   const transactions = useMemo(() => {
-    if (transactionsRaw !== undefined) return transactionsRaw
-    const dashboardTxs = getCachedDashboardTransactions?.()
-    if (dashboardTxs && dashboardTxs.length > 0) return dashboardTxs
-    return []
+    let list = []
+    if (transactionsRaw !== undefined) list = transactionsRaw
+    else {
+      const dashboardTxs = getCachedDashboardTransactions?.()
+      if (dashboardTxs && dashboardTxs.length > 0) list = dashboardTxs
+    }
+    return list.filter((tx) => !tx.deletedAt)
   }, [transactionsRaw])
 
   const allWallets = useMemo(() => {
@@ -177,7 +183,8 @@ function Transactions() {
         setRates(fetchedRates)
         setApiError('')
         setApiErrorTone('error')
-      } catch {
+      } catch (err) {
+        console.error('[Transactions:loadRates]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
         setApiError(t('tx.apiFallback'))
         setApiErrorTone('warning')
@@ -263,7 +270,8 @@ function Transactions() {
           dateLabel = format(dateObj, 'EEEE, d MMMM yyyy', {
             locale: locale === 'en' ? enUS : idLocale,
           }).toUpperCase()
-        } catch {
+        } catch (err) {
+          console.error('[Transactions:formatDate]', err)
           dateLabel = dateKey
         }
       } else {
@@ -373,45 +381,62 @@ function Transactions() {
   const handleBatchDelete = async () => {
     if (selectedTxIds.size === 0) return
     const ids = Array.from(selectedTxIds)
-    for (const id of ids) {
-      await deleteTransaction(id)
+    try {
+      for (const id of ids) {
+        await deleteTransaction(id)
+      }
+      clearBulkSelection()
+      setIsBatchDeleteModalOpen(false)
+    } catch (err) {
+      console.error('[Transactions:handleBatchDelete]', err)
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false
+      setApiError(err?.userMessage || err?.message || (offline ? t('common.error.offline') : t('common.error.saveFailed')))
+      setApiErrorTone('error')
+      clearBulkSelection()
+      setIsBatchDeleteModalOpen(false)
     }
-    clearBulkSelection()
-    setIsBatchDeleteModalOpen(false)
   }
 
   const handleBatchCategoryChange = async (newCategory) => {
     if (selectedTxIds.size === 0 || !newCategory) return
     const ids = Array.from(selectedTxIds)
-    const selectedTxs = await db.transactions.where('id').anyOf(ids).toArray()
+    try {
+      const selectedTxs = (await db.transactions.where('id').anyOf(ids).toArray()).filter((tx) => !tx.deletedAt)
 
-    const nonSplitIds = []
-    let skippedSplitCount = 0
+      const nonSplitIds = []
+      let skippedSplitCount = 0
 
-    for (const tx of selectedTxs) {
-      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-        skippedSplitCount++
-      } else {
-        nonSplitIds.push(tx.id)
+      for (const tx of selectedTxs) {
+        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+          skippedSplitCount++
+        } else {
+          nonSplitIds.push(tx.id)
+        }
       }
-    }
 
-    if (nonSplitIds.length > 0) {
-      await db.transactions.where('id').anyOf(nonSplitIds).modify({ category: newCategory })
-    }
+      if (nonSplitIds.length > 0) {
+        await db.transactions.where('id').anyOf(nonSplitIds).modify({ category: newCategory })
+      }
 
-    if (skippedSplitCount > 0) {
-      setApiError(
-        t(
-          'tx.batch.splitSkipped',
-          'Transaksi split dilewati karena memiliki rincian multi-kategori.'
+      if (skippedSplitCount > 0) {
+        setApiError(
+          t(
+            'tx.batch.splitSkipped',
+            'Transaksi split dilewati karena memiliki rincian multi-kategori.'
+          )
         )
-      )
-      setApiErrorTone('warning')
-    }
+        setApiErrorTone('warning')
+      }
 
-    setIsBatchCategoryModalOpen(false)
-    clearBulkSelection()
+      setIsBatchCategoryModalOpen(false)
+      clearBulkSelection()
+    } catch (err) {
+      console.error('[Transactions:handleBatchCategoryChange]', err)
+      setApiError(err?.message || t('common.error.saveFailed'))
+      setApiErrorTone('error')
+      setIsBatchCategoryModalOpen(false)
+      clearBulkSelection()
+    }
   }
 
   // Edit and Duplicate Handlers
@@ -449,9 +474,10 @@ function Transactions() {
         splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
       })
       setEditingTransaction(null)
-    } catch {
+    } catch (err) {
+      console.error('[Transactions:handleSaveEdit]', err)
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-      setApiError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
+      setApiError(offline ? t('common.error.offline') : (err?.message || t('common.error.saveFailed')))
       setApiErrorTone('error')
     }
   }
@@ -469,8 +495,9 @@ function Transactions() {
         await addTransaction(payload)
         setApiError(t('tx.duplicateSuccess', 'Transaksi berhasil diduplikasi ke hari ini.'))
         setApiErrorTone('success')
-      } catch {
-        setApiError(t('common.error.saveFailed', 'Gagal menduplikasi transaksi.'))
+      } catch (err) {
+        console.error('[Transactions:handleDuplicate]', err)
+        setApiError(err?.message || t('common.error.saveFailed', 'Gagal menduplikasi transaksi.'))
         setApiErrorTone('error')
       }
     },
@@ -695,8 +722,9 @@ function Transactions() {
             await deleteTransaction(txId)
             if (swipedTransactionId === txId) setSwipedTransactionId(null)
           } catch (err) {
+            console.error('[Transactions:singleDelete]', err)
             const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-            setApiError(err?.message || (offline ? t('common.error.offline') : t('common.error.saveFailed')))
+            setApiError(err?.userMessage || err?.message || (offline ? t('common.error.offline') : t('common.error.saveFailed')))
             setApiErrorTone('error')
           }
         }}

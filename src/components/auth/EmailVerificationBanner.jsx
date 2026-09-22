@@ -59,7 +59,8 @@ export default function EmailVerificationBanner() {
       } else {
         setFeedback(res.message || t('auth.verifFailedFeedback', 'Gagal mengirim email verifikasi.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[EmailVerificationBanner]', err)
       setFeedback(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
       setIsLoading(false)
@@ -77,7 +78,8 @@ export default function EmailVerificationBanner() {
       } else {
         setFeedback(t('auth.verifNotYetConfirmed', 'Email belum diverifikasi. Cek inbox email Anda.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[EmailVerificationBanner]', err)
       setFeedback(t('auth.generalError', 'Terjadi kesalahan saat memeriksa status.'))
     } finally {
       setIsChecking(false)

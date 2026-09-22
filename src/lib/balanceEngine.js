@@ -36,8 +36,8 @@ export async function getWalletBalance(walletId, rates = null) {
         memoryBalanceCache.set(cleanId, cachedRow.balance)
         return cachedRow.balance
       }
-    } catch {
-      // Cache table might not exist yet or query failed
+    } catch (err) {
+      console.warn('[balanceEngine] Failed to read walletBalanceCache:', err)
     }
   }
 
@@ -67,7 +67,7 @@ export async function recomputeAndCacheWalletBalance(walletId, rates = null, all
   ])
   const txMap = new Map()
   for (const tx of [...srcTxsNum, ...srcTxsStr, ...tgtTxsNum, ...tgtTxsStr]) {
-    if (tx && tx.id != null) {
+    if (tx && tx.id != null && !tx.deletedAt) {
       txMap.set(tx.id, tx)
     }
   }
@@ -88,8 +88,8 @@ export async function recomputeAndCacheWalletBalance(walletId, rates = null, all
         updatedAt: Date.now(),
       })
     }
-  } catch {
-    // Ignore cache write failures
+  } catch (err) {
+    console.warn('[balanceEngine] Failed to write walletBalanceCache:', err)
   }
 
   return computed
@@ -117,8 +117,8 @@ export async function invalidateWalletBalance(walletIds) {
       if (db.walletBalanceCache) {
         await db.walletBalanceCache.delete(cleanId)
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn('[balanceEngine] Failed to delete walletBalanceCache entry:', err)
     } finally {
       pendingInvalidations.delete(cleanId)
     }
@@ -135,8 +135,8 @@ export async function invalidateAllBalances() {
     if (db.walletBalanceCache) {
       await db.walletBalanceCache.clear()
     }
-  } catch {
-    // Ignore
+  } catch (err) {
+    console.warn('[balanceEngine] Failed to clear walletBalanceCache:', err)
   }
   scheduleNativeWidgetSync()
 }
@@ -181,8 +181,8 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
             results.set(cleanId, cachedRow.balance)
             return
           }
-        } catch {
-          // Ignore cache query failure
+        } catch (err) {
+          console.warn('[balanceEngine] Failed to get uncached balance row:', err)
         }
         stillUncached.push(w)
       })
@@ -198,7 +198,7 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
     const bal = await recomputeAndCacheWalletBalance(w.id, rates, allWalletsInDb)
     results.set(Number(w.id), bal)
   } else if (uncachedWallets.length > 1) {
-    const allTxs = await db.transactions.toArray()
+    const allTxs = (await db.transactions.toArray()).filter((tx) => !tx.deletedAt)
     const computedWallets = computeAllWalletBalances(wallets, allTxs, rates, allWalletsInDb)
     const cacheRows = []
 
@@ -214,8 +214,8 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
       if (db.walletBalanceCache && cacheRows.length > 0) {
         await db.walletBalanceCache.bulkPut(cacheRows)
       }
-    } catch {
-      // Ignore cache write failures
+    } catch (err) {
+      console.warn('[balanceEngine] Failed to bulkPut walletBalanceCache:', err)
     }
   }
 

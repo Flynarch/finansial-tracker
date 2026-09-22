@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import {
   Wallet,
@@ -186,11 +185,4 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
   )
 }
 
-ActionSuccessCard.propTypes = {
-  type: PropTypes.string,
-  action: PropTypes.string,
-  title: PropTypes.string,
-  subtitle: PropTypes.string,
-  data: PropTypes.object,
-}
 

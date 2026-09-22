@@ -64,7 +64,8 @@ export default function SettingsNotifications() {
     try {
       const res = await FinTrackNotificationPlugin.isPermissionGranted()
       setIsListenerGranted(Boolean(res?.granted))
-    } catch {
+    } catch (err){
+      console.warn('[SettingsNotifications]', err)
       setIsListenerGranted(false)
     }
   }, [])
@@ -75,7 +76,7 @@ export default function SettingsNotifications() {
       .then((res) => {
         if (isMounted) setIsListenerGranted(Boolean(res?.granted))
       })
-      .catch(() => {})
+      .catch((err) => console.warn('[SettingsNotifications]', err))
 
     const handleFocus = () => {
       checkNativePermission()
@@ -131,7 +132,8 @@ export default function SettingsNotifications() {
       } else {
         setSyncFeedback(t('notif.syncEmpty', 'Antrean notifikasi kosong.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[SettingsNotifications]', err)
       setSyncFeedback(t('common.error.generic', 'Terjadi kesalahan saat sinkronisasi.'))
     } finally {
       setIsSyncingQueue(false)

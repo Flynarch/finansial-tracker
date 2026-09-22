@@ -263,7 +263,8 @@ export default function TransactionEditSheet({
       setWalletError(false)
       setAmountError(false)
       onSubmit(event)
-    } catch {
+    } catch (err){
+      console.warn('[TransactionEditSheet]', err)
       setSubmitError(t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
     }
   }

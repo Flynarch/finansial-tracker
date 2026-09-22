@@ -59,6 +59,7 @@ export default function SettingsAi() {
         await setGeminiApiKey(cleanKey)
       }
     } catch (err) {
+      console.warn('[SettingsAi]', err)
       setTestResult({ ok: false, message: err.message || 'Gagal mengetes API Key.' })
     } finally {
       setIsTestingKey(false)

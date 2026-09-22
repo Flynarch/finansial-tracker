@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { parseISO } from 'date-fns'
+import { parseISO, addDays } from 'date-fns'
 import { db } from './db'
 import { formatCurrency, toSafeNumber, isExcludeAnalyticsTx } from './utils'
 import useSettingsStore from '../store/useSettingsStore'
@@ -110,44 +110,44 @@ export async function initNotificationChannels() {
       description: translate(
         locale,
         'notifications.channelDailyDesc',
-        'Pengingat rutin untuk mencatat pengeluaran harian Anda.'
+        'Pengingat mencatat pengeluaran harian.'
       ),
       importance: 4, // High
       visibility: 1, // Public (daily reminder contains no sensitive balance data)
       lights: true,
       lightColor: FINTRACK_NOTIFICATION_COLOR,
       vibration: true,
-    }).catch(() => {})
+    }).catch((err) => console.warn('[smartNotifications]', err))
 
     await LocalNotifications.createChannel({
       id: NOTIFICATION_CHANNELS.BUDGET_ALERTS,
-      name: translate(locale, 'notifications.channelBudgetName', 'Peringatan Batas Anggaran'),
+      name: translate(locale, 'notifications.channelBudgetName', 'Peringatan Anggaran'),
       description: translate(
         locale,
         'notifications.channelBudgetDesc',
-        'Pemberitahuan instan saat pengeluaran mendekati atau melebihi limit anggaran.'
+        'Notifikasi saat pengeluaran mendekati batas anggaran.'
       ),
       importance: 5, // Max (triggers heads-up popdown banner when over limit)
       visibility: sensitiveVisibility,
       lights: true,
       lightColor: '#F43F5E',
       vibration: true,
-    }).catch(() => {})
+    }).catch((err) => console.warn('[smartNotifications]', err))
 
     await LocalNotifications.createChannel({
       id: NOTIFICATION_CHANNELS.BILL_REMINDERS,
-      name: translate(locale, 'notifications.channelBillName', 'Pengingat Tagihan & Rutin'),
+      name: translate(locale, 'notifications.channelBillName', 'Pengingat Tagihan'),
       description: translate(
         locale,
         'notifications.channelBillDesc',
-        'Notifikasi untuk tagihan dan pengeluaran rutin yang akan jatuh tempo.'
+        'Notifikasi tagihan dan pengeluaran rutin.'
       ),
       importance: 4, // High
       visibility: sensitiveVisibility,
       lights: true,
       lightColor: FINTRACK_NOTIFICATION_COLOR,
       vibration: true,
-    }).catch(() => {})
+    }).catch((err) => console.warn('[smartNotifications]', err))
   } catch (err) {
     console.warn('initNotificationChannels error:', err)
   }
@@ -172,7 +172,8 @@ export async function requestNotificationPermission() {
       }
       return true
     }
-  } catch {
+  } catch (err){
+      console.warn('[smartNotifications]', err)
     /* ignore */
     return false
   }
@@ -191,17 +192,17 @@ export async function sendTestNotification() {
     await initNotificationChannels()
     const locale = useSettingsStore.getState?.()?.locale || 'id'
 
-    const title = translate(locale, 'notifications.testNotifTitle', 'FinTrack • Sistem Notifikasi')
+    const title = translate(locale, 'notifications.testNotifTitle', 'FinTrack • Tes Notifikasi')
     const body = translate(
       locale,
       'notifications.testNotifBody',
-      'Notifikasi eksternal aktif • FinTrack siap mengawal ritme keuangan Anda.'
+      'Notifikasi FinTrack aktif dan siap digunakan.'
     )
 
-    const header = translate(locale, 'notifications.testNotifHeader', 'FinTrack • Sistem Notifikasi Aktif')
-    const headline = translate(locale, 'notifications.testNotifHeadline', 'Integrasi Notifikasi Native Berjalan Normal')
-    const line1 = translate(locale, 'notifications.testNotifLine1', '• Status: Izin notifikasi aktif • Saluran pengingat siap.')
-    const line2 = translate(locale, 'notifications.testNotifLine2', '• Tampilan: BigTextStyle & tombol aksi cepat terverifikasi.')
+    const header = translate(locale, 'notifications.testNotifHeader', 'FinTrack • Tes Notifikasi')
+    const headline = translate(locale, 'notifications.testNotifHeadline', 'Sistem notifikasi berjalan normal.')
+    const line1 = translate(locale, 'notifications.testNotifLine1', '• Izin notifikasi aktif.')
+    const line2 = translate(locale, 'notifications.testNotifLine2', '• Tombol aksi cepat siap.')
     const largeBody = `${header}\n${headline}\n${line1}\n${line2}`
 
     if (Capacitor.isNativePlatform()) {
@@ -212,7 +213,7 @@ export async function sendTestNotification() {
             title,
             body,
             largeBody,
-            summaryText: translate(locale, 'notifications.testNotifSummary', 'Diagnostik Sistem'),
+            summaryText: translate(locale, 'notifications.testNotifSummary', 'Tes Sistem'),
             channelId: NOTIFICATION_CHANNELS.DAILY_REMINDER,
             actionTypeId: NOTIFICATION_ACTION_TYPES.DAILY_REMINDER,
             extra: { route: 'fintrack://quick-add' },
@@ -245,7 +246,7 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
     if (Capacitor.isNativePlatform()) {
       await LocalNotifications.cancel({
         notifications: [{ id: NOTIFICATION_IDS.DAILY_REMINDER }],
-      }).catch(() => {})
+      }).catch((err) => console.warn('[smartNotifications]', err))
     }
 
     if (!enabled) return
@@ -260,10 +261,10 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
     const targetMin = parseInt(minStr, 10) || 0
 
     const now = new Date()
-    const triggerDate = new Date()
+    let triggerDate = new Date()
     triggerDate.setHours(targetHour, targetMin, 0, 0)
     if (triggerDate <= now) {
-      triggerDate.setDate(triggerDate.getDate() + 1)
+      triggerDate = addDays(triggerDate, 1)
     }
 
     const locale = useSettingsStore.getState?.()?.locale || 'id'
@@ -272,14 +273,14 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
     const body = translate(
       locale,
       'notifications.dailyReminderBody',
-      'Catat pengeluaran hari ini • Jaga arus kas dan limit anggaran tetap presisi.'
+      'Sudah catat pengeluaran hari ini?'
     )
 
     const header = translate(locale, 'notifications.dailyReminderHeader', 'Pengingat Harian • FinTrack')
-    const headline = translate(locale, 'notifications.dailyReminderHeadline', 'Sudahkah Anda mencatat pengeluaran hari ini?')
-    const bullet1 = translate(locale, 'notifications.dailyReminderBullet1', '• Arus Kas: Catat setiap pengeluaran agar saldo dompet tetap sinkron.')
-    const bullet2 = translate(locale, 'notifications.dailyReminderBullet2', '• Anggaran: Pantau sisa kuota belanja sebelum akhir bulan.')
-    const bullet3 = translate(locale, 'notifications.dailyReminderBullet3', '• Aksi Cepat: Tekan tombol di bawah untuk menambah transaksi secara instan.')
+    const headline = translate(locale, 'notifications.dailyReminderHeadline', 'Sudah catat pengeluaran hari ini?')
+    const bullet1 = translate(locale, 'notifications.dailyReminderBullet1', '• Catat pengeluaran agar saldo akurat.')
+    const bullet2 = translate(locale, 'notifications.dailyReminderBullet2', '• Pantau sisa kuota anggaran.')
+    const bullet3 = translate(locale, 'notifications.dailyReminderBullet3', '• Buka aplikasi untuk catat cepat.')
     const largeBody = `${header}\n${headline}\n${bullet1}\n${bullet2}\n${bullet3}`
     const summaryText = translate(locale, 'notifications.channelDailyName', 'Pengingat Harian')
 
@@ -323,18 +324,18 @@ export async function snoozeDailyReminder(hours = 1) {
 
     const snoozeDate = new Date(Date.now() + Math.max(1, Number(hours) || 1) * 3600 * 1000)
 
-    const title = translate(locale, 'notifications.snoozeTitle', 'Pengingat Ditunda')
+    const title = translate(locale, 'notifications.snoozeTitle', 'Ditunda')
     const body = translate(
       locale,
       'notifications.snoozeBody',
-      'Pengingat pencatatan harian ditunda • Luangkan 1 menit untuk mencatat transaksi.'
+      'Pengingat pencatatan aktif kembali.'
     )
 
-    const header = translate(locale, 'notifications.dailyReminderHeader', 'Pengingat Harian • FinTrack')
-    const headline = translate(locale, 'notifications.snoozeHeadline', 'Pengingat Pencatatan Ditunda Aktif Kembali')
-    const bullet1 = translate(locale, 'notifications.snoozeBullet1', '• Catatan: Luangkan 1 menit untuk memeriksa pengeluaran yang belum dicatat.')
-    const bullet2 = translate(locale, 'notifications.snoozeBullet2', '• Status: Arus kas harian menunggu pembaruan.')
-    const bullet3 = translate(locale, 'notifications.snoozeBullet3', '• Aksi Cepat: Tekan tombol di bawah untuk menambah transaksi.')
+    const header = translate(locale, 'notifications.dailyReminderHeader', 'Pengingat Harian')
+    const headline = translate(locale, 'notifications.snoozeHeadline', 'Waktunya catat pengeluaran.')
+    const bullet1 = translate(locale, 'notifications.snoozeBullet1', 'Cek pengeluaran yang belum dicatat.')
+    const bullet2 = translate(locale, 'notifications.snoozeBullet2', 'Saldo menunggu pembaruan.')
+    const bullet3 = translate(locale, 'notifications.snoozeBullet3', 'Tekan tombol di bawah untuk catat cepat.')
     const largeBody = `${header}\n${headline}\n${bullet1}\n${bullet2}\n${bullet3}`
 
     await LocalNotifications.schedule({
@@ -411,6 +412,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
     const periodTxs = await db.transactions
       .filter(
         (t) =>
+          !t.deletedAt &&
           typeof t.date === 'string' &&
           t.date >= budgetPeriod.startDate &&
           t.date <= budgetPeriod.endDate &&
@@ -443,7 +445,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
       alertBody = translate(
         locale,
         'notifications.budgetExceededBody',
-        `Pos ${catDisplayName} mencapai ${formattedSpent} • Batas: ${formattedLimit}.`,
+        `${catDisplayName}: ${formattedSpent} dari ${formattedLimit}.`,
         { category: catDisplayName, spent: formattedSpent, limit: formattedLimit }
       )
 
@@ -451,19 +453,19 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
       const headline = translate(
         locale,
         'notifications.budgetExceededHeadline',
-        `Batas Anggaran ${catDisplayName} Terlampaui (100%)`,
+        `${catDisplayName} melebihi batas anggaran.`,
         { category: catDisplayName }
       )
       const metricLine = translate(
         locale,
         'notifications.budgetExceededMetric',
-        `• Realisasi: ${formattedSpent} • Batas: ${formattedLimit} • Melebihi plafon.`,
+        `• Terpakai: ${formattedSpent} / ${formattedLimit}.`,
         { spent: formattedSpent, limit: formattedLimit }
       )
       const actionLine = translate(
         locale,
         'notifications.budgetExceededAction',
-        '• Rekomendasi: Tinjau dan kendalikan pos belanja di menu Anggaran.'
+        '• Tinjau pengeluaran di menu Anggaran.'
       )
       largeBody = `${header}\n${headline}\n${metricLine}\n${actionLine}`
     } else if (spentRatio >= 0.8) {
@@ -478,7 +480,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
       alertBody = translate(
         locale,
         'notifications.budgetWarningBody',
-        `Pos ${catDisplayName} mencapai ${pct}% • Terpakai: ${formattedSpent} dari ${formattedLimit}.`,
+        `${catDisplayName}: ${formattedSpent} dari ${formattedLimit} (${pct}%).`,
         { category: catDisplayName, percent: pct, spent: formattedSpent, limit: formattedLimit }
       )
 
@@ -486,19 +488,19 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
       const headline = translate(
         locale,
         'notifications.budgetWarningHeadline',
-        `Batas Anggaran ${catDisplayName} Mencapai ${pct}%`,
+        `${catDisplayName} sudah ${pct}% terpakai.`,
         { category: catDisplayName, percent: pct }
       )
       const metricLine = translate(
         locale,
         'notifications.budgetWarningMetric',
-        `• Realisasi: ${formattedSpent} • Batas: ${formattedLimit} • Sisa kuota: ${remaining}.`,
+        `• Terpakai: ${formattedSpent} / ${formattedLimit} (sisa: ${remaining}).`,
         { spent: formattedSpent, limit: formattedLimit, remaining }
       )
       const actionLine = translate(
         locale,
         'notifications.budgetWarningAction',
-        '• Rekomendasi: Perlambat belanja pada kategori ini untuk menjaga arus kas aman.'
+        '• Kurangi belanja kategori ini.'
       )
       largeBody = `${header}\n${headline}\n${metricLine}\n${actionLine}`
     }
@@ -513,13 +515,13 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
         ? translate(
             locale,
             'notifications.budgetExceededInAppMsg',
-            `Pengeluaran kategori ${catDisplayName} melebihi batas anggaran (${Math.round(spentRatio * 100)}%).`,
+            `${catDisplayName} melebihi batas (${Math.round(spentRatio * 100)}%).`,
             { category: catDisplayName, percent: Math.round(spentRatio * 100) }
           )
         : translate(
             locale,
             'notifications.budgetWarningInAppMsg',
-            `Pengeluaran kategori ${catDisplayName} hampir habis (${Math.round(spentRatio * 100)}%).`,
+            `${catDisplayName} hampir habis (${Math.round(spentRatio * 100)}%).`,
             { category: catDisplayName, percent: Math.round(spentRatio * 100) }
           )
 
@@ -603,7 +605,8 @@ async function sendInstantBudgetNotification({ id, title, body, largeBody, summa
     } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, { body })
     }
-  } catch {
+  } catch (err){
+      console.warn('[smartNotifications]', err)
     /* ignore */
   }
 }
@@ -637,17 +640,17 @@ export function registerNotificationTapListener(callback) {
       lastProcessedActionTime = now
 
       if (actionId === 'snooze_1h') {
-        snoozeDailyReminder(1).catch(() => {})
+        snoozeDailyReminder(1).catch((err) => console.warn('[smartNotifications]', err))
         if (typeof window !== 'undefined') {
           const locale = useSettingsStore.getState?.()?.locale || 'id'
           window.dispatchEvent(
             new CustomEvent('ft-show-toast', {
               detail: {
-                title: translate(locale, 'notifications.snoozedTitle', 'Pengingat Ditunda'),
+                title: translate(locale, 'notifications.snoozedTitle', 'Ditunda 1 Jam'),
                 message: translate(
                   locale,
                   'notifications.snoozedBody',
-                  'Pengingat pencatatan harian ditunda selama 1 jam.'
+                  'Pengingat akan aktif kembali dalam 1 jam.'
                 ),
                 type: 'todo',
               },
@@ -672,7 +675,7 @@ export function registerNotificationTapListener(callback) {
                   message: translate(
                     locale,
                     'notifications.markedPaidSuccess',
-                    'Komitmen telah berhasil diselesaikan.'
+                    'Berhasil ditandai lunas.'
                   ),
                   type: 'success',
                 },
@@ -694,9 +697,10 @@ export function registerNotificationTapListener(callback) {
       }
     })
     return () => {
-      listenerPromise.then((handle) => handle.remove()).catch(() => {})
+      listenerPromise.then((handle) => handle.remove()).catch((err) => console.warn('[smartNotifications]', err))
     }
-  } catch {
+  } catch (err){
+      console.warn('[smartNotifications]', err)
     return () => {}
   }
 }

@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { Flame, Check, ArrowUpRight } from 'lucide-react'
 import { format, subDays } from 'date-fns'
@@ -158,10 +157,3 @@ export default function HabitCardWidget({
   )
 }
 
-HabitCardWidget.propTypes = {
-  habitId: PropTypes.number,
-  title: PropTypes.string,
-  color: PropTypes.string,
-  frequencyType: PropTypes.string,
-  action: PropTypes.string,
-}

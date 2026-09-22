@@ -33,11 +33,13 @@ export function clearFinancialLocalStorage() {
     keysToRemove.forEach((k) => {
       try {
         window.localStorage.removeItem(k)
-      } catch {
+      } catch (err){
+      console.warn('[settingsConstants]', err)
         /* ignore */
       }
     })
-  } catch {
+  } catch (err){
+      console.warn('[settingsConstants]', err)
     // Ignore localStorage errors during reset.
   }
 }
@@ -48,7 +50,8 @@ export function clearAppLocalStorage() {
   try {
     window.localStorage.clear()
     if (window.sessionStorage) window.sessionStorage.clear()
-  } catch {
+  } catch (err){
+      console.warn('[settingsConstants]', err)
     // Ignore localStorage errors during reset.
   }
 }

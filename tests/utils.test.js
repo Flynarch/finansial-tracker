@@ -10,6 +10,7 @@ import {
   isExcludeAnalyticsTx,
   toTransactionsCsv,
   safeFormatDate,
+  roundCurrency,
   FALLBACK_EXCHANGE_RATES,
 } from '../src/lib/utils'
 
@@ -236,6 +237,36 @@ describe('utils - safeFormatDate', () => {
     expect(safeFormatDate(undefined)).toBe('')
     expect(safeFormatDate('not-a-date')).toBe('')
     expect(safeFormatDate('2026-02-31')).toBe('') // Invalid calendar date
+  })
+})
+
+describe('utils - roundCurrency (decimal-safe)', () => {
+  it('correctly rounds 0.1 + 0.2 to 0.3 without floating point drift', () => {
+    expect(roundCurrency(0.1 + 0.2)).toBe(0.3)
+  })
+
+  it('correctly rounds 1.005 to 1.01 using round half-up', () => {
+    expect(roundCurrency(1.005)).toBe(1.01)
+  })
+
+  it('handles negative values correctly', () => {
+    expect(roundCurrency(-1.005)).toBe(-1.01)
+    expect(roundCurrency(-0.004)).toBe(0)
+  })
+
+  it('handles non-numeric strings and invalid values by returning 0', () => {
+    expect(roundCurrency('abc')).toBe(0)
+    expect(roundCurrency(Infinity)).toBe(0)
+    expect(roundCurrency(-Infinity)).toBe(0)
+    expect(roundCurrency(NaN)).toBe(0)
+    expect(roundCurrency(null)).toBe(0)
+    expect(roundCurrency(undefined)).toBe(0)
+  })
+
+  it('returns standard JavaScript number type', () => {
+    const res = roundCurrency('125.456')
+    expect(typeof res).toBe('number')
+    expect(res).toBe(125.46)
   })
 })
 

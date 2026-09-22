@@ -406,7 +406,8 @@ export default function AiQuickLogModal() {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
-        } catch {
+        } catch (err){
+      console.warn('[AiQuickLogModal]', err)
           // ignore
         }
       }
@@ -478,7 +479,8 @@ export default function AiQuickLogModal() {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
-        } catch {
+        } catch (err){
+      console.warn('[AiQuickLogModal]', err)
           // ignore
         }
       }
@@ -490,7 +492,8 @@ export default function AiQuickLogModal() {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
-      } catch {
+      } catch (err){
+      console.warn('[AiQuickLogModal]', err)
         // ignore
       }
     }
@@ -501,7 +504,8 @@ export default function AiQuickLogModal() {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
-      } catch {
+      } catch (err){
+      console.warn('[AiQuickLogModal]', err)
         // ignore
       }
     }
@@ -530,6 +534,7 @@ export default function AiQuickLogModal() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         stream.getTracks().forEach((track) => track.stop())
       } catch (micErr) {
+      console.warn('[AiQuickLogModal]', micErr)
         if (micErr?.name === 'NotAllowedError' || micErr?.name === 'PermissionDeniedError') {
           setErrorMessage(
             locale === 'en'
@@ -589,7 +594,8 @@ export default function AiQuickLogModal() {
         setIsRecording(false)
       }
       recognition.start()
-    } catch {
+    } catch (err){
+      console.warn('[AiQuickLogModal]', err)
       setIsRecording(false)
     }
   }
@@ -738,6 +744,7 @@ function isObviousNonTransaction(text) {
         setModalMode('intent_switch')
       }
     } catch (err) {
+      console.warn('[AiQuickLogModal]', err)
       setErrorMessage(err.message || 'Terjadi kesalahan saat memproses input.')
       setModalMode('input')
     }
@@ -756,7 +763,8 @@ function isObviousNonTransaction(text) {
         inputRef.current.focus()
         try {
           inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        } catch {
+        } catch (err){
+      console.warn('[AiQuickLogModal]', err)
           // ignore
         }
       }

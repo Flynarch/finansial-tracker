@@ -189,7 +189,8 @@ function loadCustom() {
       icons: data.icons && typeof data.icons === 'object' ? data.icons : {},
     }
     return cachedCustom
-  } catch {
+  } catch (err){
+      console.warn('[expenseCategories]', err)
     cachedCustom = { hidden: {}, extras: {}, colors: {}, parents: [], names: {}, icons: {} }
     return cachedCustom
   }

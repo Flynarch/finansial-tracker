@@ -57,7 +57,8 @@ export default function SavingsDetail() {
       if (item) return item
       const all = await db.goals.toArray()
       return all.find((g) => String(g.id) === String(goalId)) || null
-    } catch {
+    } catch (err){
+      console.warn('[SavingsDetail]', err)
       return null
     }
   }, [goalId])
@@ -67,7 +68,8 @@ export default function SavingsDetail() {
     try {
       const data = await db.goalLogs.where('goalId').equals(goalId).toArray()
       return (data || []).sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    } catch {
+    } catch (err){
+      console.warn('[SavingsDetail]', err)
       return []
     }
   }, [goalId])
@@ -104,7 +106,8 @@ export default function SavingsDetail() {
   const wallets = useLiveQuery(async () => {
     try {
       return await db.wallets.toArray()
-    } catch {
+    } catch (err){
+      console.warn('[SavingsDetail]', err)
       return []
     }
   }, [], [])
@@ -279,10 +282,12 @@ export default function SavingsDetail() {
       try {
         const cleanJson = predictionRaw.replace(/```json/g, '').replace(/```/g, '').trim()
         setAiPrediction(JSON.parse(cleanJson))
-      } catch {
+      } catch (err){
+      console.warn('[SavingsDetail]', err)
         setAiPrediction({ error: true, text: predictionRaw || t('savings.aiError', 'Gagal memproses prediksi AI.') })
       }
     } catch (error) {
+      console.warn('[SavingsDetail]', error)
       setAiPrediction({ error: true, text: error.message || t('savings.aiError', 'Gagal mendapatkan prediksi AI.') })
     } finally {
       setIsAiLoading(false)
@@ -298,7 +303,8 @@ export default function SavingsDetail() {
       let monthKey
       try {
         monthKey = format(new Date(log.date), 'MMMM yyyy').toUpperCase()
-      } catch {
+      } catch (err){
+      console.warn('[SavingsDetail]', err)
         monthKey = 'LAINNYA'
       }
 
@@ -348,7 +354,8 @@ export default function SavingsDetail() {
           deadlineText = t('savings.daysLeft', { count: daysLeft }, `${daysLeft} Hari Lagi`)
         }
       }
-    } catch {
+    } catch (err){
+      console.warn('[SavingsDetail]', err)
       daysLeft = null
     }
   }
@@ -566,7 +573,8 @@ export default function SavingsDetail() {
                       const logDateStr = (() => {
                         try {
                           return format(new Date(log.date), 'dd MMM yyyy, HH:mm')
-                        } catch {
+                        } catch (err){
+      console.warn('[SavingsDetail]', err)
                           return String(log.date || '')
                         }
                       })()

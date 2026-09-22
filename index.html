@@ -5,17 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0b0f1a" />
-    <script>
-      (function() {
-        try {
-          var t = localStorage.getItem('ft_theme') || 'light';
-          document.documentElement.setAttribute('data-theme', t);
-          var bg = t === 'light' ? '#f5f7fb' : (t === 'midnight' ? '#060913' : '#0f1218');
-          var m = document.querySelector('meta[name="theme-color"]');
-          if (m) m.setAttribute('content', bg);
-        } catch (e) {}
-      })();
-    </script>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' capacitor:; script-src 'self' capacitor: https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' capacitor: https://generativelanguage.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.firebasestorage.app https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://fonts.googleapis.com https://fonts.gstatic.com https://open.er-api.com https://api.coingecko.com https://v6.exchangerate-api.com https://api.gold-api.com https://metals.live; frame-src 'self' https://accounts.google.com; media-src 'self' data: blob:; worker-src 'self' blob:;"
+    />
+    <script type="module" src="/src/initTheme.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -23,16 +17,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        window.addEventListener('error', function(e) {
-          console.error('[Runtime Error]', e.message || e.error, e.filename + ':' + e.lineno);
-        });
-        window.addEventListener('unhandledrejection', function(e) {
-          console.error('[Unhandled Rejection]', e.reason);
-        });
-      }
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -38,6 +38,7 @@ import { primeThemeTransition } from '../../lib/themeTransition'
 import { ensureFirebaseAuthSynced } from '../../lib/auth'
 import { uploadLatestBackup } from '../../lib/cloudBackup'
 import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
+import { getSessionMnemonicPhrase, purgeLegacyMnemonicStorage } from '../../lib/mnemonicCrypto'
 import AppBackground from './AppBackground'
 
 function AppShell() {
@@ -200,14 +201,14 @@ function AppShell() {
     if (!Capacitor.isNativePlatform()) return
 
     const isDark = theme !== 'light' && theme !== 'nordic-light'
-    StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch(() => {})
-    StatusBar.setBackgroundColor({ color: isDark ? '#0b0f1a' : '#ffffff' }).catch(() => {})
+    StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch((err) => console.warn('[AppShell]', err))
+    StatusBar.setBackgroundColor({ color: isDark ? '#0b0f1a' : '#ffffff' }).catch((err) => console.warn('[AppShell]', err))
   }, [theme])
 
   // Native Splash Screen Smooth Fade-Out once ready
   useEffect(() => {
     if (isLoaded && Capacitor.isNativePlatform()) {
-      SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {})
+      SplashScreen.hide({ fadeOutDuration: 300 }).catch((err) => console.warn('[AppShell]', err))
     }
   }, [isLoaded])
 
@@ -226,6 +227,7 @@ function AppShell() {
 
   useEffect(() => {
     loadSettings()
+    purgeLegacyMnemonicStorage()
     primeThemeTransition()
   }, [loadSettings])
 
@@ -275,7 +277,8 @@ function AppShell() {
           await syncDailyReminderSchedule(true, dailyReminderTime)
         }
         await syncNotificationQueue({ defaultCurrency, defaultWalletId })
-      } catch {
+      } catch (err){
+      console.warn('[AppShell]', err)
         // automation failure should not block app rendering
       }
     }
@@ -354,14 +357,14 @@ function AppShell() {
       .then((launch) => {
         if (launch?.url) handleDeepLink(launch.url)
       })
-      .catch(() => {})
+      .catch((err) => console.warn('[AppShell]', err))
 
     const listenerPromise = App.addListener('appUrlOpen', (data) => {
       if (data?.url) handleDeepLink(data.url)
     })
 
     return () => {
-      listenerPromise.then((l) => l.remove?.()).catch(() => {})
+      listenerPromise.then((l) => l.remove?.()).catch((err) => console.warn('[AppShell]', err))
     }
   }, [navigate])
 
@@ -408,7 +411,7 @@ function AppShell() {
         syncNotificationQueue({
           defaultCurrency: currentSettings.defaultCurrency,
           defaultWalletId: currentSettings.defaultWalletId,
-        }).catch(() => {})
+        }).catch((err) => console.warn('[AppShell]', err))
       }
     }
 
@@ -423,7 +426,7 @@ function AppShell() {
 
   // Ensure native and web Firebase SDK authentication sessions are aligned on startup
   useEffect(() => {
-    ensureFirebaseAuthSynced().catch(() => {})
+    ensureFirebaseAuthSynced().catch((err) => console.warn('[AppShell]', err))
   }, [])
 
   // Auto-sync cloud backup when app transitions to background for authenticated users
@@ -442,7 +445,8 @@ function AppShell() {
         }
         keysToScrub.forEach((k) => window.localStorage.removeItem(k))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AppShell]', err)
       /* ignore storage scrub error */
     }
 
@@ -460,7 +464,7 @@ function AppShell() {
           (backup.wallets && backup.wallets.length > 0)
         if (!hasData) return
 
-        const e2eePhrase = typeof window !== 'undefined' ? window.localStorage.getItem('fintrack_e2ee_phrase') : null
+        const e2eePhrase = getSessionMnemonicPhrase()
         const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
 
         if (!isE2eeActive) {
@@ -477,7 +481,8 @@ function AppShell() {
         }
 
         await uploadLatestBackup(state.authUserId, uploadPayload, { isEncrypted: true })
-      } catch {
+      } catch (err){
+      console.warn('[AppShell]', err)
         /* ignore background sync network error */
       } finally {
         isBackingUp = false
@@ -486,13 +491,13 @@ function AppShell() {
 
     const handleAppStateChange = (state) => {
       if (!state.isActive) {
-        handleBackgroundBackup().catch(() => {})
+        handleBackgroundBackup().catch((err) => console.warn('[AppShell]', err))
       }
     }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        handleBackgroundBackup().catch(() => {})
+        handleBackgroundBackup().catch((err) => console.warn('[AppShell]', err))
       }
     }
 

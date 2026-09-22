@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { ListChecks, Calendar, ArrowUpRight, CheckSquare, Square } from 'lucide-react'
 import { db } from '../../../lib/db'
@@ -148,11 +147,3 @@ export default function TodoCardWidget({
   )
 }
 
-TodoCardWidget.propTypes = {
-  todoId: PropTypes.number,
-  title: PropTypes.string,
-  category: PropTypes.string,
-  dueDate: PropTypes.string,
-  priority: PropTypes.string,
-  subTasks: PropTypes.array,
-}

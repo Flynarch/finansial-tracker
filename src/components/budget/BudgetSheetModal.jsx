@@ -261,7 +261,8 @@ export default function BudgetSheetModal({
       }
       onSaved?.()
       onClose()
-    } catch {
+    } catch (err){
+      console.warn('[BudgetSheetModal]', err)
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
       setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
     }

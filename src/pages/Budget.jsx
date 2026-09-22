@@ -39,7 +39,8 @@ function Budget() {
       try {
         const fetchedRates = await fetchCurrencyRates('USD')
         setRates(fetchedRates)
-      } catch {
+      } catch (err){
+      console.warn('[Budget]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -67,7 +68,8 @@ function Budget() {
   const budgets = useLiveQuery(async () => {
     try {
       return await db.budgets.toArray()
-    } catch {
+    } catch (err){
+      console.warn('[Budget]', err)
       return []
     }
   }, [], [])
@@ -85,6 +87,7 @@ function Budget() {
         .where('date')
         .between(budgetPeriod.startDate, `${budgetPeriod.endDate}\uffff`, true, true)
         .filter((tx) =>
+          !tx.deletedAt &&
           tx.isPendingReview !== true &&
           tx.isPendingReview !== 1 &&
           (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
@@ -144,7 +147,8 @@ function Budget() {
       const [y, m] = month.split('-').map(Number)
       const d = subMonths(startOfMonth(new Date(y, m - 1, 1)), 1)
       return format(d, 'yyyy-MM')
-    } catch {
+    } catch (err){
+      console.warn('[Budget]', err)
       return ''
     }
   }, [month])
@@ -594,7 +598,8 @@ function Budget() {
               try {
                 const targetId = Number(deletingBudget.id) || deletingBudget.id
                 await db.budgets.delete(targetId)
-              } catch {
+              } catch (err){
+      console.warn('[Budget]', err)
                 await db.budgets.where('id').equals(deletingBudget.id).delete()
               }
               setDeletingBudget(null)

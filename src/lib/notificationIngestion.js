@@ -486,10 +486,10 @@ export async function syncNotificationQueue(options = {}) {
 
     // Fetch existing transactions from recent 7 days to deduplicate
     const recentDate = format(new Date(Date.now() - 7 * 86400000), 'yyyy-MM-dd')
-    const recentTransactions = await db.transactions
+    const recentTransactions = (await db.transactions
       .where('date')
       .aboveOrEqual(recentDate)
-      .toArray()
+      .toArray()).filter((tx) => !tx.deletedAt)
 
     const availableWallets = await db.wallets.toArray()
 

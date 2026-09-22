@@ -31,12 +31,14 @@ import {
   exportAllDataAsEncryptedEnvelope,
   importAllDataFromEncryptedEnvelope,
 } from '../../lib/backup'
-import { uploadLatestBackup, downloadLatestBackupJson } from '../../lib/cloudBackup'
+import { uploadLatestBackup, downloadLatestBackupJson, getLatestBackupMeta } from '../../lib/cloudBackup'
+import { getSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
 import { db } from '../../lib/db'
 import { triggerHaptic } from '../../lib/haptics'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import Modal from '../ui/Modal'
+import MnemonicRecoveryModal from '../security/MnemonicRecoveryModal'
 
 export default function AuthModal({
   isOpen,
@@ -61,6 +63,10 @@ export default function AuthModal({
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
+  const [pendingEncryptedCloudBackup, setPendingEncryptedCloudBackup] = useState(null)
+  const [isCloudRecoveryOpen, setIsCloudRecoveryOpen] = useState(false)
+  const [pendingAuthUser, setPendingAuthUser] = useState(null)
+
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
   if (prevIsOpen !== isOpen) {
     setPrevIsOpen(isOpen)
@@ -70,6 +76,9 @@ export default function AuthModal({
       setSuccessMessage('')
       setPassword('')
       setConfirmPassword('')
+      setPendingEncryptedCloudBackup(null)
+      setIsCloudRecoveryOpen(false)
+      setPendingAuthUser(null)
     }
   }
 
@@ -177,10 +186,10 @@ export default function AuthModal({
   }, [password])
 
   const restoreUserBackup = useCallback(async (userObj, isNewUser = false) => {
-    if (!userObj?.uid) return
+    if (!userObj?.uid) return { success: false }
     try {
       const getUploadPayload = async () => {
-        const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+        const e2eePhrase = getSessionMnemonicPhrase()
         const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
         if (!isE2eeActive) {
           // Never upload unencrypted data to cloud storage
@@ -209,53 +218,60 @@ export default function AuthModal({
         }
       }
 
-      // Brand new user: immediately export guest data and upload in background if real user data exists
+      // Brand new user: immediately export guest data and upload in background if real user data exists and user never had backup
       if (isNewUser) {
-        const txCount = await db.transactions.count().catch(() => 0)
-        const loanCount = await db.loans.count().catch(() => 0)
-        const goalCount = await db.goals.count().catch(() => 0)
-        if (txCount > 0 || loanCount > 0 || goalCount > 0) {
-          const uploadRes = await getUploadPayload()
-          if (uploadRes?.payload) {
-            uploadLatestBackup(userObj.uid, uploadRes.payload, { isEncrypted: uploadRes.isEncrypted }).catch(() => {})
+        try {
+          const meta = await getLatestBackupMeta(userObj.uid)
+          const hasPriorBackup = Boolean(meta?.lastBackupPath || meta?.lastBackupAt || meta?.lastBackupUrl)
+          if (!hasPriorBackup) {
+            const txCount = await db.transactions.count().catch(() => 0)
+            const loanCount = await db.loans.count().catch(() => 0)
+            const goalCount = await db.goals.count().catch(() => 0)
+            if (txCount > 0 || loanCount > 0 || goalCount > 0) {
+              const uploadRes = await getUploadPayload()
+              if (uploadRes?.payload) {
+                await uploadLatestBackup(userObj.uid, uploadRes.payload, { isEncrypted: uploadRes.isEncrypted }).catch((err) => console.warn('[AuthModal]', err))
+              }
+            }
           }
+        } catch (err){
+      console.warn('[AuthModal]', err)
+          // If metadata check fails (e.g. offline/network failure), abort upload to avoid overwriting remote data
         }
-        return
+        return { success: true }
       }
 
-      // Existing user sign-in: attempt cloud download with resilient fast timeout
-      const cloudData = await Promise.race([
-        downloadLatestBackupJson(userObj.uid),
-        new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
-      ]).catch(() => null)
+      // Existing user sign-in: attempt cloud download without race timeout (wait until done)
+      const cloudData = await downloadLatestBackupJson(userObj.uid).catch(() => null)
 
       if (cloudData) {
         if (cloudData.format === 'fintrack_encrypted_envelope') {
-          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          const e2eePhrase = getSessionMnemonicPhrase()
           if (e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12) {
             try {
               await importAllDataFromEncryptedEnvelope(cloudData, e2eePhrase.trim())
-            } catch {
-              /* stored phrase mismatch or invalid, user can restore in settings */
+              return { success: true }
+            } catch (err){
+      console.warn('[AuthModal]', err)
+              /* stored phrase mismatch or invalid, prompt user */
+              return { needsRecoveryPhrase: true, cloudData }
             }
+          } else {
+            // Local phrase missing on new device - prompt user explicitly
+            return { needsRecoveryPhrase: true, cloudData }
           }
         } else {
           await importAllDataFromJsonPayload(cloudData)
-        }
-      } else {
-        // Only upload local data if real financial records exist, preventing overwriting cloud backups with empty default wallets
-        const txCount = await db.transactions.count().catch(() => 0)
-        const loanCount = await db.loans.count().catch(() => 0)
-        const goalCount = await db.goals.count().catch(() => 0)
-        if (txCount > 0 || loanCount > 0 || goalCount > 0) {
-          const uploadRes = await getUploadPayload()
-          if (uploadRes?.payload) {
-            uploadLatestBackup(userObj.uid, uploadRes.payload, { isEncrypted: uploadRes.isEncrypted }).catch(() => {})
-          }
+          return { success: true }
         }
       }
-    } catch {
+      return { success: true }
+      // Note: No fallback auto-upload here. During login, local data must never be uploaded
+      // as fallback, preventing accidental overwrite of existing cloud backups on network lag or new device login.
+    } catch (err){
+      console.warn('[AuthModal]', err)
       // Backup restore error non-blocking
+      return { success: false }
     }
   }, [t])
 
@@ -264,14 +280,29 @@ export default function AuthModal({
     if (!isOpen || (mode !== 'login' && mode !== 'register')) return
     promptGoogleOneTap({
       onSuccess: async (user) => {
-        await setAuthUser(user)
-        await restoreUserBackup(user, false)
-        triggerHaptic('success')
-        setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
-        setTimeout(() => {
-          onSuccess?.(user)
-          onClose?.()
-        }, 800)
+        setIsLoading(true)
+        try {
+          await setAuthUser(user)
+          const restoreRes = await restoreUserBackup(user, false)
+          if (restoreRes?.needsRecoveryPhrase) {
+            setPendingAuthUser(user)
+            setPendingEncryptedCloudBackup(restoreRes.cloudData)
+            setIsCloudRecoveryOpen(true)
+            return
+          }
+          triggerHaptic('success')
+          setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
+          setTimeout(() => {
+            onSuccess?.(user)
+            onClose?.()
+          }, 800)
+        } catch (err){
+      console.warn('[AuthModal]', err)
+          triggerHaptic('warning')
+          setErrorMessage(t('auth.generalError', 'Terjadi kesalahan saat masuk.'))
+        } finally {
+          setIsLoading(false)
+        }
       },
       onError: (msg) => {
         if (msg) setErrorMessage(msg)
@@ -288,7 +319,13 @@ export default function AuthModal({
       const res = await signInWithGoogle()
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user, Boolean(res.isNewUser))
+        const restoreRes = await restoreUserBackup(res.user, Boolean(res.isNewUser))
+        if (restoreRes?.needsRecoveryPhrase) {
+          setPendingAuthUser(res.user)
+          setPendingEncryptedCloudBackup(restoreRes.cloudData)
+          setIsCloudRecoveryOpen(true)
+          return
+        }
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk dengan akun Google.'))
         setTimeout(() => {
@@ -299,7 +336,8 @@ export default function AuthModal({
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AuthModal]', err)
       triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan saat masuk.'))
     } finally {
@@ -327,7 +365,13 @@ export default function AuthModal({
       const res = await signInWithEmail(email, password)
       if (res.success && res.user) {
         await setAuthUser(res.user)
-        await restoreUserBackup(res.user, false)
+        const restoreRes = await restoreUserBackup(res.user, false)
+        if (restoreRes?.needsRecoveryPhrase) {
+          setPendingAuthUser(res.user)
+          setPendingEncryptedCloudBackup(restoreRes.cloudData)
+          setIsCloudRecoveryOpen(true)
+          return
+        }
         triggerHaptic('success')
         setSuccessMessage(t('auth.loginSuccess', 'Berhasil masuk ke akun FinTrack.'))
         setTimeout(() => {
@@ -338,7 +382,8 @@ export default function AuthModal({
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.loginFailed', 'Email atau kata sandi salah.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AuthModal]', err)
       triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan pada sistem.'))
     } finally {
@@ -395,7 +440,8 @@ export default function AuthModal({
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.registerFailed', 'Gagal mendaftarkan akun baru.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AuthModal]', err)
       triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan saat pendaftaran.'))
     } finally {
@@ -428,7 +474,8 @@ export default function AuthModal({
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.resetFailed', 'Gagal mengirim email reset kata sandi.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AuthModal]', err)
       triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
@@ -461,7 +508,8 @@ export default function AuthModal({
         triggerHaptic('warning')
         setErrorMessage(res.message || t('auth.magicLinkFailed', 'Gagal mengirim tautan masuk.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[AuthModal]', err)
       triggerHaptic('warning')
       setErrorMessage(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
@@ -470,7 +518,8 @@ export default function AuthModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} showHeader={false} showCloseButton={false} zIndex="z-[200]">
+    <>
+      <Modal isOpen={isOpen && !isCloudRecoveryOpen} onClose={onClose} showHeader={false} showCloseButton={false} zIndex="z-[200]">
       <div className="p-4 sm:p-5 space-y-3 max-w-sm w-full mx-auto">
         {/* Header Bar */}
         <div className="flex items-center justify-between">
@@ -1106,5 +1155,31 @@ export default function AuthModal({
         )}
       </div>
     </Modal>
+
+    {isCloudRecoveryOpen && (
+      <MnemonicRecoveryModal
+        isOpen={isCloudRecoveryOpen}
+        initialEnvelope={pendingEncryptedCloudBackup}
+        source="cloud"
+        onRestoreComplete={() => {
+          setIsCloudRecoveryOpen(false)
+          setPendingEncryptedCloudBackup(null)
+          triggerHaptic('success')
+          if (pendingAuthUser) {
+            onSuccess?.(pendingAuthUser)
+          }
+          onClose?.()
+        }}
+        onClose={() => {
+          setIsCloudRecoveryOpen(false)
+          setPendingEncryptedCloudBackup(null)
+          if (pendingAuthUser) {
+            onSuccess?.(pendingAuthUser)
+          }
+          onClose?.()
+        }}
+      />
+    )}
+    </>
   )
 }

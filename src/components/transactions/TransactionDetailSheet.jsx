@@ -90,7 +90,8 @@ export default function TransactionDetailSheet({
   try {
     const parsedDate = parseISO(transaction.date)
     formattedFullDate = format(parsedDate, 'EEEE, d MMMM yyyy', { locale: dateLocaleObj })
-  } catch {
+  } catch (err){
+      console.warn('[TransactionDetailSheet]', err)
     formattedFullDate = transaction.date || ''
   }
 

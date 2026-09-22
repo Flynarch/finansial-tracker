@@ -1,6 +1,7 @@
 package com.fintrack.app;
 
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -15,7 +16,11 @@ public class MainActivity extends BridgeActivity {
 
         
         try {
-            WebView.setWebContentsDebuggingEnabled(true);
+            if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+                WebView.setWebContentsDebuggingEnabled(true);
+            } else {
+                WebView.setWebContentsDebuggingEnabled(false);
+            }
             
             WebView webView = this.bridge.getWebView();
             if (webView != null) {

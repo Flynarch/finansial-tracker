@@ -159,7 +159,8 @@ export default function AiDigitalReceipt({
         txList.filter((tx) => tx.id).map((tx) => deleteTransaction(tx.id))
       )
       setIsUndone(true)
-    } catch {
+    } catch (err){
+      console.warn('[AiDigitalReceipt]', err)
       // ignore
     } finally {
       setIsUndoing(false)
@@ -221,7 +222,8 @@ export default function AiDigitalReceipt({
         prev.map((t) => (t.id === editingTx.id ? { ...t, ...updated } : t))
       )
       setEditingTx(null)
-    } catch {
+    } catch (err){
+      console.warn('[AiDigitalReceipt]', err)
       // ignore
     }
   }

@@ -18,6 +18,7 @@ import {
 import { executeThemeTransition } from '../../lib/themeTransition'
 import { importAllDataFromJsonPayload, importAllDataFromEncryptedEnvelope } from '../../lib/backup'
 import { downloadLatestBackupJson } from '../../lib/cloudBackup'
+import { getSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
 import { APP_DISPLAY_VERSION } from '../../lib/version'
 import {
   Plus,
@@ -51,7 +52,8 @@ function loadProgress() {
     const raw = localStorage.getItem(PROGRESS_KEY)
     if (!raw) return null
     return JSON.parse(raw)
-  } catch {
+  } catch (err){
+      console.warn('[OnboardingFlow]', err)
     return null
   }
 }
@@ -59,7 +61,8 @@ function loadProgress() {
 function saveProgress(data) {
   try {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(data))
-  } catch {
+  } catch (err){
+      console.warn('[OnboardingFlow]', err)
     /* ignore */
   }
 }
@@ -67,7 +70,8 @@ function saveProgress(data) {
 function clearProgress() {
   try {
     localStorage.removeItem(PROGRESS_KEY)
-  } catch {
+  } catch (err){
+      console.warn('[OnboardingFlow]', err)
     /* ignore */
   }
 }
@@ -231,18 +235,16 @@ export default function OnboardingFlow() {
 
     // Check if cloud backup exists in Firebase Storage
     try {
-      const cloudData = await Promise.race([
-        downloadLatestBackupJson(uid),
-        new Promise((resolve) => setTimeout(() => resolve(null), 2500)),
-      ]).catch(() => null)
+      const cloudData = await downloadLatestBackupJson(uid).catch(() => null)
 
       if (cloudData) {
         if (cloudData.format === 'fintrack_encrypted_envelope') {
-          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          const e2eePhrase = getSessionMnemonicPhrase()
           if (e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12) {
             try {
               await importAllDataFromEncryptedEnvelope(cloudData, e2eePhrase.trim())
-            } catch {
+            } catch (err){
+      console.warn('[OnboardingFlow]', err)
               /* stored phrase mismatch or invalid */
             }
           }
@@ -253,13 +255,15 @@ export default function OnboardingFlow() {
         clearProgress()
         try {
           localStorage.setItem('ft_onboarding_seen_v1', '1')
-        } catch {
+        } catch (err){
+      console.warn('[OnboardingFlow]', err)
           /* ignore */
         }
         navigate('/dashboard', { replace: true })
         return
       }
-    } catch {
+    } catch (err){
+      console.warn('[OnboardingFlow]', err)
       /* ignore cloud restore error */
     }
 
@@ -272,13 +276,15 @@ export default function OnboardingFlow() {
         clearProgress()
         try {
           localStorage.setItem('ft_onboarding_seen_v1', '1')
-        } catch {
+        } catch (err){
+      console.warn('[OnboardingFlow]', err)
           /* ignore */
         }
         navigate('/dashboard', { replace: true })
         return
       }
-    } catch {
+    } catch (err){
+      console.warn('[OnboardingFlow]', err)
       /* ignore */
     }
 
@@ -310,7 +316,8 @@ export default function OnboardingFlow() {
       } else if (!res.cancelled) {
         setGoogleError(res.message || t('auth.googleFailed', 'Gagal masuk dengan Google'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[OnboardingFlow]', err)
       setGoogleError(t('auth.googleFailed', 'Terjadi kesalahan saat masuk dengan Google'))
     } finally {
       setIsGoogleLoading(false)
@@ -419,7 +426,8 @@ export default function OnboardingFlow() {
     clearProgress()
     try {
       localStorage.setItem('ft_onboarding_seen_v1', '1')
-    } catch {
+    } catch (err){
+      console.warn('[OnboardingFlow]', err)
       /* ignore */
     }
     navigate('/dashboard', { replace: true })

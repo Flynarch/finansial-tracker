@@ -2,9 +2,8 @@ import { memo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import useSettingsStore from '../../store/useSettingsStore';
 import { triggerHaptic } from '../../lib/haptics';
-import PropTypes from 'prop-types';
 
-const ScrollToBottomFAB = ({ isVisible, unreadCount, onClick }) => {
+const ScrollToBottomFAB = ({ isVisible = false, unreadCount = 0, onClick }) => {
   const locale = useSettingsStore((state) => state.locale);
 
   const handleClick = () => {
@@ -37,15 +36,5 @@ const ScrollToBottomFAB = ({ isVisible, unreadCount, onClick }) => {
   );
 };
 
-ScrollToBottomFAB.propTypes = {
-  isVisible: PropTypes.bool,
-  unreadCount: PropTypes.number,
-  onClick: PropTypes.func,
-};
-
-ScrollToBottomFAB.defaultProps = {
-  isVisible: false,
-  unreadCount: 0,
-};
-
 export default memo(ScrollToBottomFAB);
+

@@ -1,7 +1,6 @@
 import { memo, useState, useEffect } from 'react';
 import { Heart, ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
 import useSettingsStore from '../../../store/useSettingsStore';
-import PropTypes from 'prop-types';
 import { triggerHaptic } from '../../../lib/haptics';
 
 const FinancialHealthWidget = memo(function FinancialHealthWidget({
@@ -13,7 +12,7 @@ const FinancialHealthWidget = memo(function FinancialHealthWidget({
   budgetCompliance,
   onAction
 }) {
-  const { locale } = useSettingsStore();
+  const locale = useSettingsStore((s) => s.locale);
   const isId = locale?.startsWith('id');
 
   // SVG configuration
@@ -32,9 +31,9 @@ const FinancialHealthWidget = memo(function FinancialHealthWidget({
   }, [score, circumference]);
 
   const getColor = (s) => {
-    if (s <= 40) return '#f43f5e'; // rose-500
-    if (s <= 70) return '#f59e0b'; // amber-500
-    return '#10b981'; // emerald-500
+    if (s <= 40) return 'var(--expense)';
+    if (s <= 70) return 'var(--warning)';
+    return 'var(--income)';
   };
 
   const getRatingText = (s) => {
@@ -187,15 +186,5 @@ const FinancialHealthWidget = memo(function FinancialHealthWidget({
     </div>
   );
 });
-
-FinancialHealthWidget.propTypes = {
-  score: PropTypes.number,
-  rating: PropTypes.string,
-  savingsRate: PropTypes.number,
-  expenseVelocity: PropTypes.number,
-  debtRatio: PropTypes.number,
-  budgetCompliance: PropTypes.number,
-  onAction: PropTypes.func
-};
 
 export default FinancialHealthWidget;

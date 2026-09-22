@@ -9,12 +9,15 @@ import {
   HardDrive,
   UserX,
   FileKey,
+  CloudDownload,
+  Loader2,
 } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import MnemonicRecoveryModal from '../../components/security/MnemonicRecoveryModal'
 import { db } from '../../lib/db'
 import { downloadTextFile } from '../../lib/utils'
 import { exportAllDataAsJson, importAllDataFromJsonPayload } from '../../lib/backup'
+import { downloadLatestBackupJson } from '../../lib/cloudBackup'
 import { deleteCurrentAccount } from '../../lib/auth'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -30,9 +33,12 @@ export default function SettingsData() {
   const navigate = useNavigate()
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
+  const authUserId = useSettingsStore((s) => s.authUserId)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false)
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false)
+  const [isCloudRecoveryModalOpen, setIsCloudRecoveryModalOpen] = useState(false)
+  const [cloudEnvelope, setCloudEnvelope] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [resetConfirmText, setResetConfirmText] = useState('')
   const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
@@ -54,7 +60,8 @@ export default function SettingsData() {
         'application/json;charset=utf-8;',
       )
       setStatusMessage(t('settings.backup.exportSuccess', 'Data cadangan berhasil diunduh (JSON).'))
-    } catch {
+    } catch (err){
+      console.warn('[SettingsData]', err)
       setStatusMessage(t('common.error.saveFailed', 'Gagal mengekspor data cadangan.'))
     } finally {
       setBusyAction(null)
@@ -71,10 +78,43 @@ export default function SettingsData() {
       const parsed = JSON.parse(text)
       await importAllDataFromJsonPayload(parsed)
       setStatusMessage(t('settings.backup.importSuccess', 'Data berhasil dipulihkan.'))
-    } catch {
+    } catch (err){
+      console.warn('[SettingsData]', err)
       setStatusMessage(t('settings.backup.importInvalid', 'File cadangan tidak valid.'))
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
+      setBusyAction(null)
+    }
+  }
+
+  const handleCloudRestoreWithPhrase = async () => {
+    if (isBusy) return
+    if (!authUserId) {
+      setStatusMessage(t('settings.backup.cloudLoginRequired', 'Silakan masuk ke akun terlebih dahulu untuk memulihkan cadangan cloud.'))
+      return
+    }
+
+    try {
+      setBusyAction('cloud_restore')
+      setStatusMessage(t('common.loading', 'Mengunduh Cadangan Cloud...'))
+      const cloudData = await downloadLatestBackupJson(authUserId)
+      if (!cloudData) {
+        setStatusMessage(t('settings.backup.noCloudBackup', 'Tidak ditemukan berkas cadangan di cloud untuk akun ini.'))
+        return
+      }
+
+      if (cloudData.format === 'fintrack_encrypted_envelope') {
+        setCloudEnvelope(cloudData)
+        setIsCloudRecoveryModalOpen(true)
+        setStatusMessage('')
+      } else {
+        await importAllDataFromJsonPayload(cloudData)
+        setStatusMessage(t('settings.backup.importSuccess', 'Data berhasil dipulihkan dari cloud.'))
+      }
+    } catch (err){
+      console.warn('[SettingsData]', err)
+      setStatusMessage(t('settings.backup.cloudRestoreError', 'Gagal mengunduh cadangan dari cloud.'))
+    } finally {
       setBusyAction(null)
     }
   }
@@ -90,7 +130,7 @@ export default function SettingsData() {
 
       // 1. Clear all data tables in Dexie EXCEPT db.settings to preserve user authentication, preferences & security
       const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
-      await Promise.all(tablesToClear.map((tbl) => tbl.clear().catch(() => {})))
+      await Promise.all(tablesToClear.map((tbl) => tbl.clear().catch((err) => console.warn('[SettingsData]', err))))
 
       // 2. Re-create default primary cash wallet so the user is never left with 0 wallets
       const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
@@ -121,7 +161,8 @@ export default function SettingsData() {
       setIsClearModalOpen(false)
       setResetConfirmText('')
       navigate('/dashboard', { replace: true })
-    } catch {
+    } catch (err){
+      console.warn('[SettingsData]', err)
       setStatusMessage(t('common.error.saveFailed', 'Gagal membersihkan data.'))
     } finally {
       setBusyAction(null)
@@ -144,7 +185,8 @@ export default function SettingsData() {
       } else {
         setStatusMessage(res.message || t('common.error.saveFailed', 'Gagal menghapus akun.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[SettingsData]', err)
       setStatusMessage(t('common.error.saveFailed', 'Gagal menghapus akun.'))
     } finally {
       setBusyAction(null)
@@ -272,6 +314,22 @@ export default function SettingsData() {
             >
               <FileKey className="h-4 w-4 text-[var(--accent)]" />
               <span className="hidden sm:inline">{t('mnemonic.restoreEncryptedBtn', 'Pulihkan File .enc')}</span>
+            </button>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)]/40">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={handleCloudRestoreWithPhrase}
+              className="w-full h-11 flex items-center justify-center gap-2 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 hover:bg-[var(--accent)]/10 text-xs font-bold text-[var(--accent)] shadow-2xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {isBusy && busyAction === 'cloud_restore' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CloudDownload className="h-4 w-4" />
+              )}
+              <span>{t('settings.backup.restoreFromCloudPhrase', 'Pulihkan dari Cloud dengan Frasa')}</span>
             </button>
           </div>
 
@@ -495,6 +553,23 @@ export default function SettingsData() {
           isOpen={isRecoveryModalOpen}
           onClose={() => setIsRecoveryModalOpen(false)}
           onRestoreComplete={() => {
+            setStatusMessage(t('mnemonic.restoreSuccessBanner', 'Pemulihan data terenkripsi berhasil disinkronkan!'))
+          }}
+        />
+      )}
+
+      {isCloudRecoveryModalOpen && (
+        <MnemonicRecoveryModal
+          isOpen={isCloudRecoveryModalOpen}
+          initialEnvelope={cloudEnvelope}
+          source="cloud"
+          onClose={() => {
+            setIsCloudRecoveryModalOpen(false)
+            setCloudEnvelope(null)
+          }}
+          onRestoreComplete={() => {
+            setIsCloudRecoveryModalOpen(false)
+            setCloudEnvelope(null)
             setStatusMessage(t('mnemonic.restoreSuccessBanner', 'Pemulihan data terenkripsi berhasil disinkronkan!'))
           }}
         />

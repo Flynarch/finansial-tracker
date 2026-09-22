@@ -18,6 +18,8 @@ import { triggerHaptic } from '../../lib/haptics'
 import {
   generateMnemonicPhrase,
   generate3WordChallenge,
+  getSessionMnemonicPhrase,
+  setSessionMnemonicPhrase,
 } from '../../lib/mnemonicCrypto'
 
 export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
@@ -50,7 +52,7 @@ export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
     let isMounted = true
     if (isOpen) {
       const initPhrase = async () => {
-        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+        const saved = getSessionMnemonicPhrase()
         const targetPhrase =
           saved && saved.trim().split(' ').length === 12
             ? saved.trim()
@@ -110,7 +112,8 @@ export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
     try {
       if (typeof setE2eeEnabled === 'function') await setE2eeEnabled(true)
       if (typeof setHasMnemonicBackup === 'function') await setHasMnemonicBackup(true)
-      localStorage.setItem('fintrack_e2ee_phrase', phrase)
+      setSessionMnemonicPhrase(phrase)
+      localStorage.removeItem('fintrack_e2ee_phrase')
       localStorage.setItem('fintrack_e2ee_active', 'true')
     } catch (err) {
       console.error('Error enabling E2EE:', err)

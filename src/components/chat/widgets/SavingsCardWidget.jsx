@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { Target, PiggyBank, ArrowUpRight } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
@@ -99,10 +98,3 @@ export default function SavingsCardWidget({
   )
 }
 
-SavingsCardWidget.propTypes = {
-  title: PropTypes.string,
-  targetAmount: PropTypes.number,
-  currentAmount: PropTypes.number,
-  currency: PropTypes.string,
-  action: PropTypes.string,
-}

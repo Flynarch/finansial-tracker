@@ -1,33 +1,4 @@
-/**
- * Converts ArrayBuffer to Base64URL
- */
-function bufferToBase64Url(buffer) {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-/**
- * Converts Base64URL to ArrayBuffer
- */
-function base64UrlToBuffer(base64url) {
-  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
-  while (base64.length % 4) {
-    base64 += '='
-  }
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes.buffer
-}
+import { bufferToBase64Url, base64UrlToBuffer } from './cryptoUtils'
 
 const STORAGE_KEY = 'fintrack_passkeys_v1'
 
@@ -42,7 +13,8 @@ export async function isPasskeySupported() {
     const available =
       await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
     return Boolean(available)
-  } catch {
+  } catch (err){
+      console.warn('[passkeys]', err)
     return false
   }
 }
@@ -58,7 +30,8 @@ export function getStoredPasskeys() {
       return JSON.parse(raw)
     }
     return []
-  } catch {
+  } catch (err){
+      console.warn('[passkeys]', err)
     return []
   }
 }
@@ -138,6 +111,7 @@ export async function registerPasskey(deviceName = 'Perangkat Ini', userEmail = 
       publicKey: publicKeyCredentialCreationOptions,
     })
   } catch (err) {
+      console.warn('[passkeys]', err)
     if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
       throw new Error('Pendaftaran Passkey dibatalkan oleh pengguna.', { cause: err })
     }

@@ -1,6 +1,26 @@
 import { formatCurrency, toSafeNumber } from './utils'
 import { getLocalDateString } from './dateUtils'
 
+export const PRINT_THEME_COLORS = {
+  borderLight: '#e2e8f0',
+  textMain: '#1e293b',
+  bgLight: '#f1f5f9',
+  primary: '#6366f1',
+  textMuted: '#64748b',
+  textDark: '#0f172a',
+  bgIncome: '#ecfdf5',
+  bgExpense: '#fff1f2',
+  bgTransfer: '#eff6ff',
+  textIncome: '#059669',
+  textExpense: '#e11d48',
+  textTransfer: '#2563eb',
+  textSecondary: '#475569',
+  bgWhite: '#ffffff',
+  textLightMuted: '#94a3b8',
+  bgSurface: '#f8fafc',
+  borderMedium: '#cbd5e1'
+};
+
 /**
  * Escapes string for safe HTML rendering to prevent XSS.
  */
@@ -212,14 +232,14 @@ export function generateMonthlyPdfStatement({
     .map(
       (cat) => `
       <tr>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #1e293b;">${escapeHtml(cat.name)}</td>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; width: 140px;">
-          <div style="background: #f1f5f9; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
-            <div style="background: #6366f1; height: 100%; width: ${Math.min(100, cat.percent || 0)}%; border-radius: 4px;"></div>
+        <td style="padding: 10px 14px; border-bottom: 1px solid ${PRINT_THEME_COLORS.borderLight}; font-weight: 600; color: ${PRINT_THEME_COLORS.textMain};">${escapeHtml(cat.name)}</td>
+        <td style="padding: 10px 14px; border-bottom: 1px solid ${PRINT_THEME_COLORS.borderLight}; width: 140px;">
+          <div style="background: ${PRINT_THEME_COLORS.bgLight}; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
+            <div style="background: ${PRINT_THEME_COLORS.primary}; height: 100%; width: ${Math.min(100, cat.percent || 0)}%; border-radius: 4px;"></div>
           </div>
         </td>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #64748b; font-weight: 700;">${toSafeNumber(cat.percent)}%</td>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 800; color: #0f172a;">${formatCurrency(cat.amount, defaultCurrency, locale)}</td>
+        <td style="padding: 10px 14px; border-bottom: 1px solid ${PRINT_THEME_COLORS.borderLight}; text-align: right; color: ${PRINT_THEME_COLORS.textMuted}; font-weight: 700;">${toSafeNumber(cat.percent)}%</td>
+        <td style="padding: 10px 14px; border-bottom: 1px solid ${PRINT_THEME_COLORS.borderLight}; text-align: right; font-weight: 800; color: ${PRINT_THEME_COLORS.textDark};">${formatCurrency(cat.amount, defaultCurrency, locale)}</td>
       </tr>
     `,
     )
@@ -236,22 +256,22 @@ export function generateMonthlyPdfStatement({
       const isExp = tx.type === 'expense'
       const isTrf = tx.type === 'transfer'
       const typeLabel = isInc ? 'Pemasukan' : isExp ? 'Pengeluaran' : isTrf ? 'Transfer' : 'Penyesuaian'
-      const typeBg = isInc ? '#ecfdf5' : isExp ? '#fff1f2' : '#eff6ff'
-      const typeColor = isInc ? '#059669' : isExp ? '#e11d48' : '#2563eb'
+      const typeBg = isInc ? '${PRINT_THEME_COLORS.bgIncome}' : isExp ? '${PRINT_THEME_COLORS.bgExpense}' : '${PRINT_THEME_COLORS.bgTransfer}'
+      const typeColor = isInc ? '${PRINT_THEME_COLORS.textIncome}' : isExp ? '${PRINT_THEME_COLORS.textExpense}' : '${PRINT_THEME_COLORS.textTransfer}'
       const sign = isInc ? '+' : isExp ? '-' : ''
-      const amountColor = isInc ? '#059669' : isExp ? '#e11d48' : '#0f172a'
+      const amountColor = isInc ? '${PRINT_THEME_COLORS.textIncome}' : isExp ? '${PRINT_THEME_COLORS.textExpense}' : '${PRINT_THEME_COLORS.textDark}'
       const walletName = escapeHtml(walletMap.get(String(tx.walletId)) || 'Dompet Utama')
 
       return `
         <tr>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #475569; white-space: nowrap;">${escapeHtml(tx.date || '-')}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textSecondary}; white-space: nowrap;">${escapeHtml(tx.date || '-')}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight};">
             <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; background: ${typeBg}; color: ${typeColor};">${typeLabel}</span>
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; font-weight: 600; color: #1e293b;">${escapeHtml(tx.category || '-')}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #64748b;">${walletName}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #64748b; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.notes ? `"${escapeHtml(tx.notes)}"` : '-'}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-size: 12px; font-weight: 800; color: ${amountColor}; white-space: nowrap;">${sign}${formatCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, locale)}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; font-weight: 600; color: ${PRINT_THEME_COLORS.textMain};">${escapeHtml(tx.category || '-')}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted};">${walletName}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted}; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.notes ? `"${escapeHtml(tx.notes)}"` : '-'}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; text-align: right; font-size: 12px; font-weight: 800; color: ${amountColor}; white-space: nowrap;">${sign}${formatCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, locale)}</td>
         </tr>
       `
     })
@@ -273,13 +293,13 @@ export function generateMonthlyPdfStatement({
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           margin: 0;
           padding: 24px;
-          color: #0f172a;
-          background: #ffffff;
+          color: ${PRINT_THEME_COLORS.textDark};
+          background: ${PRINT_THEME_COLORS.bgWhite};
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
         .header {
-          border-bottom: 2px solid #0f172a;
+          border-bottom: 2px solid ${PRINT_THEME_COLORS.textDark};
           padding-bottom: 16px;
           margin-bottom: 20px;
           display: flex;
@@ -290,12 +310,12 @@ export function generateMonthlyPdfStatement({
           font-size: 24px;
           font-weight: 900;
           letter-spacing: -0.5px;
-          color: #0f172a;
+          color: ${PRINT_THEME_COLORS.textDark};
         }
         .app-subtitle {
           font-size: 13px;
           font-weight: 600;
-          color: #64748b;
+          color: ${PRINT_THEME_COLORS.textMuted};
           margin-top: 2px;
         }
         .period-badge {
@@ -304,12 +324,12 @@ export function generateMonthlyPdfStatement({
         .period-name {
           font-size: 16px;
           font-weight: 800;
-          color: #0f172a;
+          color: ${PRINT_THEME_COLORS.textDark};
         }
         .print-date {
           font-size: 11px;
           font-weight: 600;
-          color: #94a3b8;
+          color: ${PRINT_THEME_COLORS.textLightMuted};
           margin-top: 2px;
         }
         .kpi-grid {
@@ -319,17 +339,17 @@ export function generateMonthlyPdfStatement({
           margin-bottom: 24px;
         }
         .kpi-card {
-          border: 1px solid #e2e8f0;
+          border: 1px solid ${PRINT_THEME_COLORS.borderLight};
           border-radius: 12px;
           padding: 14px;
-          background: #f8fafc;
+          background: ${PRINT_THEME_COLORS.bgSurface};
         }
         .kpi-label {
           font-size: 10px;
           font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #64748b;
+          color: ${PRINT_THEME_COLORS.textMuted};
           margin-bottom: 4px;
         }
         .kpi-value {
@@ -340,7 +360,7 @@ export function generateMonthlyPdfStatement({
         .section-title {
           font-size: 14px;
           font-weight: 800;
-          color: #0f172a;
+          color: ${PRINT_THEME_COLORS.textDark};
           margin-bottom: 10px;
           display: flex;
           align-items: center;
@@ -352,25 +372,25 @@ export function generateMonthlyPdfStatement({
           margin-bottom: 24px;
         }
         th {
-          background: #f1f5f9;
+          background: ${PRINT_THEME_COLORS.bgLight};
           padding: 8px 12px;
-          border-bottom: 2px solid #cbd5e1;
+          border-bottom: 2px solid ${PRINT_THEME_COLORS.borderMedium};
           text-align: left;
           font-size: 11px;
           font-weight: 800;
           text-transform: uppercase;
-          color: #475569;
+          color: ${PRINT_THEME_COLORS.textSecondary};
           letter-spacing: 0.5px;
         }
         .footer {
           margin-top: 32px;
           padding-top: 16px;
-          border-top: 1px solid #e2e8f0;
+          border-top: 1px solid ${PRINT_THEME_COLORS.borderLight};
           display: flex;
           justify-content: space-between;
           align-items: center;
           font-size: 11px;
-          color: #94a3b8;
+          color: ${PRINT_THEME_COLORS.textLightMuted};
         }
         @media print {
           body { padding: 0; }
@@ -380,7 +400,7 @@ export function generateMonthlyPdfStatement({
     </head>
     <body>
       <div class="no-print" style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px;">
-        <button onclick="window.print()" style="padding: 10px 18px; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 800; font-size: 13px; border: none; cursor: pointer;">
+        <button onclick="window.print()" style="padding: 10px 18px; border-radius: 10px; background: ${PRINT_THEME_COLORS.textDark}; color: ${PRINT_THEME_COLORS.bgWhite}; font-weight: 800; font-size: 13px; border: none; cursor: pointer;">
           Cetak / Simpan PDF
         </button>
       </div>
@@ -399,19 +419,19 @@ export function generateMonthlyPdfStatement({
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-label">Total Pemasukan</div>
-          <div class="kpi-value" style="color: #059669;">${formattedIncome}</div>
+          <div class="kpi-value" style="color: ${PRINT_THEME_COLORS.textIncome};">${formattedIncome}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Total Pengeluaran</div>
-          <div class="kpi-value" style="color: #e11d48;">${formattedExpense}</div>
+          <div class="kpi-value" style="color: ${PRINT_THEME_COLORS.textExpense};">${formattedExpense}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Arus Kas Bersih</div>
-          <div class="kpi-value" style="color: ${netSavings >= 0 ? '#059669' : '#e11d48'};">${formattedSavings}</div>
+          <div class="kpi-value" style="color: ${netSavings >= 0 ? '${PRINT_THEME_COLORS.textIncome}' : '${PRINT_THEME_COLORS.textExpense}'};">${formattedSavings}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Rasio Tabungan</div>
-          <div class="kpi-value" style="color: #6366f1;">${savingsRate}%</div>
+          <div class="kpi-value" style="color: ${PRINT_THEME_COLORS.primary};">${savingsRate}%</div>
         </div>
       </div>
 
@@ -448,7 +468,7 @@ export function generateMonthlyPdfStatement({
           </tr>
         </thead>
         <tbody>
-          ${transactionRowsHtml || '<tr><td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Belum ada riwayat transaksi pada periode ini.</td></tr>'}
+          ${transactionRowsHtml || '<tr><td colspan="6" style="padding: 24px; text-align: center; color: ${PRINT_THEME_COLORS.textLightMuted};">Belum ada riwayat transaksi pada periode ini.</td></tr>'}
         </tbody>
       </table>
 

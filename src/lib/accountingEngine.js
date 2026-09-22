@@ -1,5 +1,7 @@
 import { format } from 'date-fns'
-import { convertCurrency, isExcludeAnalyticsTx, toSafeNumber } from './utils'
+import { convertCurrency, isExcludeAnalyticsTx, roundCurrency, toSafeNumber } from './utils'
+
+export { roundCurrency }
 
 /**
  * Calculates SHA-256 digital checksum of a string using Web Crypto API.
@@ -13,8 +15,8 @@ export async function calculateSha256Checksum(input) {
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer)
       const hashArray = Array.from(new Uint8Array(hashBuffer))
       return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
-    } catch {
-      /* fallback below */
+    } catch (err) {
+      console.error('[calculateSha256Checksum]', err)
     }
   }
   // Deterministic fallback
@@ -32,17 +34,30 @@ export async function calculateSha256Checksum(input) {
  */
 export function filterTransactionsByDateRange(transactions = [], startDate, endDate) {
   if (!Array.isArray(transactions)) return []
-  if (!startDate && !endDate) return transactions
+  if (!startDate && !endDate) return transactions.filter((tx) => tx && !tx.deletedAt)
+
+  const hasIsoRange = (!startDate || startDate.length === 10) && (!endDate || endDate.length === 10)
+
+  if (hasIsoRange) {
+    return transactions.filter((tx) => {
+      if (!tx || !tx.date || tx.deletedAt) return false
+      const dateKey = String(tx.date).slice(0, 10)
+      if (startDate && dateKey < startDate) return false
+      if (endDate && dateKey > endDate) return false
+      return true
+    })
+  }
 
   const start = startDate ? new Date(startDate + 'T00:00:00') : new Date('1970-01-01')
   const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2099-12-31')
 
   return transactions.filter((tx) => {
-    if (!tx || !tx.date) return false
+    if (!tx || !tx.date || tx.deletedAt) return false
     try {
       const txDate = new Date(tx.date.length === 10 ? tx.date + 'T12:00:00' : tx.date)
       return txDate >= start && txDate <= end
-    } catch {
+    } catch (err) {
+      console.warn('[filterTransactionsByDateRange]', err)
       return false
     }
   })
@@ -124,7 +139,7 @@ export function generateIncomeStatement(
         revenueMap.set(mapKey, {
           category: mapKey,
           parentCategory: parentCat,
-          amount: (revenueMap.get(mapKey)?.amount || 0) + normalizedAmt,
+          amount: roundCurrency((revenueMap.get(mapKey)?.amount || 0) + normalizedAmt),
           isNonOperating,
         })
       } else if (item.type === 'expense') {
@@ -133,7 +148,7 @@ export function generateIncomeStatement(
         expenseMap.set(mapKey, {
           category: mapKey,
           parentCategory: parentCat,
-          amount: (expenseMap.get(mapKey)?.amount || 0) + normalizedAmt,
+          amount: roundCurrency((expenseMap.get(mapKey)?.amount || 0) + normalizedAmt),
           isNonOperating,
         })
       }
@@ -166,11 +181,16 @@ export function generateIncomeStatement(
   operatingExpenseItems.sort((a, b) => b.amount - a.amount)
   nonOperatingExpenseItems.sort((a, b) => b.amount - a.amount)
 
-  const totalRevenue = totalOperatingRevenue + totalNonOperatingRevenue
-  const totalExpenses = totalOperatingExpenses + totalNonOperatingExpenses
-  const operatingProfit = totalOperatingRevenue - totalOperatingExpenses
-  const netIncome = totalRevenue - totalExpenses
-  const netProfitMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0
+  totalOperatingRevenue = roundCurrency(totalOperatingRevenue)
+  totalNonOperatingRevenue = roundCurrency(totalNonOperatingRevenue)
+  totalOperatingExpenses = roundCurrency(totalOperatingExpenses)
+  totalNonOperatingExpenses = roundCurrency(totalNonOperatingExpenses)
+
+  const totalRevenue = roundCurrency(totalOperatingRevenue + totalNonOperatingRevenue)
+  const totalExpenses = roundCurrency(totalOperatingExpenses + totalNonOperatingExpenses)
+  const operatingProfit = roundCurrency(totalOperatingRevenue - totalOperatingExpenses)
+  const netIncome = roundCurrency(totalRevenue - totalExpenses)
+  const netProfitMargin = totalRevenue > 0 ? roundCurrency((netIncome / totalRevenue) * 100) : 0
 
   return {
     period: { startDate, endDate },
@@ -224,6 +244,7 @@ export function generateBalanceSheet(
   const postDateTxs = (transactions || []).filter(
     (tx) =>
       tx?.date &&
+      !tx.deletedAt &&
       String(tx.date).slice(0, 10) > asOfDate &&
       !(tx.isPendingReview === true || tx.isPendingReview === 1)
   )
@@ -278,6 +299,7 @@ export function generateBalanceSheet(
     const postDateGoalTxs = (transactions || []).filter(
       (tx) =>
         tx?.date &&
+        !tx.deletedAt &&
         String(tx.date).slice(0, 10) > asOfDate &&
         !(tx.isPendingReview === true || tx.isPendingReview === 1) &&
         ((tx.goalId != null && String(tx.goalId) === String(goal.id)) ||
@@ -357,7 +379,7 @@ export function generateBalanceSheet(
     if (totalAmt > 0) {
       remaining = Math.min(totalAmt, remaining)
     }
-    remaining = Math.max(0, Math.round(remaining * 100) / 100)
+    remaining = Math.max(0, roundCurrency(remaining))
 
     const isPaidBeforeAsOf = l.status === 'paid' && l.paidDate && String(l.paidDate).slice(0, 10) <= asOfDate
     const isForgivenBeforeAsOf = l.status === 'forgiven' && l.forgivenDate && String(l.forgivenDate).slice(0, 10) <= asOfDate
@@ -405,12 +427,18 @@ export function generateBalanceSheet(
     }
   })
 
-  const totalCurrentAssets = totalCash
-  const totalNonCurrentAssets = totalSavings + totalInvestments + totalReceivables
-  const totalAssets = totalCurrentAssets + totalNonCurrentAssets
+  totalCash = roundCurrency(totalCash)
+  totalSavings = roundCurrency(totalSavings)
+  totalInvestments = roundCurrency(totalInvestments)
+  totalReceivables = roundCurrency(totalReceivables)
+  totalLiabilities = roundCurrency(totalLiabilities)
+
+  const totalCurrentAssets = roundCurrency(totalCash)
+  const totalNonCurrentAssets = roundCurrency(totalSavings + totalInvestments + totalReceivables)
+  const totalAssets = roundCurrency(totalCurrentAssets + totalNonCurrentAssets)
 
   // 4. Equity (Net Worth / Ekuitas Bersih)
-  const totalEquity = totalAssets - totalLiabilities
+  const totalEquity = roundCurrency(totalAssets - totalLiabilities)
   const debtToAssetRatio = totalAssets > 0 ? (totalLiabilities / totalAssets) * 100 : 0
   const currentRatio = totalLiabilities > 0 ? totalCurrentAssets / totalLiabilities : totalCurrentAssets > 0 ? 10 : 1
 
@@ -545,10 +573,17 @@ export function generateCashFlowStatement(
     })
   })
 
-  const netOperatingCashFlow = operatingInflow - operatingOutflow
-  const netInvestingCashFlow = investingInflow - investingOutflow
-  const netFinancingCashFlow = financingInflow - financingOutflow
-  const netChangeInCash = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow
+  operatingInflow = roundCurrency(operatingInflow)
+  operatingOutflow = roundCurrency(operatingOutflow)
+  investingInflow = roundCurrency(investingInflow)
+  investingOutflow = roundCurrency(investingOutflow)
+  financingInflow = roundCurrency(financingInflow)
+  financingOutflow = roundCurrency(financingOutflow)
+
+  const netOperatingCashFlow = roundCurrency(operatingInflow - operatingOutflow)
+  const netInvestingCashFlow = roundCurrency(investingInflow - investingOutflow)
+  const netFinancingCashFlow = roundCurrency(financingInflow - financingOutflow)
+  const netChangeInCash = roundCurrency(netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow)
 
   return {
     period: { startDate, endDate },

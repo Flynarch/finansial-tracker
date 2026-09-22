@@ -1,7 +1,9 @@
 import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
-import { convertCurrency, isExcludeAnalyticsTx, toSafeNumber } from './utils'
+import { convertCurrency, isExcludeAnalyticsTx, roundCurrency, toSafeNumber } from './utils'
 import { parseExpenseCategoryPath } from './expenseCategories'
+
+export { roundCurrency }
 
 /**
  * Returns the budget month key ('yyyy-MM') taking into account payday cycle start day.
@@ -50,7 +52,7 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
   if (!budgetCategory || !Array.isArray(monthExpenseTxs)) return 0
 
   const total = monthExpenseTxs.reduce((sum, tx) => {
-    if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1) return sum
+    if (!tx || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1) return sum
 
     if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
       let splitSum = 0
@@ -93,7 +95,7 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
     )
   }, 0)
 
-  return Math.round(total * 100) / 100
+  return roundCurrency(total)
 }
 
 /**

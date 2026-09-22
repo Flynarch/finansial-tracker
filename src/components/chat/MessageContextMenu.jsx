@@ -2,7 +2,6 @@ import { memo } from 'react';
 import { Copy, DollarSign, Pencil, Trash2 } from 'lucide-react';
 import useSettingsStore from '../../store/useSettingsStore';
 import { triggerHaptic } from '../../lib/haptics';
-import PropTypes from 'prop-types';
 
 const MessageContextMenu = memo(function MessageContextMenu({
   isOpen,
@@ -14,7 +13,7 @@ const MessageContextMenu = memo(function MessageContextMenu({
   onEditTransaction,
   onDeleteMessage
 }) {
-  const { locale } = useSettingsStore();
+  const locale = useSettingsStore((s) => s.locale);
 
   if (!isOpen) return null;
 
@@ -102,16 +101,5 @@ const MessageContextMenu = memo(function MessageContextMenu({
     </>
   );
 });
-
-MessageContextMenu.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  messageContent: PropTypes.string,
-  messageType: PropTypes.string,
-  onCopyText: PropTypes.func,
-  onCopyAmount: PropTypes.func,
-  onEditTransaction: PropTypes.func,
-  onDeleteMessage: PropTypes.func
-};
 
 export default MessageContextMenu;

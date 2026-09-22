@@ -4,7 +4,7 @@
 
 **Enterprise-Grade Personal Finance Intelligence & Native Android Asset Management System**
 
-[![Version](https://img.shields.io/badge/Version-v4.9.1-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.1)
+[![Version](https://img.shields.io/badge/Version-v5.0.0-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.0.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.1-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -15,7 +15,7 @@
 
 *A privacy-first, offline-capable financial operations engine equipped with native Android home screen widgets, live sparkline trend analysis, Google Gemini AI receipt perception, local IndexedDB persistence, bank-grade biometric security, and 120 FPS mobile performance.*
 
-[Download Latest APK (v4.9.1)](https://github.com/Flynarch/finansial-tracker/releases/tag/v4.9.1) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
+[Download Latest APK (v5.0.0)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.0.0) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
 
 ---
 
@@ -40,6 +40,10 @@
   - [12. Financial Discipline Matrix & Habit Heatmap](#12-financial-discipline-matrix--habit-heatmap)
   - [13. Custom Category Hierarchy & Visual Taxonomies](#13-custom-category-hierarchy--visual-taxonomies)
   - [14. Hardware-Secured Privacy Fortress, Biometrics & Haptics](#14-hardware-secured-privacy-fortress-biometrics--haptics)
+  - [15. Decimal-Safe Arithmetic & High-Precision Ledger](#15-decimal-safe-arithmetic--high-precision-ledger)
+  - [16. Hardened Cryptography & Field-Level Storage Encryption](#16-hardened-cryptography--field-level-storage-encryption)
+  - [17. Modular Dexie Migrations & Subsystem Architecture](#17-modular-dexie-migrations--subsystem-architecture)
+  - [18. Self-Healing AI Client with Exponential Backoff](#18-self-healing-ai-client-with-exponential-backoff)
 - [System Architecture](#system-architecture)
 - [Tech Stack & Dependencies](#tech-stack--dependencies)
 - [Getting Started](#getting-started)
@@ -177,6 +181,26 @@ All sensitive records—bank balances, transactions, loan ledgers, savings goals
 - **Tactile Haptic Feedback**: Multi-channel physical vibration feedback on button presses, keypad inputs, pattern nodes, and drawer snaps via `@capacitor/haptics`.
 - **Bilingual Localization (ID/EN)**: 100% comprehensive localization across all 1800+ strings with instantaneous language toggling.
 
+### 15. Decimal-Safe Arithmetic & High-Precision Ledger
+- **Binary Floating-Point Elimination**: Standard IEEE-754 arithmetic errors (*e.g., 0.1 + 0.2 = 0.30000000000000004*) are eliminated using `decimal.js-light` in the foundational `roundCurrency()` pipeline.
+- **Audited Financial Balance Calculations**: Multi-currency conversions, split transactions, and loan amortization installments round half-up at 2 decimal places with mathematical determinism.
+- **Double-Entry Equilibrium**: Guaranteed net zero drift across multi-wallet internal transfers, net worth growth metrics, and balance sheet equity equations.
+
+### 16. Hardened Cryptography & Field-Level Storage Encryption
+- **Strict Web Crypto Enforcement**: Replaced insecure plaintext fallbacks with strict exception handling. If cryptographic key derivation or AES-GCM encryption fails, the system safely halts instead of writing unencrypted data.
+- **Client-Specific Persistent Salt**: Password-based key derivation (PBKDF2) leverages a secure, isolated client salt stored in `ft_client_salt_v2`, preventing precomputed rainbow table attacks.
+- **Field-Level Sensitive Record Encryption**: Dedicated `src/lib/fieldEncryption.js` module enabling AES-GCM record-level encryption for sensitive database fields directly at rest within IndexedDB.
+
+### 17. Modular Dexie Migrations & Subsystem Architecture
+- **Decoupled Migration Engine**: All 22 Dexie schema versions, upgrade handlers, and initialization hooks are decoupled from `db.js` into a dedicated `src/lib/db/migrations.js` module, shrinking `db.js` by 77% (from 631 to 142 lines).
+- **Decomposed Dashboard Data**: Subdivided the monolithic `useDashboardData` hook into specialized sub-modules (`dashboardCache.js` and `dashboardStats.js`) for cache invalidation, Net Worth growth calculations, and period cashflow analysis.
+- **CSS Variable-Driven Chart Design Tokens**: Dynamic chart theming using CSS variables (`--chart-1` through `--chart-8`), ensuring SVG charts harmoniously adapt between Light Luxe, Matte Dark, and Midnight Sapphire palettes.
+
+### 18. Self-Healing AI Client with Exponential Backoff
+- **Resilient AI Pipeline**: The Gemini client incorporates an exponential backoff wrapper (`withRetry.js`) with full jitter, gracefully recovering from transient network disruptions and HTTP 429 quota exhaustion.
+- **Intelligent Backoff Strategy**: Differentiates retryable errors (HTTP 429, 503, connection drops) from non-retryable errors (HTTP 400, 401, 403), optimizing user response time while preventing cascading API quota burnout.
+- **Component Mount Smoke Test Suite**: Automated React smoke tests (`tests/routeSmokeRender.test.jsx`) verifying clean, error-free component mounting across all core routes under headless conditions.
+
 ---
 
 ## System Architecture
@@ -217,10 +241,12 @@ flowchart TD
 | **Build Tool** | Vite | 8.1.3 | Fast ESM development server and Rollup production bundler |
 | **Styling Engine** | Tailwind CSS | 4.2.4 | Modern CSS variables and design token engine |
 | **Local Database** | Dexie.js | 4.4.2 | High-performance IndexedDB wrapper with reactive live queries |
+| **Precision Math** | decimal.js-light | 2.5.1 | IEEE-754 precision floating-point protection for monetary calculations |
 | **Native Mobile Bridge** | Capacitor | 8.4.1 | Native Android container and hardware plugin bridge |
 | **Biometric Security** | @aparajita/capacitor-biometric-auth | 10.0.0 | Native Android fingerprint and facial recognition |
-| **Artificial Intelligence** | Google Gemini Generative AI | 0.24.1 | Multimodal receipt OCR and financial NLP |
-| **Chart Visualizations** | Recharts | 3.9.2 | Responsive SVG area, line, and bar chart analytics |
+| **Data Encryption** | Web Crypto API (AES-GCM / PBKDF2) | Native | At-rest field-level storage encryption and cryptographic salts |
+| **Artificial Intelligence** | Google Gemini Generative AI | 0.24.1 | Multimodal receipt OCR and financial NLP with exponential retry |
+| **Chart Visualizations** | Recharts | 3.9.2 | Responsive SVG area, line, and bar chart analytics with CSS tokens |
 | **Date Utilities** | date-fns | 4.1.0 | Immutable date math and internationalization |
 | **State Management** | Zustand | 5.0.13 | Lightweight, unopinionated reactive state stores |
 | **Iconography** | Lucide React | 1.16.0 | Scalable vector interface icons |
@@ -310,7 +336,7 @@ cmd.exe /c "cd android && gradlew.bat assembleDebug"
 cd android && ./gradlew assembleDebug
 ```
 
-The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v4.9.1.apk` in the repository root.
+The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v5.0.0.apk` in the repository root.
 
 ---
 
@@ -319,7 +345,7 @@ The compiled APK will be located at `android/app/build/outputs/apk/debug/app-deb
 To ensure zero regressions and maintain enterprise-grade reliability, all changes must pass the sequential verification pipeline:
 
 ```bash
-# 1. Run unit test suite (482 unit tests across 37 test files)
+# 1. Run unit test suite (684 unit tests across 47 test files)
 npm test
 
 # 2. Run code style and syntax linter

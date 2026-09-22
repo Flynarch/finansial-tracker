@@ -77,10 +77,7 @@ public class FinTrackNotificationPlugin extends Plugin {
         JSObject ret = new JSObject();
         synchronized (FinTrackNotificationService.QUEUE_LOCK) {
             try {
-                SharedPreferences prefs = context.getSharedPreferences(
-                    FinTrackNotificationService.PREFS_NAME,
-                    Context.MODE_PRIVATE
-                );
+                SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
                 String queueJson = prefs.getString(FinTrackNotificationService.KEY_QUEUE, "[]");
                 JSONArray jsonArray = new JSONArray(queueJson);
 
@@ -113,10 +110,7 @@ public class FinTrackNotificationPlugin extends Plugin {
         JSObject ret = new JSObject();
         synchronized (FinTrackNotificationService.QUEUE_LOCK) {
             try {
-                SharedPreferences prefs = context.getSharedPreferences(
-                    FinTrackNotificationService.PREFS_NAME,
-                    Context.MODE_PRIVATE
-                );
+                SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
                 String queueJson = prefs.getString(FinTrackNotificationService.KEY_QUEUE, "[]");
                 JSONArray jsonArray = new JSONArray(queueJson);
 
@@ -145,10 +139,7 @@ public class FinTrackNotificationPlugin extends Plugin {
         Context context = getContext();
         synchronized (FinTrackNotificationService.QUEUE_LOCK) {
             try {
-                SharedPreferences prefs = context.getSharedPreferences(
-                    FinTrackNotificationService.PREFS_NAME,
-                    Context.MODE_PRIVATE
-                );
+                SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
                 prefs.edit().putString(FinTrackNotificationService.KEY_QUEUE, "[]").commit();
 
                 JSObject ret = new JSObject();

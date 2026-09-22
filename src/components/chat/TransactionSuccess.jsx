@@ -60,7 +60,8 @@ export default function TransactionSuccess({ data, onUndo }) {
     try {
       const parsed = parseISO(dateStr)
       return format(parsed, 'EEEE, dd MMMM yyyy', { locale: locale === 'id' ? idLocale : enUS })
-    } catch {
+    } catch (err){
+      console.warn('[TransactionSuccess]', err)
       return dateStr
     }
   }

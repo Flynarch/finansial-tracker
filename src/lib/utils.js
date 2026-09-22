@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import Decimal from 'decimal.js-light'
 
 /** When live FX fetch fails: 1 USD = currency rates (approximate fallback). */
 export const FALLBACK_EXCHANGE_RATES = Object.freeze({
@@ -31,7 +32,8 @@ export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
         minimumFractionDigits: isZeroDecimal ? 0 : 2,
         maximumFractionDigits: isZeroDecimal ? 0 : 2,
       })
-    } catch {
+    } catch (err){
+      console.warn('[utils]', err)
       fmt = new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
@@ -342,8 +344,23 @@ export function safeFormatDate(val, formatPattern = 'dd MMM yyyy', options = {})
 
     if (isNaN(d.getTime())) return ''
     return format(d, formatPattern, options)
-  } catch {
+  } catch (err) {
+    console.error('[utils:formatSafeDate]', err)
     return ''
   }
 }
+
+/**
+ * Standardized floating-point rounding for financial currency calculations.
+ * Ensures consistent precision across all aggregation and ledger totals.
+ *
+ * @param {number|string} val
+ * @returns {number}
+ */
+export function roundCurrency(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return 0
+  return new Decimal(n).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber()
+}
+
 

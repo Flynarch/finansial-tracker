@@ -1,4 +1,4 @@
-import { addDays, format, parse } from 'date-fns'
+import { addDays, subDays, format, parse } from 'date-fns'
 import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -170,7 +170,7 @@ function TodoList() {
         setNotifPermissionAsked(true)
         window.localStorage.setItem(TODO_NOTIF_PERMISSION_KEY, '1')
       })
-      .catch(() => {})
+      .catch((err) => console.warn('[TodoList]', err))
   }, [todos, notifPermissionAsked])
 
   const scheduleTodoDueNotifications = useCallback(async (todo) => {
@@ -209,8 +209,7 @@ function TodoList() {
       })
     }
 
-    const dMinus1 = new Date(scheduleDate)
-    dMinus1.setDate(dMinus1.getDate() - 1)
+    const dMinus1 = subDays(scheduleDate, 1)
     if (dMinus1 > now) {
       notifs.push({
         id: id * 10 + 2,

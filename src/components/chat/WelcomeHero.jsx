@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import PropTypes from 'prop-types';
 import { Sparkles, Receipt, PieChart, TrendingUp, HandCoins } from 'lucide-react';
 import useSettingsStore from '../../store/useSettingsStore';
 import { formatCurrency } from '../../lib/utils';
@@ -95,11 +94,5 @@ const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0
     </div>
   );
 });
-
-WelcomeHero.propTypes = {
-  onSelectPrompt: PropTypes.func.isRequired,
-  todayExpense: PropTypes.number,
-  todayCurrency: PropTypes.string,
-};
 
 export default WelcomeHero;

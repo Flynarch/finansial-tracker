@@ -154,13 +154,21 @@ function Profile() {
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
 
-  const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
+  const txCount = useLiveQuery(
+    async () => {
+      const all = await db.transactions.toArray()
+      return (all || []).filter((tx) => !tx.deletedAt).length
+    },
+    [],
+    0,
+  )
   const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
   const goalsCount = useLiveQuery(async () => {
     try {
       const all = await db.goals.toArray()
       return all.filter((g) => !g.isCompleted && !g.isArchived).length
-    } catch {
+    } catch (err) {
+      console.warn('[Profile:goalsCount]', err)
       return 0
     }
   }, [], 0)

@@ -167,7 +167,8 @@ export function aggregateMonthlyIncomeExpense(
     let key
     try {
       key = format(parseISO(String(tx.date)), 'yyyy-MM')
-    } catch {
+    } catch (err){
+      console.warn('[reportAnalytics]', err)
       return
     }
     if (!monthMap.has(key)) return

@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { getAllWalletBalances } from '../lib/balanceEngine'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
-import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, toSafeNumber } from '../lib/utils'
+import { convertCurrency, FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, roundCurrency, toSafeNumber } from '../lib/utils'
 import { calculateBudgetSpent, getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../lib/budgetUtils'
 import useTranslation from './useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -15,179 +15,34 @@ import {
   buildPaddedDomain,
 } from '../components/dashboard/DashboardChartHelpers'
 
-export const getCompactItems = (locale = 'id') => [
-  { id: '1d', label: locale === 'en' ? '1D' : '1H' },
-  { id: '1w', label: locale === 'en' ? '1W' : '1M' },
-  { id: '1m', label: locale === 'en' ? '1M' : '1B' },
-  { id: '3m', label: locale === 'en' ? '3M' : '3B' },
-  { id: 'ytd', label: 'YTD' },
-  { id: '1y', label: locale === 'en' ? '1Y' : '1T' },
-  { id: 'all', label: locale === 'en' ? 'ALL' : 'SEMUA' },
-]
+export {
+  getCompactItems,
+  COMPACT_ITEMS,
+  getSavedNetWorthRange,
+  cachedDashboardState,
+  clearCachedDashboardState,
+  getCachedDashboardTransactions,
+  setCachedDashboardTransactions,
+  getCachedDashboardWallets,
+  setCachedDashboardWallets,
+} from './dashboard/dashboardCache'
 
-export const COMPACT_ITEMS = getCompactItems('id')
+export {
+  computeNetWorthGrowth,
+  generateMonthlyData,
+  calculatePeriodStats,
+  calculate1DHourlyFlow,
+} from './dashboard/dashboardStats'
 
-export const getSavedNetWorthRange = () => {
-  try {
-    const val = localStorage.getItem('ft_networth_range')
-    if (val === 'today') return '1d'
-    if (val === 'weekly') return '1w'
-    if (val === 'monthly') return '1m'
-    if (val === 'yearly') return '1y'
-    return val || '1m'
-  } catch {
-    return '1m'
-  }
-}
+import {
+  getSavedNetWorthRange,
+  cachedDashboardState,
+} from './dashboard/dashboardCache'
 
-// Module-level in-memory cache to eliminate skeleton flash and layout jump on tab switching
-const cachedDashboardState = {
-  transactions: null,
-  investments: null,
-  budgets: null,
-  goals: null,
-  loans: null,
-  wallets: null,
-  walletsWithBalance: null,
-  rawHabitLogs: null,
-  rawHabits: null,
-}
-
-export function clearCachedDashboardState() {
-  cachedDashboardState.transactions = null
-  cachedDashboardState.investments = null
-  cachedDashboardState.budgets = null
-  cachedDashboardState.goals = null
-  cachedDashboardState.loans = null
-  cachedDashboardState.wallets = null
-  cachedDashboardState.walletsWithBalance = null
-  cachedDashboardState.rawHabitLogs = null
-  cachedDashboardState.rawHabits = null
-}
-
-export function getCachedDashboardTransactions() {
-  return cachedDashboardState.transactions
-}
-
-export function setCachedDashboardTransactions(transactions) {
-  cachedDashboardState.transactions = transactions
-}
-
-export function getCachedDashboardWallets() {
-  return cachedDashboardState.wallets
-}
-
-export function setCachedDashboardWallets(wallets) {
-  cachedDashboardState.wallets = wallets
-}
-
-export function computeNetWorthGrowth(startVal, currentVal) {
-  const net = currentVal - startVal
-  const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
-  return { net, pct }
-}
-
-export function generateMonthlyData(monthsCount, endMonthD = new Date()) {
-  const baseDate = startOfMonth(endMonthD)
-  const arr = Array.from({ length: monthsCount }, (_, idx) => {
-    const d = subMonths(baseDate, monthsCount - 1 - idx)
-    return { day: format(d, 'MMM yyyy'), key: format(d, 'yyyy-MM'), income: 0, expense: 0, net: 0 }
-  })
-  const map = new Map(arr.map((r) => [r.key, r]))
-  return { arr, map }
-}
-
-export function calculatePeriodStats(safeTx, period, defaultCurrency = 'IDR', rates = null) {
-  if (!Array.isArray(safeTx) || !period?.startDate || !period?.endDate) {
-    return { income: 0, expense: 0 }
-  }
-
-  const raw = safeTx.reduce(
-    (acc, tx) => {
-      const txDate = (tx?.date || '').slice(0, 10)
-      if (!txDate || txDate < period.startDate || txDate > period.endDate) return acc
-
-      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-        tx.splitItems.forEach((si) => {
-          const itemTx = {
-            ...tx,
-            ...si,
-            category: si.category || tx.category,
-            isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
-            excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
-          }
-          if (isExcludeAnalyticsTx(itemTx)) return
-          const amount = convertCurrency(toSafeNumber(si.amount), si.currency || tx.currency || defaultCurrency, defaultCurrency, rates)
-          const itemType = si.type || tx.type
-          if (itemType === 'income') acc.income += amount
-          if (itemType === 'expense') acc.expense += amount
-        })
-        return acc
-      }
-
-      if (isExcludeAnalyticsTx(tx)) return acc
-      const amount = tx.convertedAmount != null
-        ? tx.convertedAmount
-        : convertCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, defaultCurrency, rates)
-      if (tx.type === 'income') acc.income += amount
-      if (tx.type === 'expense') acc.expense += amount
-      return acc
-    },
-    { income: 0, expense: 0 },
-  )
-
-  return {
-    income: Math.round((raw.income + Number.EPSILON) * 100) / 100,
-    expense: Math.round((raw.expense + Number.EPSILON) * 100) / 100,
-  }
-}
-
-export function calculate1DHourlyFlow(
-  normalizedTransactions,
-  todayKey,
-  activeWalletIdSet,
-  walletCurrencyMap,
-  defaultCurrency = 'IDR',
-  rates = null,
-) {
-  const hourNet = Array.from({ length: 24 }, () => 0)
-  if (!Array.isArray(normalizedTransactions)) return hourNet
-
-  normalizedTransactions.forEach((tx) => {
-    if (tx?.isPendingReview === true || tx?.isPendingReview === 1) return
-    if (String(tx?.date || '') !== todayKey) return
-    const isAdj = tx.type === 'balance_adjustment'
-    const amount = tx.convertedAmount || 0
-    const isSrcActive = activeWalletIdSet ? activeWalletIdSet.has(String(tx?.walletId)) : true
-    const isTgtActive = tx?.targetWalletId && activeWalletIdSet ? activeWalletIdSet.has(String(tx.targetWalletId)) : false
-
-    let signed = 0
-    if (tx.type === 'transfer') {
-      if (isSrcActive && !isTgtActive) signed = -amount
-      else if (!isSrcActive && isTgtActive) {
-        const tgtCurrency =
-          tx.targetCurrency || (tx.targetWalletId != null && walletCurrencyMap ? walletCurrencyMap.get(String(tx.targetWalletId)) : null) || defaultCurrency
-        signed =
-          tx.targetAmount != null && toSafeNumber(tx.targetAmount) > 0
-            ? convertCurrency(toSafeNumber(tx.targetAmount), tgtCurrency, defaultCurrency, rates)
-            : amount
-      }
-    } else if (isSrcActive) {
-      if (tx.type === 'income' || isAdj) signed = amount
-      else if (tx.type === 'expense') signed = -amount
-    }
-
-    if (signed === 0) return
-
-    const fallbackMs = Number(new Date(`${todayKey}T12:00:00`).getTime())
-    const txMs = Number.isFinite(Number(tx?.createdAt)) ? Number(tx.createdAt) : fallbackMs
-    const hour = new Date(txMs).getHours()
-    if (hour >= 0 && hour <= 23) hourNet[hour] += signed
-  })
-
-  return hourNet
-}
+import {
+  calculatePeriodStats,
+  calculate1DHourlyFlow,
+} from './dashboard/dashboardStats'
 
 export function useDashboardData() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
@@ -211,7 +66,12 @@ export function useDashboardData() {
   const isAllRange = zoomRevenueRange === 'all' || miniRevenueRange === 'all'
   const txCutoffDate = format(startOfMonth(subMonths(new Date(), 12)), 'yyyy-MM-dd')
   const transactions = useLiveQuery(
-    () => (isAllRange ? db.transactions.toArray() : db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray()),
+    async () => {
+      const list = isAllRange
+        ? await db.transactions.toArray()
+        : await db.transactions.where('date').aboveOrEqual(txCutoffDate).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
+    },
     [isAllRange, txCutoffDate],
     cachedDashboardState.transactions,
   )
@@ -277,7 +137,8 @@ export function useDashboardData() {
     setMiniRevenueRangeState(range)
     try {
       localStorage.setItem('ft_networth_range', range)
-    } catch {
+    } catch (err){
+      console.warn('[useDashboardData]', err)
       /* ignore storage errors */
     }
   }, [])
@@ -288,7 +149,8 @@ export function useDashboardData() {
     setZoomRevenueRangeState(range)
     try {
       localStorage.setItem('ft_networth_range', range)
-    } catch {
+    } catch (err){
+      console.warn('[useDashboardData]', err)
       /* ignore storage errors */
     }
   }, [])
@@ -298,7 +160,8 @@ export function useDashboardData() {
       try {
         const fetchedRates = await fetchCurrencyRates('USD')
         setRates(fetchedRates)
-      } catch {
+      } catch (err){
+      console.warn('[useDashboardData]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -375,18 +238,18 @@ export function useDashboardData() {
     const lastMonth = calculatePeriodStats(safeTx, lastPeriod, defaultCurrency, rates)
 
     const rawMonthDelta = thisMonth.income - thisMonth.expense
-    const monthDelta = Math.round((rawMonthDelta + Number.EPSILON) * 100) / 100
+    const monthDelta = roundCurrency(rawMonthDelta)
     return {
       monthIncome: thisMonth.income,
       monthExpense: thisMonth.expense,
       monthDelta,
       monthDeltaTone: monthDelta >= 0 ? 'success' : 'danger',
-      monthDeltaPct: thisMonth.income > 0 ? Math.round(((monthDelta / thisMonth.income) * 100 + Number.EPSILON) * 100) / 100 : 0,
+      monthDeltaPct: thisMonth.income > 0 ? roundCurrency((monthDelta / thisMonth.income) * 100) : 0,
       incomeDeltaPct: lastMonth.income > 0
-        ? Math.round((((thisMonth.income - lastMonth.income) / lastMonth.income) * 100 + Number.EPSILON) * 100) / 100
+        ? roundCurrency(((thisMonth.income - lastMonth.income) / lastMonth.income) * 100)
         : thisMonth.income > 0 ? 100 : 0,
       expenseDeltaPct: lastMonth.expense > 0
-        ? Math.round((((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100 + Number.EPSILON) * 100) / 100
+        ? roundCurrency(((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100)
         : thisMonth.expense > 0 ? 100 : 0,
     }
   }, [transactions, investments, currentMonthKey, budgetCycleStartDay, locale, currentPeriod, normalizedTransactions, defaultCurrency, rates])
@@ -467,8 +330,7 @@ export function useDashboardData() {
 
     const generateDaily = (daysCount) => {
       const arr = Array.from({ length: daysCount }, (_, idx) => {
-        const d = new Date()
-        d.setDate(d.getDate() - (daysCount - 1 - idx))
+        const d = subDays(new Date(), daysCount - 1 - idx)
         return { day: format(d, 'dd MMM'), date: format(d, 'yyyy-MM-dd'), income: 0, expense: 0, net: 0 }
       })
       const map = new Map(arr.map((r) => [r.date, r]))
@@ -879,7 +741,8 @@ export function useDashboardData() {
   const zoomRevenueSeries = useMemo(() => {
     try {
       return buildRevenueSeries(zoomRevenueRange)
-    } catch {
+    } catch (err){
+      console.warn('[useDashboardData]', err)
       return []
     }
   }, [buildRevenueSeries, zoomRevenueRange])
@@ -889,7 +752,8 @@ export function useDashboardData() {
   const miniRevenueSeries = useMemo(() => {
     try {
       return buildRevenueSeries(miniRevenueRange)
-    } catch {
+    } catch (err){
+      console.warn('[useDashboardData]', err)
       return []
     }
   }, [buildRevenueSeries, miniRevenueRange])
@@ -1155,7 +1019,8 @@ export function useDashboardData() {
     if (!comparePrevious) return zoomRevenueSeries
     try {
       return buildPreviousPeriodRevenueSeries(zoomRevenueRange, zoomRevenueSeries)
-    } catch {
+    } catch (err){
+      console.warn('[useDashboardData]', err)
       return zoomRevenueSeries
     }
   }, [zoomRevenueSeries, comparePrevious, buildPreviousPeriodRevenueSeries, zoomRevenueRange])
@@ -1293,8 +1158,7 @@ export function useDashboardData() {
     let streak = 0
     const todayDate = new Date()
     for (let i = 0; i < 365; i++) {
-      const d = new Date(todayDate)
-      d.setDate(d.getDate() - i)
+      const d = subDays(todayDate, i)
       const dateStr = format(d, 'yyyy-MM-dd')
       if (logDates.has(dateStr)) {
         streak++

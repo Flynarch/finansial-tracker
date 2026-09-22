@@ -58,8 +58,8 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
         {/* Header Info */}
         <div className="flex items-center gap-4">
           <div 
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-2xl shadow-md"
-            style={{ backgroundColor: activeHabit.color, color: '#fff' }}
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-2xl shadow-md text-white"
+            style={{ backgroundColor: activeHabit.color }}
           >
             {activeHabit.title.charAt(0).toUpperCase()}
           </div>

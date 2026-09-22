@@ -37,6 +37,7 @@ import {
 } from '../../lib/auth'
 import { db } from '../../lib/db'
 import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
+import { getSessionMnemonicPhrase, clearSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
 import { uploadLatestBackup } from '../../lib/cloudBackup'
 import { firebaseErrorToI18nKey } from '../../lib/firebaseErrors'
 import PageHeader from '../../components/ui/PageHeader'
@@ -154,7 +155,8 @@ export default function SettingsHome() {
       } else {
         setVerifFeedback(res.message || t('auth.verifFailedFeedback', 'Gagal mengirim email verifikasi.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[SettingsHome]', err)
       setVerifFeedback(t('auth.generalError', 'Terjadi kesalahan sistem.'))
     } finally {
       setIsVerifLoading(false)
@@ -172,7 +174,8 @@ export default function SettingsHome() {
       } else {
         setVerifFeedback(t('auth.verifNotYetConfirmed', 'Email belum diverifikasi. Cek inbox email Anda.'))
       }
-    } catch {
+    } catch (err){
+      console.warn('[SettingsHome]', err)
       setVerifFeedback(t('auth.generalError', 'Terjadi kesalahan saat memeriksa status.'))
     } finally {
       setIsVerifChecking(false)
@@ -185,7 +188,7 @@ export default function SettingsHome() {
       if (backup && authUserId) {
         const hasData = (backup.transactions && backup.transactions.length > 0) || (backup.wallets && backup.wallets.length > 0)
         if (hasData) {
-          const e2eePhrase = typeof window !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+          const e2eePhrase = getSessionMnemonicPhrase()
           const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
 
           if (isE2eeActive) {
@@ -255,19 +258,22 @@ export default function SettingsHome() {
         db.loanPayments,
         db.walletBalanceCache,
       ]
-      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch(() => {})))
+      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch((err) => console.warn('[SettingsHome]', err))))
       clearFinancialLocalStorage()
-    } catch {
+    } catch (err){
+      console.warn('[SettingsHome]', err)
       /* ignore */
     } finally {
-      await signOutCurrentUser().catch(() => {})
+      await signOutCurrentUser().catch((err) => console.warn('[SettingsHome]', err))
       try {
         localStorage.removeItem('ft_onboarding_seen_v1')
         localStorage.removeItem('ft_onboarding_progress')
-      } catch {
+      } catch (err){
+      console.warn('[SettingsHome]', err)
         /* ignore */
       }
-      await resetOnboarding().catch(() => {})
+      clearSessionMnemonicPhrase()
+      await resetOnboarding().catch((err) => console.warn('[SettingsHome]', err))
       await setAuthUser({
         uid: '',
         email: '',
@@ -275,7 +281,7 @@ export default function SettingsHome() {
         photoURL: '',
         provider: 'guest',
         emailVerified: false,
-      }).catch(() => {})
+      }).catch((err) => console.warn('[SettingsHome]', err))
       navigate('/dashboard', { replace: true })
     }
   }

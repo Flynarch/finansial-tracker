@@ -99,8 +99,8 @@ export default function HabitColorPicker({ selectedColor = '#10b981', onChangeCo
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="h-5 w-5 shrink-0 rounded-full border border-white/40 shadow-xs"
-            style={{ backgroundColor: selectedColor || '#10b981' }}
+            className={`h-5 w-5 shrink-0 rounded-full border border-white/40 shadow-xs ${selectedColor ? '' : 'bg-emerald-500'}`}
+            style={selectedColor ? { backgroundColor: selectedColor } : undefined}
           />
           <span className="truncate text-sm font-bold text-[var(--fg)]">
             {activePreset ? activePreset.name : 'Warna Kustom'}

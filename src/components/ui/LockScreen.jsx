@@ -140,7 +140,8 @@ function LockScreen({ onUnlock }) {
         }
         return
       }
-    } catch {
+    } catch (err){
+      console.warn('[LockScreen]', err)
       /* ignore */
     } finally {
       if (isMountedRef.current) {
@@ -415,7 +416,7 @@ function LockScreen({ onUnlock }) {
                       y1={p1.y}
                       x2={p2.x}
                       y2={p2.y}
-                      stroke={isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)'}
+                      stroke={isSuccessUnlocked ? 'var(--income)' : isShaking ? 'var(--expense)' : 'var(--lock)'}
                       strokeWidth="4"
                       strokeLinecap="round"
                     />
@@ -440,6 +441,7 @@ function LockScreen({ onUnlock }) {
                 {/* Nodes */}
                 {PATTERN_DOTS.map((dot) => {
                   const isSelected = patternPath.includes(dot.id)
+                  const dotColor = isSuccessUnlocked ? 'var(--income)' : isShaking ? 'var(--expense)' : 'var(--lock)'
                   return (
                     <g key={dot.id}>
                       {isSelected && (
@@ -447,7 +449,7 @@ function LockScreen({ onUnlock }) {
                           cx={dot.x}
                           cy={dot.y}
                           r="18"
-                          fill={isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)'}
+                          fill={dotColor}
                           fillOpacity="0.2"
                         />
                       )}
@@ -456,14 +458,14 @@ function LockScreen({ onUnlock }) {
                         cy={dot.y}
                         r="10"
                         fill="var(--field-bg)"
-                        stroke={isSelected ? (isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)') : 'var(--border-strong)'}
+                        stroke={isSelected ? dotColor : 'var(--border-strong)'}
                         strokeWidth={isSelected ? '3' : '2'}
                       />
                       <circle
                         cx={dot.x}
                         cy={dot.y}
                         r="4"
-                        fill={isSelected ? (isSuccessUnlocked ? '#10b981' : isShaking ? '#f43f5e' : 'var(--lock)') : 'var(--muted)'}
+                        fill={isSelected ? dotColor : 'var(--muted)'}
                       />
                     </g>
                   )

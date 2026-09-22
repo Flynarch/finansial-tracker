@@ -212,7 +212,8 @@ export default function BudgetSavingsDetailSheet({
         deadline: '',
       })
       setSheetView('detail')
-    } catch {
+    } catch (err){
+      console.warn('[BudgetSavingsDetailSheet]', err)
       setGoalError(t('common.error.saveFailed', 'Gagal menyimpan data.'))
     }
   }
@@ -250,7 +251,8 @@ export default function BudgetSavingsDetailSheet({
       })
       setBudgetLimitInput('')
       setSheetView('detail')
-    } catch {
+    } catch (err){
+      console.warn('[BudgetSavingsDetailSheet]', err)
       setBudgetError(t('common.error.saveFailed', 'Gagal menyimpan data.'))
     }
   }

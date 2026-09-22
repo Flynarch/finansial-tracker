@@ -21,6 +21,7 @@ import { triggerHaptic } from '../../lib/haptics'
 import { downloadTextFile } from '../../lib/utils'
 import { getLocalDateString } from '../../lib/dateUtils'
 import { exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
+import { getSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
 import { getStoredPasskeys } from '../../lib/passkeys'
 import {
   SettingsSection,
@@ -176,7 +177,7 @@ export default function SettingsSecurity() {
     triggerHaptic('selection')
     setStatusMessage('')
 
-    const savedPhrase = typeof localStorage !== 'undefined' ? localStorage.getItem('fintrack_e2ee_phrase') : null
+    const savedPhrase = getSessionMnemonicPhrase()
     if (!savedPhrase || savedPhrase.trim().split(/\s+/).length !== 12) {
       setIsSetupModalOpen(true)
       return
@@ -190,7 +191,8 @@ export default function SettingsSecurity() {
       downloadTextFile(`fintrack-e2ee-backup-${ymd}.enc`, jsonStr, 'application/json')
       setStatusMessage(t('mnemonic.exportSuccessBanner', 'Cadangan terenkripsi berhasil diunduh.'))
       setTimeout(() => setStatusMessage(''), 4000)
-    } catch {
+    } catch (err){
+      console.warn('[SettingsSecurity]', err)
       setStatusMessage(t('common.error.saveFailed', 'Gagal mengenkripsi data cadangan.'))
     } finally {
       setIsExportingEnc(false)

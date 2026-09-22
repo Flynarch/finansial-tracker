@@ -12,7 +12,8 @@ export async function hapticImpact(style = 'light') {
       try {
         const ms = style === 'heavy' ? 40 : style === 'medium' ? 25 : 15
         navigator.vibrate(ms)
-      } catch {
+      } catch (err){
+      console.warn('[haptics]', err)
         // ignore
       }
     }
@@ -25,7 +26,8 @@ export async function hapticImpact(style = 'light') {
     if (style === 'heavy') impactStyle = ImpactStyle.Heavy
 
     await Haptics.impact({ style: impactStyle })
-  } catch {
+  } catch (err){
+      console.warn('[haptics]', err)
     // ignore
   }
 }
@@ -40,7 +42,8 @@ export async function hapticSuccess() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate([15, 30, 20])
-      } catch {
+      } catch (err){
+      console.warn('[haptics]', err)
         // ignore
       }
     }
@@ -49,7 +52,8 @@ export async function hapticSuccess() {
 
   try {
     await Haptics.notification({ type: NotificationType.Success })
-  } catch {
+  } catch (err){
+      console.warn('[haptics]', err)
     // ignore
   }
 }
@@ -62,7 +66,8 @@ export async function hapticWarning() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate([30, 50, 30])
-      } catch {
+      } catch (err){
+      console.warn('[haptics]', err)
         // ignore
       }
     }
@@ -71,7 +76,8 @@ export async function hapticWarning() {
 
   try {
     await Haptics.notification({ type: NotificationType.Warning })
-  } catch {
+  } catch (err){
+      console.warn('[haptics]', err)
     // ignore
   }
 }
@@ -84,7 +90,8 @@ export async function hapticError() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate([40, 60, 40, 60, 40])
-      } catch {
+      } catch (err){
+      console.warn('[haptics]', err)
         // ignore
       }
     }
@@ -93,7 +100,8 @@ export async function hapticError() {
 
   try {
     await Haptics.notification({ type: NotificationType.Error })
-  } catch {
+  } catch (err){
+      console.warn('[haptics]', err)
     // ignore
   }
 }
@@ -105,7 +113,8 @@ export async function hapticSelection() {
   if (!isNative) return
   try {
     await Haptics.selectionChanged()
-  } catch {
+  } catch (err){
+      console.warn('[haptics]', err)
     // ignore
   }
 }

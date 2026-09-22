@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
-import { convertCurrency } from '../lib/utils'
+import { convertCurrency, roundCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
 import useSettingsStore from './useSettingsStore'
 
@@ -69,6 +69,7 @@ const useLoanStore = create(() => ({
         isExcludeFromAnalytics: true,
         excludeFromAnalytics: true,
         createdAt: Date.now(),
+        deletedAt: null,
       })
 
       await db.loans.update(loanId, { initialTransactionId: initialTxId })
@@ -91,7 +92,7 @@ const useLoanStore = create(() => ({
       ? Number(loanData.remainingAmount)
       : existing.remainingAmount + diffTotal
     let newRemaining = Math.max(0, rawRemaining)
-    newRemaining = Math.round(newRemaining * 100) / 100
+    newRemaining = roundCurrency(newRemaining)
     const isNowPaid = newRemaining <= 0
     const wasPaidReopened = !isNowPaid && existing.status === 'paid'
     const newStatus = isNowPaid ? 'paid' : (wasPaidReopened ? 'active' : (loanData.status || existing.status))
@@ -240,14 +241,14 @@ const useLoanStore = create(() => ({
     const payAmtInLoanCurrency = convertCurrency(payAmt, paymentCurrency, loanCurrency, rates)
     const payAmtInWalletCurrency = convertCurrency(payAmt, paymentCurrency, walletCurrency, rates)
 
-    const roundedLoanRemaining = Math.round((Number(loan.remainingAmount) || 0) * 100) / 100
-    const roundedPayAmt = Math.round(payAmtInLoanCurrency * 100) / 100
+    const roundedLoanRemaining = roundCurrency(Number(loan.remainingAmount) || 0)
+    const roundedPayAmt = roundCurrency(payAmtInLoanCurrency)
     if (roundedPayAmt > roundedLoanRemaining) {
       throw new Error(`Nominal pembayaran tidak boleh melebihi sisa tagihan (${loan.remainingAmount}).`)
     }
 
     let newRemaining = Math.max(0, loan.remainingAmount - payAmtInLoanCurrency)
-    newRemaining = Math.round(newRemaining * 100) / 100
+    newRemaining = roundCurrency(newRemaining)
     const newStatus = newRemaining <= 0 ? 'paid' : 'partially_paid'
     const payDate = (typeof effectiveDate === 'string' && effectiveDate) ? effectiveDate : getLocalDateString()
 
@@ -274,6 +275,7 @@ const useLoanStore = create(() => ({
           isExcludeFromAnalytics: true,
           excludeFromAnalytics: true,
           createdAt: Date.now(),
+          deletedAt: null,
         })
       }
 

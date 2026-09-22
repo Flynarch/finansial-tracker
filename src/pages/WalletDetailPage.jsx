@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import {
   Trash2,
   Search,
@@ -40,6 +40,7 @@ import {
   formatMoneyValueForInput,
   parseMoneyInput,
   convertCurrency,
+  roundCurrency,
   FALLBACK_EXCHANGE_RATES,
   safeFormatDate,
 } from '../lib/utils'
@@ -63,7 +64,8 @@ export default function WalletDetailPage() {
       if (item) return item
       const all = await db.wallets.toArray()
       return all.find((w) => String(w.id) === String(walletId)) || null
-    } catch {
+    } catch (err) {
+      console.error('[WalletDetailPage:getWallet]', err)
       return null
     }
   }, [walletId])
@@ -83,10 +85,10 @@ export default function WalletDetailPage() {
     ])
     const txMap = new Map()
     for (const tx of [...srcTxsNum, ...srcTxsStr]) {
-      if (tx && tx.id != null) txMap.set(tx.id, tx)
+      if (tx && tx.id != null && !tx.deletedAt) txMap.set(tx.id, tx)
     }
     for (const tx of [...tgtTxsNum, ...tgtTxsStr]) {
-      if (tx && tx.id != null && tx.type === 'transfer') txMap.set(tx.id, tx)
+      if (tx && tx.id != null && !tx.deletedAt && tx.type === 'transfer') txMap.set(tx.id, tx)
     }
     const txs = Array.from(txMap.values())
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
@@ -99,7 +101,8 @@ export default function WalletDetailPage() {
       try {
         const fetched = await fetchCurrencyRates('USD')
         setRates(fetched)
-      } catch {
+      } catch (err) {
+        console.error('[WalletDetailPage:loadRates]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -179,6 +182,7 @@ export default function WalletDetailPage() {
       })
       setEditingTransaction(null)
     } catch (err) {
+      console.error('[WalletDetailPage:editTransaction]', err)
       setPageError(err.message || 'Gagal mengubah transaksi.')
     }
   }
@@ -222,6 +226,7 @@ export default function WalletDetailPage() {
       })
       setIsEditWalletModalOpen(false)
     } catch (err) {
+      console.error('[WalletDetailPage:editWallet]', err)
       setPageError(err.message || 'Gagal mengubah dompet.')
     }
   }
@@ -288,8 +293,7 @@ export default function WalletDetailPage() {
     })
 
     const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const yesterdayDate = new Date()
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterdayDate = subDays(new Date(), 1)
     const yesterdayStr = format(yesterdayDate, 'yyyy-MM-dd')
 
     return Object.keys(groups)
@@ -303,7 +307,8 @@ export default function WalletDetailPage() {
         } else {
           try {
             dateLabel = format(new Date(dateKey), 'dd MMMM yyyy')
-          } catch {
+          } catch (err) {
+            console.error('[WalletDetailPage:formatDate]', err)
             dateLabel = dateKey
           }
         }
@@ -418,7 +423,7 @@ export default function WalletDetailPage() {
     if (isNaN(newBal)) return
 
     const isZeroDec = ['IDR', 'JPY', 'KRW', 'VND'].includes(targetCurrency)
-    const diff = isZeroDec ? Math.round(newBal - currentBalance) : Math.round((newBal - currentBalance) * 100) / 100
+    const diff = isZeroDec ? Math.round(newBal - currentBalance) : roundCurrency(newBal - currentBalance)
     if (diff !== 0) {
       await addTransaction({
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -907,7 +912,8 @@ export default function WalletDetailPage() {
             await deleteTransaction(txId)
             if (swipedTransactionId === txId) setSwipedTransactionId(null)
           } catch (err) {
-            setPageError(err.message || 'Gagal menghapus transaksi.')
+            console.error('[WalletDetailPage:deleteTransaction]', err)
+            setPageError(err.userMessage || err.message || 'Gagal menghapus transaksi.')
           }
         }}
         title={t('tx.item.delete') || 'Hapus Transaksi'}

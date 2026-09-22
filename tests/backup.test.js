@@ -14,9 +14,14 @@ if (typeof globalThis.localStorage === 'undefined') {
   }
 }
 if (typeof globalThis.window === 'undefined') {
-  globalThis.window = { dispatchEvent: vi.fn(), CustomEvent: class CustomEvent {} }
-} else if (!globalThis.window.dispatchEvent) {
-  globalThis.window.dispatchEvent = vi.fn()
+  globalThis.window = { dispatchEvent: vi.fn(), CustomEvent: class CustomEvent {}, localStorage: globalThis.localStorage }
+} else {
+  if (!globalThis.window.dispatchEvent) {
+    globalThis.window.dispatchEvent = vi.fn()
+  }
+  if (!globalThis.window.localStorage) {
+    globalThis.window.localStorage = globalThis.localStorage
+  }
 }
 
 describe('backup - importAllDataFromJsonPayload settings restoration', () => {
@@ -72,6 +77,7 @@ describe('backup - importAllDataFromJsonPayload settings restoration', () => {
   })
 
   it('preserves existing auth and security state during import', async () => {
+    const existingLockSecret = 'pbkdf2:c3c4a072d05d23d46b3f2530474eb253:06018b0a83eb9009b097c8960bce946c3bb2d6929398b5d79d2c642602635548'
     await db.settings.put({
       key: 'preferences',
       authUserId: 'user-123',
@@ -80,7 +86,7 @@ describe('backup - importAllDataFromJsonPayload settings restoration', () => {
       emailVerified: true,
       securityEnabled: true,
       securityMethod: 'pin',
-      lockSecret: 'hash-abc',
+      lockSecret: existingLockSecret,
       autoLockTimeout: 60,
     })
 
@@ -106,7 +112,7 @@ describe('backup - importAllDataFromJsonPayload settings restoration', () => {
     expect(saved.authUserId).toBe('user-123')
     expect(saved.authUserEmail).toBe('user@example.com')
     expect(saved.securityEnabled).toBe(true)
-    expect(saved.lockSecret).toBe('hash-abc')
+    expect(saved.lockSecret).toBe(existingLockSecret)
   })
 
   it('exportAllDataAsJson redacts lockSecret from settings', async () => {

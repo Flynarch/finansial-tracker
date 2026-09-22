@@ -44,7 +44,8 @@ export default function SettingsCurrency() {
         const parsed = JSON.parse(cached)
         return parsed?.timestamp ? new Date(parsed.timestamp) : new Date()
       }
-    } catch {
+    } catch (err){
+      console.warn('[SettingsCurrency]', err)
       // Ignore
     }
     return new Date()
@@ -60,7 +61,8 @@ export default function SettingsCurrency() {
       const fresh = await fetchCurrencyRates('USD')
       setRates(fresh)
       setLastUpdated(new Date())
-    } catch {
+    } catch (err){
+      console.warn('[SettingsCurrency]', err)
       setRates((prev) => prev || { ...FALLBACK_EXCHANGE_RATES })
     } finally {
       setIsLoading(false)

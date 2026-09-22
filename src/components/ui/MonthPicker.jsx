@@ -197,7 +197,8 @@ export default function MonthPicker({ value, onChange, className = '', compact =
       }
       const [y, m] = String(value).split('-').map(Number)
       return { year: y || new Date().getFullYear(), month: (m || 1) - 1 }
-    } catch {
+    } catch (err){
+      console.warn('[MonthPicker]', err)
       const now = new Date()
       return { year: now.getFullYear(), month: now.getMonth() }
     }
@@ -264,7 +265,8 @@ export default function MonthPicker({ value, onChange, className = '', compact =
       if (!value) return t('common.select')
       const d = parse(`${value}-01`, 'yyyy-MM-dd', new Date())
       return format(d, 'MMMM yyyy', { locale: locale === 'en' ? enUS : idLocale })
-    } catch {
+    } catch (err){
+      console.warn('[MonthPicker]', err)
       return value || '-'
     }
   }, [value, locale, t])

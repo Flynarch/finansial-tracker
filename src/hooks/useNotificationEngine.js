@@ -21,7 +21,7 @@ export default function useNotificationEngine() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {})
+      Notification.requestPermission().catch((err) => console.warn('[useNotificationEngine]', err))
     }
 
     const checkReminders = async () => {
@@ -34,7 +34,8 @@ export default function useNotificationEngine() {
         if (!createdVal) return false
         try {
           return format(new Date(createdVal), 'yyyy-MM-dd') === todayStr
-        } catch {
+        } catch (err){
+      console.warn('[useNotificationEngine]', err)
           return false
         }
       }
@@ -47,8 +48,8 @@ export default function useNotificationEngine() {
               .toArray()
             
             if (existing.length === 0) {
-              const title = translate(locale, 'notifications.todoDueTitle', 'Pengingat Komitmen')
-              const message = `${todo.title} • ${translate(locale, 'notifications.todoDueBodySuffix', 'Jatuh tempo hari ini')}`
+              const title = translate(locale, 'notifications.todoDueTitle', 'Jatuh Tempo')
+              const message = `${todo.title} • ${translate(locale, 'notifications.todoDueBodySuffix', 'jatuh tempo hari ini')}`
 
               await db.notifications.add({
                 type: 'todo',
@@ -60,11 +61,11 @@ export default function useNotificationEngine() {
               })
 
               if (Capacitor.isNativePlatform()) {
-                const largeHeader = translate(locale, 'notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')
-                const bullet1 = translate(locale, 'notifications.todoDueBullet1', '• Jadwal: Jatuh tempo hari ini • Prioritas komitmen aktif.')
-                const bullet2 = translate(locale, 'notifications.todoDueBullet2', '• Rekomendasi: Selesaikan tugas atau tandai lunas setelah transaksi.')
+                const largeHeader = translate(locale, 'notifications.billReminderHeader', 'Pengingat Tagihan')
+                const bullet1 = translate(locale, 'notifications.todoDueBullet1', 'Jatuh tempo hari ini.')
+                const bullet2 = translate(locale, 'notifications.todoDueBullet2', 'Selesaikan atau tandai lunas.')
                 const largeBody = `${largeHeader}\n${todo.title}\n${bullet1}\n${bullet2}`
-                const summaryText = translate(locale, 'notifications.summaryCommitment', 'Jadwal & Komitmen')
+                const summaryText = translate(locale, 'notifications.summaryCommitment', 'Jadwal')
 
                 await LocalNotifications.schedule({
                   notifications: [
@@ -83,7 +84,7 @@ export default function useNotificationEngine() {
                       iconColor: FINTRACK_NOTIFICATION_COLOR,
                     }
                   ]
-                }).catch(() => {})
+                }).catch((err) => console.warn('[useNotificationEngine]', err))
               } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                 new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
                   body: message
@@ -105,7 +106,7 @@ export default function useNotificationEngine() {
                 
               if (existing.length === 0) {
                 const title = translate(locale, 'notifications.habitTitle', 'Pengingat Kebiasaan')
-                const message = `${habit.title} • ${translate(locale, 'notifications.habitBodySuffix', 'Waktunya menyelesaikan target kebiasaan hari ini')}`
+                const message = `${habit.title} • ${translate(locale, 'notifications.habitBodySuffix', 'Waktunya selesaikan target hari ini')}`
 
                 await db.notifications.add({
                   type: 'habit',
@@ -117,11 +118,11 @@ export default function useNotificationEngine() {
                 })
   
                 if (Capacitor.isNativePlatform()) {
-                  const habitHeader = translate(locale, 'notifications.habitHeader', 'Pelacak Kebiasaan • FinTrack')
-                  const habitBullet1 = translate(locale, 'notifications.habitBullet1', '• Target: Konsistensi harian memperkuat kontrol finansial Anda.')
-                  const habitBullet2 = translate(locale, 'notifications.habitBullet2', '• Aksi: Buka aplikasi dan tandai progres kebiasaan Anda.')
+                  const habitHeader = translate(locale, 'notifications.habitHeader', 'Pengingat Kebiasaan')
+                  const habitBullet1 = translate(locale, 'notifications.habitBullet1', 'Jaga konsistensi harian.')
+                  const habitBullet2 = translate(locale, 'notifications.habitBullet2', 'Buka aplikasi dan tandai progres.')
                   const largeBody = `${habitHeader}\n${habit.title}\n${habitBullet1}\n${habitBullet2}`
-                  const summaryText = translate(locale, 'notifications.summaryHabit', 'Disiplin Finansial')
+                  const summaryText = translate(locale, 'notifications.summaryHabit', 'Kebiasaan')
 
                   await LocalNotifications.schedule({
                     notifications: [
@@ -140,7 +141,7 @@ export default function useNotificationEngine() {
                         iconColor: FINTRACK_NOTIFICATION_COLOR,
                       }
                     ]
-                  }).catch(() => {})
+                  }).catch((err) => console.warn('[useNotificationEngine]', err))
                 } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                   new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
                     body: message

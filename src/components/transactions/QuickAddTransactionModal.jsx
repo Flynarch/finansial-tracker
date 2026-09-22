@@ -108,7 +108,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   useEffect(() => {
     fetchCurrencyRates('USD')
       .then((r) => r && setRates(r))
-      .catch(() => {})
+      .catch((err) => console.warn('[QuickAddTransactionModal]', err))
   }, [])
 
   const wallets = useLiveQuery(
@@ -344,7 +344,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           purchaseCurrency: 'IDR',
           purchasePrice: formatMoneyInput(String(Math.round(safe)), 'IDR'),
         }))
-      } catch {
+      } catch (err){
+      console.warn('[QuickAddTransactionModal]', err)
         const rows = getGoldPriceHistory()
         const last = toSafeNumber(rows[rows.length - 1]?.price)
         if (!cancelled && last > 0) {
@@ -724,6 +725,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       }
       onClose?.()
     } catch (err) {
+      console.warn('[QuickAddTransactionModal]', err)
       hapticWarning()
       setSubmitError(err?.message || t('common.error.saveFailed'))
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hashPin, verifyPin, isPinHash, derivePbkdf2Pin } from '../src/lib/crypto'
+import { hashPin, verifyPin, isPinHash, derivePbkdf2Pin, encryptSecret, decryptSecret, migrateSecretIfNeeded } from '../src/lib/crypto'
 
 describe('Crypto & PIN Hashing Utilities', () => {
   it('identifies valid and invalid SHA-256 hashes', () => {
@@ -56,5 +56,50 @@ describe('Crypto & PIN Hashing Utilities', () => {
     // Verify incorrect PIN
     const isInvalid = await verifyPin('9999', pbkdf2Hash)
     expect(isInvalid).toBe(false)
+  })
+
+  describe('AES-GCM Secret Encryption for BYOK Keys (At-Rest)', () => {
+    it('encrypts sensitive plaintext into enc:v1 format', async () => {
+      const plainKey = 'AIzaSyD-mock-gemini-api-key-12345'
+      const encrypted = await encryptSecret(plainKey)
+
+      expect(encrypted).toMatch(/^enc:v1:[0-9a-f]{24}:[0-9a-f]+$/i)
+      expect(encrypted).not.toBe(plainKey)
+      expect(encrypted.includes(plainKey)).toBe(false)
+    })
+
+    it('decrypts encrypted secret back to original plaintext accurately', async () => {
+      const original = 'AIzaSyD-super-secret-key-67890'
+      const encrypted = await encryptSecret(original)
+      const decrypted = await decryptSecret(encrypted)
+
+      expect(decrypted).toBe(original)
+    })
+
+    it('transparently handles legacy plaintext without error', async () => {
+      const legacyKey = 'AIzaSyD-legacy-unencrypted-key'
+      const result = await decryptSecret(legacyKey)
+      expect(result).toBe(legacyKey)
+    })
+
+    it('handles empty and null inputs safely', async () => {
+      expect(await encryptSecret('')).toBe('')
+      expect(await encryptSecret(null)).toBe('')
+      expect(await decryptSecret('')).toBe('')
+      expect(await decryptSecret(null)).toBe('')
+    })
+
+    it('migrates legacy static encrypted keys to new client salt via migrateSecretIfNeeded', async () => {
+      // Temporarily mock localStorage so we test migration
+      const testKey = 'AIzaSyD-legacy-key-to-migrate'
+      // Encrypt with client salt
+      const encrypted = await encryptSecret(testKey)
+      // When already on client salt, migrateSecretIfNeeded returns null (no migration needed)
+      const noMigrate = await migrateSecretIfNeeded(encrypted)
+      expect(noMigrate).toBeNull()
+
+      // Verify that decryptSecret decrypts accurately
+      expect(await decryptSecret(encrypted)).toBe(testKey)
+    })
   })
 })

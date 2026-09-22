@@ -161,7 +161,10 @@ function Calendar() {
   const calEnd = useMemo(() => format(endOfMonth(addMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
 
   const transactions = useLiveQuery(
-    () => db.transactions.where('date').between(calStart, calEnd, true, true).toArray(),
+    async () => {
+      const list = await db.transactions.where('date').between(calStart, calEnd, true, true).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
+    },
     [calStart, calEnd],
     []
   )
@@ -766,7 +769,8 @@ function Calendar() {
                           const caret = getMoneyInputCaret(raw, next, event.target.selectionStart ?? raw.length, txForm.currency)
                           setAmountInput(next)
                           requestAnimationFrame(() => {
-                            try { event.target.setSelectionRange(caret, caret) } catch { /* ignore */ }
+                            try { event.target.setSelectionRange(caret, caret) } catch (err){
+      console.warn('[Calendar]', err) /* ignore */ }
                           })
                         }}
                         placeholder="0"

@@ -83,5 +83,35 @@ describe('decimal currency handling', () => {
     expect(result.isValid).toBe(true)
     expect(result.result).toBe(4)
   })
+
+  test('USD 50,50 with decimal comma should parse as 50.5', () => {
+    const result = evaluateExpression('50,50', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(50.5)
+  })
+
+  test('USD 1,50 + 2,50 with decimal comma should evaluate to 4', () => {
+    const result = evaluateExpression('1,50 + 2,50', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(4)
+  })
+
+  test('USD 1,000.50 + 500 should evaluate to 1500.5', () => {
+    const result = evaluateExpression('1,000.50 + 500', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(1500.5)
+  })
+
+  test('EUR 1.000,50 with European thousand dot and decimal comma should evaluate to 1000.5', () => {
+    const result = evaluateExpression('1.000,50', 'EUR')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(1000.5)
+  })
+
+  test('USD 2,5k with decimal comma shorthand should evaluate to 2500', () => {
+    const result = evaluateExpression('2,5k', 'USD')
+    expect(result.isValid).toBe(true)
+    expect(result.result).toBe(2500)
+  })
 })
 

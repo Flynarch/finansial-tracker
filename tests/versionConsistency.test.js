@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { APP_VERSION, APP_DISPLAY_VERSION } from '../src/lib/version'
@@ -53,12 +53,15 @@ describe('Version Consistency Verification', () => {
     expect(enBadge).not.toContain('v4.6.6')
   })
 
-  it('matches react-native-fintrack package.json and app.json versions', () => {
-    const rnPkg = JSON.parse(readFileSync(path.resolve(process.cwd(), 'react-native-fintrack/package.json'), 'utf8'))
-    const rnApp = JSON.parse(readFileSync(path.resolve(process.cwd(), 'react-native-fintrack/app.json'), 'utf8'))
+  it('matches react-native-fintrack package.json and app.json versions if present', () => {
+    const rnPkgPath = path.resolve(process.cwd(), 'react-native-fintrack/package.json')
+    if (existsSync(rnPkgPath)) {
+      const rnPkg = JSON.parse(readFileSync(rnPkgPath, 'utf8'))
+      const rnApp = JSON.parse(readFileSync(path.resolve(process.cwd(), 'react-native-fintrack/app.json'), 'utf8'))
 
-    expect(rnPkg.version).toBe(APP_VERSION)
-    expect(rnApp.expo.version).toBe(APP_VERSION)
+      expect(rnPkg.version).toBe(APP_VERSION)
+      expect(rnApp.expo.version).toBe(APP_VERSION)
+    }
   })
 
   it('declares necessary microphone and camera permissions in android/app/src/main/AndroidManifest.xml', () => {

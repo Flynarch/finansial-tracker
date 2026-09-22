@@ -417,6 +417,7 @@ export async function shareExecutiveReportPdf(reportParams) {
       })
       return { success: true, shared: true }
     } catch (shareErr) {
+      console.warn('[pdfReportGenerator]', shareErr)
       if (shareErr?.name === 'AbortError') {
         return { success: false, cancelled: true }
       }

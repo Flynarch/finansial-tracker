@@ -34,7 +34,8 @@ function readJsonCache(key) {
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
-  } catch {
+  } catch (err){
+      console.warn('[api]', err)
     return null;
   }
 }
@@ -43,7 +44,8 @@ function writeJsonCache(key, value) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
+  } catch (err){
+      console.warn('[api]', err)
     // Ignore storage failures.
   }
 }
@@ -111,7 +113,8 @@ function migrateGoldHistory() {
 
     writeJsonCache(GOLD_PRICE_HISTORY_KEY, merged);
     window.localStorage.setItem(GOLD_HISTORY_MIGRATED_KEY, "1");
-  } catch {
+  } catch (err){
+      console.warn('[api]', err)
     window.localStorage.setItem(GOLD_HISTORY_MIGRATED_KEY, "1");
   }
 }
@@ -198,6 +201,7 @@ export async function fetchGoldPrice() {
     }
     throw new Error("Invalid gold-api payload");
   } catch (primaryErr) {
+      console.warn('[api]', primaryErr)
     // Fallback legacy provider (kept as backup).
     const data = await fetchJsonWithTimeout("https://metals.live/api/v1/spot", 5000);
     if (!Array.isArray(data) || data.length === 0) {
@@ -236,7 +240,8 @@ async function fetchGoldPricePerGramIDRInternal() {
       try {
         const rates = await fetchCurrencyRates("USD");
         idrRate = Number(rates?.IDR);
-      } catch {
+      } catch (err){
+      console.warn('[api]', err)
         idrRate = await fetchUsdIdrFallbackRate();
       }
       if (!Number.isFinite(idrRate) || idrRate <= 0) {
@@ -247,6 +252,7 @@ async function fetchGoldPricePerGramIDRInternal() {
 
     throw new Error(`Unsupported gold quote currency: ${currency}`);
   } catch (error) {
+      console.warn('[api]', error)
     if (error?.status === 429) {
       const retrySec = error.retryAfterSec ?? 90;
       goldSpotCooldownUntil = Date.now() + retrySec * 1000;
@@ -294,13 +300,15 @@ export async function fetchCryptoPrice() {
 
 export function getCachedCurrencyRates(baseCurrency = "USD") {
   try {
-    const cached = localStorage.getItem(`ft_rates_${baseCurrency}`);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed?.rates) return parsed.rates;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem(`ft_rates_${baseCurrency}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.rates) return parsed.rates;
+      }
     }
-  } catch {
-    // Ignore errors
+  } catch (err) {
+    console.warn('[api]', err)
   }
   return null; // Return null so callers know to fallback to FALLBACK_EXCHANGE_RATES if needed
 }
@@ -325,7 +333,8 @@ export async function fetchCurrencyRates(baseCurrency = "USD") {
           return payload.conversion_rates;
         }
       }
-    } catch {
+    } catch (err){
+      console.warn('[api]', err)
       // Continue to fallback provider below.
     }
   }

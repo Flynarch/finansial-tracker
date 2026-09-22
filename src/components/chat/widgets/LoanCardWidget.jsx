@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { HandCoins, ArrowUpRight, CheckCircle2, Calendar } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
@@ -100,12 +99,3 @@ export default function LoanCardWidget({
   )
 }
 
-LoanCardWidget.propTypes = {
-  title: PropTypes.string,
-  personName: PropTypes.string,
-  loanType: PropTypes.string,
-  amount: PropTypes.number,
-  dueDate: PropTypes.string,
-  currency: PropTypes.string,
-  action: PropTypes.string,
-}

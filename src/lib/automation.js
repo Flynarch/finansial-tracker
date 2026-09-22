@@ -78,7 +78,8 @@ async function notifyIfAllowed(title, body, route = '/settings/recurring', extra
         ],
       })
       return
-    } catch {
+    } catch (err){
+      console.warn('[automation]', err)
       // Fallback
     }
   }
@@ -135,32 +136,35 @@ export async function processRecurringTransactions(currentDate = new Date()) {
         try {
           await db.notifications.add({
             type: 'recurring_auto',
-            title: isEn ? 'Recurring Bill Auto-Logged' : 'Tagihan Rutin Dicatat Otomatis',
+            title: isEn ? 'Recurring Bill' : 'Tagihan Rutin',
             message: isEn
-              ? `Auto-logged "${item.title}" for ${formatCurrency(item.amount, item.currency || 'IDR', 'en')}`
-              : `Tagihan "${item.title}" sebesar ${formatCurrency(item.amount, item.currency || 'IDR', 'id')} telah dicatat otomatis ke dompet.`,
+              ? `"${item.title}" auto-logged (${formatCurrency(item.amount, item.currency || 'IDR', 'en')})`
+              : `"${item.title}" otomatis dicatat (${formatCurrency(item.amount, item.currency || 'IDR', 'id')})`,
             read: false,
             relatedId: item.id,
             createdAt: Date.now(),
           })
-        } catch {
+        } catch (err){
+      console.warn('[automation]', err)
           // Ignore notification storage error
         }
       } catch (err) {
+      console.warn('[automation]', err)
         // When execution fails, advance nextDate to next cycle and notify user rather than freezing execution indefinitely
         try {
           await db.recurringTransactions.update(item.id, { nextDate: nextKey, anchorDay })
           await db.notifications.add({
             type: 'recurring_failed',
-            title: isEn ? 'Recurring Bill Execution Failed' : 'Gagal Mencatat Tagihan Rutin',
+            title: isEn ? 'Recurring Bill Failed' : 'Gagal Catat Tagihan',
             message: isEn
-              ? `Failed to auto-log "${item.title}": ${err?.message || 'Unknown error'}. Advanced to next cycle.`
-              : `Gagal mencatat transaksi rutin "${item.title}": ${err?.message || 'Terjadi kesalahan'}. Jadwal dialihkan ke periode berikutnya.`,
+              ? `Failed to log "${item.title}": ${err?.message || 'Error'}.`
+              : `Gagal mencatat "${item.title}": ${err?.message || 'Terjadi kesalahan'}.`,
             read: false,
             relatedId: item.id,
             createdAt: Date.now(),
           })
-        } catch {
+        } catch (err){
+      console.warn('[automation]', err)
           // Ignore secondary notification/update errors
         }
         break

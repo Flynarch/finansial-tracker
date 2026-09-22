@@ -1,8 +1,18 @@
-import Papa from 'papaparse'
 import { format, isValid } from 'date-fns'
 import { toSafeNumber } from './utils'
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { cleanMutationMerchant, matchCategoryFromDescription } from './merchantUtils'
+
+/**
+ * Configure PapaParse using dynamic import (offline capable)
+ */
+let papaLib = null
+async function getPapa() {
+  if (!papaLib) {
+    const imported = await import('papaparse')
+    papaLib = imported.default || imported
+  }
+  return papaLib
+}
 
 /**
  * Configure PDF.js worker using local bundled worker (offline capable)
@@ -10,9 +20,13 @@ import { cleanMutationMerchant, matchCategoryFromDescription } from './merchantU
 let pdfjsLib = null
 async function getPdfJs() {
   if (!pdfjsLib) {
-    pdfjsLib = await import('pdfjs-dist')
+    const [pdfjsModule, workerUrlModule] = await Promise.all([
+      import('pdfjs-dist'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+    ])
+    pdfjsLib = pdfjsModule
     if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrlModule.default
     }
   }
   return pdfjsLib
@@ -73,6 +87,7 @@ export async function extractTextFromPdf(arrayBuffer, password = '') {
 
     return { pages, fullText, isEncrypted: false }
   } catch (err) {
+      console.warn('[statementParser]', err)
     if (err.name === 'PasswordException' || String(err.message).toLowerCase().includes('password')) {
       return { pages: [], fullText: '', isEncrypted: true, needsPassword: true }
     }
@@ -81,9 +96,12 @@ export async function extractTextFromPdf(arrayBuffer, password = '') {
 }
 
 /**
- * Parses CSV or TSV string into raw rows.
+ * Parses CSV or TSV string into raw rows using dynamically imported PapaParse.
+ * @param {string} csvString
+ * @returns {Promise<{ headers: string[], rows: object[] }>}
  */
-export function parseCsvStatement(csvString) {
+export async function parseCsvStatement(csvString) {
+  const Papa = await getPapa()
   const result = Papa.parse(csvString, {
     header: true,
     skipEmptyLines: true,
@@ -241,7 +259,8 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
           isoDate = format(parsed, 'yyyy-MM-dd')
         }
       }
-    } catch {
+    } catch (err){
+      console.warn('[statementParser]', err)
       /* fallback */
     }
 

@@ -101,7 +101,8 @@ function compressImage(file, maxSize = 400, quality = 0.85) {
             resolve(dataUrl)
             return
           }
-        } catch {
+        } catch (err){
+      console.warn('[ChangePhotoModal]', err)
           /* ignore and use jpeg */
         }
 
@@ -140,7 +141,8 @@ function ChangePhotoContent({
       setErrorMsg('')
       const compressedDataUrl = await compressImage(file, 400, 0.85)
       setPreviewPhoto(compressedDataUrl)
-    } catch {
+    } catch (err){
+      console.warn('[ChangePhotoModal]', err)
       setErrorMsg(t('profile.photoProcessError', 'Gagal memproses gambar. Silakan coba gambar lain.'))
     } finally {
       setIsProcessing(false)
@@ -167,7 +169,8 @@ function ChangePhotoContent({
         await setProfilePhoto(previewPhoto)
       }
       onClose()
-    } catch {
+    } catch (err){
+      console.warn('[ChangePhotoModal]', err)
       setErrorMsg(t('profile.photoSaveError', 'Gagal menyimpan foto profil.'))
     } finally {
       setIsProcessing(false)

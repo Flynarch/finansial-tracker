@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import PropTypes from 'prop-types'
 import { Check, Trash2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft } from 'lucide-react'
 import { db } from '../../lib/db'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
+import { deleteTransaction } from '../../services/transactionService'
 
 export default function StagingReviewInbox({
   pendingTransactions = [],
@@ -39,7 +39,7 @@ export default function StagingReviewInbox({
       const affectedWallets = [tx.walletId, Number(targetWalletId)].filter(Boolean)
       await invalidateWalletBalance(affectedWallets)
     } catch (err) {
-      console.error('Failed to approve staged transaction:', err)
+      console.error('[StagingReviewInbox:approve]', err)
     } finally {
       setIsProcessingId(null)
     }
@@ -48,12 +48,9 @@ export default function StagingReviewInbox({
   const handleDismiss = async (tx) => {
     setIsProcessingId(tx.id)
     try {
-      await db.transactions.delete(tx.id)
-      if (tx.walletId) {
-        await invalidateWalletBalance([Number(tx.walletId)])
-      }
+      await deleteTransaction(tx.id)
     } catch (err) {
-      console.error('Failed to dismiss staged transaction:', err)
+      console.error('[StagingReviewInbox:dismiss]', err)
     } finally {
       setIsProcessingId(null)
     }
@@ -157,10 +154,3 @@ export default function StagingReviewInbox({
   )
 }
 
-StagingReviewInbox.propTypes = {
-  pendingTransactions: PropTypes.array,
-  wallets: PropTypes.array,
-  formatCurrency: PropTypes.func.isRequired,
-  defaultCurrency: PropTypes.string,
-  t: PropTypes.func.isRequired,
-}

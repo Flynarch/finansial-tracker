@@ -55,7 +55,8 @@ export async function initFirebaseAnalytics() {
   try {
     const app = getFirebaseApp({ requireConfig: true })
     getAnalytics(app)
-  } catch {
+  } catch (err){
+      console.warn('[firebase]', err)
     // Missing env or init failed — app can still run without Analytics
   }
 }

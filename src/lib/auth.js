@@ -75,7 +75,8 @@ export function subscribeAuth(listener) {
   try {
     const auth = getFirebaseAuth()
     return onAuthStateChanged(auth, listener)
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     // Firebase not configured yet: behave as logged-out.
     listener(null)
     return () => {}
@@ -85,14 +86,29 @@ export function subscribeAuth(listener) {
 export async function signOutCurrentUser() {
   try {
     if (Capacitor.isNativePlatform()) {
-      await FirebaseAuthentication.signOut().catch(() => {})
+      await FirebaseAuthentication.signOut().catch((err) => {
+        if (err?.code === 'network-request-failed' || String(err?.message).toLowerCase().includes('offline') || String(err?.message).toLowerCase().includes('network')) {
+          console.warn('[auth] Expected offline error during native signout:', err)
+        } else {
+          console.error('[auth] Critical auth error during native signout:', err)
+          throw err
+        }
+      })
     }
     const auth = getFirebaseAuth()
     if (auth) {
-      await signOut(auth).catch(() => {})
+      await signOut(auth).catch((err) => {
+        if (err?.code === 'auth/network-request-failed' || String(err?.message).toLowerCase().includes('offline') || String(err?.message).toLowerCase().includes('network')) {
+          console.warn('[auth] Expected offline error during web signout:', err)
+        } else {
+          console.error('[auth] Critical auth error during web signout:', err)
+          throw err
+        }
+      })
     }
-  } catch {
-    // Graceful logout even if offline or Firebase unconfigured
+  } catch (err){
+    console.error('[auth] SignOut failed with critical error:', err)
+    throw err
   }
 }
 
@@ -106,10 +122,11 @@ export async function ensureFirebaseAuthSynced() {
       const tokenRes = await FirebaseAuthentication.getIdToken().catch(() => null)
       if (tokenRes?.token) {
         const credential = GoogleAuthProvider.credential(tokenRes.token)
-        await signInWithCredential(auth, credential).catch(() => {})
+        await signInWithCredential(auth, credential).catch((err) => console.warn('[auth]', err))
       }
     }
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     // Graceful fallback
   }
 }
@@ -181,6 +198,7 @@ export async function signInWithGoogleCredential(idToken) {
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error?.code || 'UNKNOWN_ERROR',
@@ -319,6 +337,7 @@ export async function signInWithGoogle() {
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     const code = error?.code || 'UNKNOWN_ERROR'
     const isCancelled =
       code === 'auth/popup-closed-by-user' ||
@@ -364,6 +383,7 @@ export async function signInWithEmail(email, password) {
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -401,7 +421,7 @@ export async function signUpWithEmail(email, password, displayName, sendVerifica
 
     const postTasks = []
     if (cleanName) {
-      postTasks.push(updateProfile(u, { displayName: cleanName }).catch(() => {}))
+      postTasks.push(updateProfile(u, { displayName: cleanName }).catch((err) => console.warn('[auth]', err)))
     }
 
     let verificationSent = false
@@ -434,6 +454,7 @@ export async function signUpWithEmail(email, password, displayName, sendVerifica
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -459,6 +480,7 @@ export async function sendPasswordReset(email) {
       message: 'Email pemulihan kata sandi telah dikirim. Silakan periksa kotak masuk atau spam email Anda.',
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -502,6 +524,7 @@ export async function sendEmailMagicLink(email) {
       message: 'Tautan masuk ajaib telah dikirim ke email Anda. Buka email di HP ini dan klik tautan untuk langsung masuk.',
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -552,6 +575,7 @@ export async function signInWithMagicLink(email, url) {
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -579,6 +603,7 @@ export async function sendVerificationEmail() {
       message: 'Tautan verifikasi email telah dikirim. Silakan cek inbox atau spam email Anda.',
     }
   } catch (error) {
+      console.warn('[auth]', error)
     return {
       success: false,
       code: error.code || 'UNKNOWN_ERROR',
@@ -603,7 +628,8 @@ export async function reloadAuthUser() {
       photoURL: user.photoURL || '',
       emailVerified: Boolean(user.emailVerified),
     }
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     return null
   }
 }
@@ -615,7 +641,8 @@ export function isCurrentUserAnonymous() {
   try {
     const auth = getFirebaseAuth()
     return Boolean(auth?.currentUser?.isAnonymous)
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     return false
   }
 }
@@ -684,6 +711,7 @@ export async function signInAnonymousUser() {
       },
     }
   } catch (error) {
+      console.warn('[auth]', error)
     // If Firebase Anonymous is disabled in console or device is offline, gracefully return anonymous guest user
     return {
       success: true,
@@ -729,12 +757,12 @@ export async function deleteCurrentAccount() {
   if (currentUser) {
     const uid = currentUser.uid
     // 1. Purge cloud backup data with timeout protection
-    await withTimeout(deleteCloudBackup(uid).catch(() => {}), 3500)
+    await withTimeout(deleteCloudBackup(uid).catch((err) => console.warn('[auth]', err)), 3500)
 
     // 2. Delete user from Firebase Auth with timeout protection
     try {
       if (Capacitor.isNativePlatform()) {
-        await withTimeout(FirebaseAuthentication.deleteUser().catch(() => {}), 3000)
+        await withTimeout(FirebaseAuthentication.deleteUser().catch((err) => console.warn('[auth]', err)), 3000)
       }
       await withTimeout(deleteUser(currentUser), 3000)
     } catch (error) {
@@ -773,22 +801,25 @@ export async function deleteCurrentAccount() {
       db.loans,
       db.loanPayments,
       db.walletBalanceCache,
+      db.chatMessages,
     ]
-    await Promise.all(dataTables.map((t) => t?.clear?.().catch(() => {})))
-  } catch {
+    await Promise.all(dataTables.map((t) => t?.clear?.().catch((err) => console.warn('[auth]', err))))
+  } catch (err){
+      console.warn('[auth]', err)
     /* ignore */
   }
 
   // 4. Reset local store and storage
   try {
     clearAppLocalStorage()
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     /* ignore */
   }
 
   try {
     const resetOnboarding = useSettingsStore.getState().resetOnboarding
-    if (resetOnboarding) await resetOnboarding().catch(() => {})
+    if (resetOnboarding) await resetOnboarding().catch((err) => console.warn('[auth]', err))
 
     const setAuthUser = useSettingsStore.getState().setAuthUser
     if (setAuthUser) {
@@ -799,9 +830,10 @@ export async function deleteCurrentAccount() {
         photoURL: '',
         provider: 'guest',
         emailVerified: false,
-      }).catch(() => {})
+      }).catch((err) => console.warn('[auth]', err))
     }
-  } catch {
+  } catch (err){
+      console.warn('[auth]', err)
     /* ignore */
   }
 

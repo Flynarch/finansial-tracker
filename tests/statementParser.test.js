@@ -77,9 +77,9 @@ describe('statementParser', () => {
     expect(results[1].selected).toBe(true)
   })
 
-  it('parses CSV statements cleanly with PapaParse', () => {
+  it('parses CSV statements cleanly with PapaParse', async () => {
     const csv = `Date,Description,Amount,Type\n2026-08-01,Indomaret Belanja,35000,DB\n2026-08-02,Gaji Bonus,2000000,CR`
-    const parsed = parseCsvStatement(csv)
+    const parsed = await parseCsvStatement(csv)
     expect(parsed.headers).toEqual(['Date', 'Description', 'Amount', 'Type'])
     expect(parsed.rows.length).toBe(2)
   })

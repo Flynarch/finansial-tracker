@@ -155,7 +155,7 @@ export const ReasoningIndicator = memo(function ReasoningIndicator() {
 export const TypingIndicator = ReasoningIndicator
 
 // ── Chart Bubble ──
-const ELEGANT_PIE_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#818cf8']
+import { getChartPalette } from '../../lib/chartTheme'
 
 function CustomTooltip({ active, payload, defaultCurrency = 'IDR' }) {
   if (active && payload && payload.length) {
@@ -221,10 +221,11 @@ export const ChartBubble = memo(function ChartBubble({ data = {}, chartType = 'e
   }, [data, chartType, locale])
 
   const chartData = useMemo(() => {
+    const palette = getChartPalette()
     return Object.values(groupedData)
       .map((item, idx) => ({
         ...item,
-        color: ELEGANT_PIE_COLORS[idx % ELEGANT_PIE_COLORS.length]
+        color: palette[idx % palette.length]
       }))
       .sort((a, b) => b.value - a.value)
   }, [groupedData])

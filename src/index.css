@@ -386,6 +386,16 @@ img, svg, a, button {
     --chart-success: #10b981;
     --chart-success-fill: rgba(16, 185, 129, 0.14);
 
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #818cf8;
+    --chart-2: #34d399;
+    --chart-3: #fbbf24;
+    --chart-4: #fb7185;
+    --chart-5: #38bdf8;
+    --chart-6: #a78bfa;
+    --chart-7: #f472b6;
+    --chart-8: #2dd4bf;
+
     /* Mobile bottom navigation (follows theme) */
     --nav-shell-fill: #11151e;
     --nav-shell-stroke: rgba(255, 255, 255, 0.08);
@@ -498,6 +508,16 @@ img, svg, a, button {
     --chart-success: #34d399;
     --chart-success-fill: rgba(52, 211, 153, 0.15);
 
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #93c5fd;
+    --chart-2: #6ee7b7;
+    --chart-3: #fde68a;
+    --chart-4: #fda4af;
+    --chart-5: #67e8f9;
+    --chart-6: #c4b5fd;
+    --chart-7: #f9a8d4;
+    --chart-8: #5eead4;
+
     /* Mobile bottom navigation */
     --nav-shell-fill: #080d1a;
     --nav-shell-stroke: rgba(56, 189, 248, 0.12);
@@ -607,6 +627,16 @@ img, svg, a, button {
     --chart-gold-fill: rgba(217, 119, 6, 0.12);
     --chart-success: #059669;
     --chart-success-fill: rgba(5, 150, 105, 0.12);
+
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #6366f1;
+    --chart-2: #059669;
+    --chart-3: #d97706;
+    --chart-4: #e11d48;
+    --chart-5: #0284c7;
+    --chart-6: #7c3aed;
+    --chart-7: #db2777;
+    --chart-8: #0d9488;
 
     --nav-shell-fill: #ffffff;
     --nav-shell-stroke: rgba(15, 23, 42, 0.08);

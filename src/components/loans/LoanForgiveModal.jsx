@@ -36,6 +36,7 @@ export default function LoanForgiveModal({
       onSuccess?.()
       onClose()
     } catch (err) {
+      console.warn('[LoanForgiveModal]', err)
       hapticWarning()
       setError(err.message || t('common.error.generic', 'Terjadi Kendala'))
     } finally {

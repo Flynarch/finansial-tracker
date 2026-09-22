@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { CircleDollarSign, ArrowUpRight, AlertTriangle, CheckCircle2, AlertOctagon } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
@@ -170,10 +169,3 @@ export default function BudgetStatusWidget({
   )
 }
 
-BudgetStatusWidget.propTypes = {
-  category: PropTypes.string,
-  limit: PropTypes.number,
-  spent: PropTypes.number,
-  currency: PropTypes.string,
-  action: PropTypes.string,
-}

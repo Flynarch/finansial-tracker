@@ -27,3 +27,9 @@ dist-ssr
 *.sln
 *.sw?
 *.apk
+repomix.md
+.agents/*/
+!.agents/skills/
+.agents/ORIGINAL_REQUEST.md
+.agents/PROJECT.md
+.agents/TEST_INFRA.md

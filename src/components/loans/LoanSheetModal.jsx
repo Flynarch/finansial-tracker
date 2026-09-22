@@ -203,6 +203,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
       onSaved?.()
       onClose?.()
     } catch (err) {
+      console.warn('[LoanSheetModal]', err)
       setSheetError(err.message || t('loans.error.saveFailed', 'Gagal menyimpan data pinjaman. Silakan coba lagi.'))
     }
   }

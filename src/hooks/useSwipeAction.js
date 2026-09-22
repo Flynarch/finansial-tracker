@@ -7,7 +7,8 @@ function triggerHaptic(duration = 10) {
   if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
     try {
       navigator.vibrate(duration)
-    } catch {
+    } catch (err){
+      console.warn('[useSwipeAction]', err)
       // Ignore vibration errors on unsupported environments
     }
   }

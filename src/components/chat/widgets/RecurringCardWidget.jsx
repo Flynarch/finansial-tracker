@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { Repeat, Calendar, ArrowUpRight } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
@@ -78,10 +77,3 @@ export default function RecurringCardWidget({
   )
 }
 
-RecurringCardWidget.propTypes = {
-  title: PropTypes.string,
-  amount: PropTypes.number,
-  frequency: PropTypes.string,
-  currency: PropTypes.string,
-  category: PropTypes.string,
-}

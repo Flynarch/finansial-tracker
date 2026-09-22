@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
-import { derivePbkdf2Pin, hashPin, isPinHash } from '../lib/crypto'
+import { derivePbkdf2Pin, isPinHash, encryptSecret, decryptSecret, migrateSecretIfNeeded } from '../lib/crypto'
 
 const SETTINGS_KEY = 'preferences'
 
@@ -15,10 +15,10 @@ function detectSystemLocale() {
 function getInitialTheme() {
   if (typeof window !== 'undefined') {
     try {
-      const cached = window.localStorage.getItem('ft_theme')
+      const cached = window.localStorage?.getItem?.('ft_theme')
       if (cached && ['light', 'dark', 'midnight'].includes(cached)) return cached
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:getInitialTheme]', err)
     }
   }
   return 'light'
@@ -61,6 +61,7 @@ const useSettingsStore = create((set, get) => ({
   clearUnviewedMutations: () => set({ unviewedMutationsCount: 0 }),
   persist: async (updates) => {
     const next = { ...get(), ...updates }
+    const persistedApiKey = next.geminiApiKey ? await encryptSecret(next.geminiApiKey) : ''
     await db.settings.put({
       key: SETTINGS_KEY,
       theme: next.theme,
@@ -82,7 +83,7 @@ const useSettingsStore = create((set, get) => ({
       lockSecret: next.lockSecret,
       biometricEnabled: next.biometricEnabled !== undefined ? Boolean(next.biometricEnabled) : true,
       autoLockTimeout: next.autoLockTimeout,
-      geminiApiKey: next.geminiApiKey,
+      geminiApiKey: persistedApiKey,
       dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
@@ -95,24 +96,24 @@ const useSettingsStore = create((set, get) => ({
     set({ hideBalance: next })
     try {
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('ft_hide_balance', next ? '1' : '0')
+        window.localStorage?.setItem?.('ft_hide_balance', next ? '1' : '0')
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:toggleHideBalance]', err)
     }
-    get().persist({ hideBalance: next }).catch(() => {})
+    get().persist({ hideBalance: next }).catch((err) => console.error('[useSettingsStore:persistHideBalance]', err))
   },
   setTheme: (theme) => {
     set({ theme })
     try {
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('ft_theme', theme)
+        window.localStorage?.setItem?.('ft_theme', theme)
         document.documentElement.setAttribute('data-theme', theme)
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:setTheme]', err)
     }
-    get().persist({ theme }).catch(() => {})
+    get().persist({ theme }).catch((err) => console.error('[useSettingsStore:persistTheme]', err))
   },
   setDefaultCurrency: async (defaultCurrency) => {
     set({ defaultCurrency })
@@ -120,8 +121,8 @@ const useSettingsStore = create((set, get) => ({
     try {
       const { scheduleNativeWidgetSync } = await import('../lib/nativeWidgetSync')
       scheduleNativeWidgetSync(100)
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:setDefaultCurrencySync]', err)
     }
   },
   setDefaultWalletId: async (defaultWalletId) => {
@@ -140,8 +141,8 @@ const useSettingsStore = create((set, get) => ({
       if (dailyReminderEnabled) {
         await syncDailyReminderSchedule(true, dailyReminderTime)
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:setLocaleSync]', err)
     }
   },
   setMotionPreference: async (motionPreference) => {
@@ -235,8 +236,8 @@ const useSettingsStore = create((set, get) => ({
     try {
       const { initNotificationChannels } = await import('../lib/smartNotifications')
       await initNotificationChannels()
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('[useSettingsStore:initNotificationChannels]', err)
     }
   },
   unlock: () => set({ isUnlocked: true }),
@@ -280,7 +281,7 @@ const useSettingsStore = create((set, get) => ({
   loadSettings: async () => {
     const record = await db.settings.get(SETTINGS_KEY)
     // Check old onboarding localStorage flag for migration
-    const oldOnboardingSeen = typeof window !== 'undefined' && window.localStorage.getItem('ft_onboarding_seen_v1') === '1'
+    const oldOnboardingSeen = typeof window !== 'undefined' && window.localStorage?.getItem?.('ft_onboarding_seen_v1') === '1'
     if (!record) {
       // No settings record: new user OR user who saw old onboarding but never changed settings
       const detectedLocale = detectSystemLocale()
@@ -305,16 +306,30 @@ const useSettingsStore = create((set, get) => ({
     const loadedTheme = record.theme || 'light'
     try {
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('ft_theme', loadedTheme)
-        document.documentElement.setAttribute('data-theme', loadedTheme)
+        window.localStorage?.setItem?.('ft_theme', loadedTheme)
       }
-    } catch {
+      if (typeof document !== 'undefined') {
+        document.documentElement?.setAttribute?.('data-theme', loadedTheme)
+      }
+    } catch (err) {
+      console.warn('[useSettingsStore]', err)
       /* ignore */
     }
     let initialLockSecret = record.lockSecret || ''
     if ((record.securityMethod === 'pin' || record.securityMethod === 'pattern') && initialLockSecret && !isPinHash(initialLockSecret)) {
-      initialLockSecret = await hashPin(initialLockSecret)
-      void db.settings.update(SETTINGS_KEY, { lockSecret: initialLockSecret }).catch(() => {})
+      initialLockSecret = await derivePbkdf2Pin(initialLockSecret)
+      void db.settings.update(SETTINGS_KEY, { lockSecret: initialLockSecret }).catch((err) => console.warn('[useSettingsStore]', err))
+    }
+
+    let decryptedApiKey = ''
+    if (record.geminiApiKey) {
+      const migrated = await migrateSecretIfNeeded(record.geminiApiKey)
+      if (migrated) {
+        void db.settings.update(SETTINGS_KEY, { geminiApiKey: migrated }).catch((err) => console.warn('[useSettingsStore]', err))
+        decryptedApiKey = await decryptSecret(migrated)
+      } else {
+        decryptedApiKey = await decryptSecret(record.geminiApiKey)
+      }
     }
 
     set({
@@ -339,14 +354,14 @@ const useSettingsStore = create((set, get) => ({
       lockSecret: initialLockSecret,
       biometricEnabled: record.biometricEnabled !== undefined ? Boolean(record.biometricEnabled) : true,
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
-      geminiApiKey: record.geminiApiKey || '',
+      geminiApiKey: decryptedApiKey,
       dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
       budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
       hideBalance: record.hideBalance !== undefined
         ? Boolean(record.hideBalance)
-        : (typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false),
+        : (typeof window !== 'undefined' ? window.localStorage?.getItem?.('ft_hide_balance') === '1' : false),
       isUnlocked: !securityEnabled,
       isLoaded: true,
     })

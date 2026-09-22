@@ -41,7 +41,8 @@ function Savings() {
       try {
         const fetchedRates = await fetchCurrencyRates('USD')
         setRates(fetchedRates)
-      } catch {
+      } catch (err){
+      console.warn('[Savings]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -59,7 +60,8 @@ function Savings() {
   const goals = useLiveQuery(async () => {
     try {
       return await db.goals.toArray()
-    } catch {
+    } catch (err){
+      console.warn('[Savings]', err)
       return []
     }
   }, [], [])
@@ -67,7 +69,8 @@ function Savings() {
   const wallets = useLiveQuery(async () => {
     try {
       return await db.wallets.toArray()
-    } catch {
+    } catch (err){
+      console.warn('[Savings]', err)
       return []
     }
   }, [], [])
@@ -158,7 +161,8 @@ function Savings() {
     try {
       const stored = localStorage.getItem('fintrack_seen_archived_goal_ids')
       return stored ? JSON.parse(stored) : []
-    } catch {
+    } catch (err){
+      console.warn('[Savings]', err)
       return []
     }
   })
@@ -175,7 +179,8 @@ function Savings() {
         const merged = Array.from(new Set([...prev, ...allCurrentArchivedIds]))
         try {
           localStorage.setItem('fintrack_seen_archived_goal_ids', JSON.stringify(merged))
-        } catch {
+        } catch (err){
+      console.warn('[Savings]', err)
           // ignore
         }
         return merged

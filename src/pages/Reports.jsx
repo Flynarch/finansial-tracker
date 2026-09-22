@@ -48,7 +48,8 @@ export default function Reports() {
       try {
         const fetchedRates = await fetchCurrencyRates('USD')
         setRates(fetchedRates)
-      } catch {
+      } catch (err){
+      console.warn('[Reports]', err)
         setRates({ ...FALLBACK_EXCHANGE_RATES })
       }
     }
@@ -75,7 +76,10 @@ export default function Reports() {
   }, [rangeMonths])
 
   const transactions = useLiveQuery(
-    () => db.transactions.where('date').aboveOrEqual(cutoffDate).toArray(),
+    async () => {
+      const list = await db.transactions.where('date').aboveOrEqual(cutoffDate).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
+    },
     [cutoffDate],
     []
   )
@@ -92,11 +96,19 @@ export default function Reports() {
     [rates],
     []
   )
-  const txCount = useLiveQuery(() => db.transactions.count(), [], 0)
+  const txCount = useLiveQuery(
+    async () => {
+      const all = await db.transactions.toArray()
+      return (all || []).filter((tx) => !tx.deletedAt).length
+    },
+    [],
+    0
+  )
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return []
     const validTxs = transactions.filter((t) => {
+      if (t.deletedAt) return false
       if (t.isSplit && Array.isArray(t.splitItems) && t.splitItems.length > 0) {
         return t.splitItems.some((si) =>
           !isExcludeAnalyticsTx({

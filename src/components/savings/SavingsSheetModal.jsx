@@ -85,7 +85,8 @@ export default memo(function SavingsSheetModal({ isOpen, onClose, editingGoal = 
       }
       onSaved?.()
       onClose()
-    } catch {
+    } catch (err){
+      console.warn('[SavingsSheetModal]', err)
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
       setSheetError(offline ? t('common.error.offline') : t('common.error.saveFailed'))
     }

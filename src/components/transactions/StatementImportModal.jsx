@@ -84,7 +84,7 @@ export default function StatementImportModal({
         await tryProcessPdf(buffer, '')
       } else if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
         const text = await selectedFile.text()
-        const parsed = parseCsvStatement(text)
+        const parsed = await parseCsvStatement(text)
         setCsvHeaders(parsed.headers)
         setCsvRows(parsed.rows)
 

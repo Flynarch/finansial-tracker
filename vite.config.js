@@ -12,7 +12,6 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('pdfjs-dist')) return 'vendor-pdfjs'
           if (id.includes('jspdf')) return 'vendor-jspdf'
-          if (id.includes('acorn')) return 'vendor-acorn'
           if (id.includes('react-markdown') || id.includes('remark-') || id.includes('micromark') || id.includes('mdast') || id.includes('unist')) return 'vendor-markdown'
           if (id.includes('papaparse')) return 'vendor-csv'
           if (id.includes('@capacitor') || id.includes('@aparajita')) return 'vendor-capacitor'
@@ -30,7 +29,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-    // ijinkan akses via tunnel (ngrok, dll.); tanpa ini Vite menolak Host header selain localhost
-    allowedHosts: true,
+    // Batasi akses host ke localhost dan domain tunnel development yang umum
+    allowedHosts: ['.ngrok-free.app', '.ngrok.io', '.loca.lt', 'localhost', '127.0.0.1'],
   },
 })

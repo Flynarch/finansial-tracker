@@ -14,24 +14,56 @@ import { importAllDataFromJsonPayload } from '../../lib/backup'
 import {
   decryptPayloadWithMnemonic,
   validateMnemonicPhrase,
+  setSessionMnemonicPhrase,
 } from '../../lib/mnemonicCrypto'
 
-export default function MnemonicRecoveryModal({ isOpen, onClose, onRestoreComplete }) {
+export default function MnemonicRecoveryModal({
+  isOpen,
+  onClose,
+  onRestoreComplete,
+  initialEnvelope = null,
+  source = 'file',
+}) {
   const { t } = useTranslation()
   const fileInputRef = useRef(null)
 
-  const [step, setStep] = useState('upload') // 'upload' | 'phrase' | 'preview'
+  const [step, setStep] = useState(initialEnvelope ? 'phrase' : 'upload') // 'upload' | 'phrase' | 'preview'
   const [file, setFile] = useState(null)
-  const [rawEnvelope, setRawEnvelope] = useState(null)
+  const [rawEnvelope, setRawEnvelope] = useState(initialEnvelope)
   const [phraseInput, setPhraseInput] = useState('')
   const [phraseError, setPhraseError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [decryptedData, setDecryptedData] = useState(null)
 
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  const [prevInitialEnvelope, setPrevInitialEnvelope] = useState(initialEnvelope)
+
+  if (prevIsOpen !== isOpen || prevInitialEnvelope !== initialEnvelope) {
+    setPrevIsOpen(isOpen)
+    setPrevInitialEnvelope(initialEnvelope)
+    if (isOpen) {
+      if (initialEnvelope && initialEnvelope.format === 'fintrack_encrypted_envelope') {
+        setRawEnvelope(initialEnvelope)
+        setStep('phrase')
+        setPhraseError('')
+        setFile(null)
+        setPhraseInput('')
+        setDecryptedData(null)
+      } else {
+        setStep('upload')
+        setFile(null)
+        setRawEnvelope(null)
+        setPhraseInput('')
+        setPhraseError('')
+        setDecryptedData(null)
+      }
+    }
+  }
+
   const handleReset = () => {
-    setStep('upload')
+    setStep(initialEnvelope ? 'phrase' : 'upload')
     setFile(null)
-    setRawEnvelope(null)
+    setRawEnvelope(initialEnvelope || null)
     setPhraseInput('')
     setPhraseError('')
     setDecryptedData(null)
@@ -52,7 +84,8 @@ export default function MnemonicRecoveryModal({ isOpen, onClose, onRestoreComple
       }
       setRawEnvelope(envelope)
       setStep('phrase')
-    } catch {
+    } catch (err){
+      console.warn('[MnemonicRecoveryModal]', err)
       setPhraseError(t('mnemonic.fileReadError', 'Gagal membaca berkas cadangan.'))
     }
   }
@@ -89,6 +122,17 @@ export default function MnemonicRecoveryModal({ isOpen, onClose, onRestoreComple
 
     try {
       await importAllDataFromJsonPayload(decryptedData)
+      const cleanPhrase = phraseInput.trim().toLowerCase()
+      setSessionMnemonicPhrase(cleanPhrase)
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('fintrack_e2ee_active', 'true')
+          window.localStorage.removeItem('fintrack_e2ee_phrase')
+        }
+      } catch (err){
+      console.warn('[MnemonicRecoveryModal]', err)
+        // ignore
+      }
 
       if (onRestoreComplete) onRestoreComplete()
       handleReset()
@@ -105,7 +149,11 @@ export default function MnemonicRecoveryModal({ isOpen, onClose, onRestoreComple
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('mnemonic.recoveryModalTitle', 'Pulihkan Data Terenkripsi (.fintrack.enc)')}
+      title={
+        source === 'cloud'
+          ? t('mnemonic.cloudRecoveryTitle', 'Pulihkan Cadangan Cloud Terenkripsi')
+          : t('mnemonic.recoveryModalTitle', 'Pulihkan Data Terenkripsi (.fintrack.enc)')
+      }
       maxWidth="max-w-md"
       showCloseButton={true}
     >
@@ -150,11 +198,23 @@ export default function MnemonicRecoveryModal({ isOpen, onClose, onRestoreComple
           <div className="space-y-4 animate-fadeIn">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 space-y-1">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
-                {t('mnemonic.fileReady', 'Berkas Cadangan')}
+                {source === 'cloud'
+                  ? t('mnemonic.cloudBackupReady', 'Cadangan Cloud Terenkripsi')
+                  : t('mnemonic.fileReady', 'Berkas Cadangan')}
               </span>
               <h4 className="text-xs font-bold text-[var(--fg)] truncate">
-                {file?.name}
+                {source === 'cloud'
+                  ? t('mnemonic.cloudEnvelopeReady', 'Cadangan Cloud Akun (Zero-Knowledge E2EE)')
+                  : file?.name}
               </h4>
+              {source === 'cloud' ? (
+                <p className="text-[11px] text-[var(--muted)] leading-relaxed pt-1">
+                  {t(
+                    'mnemonic.cloudPhraseNotice',
+                    'Data akun Anda di cloud diamankan dengan enkripsi Zero-Knowledge. Masukkan 12 kata pemulihan Anda untuk memulihkan transaksi dan saldo ke perangkat ini.',
+                  )}
+                </p>
+              ) : null}
             </div>
 
             <div>

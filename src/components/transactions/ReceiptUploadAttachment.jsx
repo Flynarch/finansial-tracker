@@ -19,7 +19,8 @@ export default function ReceiptUploadAttachment({ value, onChange, onView, input
       if (compressed) {
         onChange(compressed)
       }
-    } catch {
+    } catch (err){
+      console.warn('[ReceiptUploadAttachment]', err)
       // Ignore error
     } finally {
       setIsCompressing(false)

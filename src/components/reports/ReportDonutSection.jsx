@@ -1,9 +1,9 @@
-﻿import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { ArrowLeft, Layers, ChevronRight, PieChart as PieIcon } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency, formatCompactCurrency, toSafeNumber } from '../../lib/utils'
-import { CHART_PALETTE } from '../../lib/chartTheme'
+import { getChartPalette } from '../../lib/chartTheme'
 import ChartTooltip from './ChartTooltip'
 import EmptyState from '../ui/EmptyState'
 import { triggerHaptic } from '../../lib/haptics'
@@ -27,6 +27,7 @@ export default function ReportDonutSection({
 }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+  const chartPalette = getChartPalette()
 
   const hasData = toSafeNumber(donutTotal) > 0
   const safeActivePieIdx = donutData.length ? Math.min(activePieIdx, donutData.length - 1) : 0
@@ -170,7 +171,7 @@ export default function ReportDonutSection({
                   {donutData.map((_, idx) => (
                     <Cell
                       key={`donut-cell-${idx}`}
-                      fill={CHART_PALETTE[idx % CHART_PALETTE.length]}
+                      fill={chartPalette[idx % chartPalette.length]}
                       opacity={safeActivePieIdx === idx ? 1 : 0.82}
                     />
                   ))}
@@ -223,7 +224,7 @@ export default function ReportDonutSection({
             <ul className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {categoriesList.map((row, index) => {
                 const share = donutTotal > 0 ? (toSafeNumber(row.value) / donutTotal) * 100 : 0
-                const color = CHART_PALETTE[index % CHART_PALETTE.length]
+                const color = chartPalette[index % chartPalette.length]
 
                 return (
                   <li

@@ -3,19 +3,9 @@
  * Uses native Web Crypto API for SHA-256 hashing.
  */
 
-function bufferToHex(buffer) {
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
+import { bufferToHex, hexToBuffer } from './cryptoUtils'
 
-function hexToBuffer(hex) {
-  const bytes = new Uint8Array(Math.ceil(hex.length / 2))
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = parseInt(hex.substr(i * 2, 2), 16)
-  }
-  return bytes
-}
+export { bufferToHex, hexToBuffer }
 
 /**
  * Checks if a string is a 64-character SHA-256 hex digest or a PBKDF2 formatted hash.
@@ -130,3 +120,167 @@ export async function verifyPin(enteredPin, storedSecret) {
   // 3. Legacy plaintext fallback
   return trimmedInput === trimmedStored
 }
+
+const ENCRYPTED_PREFIX = 'enc:v1:'
+
+async function getSecretKey(useLegacy = false) {
+  const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
+  if (!cryptoObj?.subtle) return null
+  const enc = new TextEncoder()
+  
+  let salt = 'fintrack_local_key_salt';
+  if (!useLegacy && typeof window !== 'undefined' && window.localStorage) {
+    let clientSalt = window.localStorage.getItem('ft_client_salt_v2');
+    if (!clientSalt) {
+      const arr = new Uint8Array(16);
+      cryptoObj.getRandomValues(arr);
+      clientSalt = bufferToHex(arr);
+      window.localStorage.setItem('ft_client_salt_v2', clientSalt);
+    }
+    salt = clientSalt;
+  }
+
+  const keyMaterial = await cryptoObj.subtle.importKey(
+    'raw',
+    enc.encode('ft_sec_byok_at_rest_salt_v1'),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  )
+  return cryptoObj.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: enc.encode(salt),
+      iterations: 50000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+/**
+ * Encrypts a sensitive plaintext string (such as BYOK Gemini API key) using AES-GCM.
+ * @param {string} plaintext
+ * @returns {Promise<string>} Format: "enc:v1:{ivHex}:{cipherHex}"
+ */
+export async function encryptSecret(plaintext) {
+  if (!plaintext || typeof plaintext !== 'string') return ''
+  // If it's already encrypted with the new format (which is the same prefix), we would need a way to know,
+  // but we can't easily. The easiest is to just re-encrypt if it's not starting with ENCRYPTED_PREFIX.
+  // Wait, if it IS starting with ENCRYPTED_PREFIX, we could theoretically decrypt and re-encrypt, but then we might loop.
+  // We will just leave it if it's already encrypted, or always re-encrypt?
+  // Let's just follow the original logic: if it starts with ENCRYPTED_PREFIX, return it. 
+  // Wait, "if an existing encrypted key cannot be decrypted with the new key, attempt decryption with legacy static salt and seamlessly re-encrypt with the new key."
+  // This means the seamless re-encryption should probably happen inside decryptSecret if it notices it was legacy? No, decryptSecret returns string.
+  if (plaintext.startsWith(ENCRYPTED_PREFIX)) return plaintext
+  const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
+  if (!cryptoObj?.subtle) {
+    throw new Error('Web Crypto API tidak didukung di lingkungan ini.')
+  }
+  try {
+    const key = await getSecretKey(false)
+    if (!key) throw new Error('Gagal menurunkan kunci enkripsi.')
+    const iv = cryptoObj.getRandomValues(new Uint8Array(12))
+    const enc = new TextEncoder()
+    const ciphertext = await cryptoObj.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      enc.encode(plaintext)
+    )
+    return `${ENCRYPTED_PREFIX}${bufferToHex(iv)}:${bufferToHex(ciphertext)}`
+  } catch (err) {
+    console.error('[crypto.encryptSecret]', err)
+    throw err
+  }
+}
+
+/**
+ * Decrypts an AES-GCM encrypted secret string. Transparently supports legacy plaintext strings.
+ * @param {string} ciphertext
+ * @returns {Promise<string>} Decrypted plaintext
+ */
+export async function decryptSecret(ciphertext) {
+  if (!ciphertext || typeof ciphertext !== 'string') return ''
+  if (!ciphertext.startsWith(ENCRYPTED_PREFIX)) return ciphertext // Already plaintext (legacy)
+  const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
+  if (!cryptoObj?.subtle) return ciphertext
+  
+  const parts = ciphertext.slice(ENCRYPTED_PREFIX.length).split(':')
+  if (parts.length !== 2) return ciphertext
+  const [ivHex, cipherHex] = parts
+  const iv = hexToBuffer(ivHex)
+  const data = hexToBuffer(cipherHex)
+
+  try {
+    const key = await getSecretKey(false)
+    if (!key) return ciphertext
+    const decrypted = await cryptoObj.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      data
+    )
+    const dec = new TextDecoder()
+    return dec.decode(decrypted)
+  } catch {
+    // Attempt fallback with legacy static salt
+    try {
+      const legacyKey = await getSecretKey(true)
+      if (!legacyKey) return ciphertext
+      const decryptedFallback = await cryptoObj.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        legacyKey,
+        data
+      )
+      const dec = new TextDecoder()
+      return dec.decode(decryptedFallback)
+    } catch {
+      return ciphertext
+    }
+  }
+}
+
+/**
+ * Checks if a ciphertext needs migration from legacy static salt to new client salt.
+ * @param {string} ciphertext
+ * @returns {Promise<string|null>} New ciphertext if migrated, null if no migration needed
+ */
+export async function migrateSecretIfNeeded(ciphertext) {
+  if (!ciphertext || typeof ciphertext !== 'string' || !ciphertext.startsWith(ENCRYPTED_PREFIX)) return null
+  const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
+  if (!cryptoObj?.subtle) return null
+
+  const parts = ciphertext.slice(ENCRYPTED_PREFIX.length).split(':')
+  if (parts.length !== 2) return null
+  const [ivHex, cipherHex] = parts
+  const iv = hexToBuffer(ivHex)
+  const data = hexToBuffer(cipherHex)
+
+  try {
+    const key = await getSecretKey(false)
+    if (!key) return null
+    // Test decryption with new key
+    await cryptoObj.subtle.decrypt({ name: 'AES-GCM', iv }, key, data)
+    return null // Success with new key, no migration needed
+  } catch {
+    // Failed with new key, check if legacy key works
+    try {
+      const legacyKey = await getSecretKey(true)
+      if (!legacyKey) return null
+      const decryptedFallback = await cryptoObj.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        legacyKey,
+        data
+      )
+      const dec = new TextDecoder()
+      const plaintext = dec.decode(decryptedFallback)
+      // Re-encrypt with new key
+      return await encryptSecret(plaintext)
+    } catch {
+      return null
+    }
+  }
+}
+

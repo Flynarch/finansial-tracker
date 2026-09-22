@@ -7,6 +7,8 @@
  * 3. 'midnight' (Mode Biru Malam / Obsidian Navy Blue)
  */
 
+import { THEME_BG_COLORS } from './themeColors'
+
 export const THEME_CYCLE = ['light', 'dark', 'midnight']
 
 export function getNextTheme(currentTheme) {
@@ -21,20 +23,20 @@ export function getThemeDetails(theme) {
       return {
         label: 'Midnight Sapphire',
         shortLabel: 'Midnight',
-        bgColor: '#060913',
+        bgColor: THEME_BG_COLORS.midnight,
       }
     case 'dark':
       return {
         label: 'Matte Dark',
         shortLabel: 'Matte Dark',
-        bgColor: '#0f1218',
+        bgColor: THEME_BG_COLORS.dark,
       }
     case 'light':
     default:
       return {
         label: 'Putih',
         shortLabel: 'Putih',
-        bgColor: '#f5f7fb',
+        bgColor: THEME_BG_COLORS.light,
       }
   }
 }
@@ -60,7 +62,8 @@ export function primeThemeTransition() {
           })
           ?.catch(() => {})
       }
-    } catch {
+    } catch (err){
+      console.warn('[themeTransition]', err)
       /* ignore */
     }
   }
@@ -156,7 +159,8 @@ export function executeThemeTransition({ currentTheme, targetTheme, setTheme, or
           document.documentElement.classList.remove('ft-theme-transitioning')
         })
         ?.catch(() => {})
-    } catch {
+    } catch (err){
+      console.warn('[themeTransition]', err)
       document.documentElement.setAttribute('data-theme', nextTheme)
       setTheme(nextTheme)
       document.documentElement.classList.remove('ft-theme-transitioning')

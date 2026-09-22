@@ -31,7 +31,8 @@ export default function CustomDatePicker({
     if (!value) return null
     try {
       return parse(value, 'yyyy-MM-dd', new Date())
-    } catch {
+    } catch (err){
+      console.warn('[CustomDatePicker]', err)
       return null
     }
   }, [value])
@@ -49,7 +50,8 @@ export default function CustomDatePicker({
     if (!tempDate) return null
     try {
       return parse(tempDate, 'yyyy-MM-dd', new Date())
-    } catch {
+    } catch (err){
+      console.warn('[CustomDatePicker]', err)
       return null
     }
   }, [tempDate])
@@ -88,7 +90,8 @@ export default function CustomDatePicker({
     if (!parsedValue) return ''
     try {
       return format(parsedValue, 'dd MMM yyyy', { locale: dateLocale })
-    } catch {
+    } catch (err){
+      console.warn('[CustomDatePicker]', err)
       return value || ''
     }
   }, [parsedValue, value, dateLocale])

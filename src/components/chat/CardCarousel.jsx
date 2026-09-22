@@ -1,5 +1,4 @@
 import React, { memo, useRef, useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 
 const CardCarousel = ({ children, cardWidth = 260 }) => {
   const scrollRef = useRef(null);
@@ -55,11 +54,6 @@ const CardCarousel = ({ children, cardWidth = 260 }) => {
       )}
     </div>
   );
-};
-
-CardCarousel.propTypes = {
-  children: PropTypes.node,
-  cardWidth: PropTypes.number,
 };
 
 export default memo(CardCarousel);

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format, isToday, isTomorrow, isBefore, startOfDay, parse } from 'date-fns'
+import { format, isToday, isTomorrow, isBefore, startOfDay, parse, subDays } from 'date-fns'
 import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
@@ -112,7 +112,8 @@ function getDueStatusConfig(dueDate, completed, t, dateLocale = idLocale) {
       badgeClass: 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] font-semibold',
       icon: <Calendar size={13} />,
     }
-  } catch {
+  } catch (err){
+      console.warn('[TodoDetailPage]', err)
     return null
   }
 }
@@ -152,7 +153,8 @@ export default function TodoDetailPage() {
       if (item) return item
       const all = await db.todos.toArray()
       return all.find((t) => String(t.id) === String(todoId)) || null
-    } catch {
+    } catch (err){
+      console.warn('[TodoDetailPage]', err)
       return null
     }
   }, [todoId, isValidId])
@@ -165,7 +167,8 @@ export default function TodoDetailPage() {
         if (subs && subs.length > 0) return subs
         const all = await db.sub_tasks.toArray()
         return all.filter((s) => String(s.todoId) === String(todoId)).sort((a, b) => (a.id || 0) - (b.id || 0))
-      } catch {
+      } catch (err){
+      console.warn('[TodoDetailPage]', err)
         return []
       }
     },
@@ -248,8 +251,7 @@ export default function TodoDetailPage() {
       })
     }
 
-    const dMinus1 = new Date(scheduleDate)
-    dMinus1.setDate(dMinus1.getDate() - 1)
+    const dMinus1 = subDays(scheduleDate, 1)
     if (dMinus1 > now) {
       notifs.push({
         id: id * 10 + 2,
@@ -270,7 +272,8 @@ export default function TodoDetailPage() {
     if (notifs.length > 0) {
       try {
         await LocalNotifications.schedule({ notifications: notifs })
-      } catch {
+      } catch (err){
+      console.warn('[TodoDetailPage]', err)
         // ignore
       }
     }
@@ -282,7 +285,8 @@ export default function TodoDetailPage() {
       await LocalNotifications.cancel({
         notifications: [{ id: id * 10 + 1 }, { id: id * 10 + 2 }],
       })
-    } catch {
+    } catch (err){
+      console.warn('[TodoDetailPage]', err)
       // ignore
     }
   }, [])

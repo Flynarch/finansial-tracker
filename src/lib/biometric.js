@@ -19,7 +19,8 @@ export async function canUseBiometric() {
     try {
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
       return Boolean(available)
-    } catch {
+    } catch (err){
+      console.warn('[biometric]', err)
       return true // allow fallback simulation on dev
     }
   }

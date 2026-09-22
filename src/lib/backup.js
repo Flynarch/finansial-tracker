@@ -52,7 +52,8 @@ export async function exportAllDataAsJson() {
     if (rawExp) expenseCustom = JSON.parse(rawExp)
     const rawInc = localStorage.getItem('ft_income_category_custom_v1')
     if (rawInc) incomeCustom = JSON.parse(rawInc)
-  } catch {
+  } catch (err){
+      console.warn('[backup]', err)
     /* ignore */
   }
 
@@ -110,7 +111,8 @@ export async function importAllDataFromJsonPayload(payload) {
       localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
       window.dispatchEvent(new CustomEvent('ft-expense-category-custom-changed'))
       window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
-    } catch {
+    } catch (err){
+      console.warn('[backup]', err)
       /* ignore */
     }
   }
@@ -119,7 +121,8 @@ export async function importAllDataFromJsonPayload(payload) {
       localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
       window.dispatchEvent(new CustomEvent('ft-income-category-custom-changed'))
       window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
-    } catch {
+    } catch (err){
+      console.warn('[backup]', err)
       /* ignore */
     }
   }
@@ -204,7 +207,8 @@ export async function importAllDataFromJsonPayload(payload) {
   try {
     const useSettingsStore = (await import('../store/useSettingsStore')).default
     await useSettingsStore.getState().loadSettings?.()
-  } catch {
+  } catch (err){
+      console.warn('[backup]', err)
     /* ignore */
   }
 

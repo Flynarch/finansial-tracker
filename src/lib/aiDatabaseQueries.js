@@ -19,14 +19,19 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
   const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
   const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
 
-  let rawTxs = await db.transactions.toArray()
+  let collection
+  if (startDate && endDate) {
+    collection = db.transactions.where('date').between(startDate, endDate, true, true)
+  } else if (startDate) {
+    collection = db.transactions.where('date').aboveOrEqual(startDate)
+  } else if (endDate) {
+    collection = db.transactions.where('date').belowOrEqual(endDate)
+  } else {
+    collection = db.transactions.orderBy('date')
+  }
 
-  if (startDate) {
-    rawTxs = rawTxs.filter((tx) => tx.date && tx.date >= startDate)
-  }
-  if (endDate) {
-    rawTxs = rawTxs.filter((tx) => tx.date && tx.date <= endDate)
-  }
+  let allRawTxs = await collection.toArray()
+  let rawTxs = allRawTxs.filter((tx) => !tx.deletedAt)
 
   // Sort chronologically ascending
   rawTxs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
@@ -128,7 +133,11 @@ export async function getMonthSummaryForPrompt() {
     const prevMonthKey = format(subMonths(currentMonthDate, 1), 'yyyy-MM')
     const prevPeriod = getBudgetPeriodDateRange(prevMonthKey, budgetCycleStartDay)
 
-    const allTxs = await db.transactions.toArray()
+    const rawAllTxs = await db.transactions
+      .where('date')
+      .between(prevPeriod.startDate, currentPeriod.endDate, true, true)
+      .toArray()
+    const allTxs = (rawAllTxs || []).filter((tx) => !tx.deletedAt)
 
     const currentMonthTxs = []
     const prevMonthTxs = []
@@ -264,7 +273,8 @@ export async function getMonthSummaryForPrompt() {
 
 6. LAINNYA:
    - Total Habits Aktif: ${habits.length} | Tugas Belum Selesai: ${activeTodos.length}`
-  } catch {
+  } catch (err){
+      console.warn('[aiDatabaseQueries]', err)
     return 'Gagal memuat ringkasan data finansial pengguna.'
   }
 }

@@ -80,4 +80,28 @@ describe('mnemonicCrypto - Zero-Knowledge E2EE Suite', () => {
     const tampered = { ...envelope, ciphertext: envelope.ciphertext.slice(0, -4) + '0000' }
     await expect(decryptPayloadWithMnemonic(tampered, phrase)).rejects.toThrow(/Integritas data rusak/)
   })
+
+  it('manages in-memory session mnemonic phrase without persisting to localStorage', async () => {
+    const {
+      setSessionMnemonicPhrase,
+      getSessionMnemonicPhrase,
+      clearSessionMnemonicPhrase,
+      purgeLegacyMnemonicStorage,
+    } = await import('../src/lib/mnemonicCrypto')
+
+    const testPhrase = 'abandon ability able about above absent absorb abstract absurd abuse access account'
+    setSessionMnemonicPhrase(testPhrase)
+    expect(getSessionMnemonicPhrase()).toBe(testPhrase)
+
+    clearSessionMnemonicPhrase()
+    expect(getSessionMnemonicPhrase()).toBeNull()
+
+    // Test legacy plaintext purge
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('fintrack_e2ee_phrase', testPhrase)
+      expect(window.localStorage.getItem('fintrack_e2ee_phrase')).toBe(testPhrase)
+      purgeLegacyMnemonicStorage()
+      expect(window.localStorage.getItem('fintrack_e2ee_phrase')).toBeNull()
+    }
+  })
 })

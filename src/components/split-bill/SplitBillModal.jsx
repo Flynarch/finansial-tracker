@@ -58,7 +58,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     fetchCurrencyRates('USD')
       .then((r) => r && setRates(r))
-      .catch(() => {})
+      .catch((err) => console.warn('[SplitBillModal]', err))
   }, [])
 
   const wallets = useLiveQuery(
@@ -276,7 +276,8 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
 
       setStep(3)
       onSuccess?.()
-    } catch {
+    } catch (err){
+      console.warn('[SplitBillModal]', err)
       setErrorMsg('Gagal membuat split bill. Coba periksa kembali data Anda.')
     }
   }
