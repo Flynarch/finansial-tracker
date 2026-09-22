@@ -138,11 +138,9 @@ describe('smartNotifications - Schedule & BigTextStyle Formatting', () => {
     expect(payload.summaryText).toBeDefined()
     expect(payload.largeBody).toBeDefined()
 
-    // Verify visual hierarchy and bullet delimiters
-    const lines = payload.largeBody.split('\n')
-    expect(lines.length).toBeGreaterThanOrEqual(3)
-    expect(lines[0]).toContain('FinTrack')
-    expect(payload.largeBody).toContain('•')
+    // Verify clean, concise format without bullet point clutter
+    expect(payload.largeBody).toBeDefined()
+    expect(payload.largeBody).not.toContain('•')
   })
 
   it('schedules snooze reminder for 1 hour with correct ID and action buttons', async () => {
@@ -170,7 +168,8 @@ describe('smartNotifications - Schedule & BigTextStyle Formatting', () => {
     expect(payload.largeIcon).toBe('ic_fintrack_large')
     expect(payload.iconColor).toBe('#6B7C5E')
     expect(payload.title).toContain('FinTrack')
-    expect(payload.largeBody).toContain('•')
+    expect(payload.largeBody).toBeDefined()
+    expect(payload.largeBody).not.toContain('•')
     expect(payload.summaryText).toBeDefined()
   })
 })
@@ -315,7 +314,7 @@ describe('smartNotifications - Branding & Locale Parity Suite', () => {
     await syncDailyReminderSchedule(true, '20:00')
     const payload = LocalNotifications.schedule.mock.calls[0][0].notifications[0]
     expect(payload.title).not.toMatch(/^FinTrack\s*•/i)
-    expect(['Evaluasi Arus Kas Harian', 'Daily Financial Check-in']).toContain(payload.title)
+    expect(['Catat Pengeluaran', 'Evaluasi Arus Kas Harian', 'Daily Financial Check-in', 'Log Expenses']).toContain(payload.title)
   })
 })
 

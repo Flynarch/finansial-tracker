@@ -61,10 +61,7 @@ export default function useNotificationEngine() {
               })
 
               if (Capacitor.isNativePlatform()) {
-                const largeHeader = translate(locale, 'notifications.billReminderHeader', 'Pengingat Tagihan')
-                const bullet1 = translate(locale, 'notifications.todoDueBullet1', 'Jatuh tempo hari ini.')
-                const bullet2 = translate(locale, 'notifications.todoDueBullet2', 'Selesaikan atau tandai lunas.')
-                const largeBody = `${largeHeader}\n${todo.title}\n${bullet1}\n${bullet2}`
+                const largeBody = message
                 const summaryText = translate(locale, 'notifications.summaryCommitment', 'Jadwal')
 
                 await LocalNotifications.schedule({
@@ -118,10 +115,7 @@ export default function useNotificationEngine() {
                 })
   
                 if (Capacitor.isNativePlatform()) {
-                  const habitHeader = translate(locale, 'notifications.habitHeader', 'Pengingat Kebiasaan')
-                  const habitBullet1 = translate(locale, 'notifications.habitBullet1', 'Jaga konsistensi harian.')
-                  const habitBullet2 = translate(locale, 'notifications.habitBullet2', 'Buka aplikasi dan tandai progres.')
-                  const largeBody = `${habitHeader}\n${habit.title}\n${habitBullet1}\n${habitBullet2}`
+                  const largeBody = message
                   const summaryText = translate(locale, 'notifications.summaryHabit', 'Kebiasaan')
 
                   await LocalNotifications.schedule({

@@ -198,12 +198,7 @@ export async function sendTestNotification() {
       'notifications.testNotifBody',
       'Notifikasi FinTrack aktif dan siap digunakan.'
     )
-
-    const header = translate(locale, 'notifications.testNotifHeader', 'FinTrack • Tes Notifikasi')
-    const headline = translate(locale, 'notifications.testNotifHeadline', 'Sistem notifikasi berjalan normal.')
-    const line1 = translate(locale, 'notifications.testNotifLine1', '• Izin notifikasi aktif.')
-    const line2 = translate(locale, 'notifications.testNotifLine2', '• Tombol aksi cepat siap.')
-    const largeBody = `${header}\n${headline}\n${line1}\n${line2}`
+    const largeBody = body
 
     if (Capacitor.isNativePlatform()) {
       await LocalNotifications.schedule({
@@ -269,19 +264,13 @@ export async function syncDailyReminderSchedule(enabled = true, timeStr = '20:00
 
     const locale = useSettingsStore.getState?.()?.locale || 'id'
 
-    const title = translate(locale, 'notifications.dailyReminderTitle', 'Evaluasi Arus Kas Harian')
+    const title = translate(locale, 'notifications.dailyReminderTitle', 'Catat Pengeluaran')
     const body = translate(
       locale,
       'notifications.dailyReminderBody',
-      'Sudah catat pengeluaran hari ini?'
+      'Sudah catat pengeluaran hari ini? Yuk luangkan 1 menit.'
     )
-
-    const header = translate(locale, 'notifications.dailyReminderHeader', 'Pengingat Harian • FinTrack')
-    const headline = translate(locale, 'notifications.dailyReminderHeadline', 'Sudah catat pengeluaran hari ini?')
-    const bullet1 = translate(locale, 'notifications.dailyReminderBullet1', '• Catat pengeluaran agar saldo akurat.')
-    const bullet2 = translate(locale, 'notifications.dailyReminderBullet2', '• Pantau sisa kuota anggaran.')
-    const bullet3 = translate(locale, 'notifications.dailyReminderBullet3', '• Buka aplikasi untuk catat cepat.')
-    const largeBody = `${header}\n${headline}\n${bullet1}\n${bullet2}\n${bullet3}`
+    const largeBody = body
     const summaryText = translate(locale, 'notifications.channelDailyName', 'Pengingat Harian')
 
     if (Capacitor.isNativePlatform()) {
@@ -328,15 +317,9 @@ export async function snoozeDailyReminder(hours = 1) {
     const body = translate(
       locale,
       'notifications.snoozeBody',
-      'Pengingat pencatatan aktif kembali.'
+      'Waktunya mencatat pengeluaran hari ini.'
     )
-
-    const header = translate(locale, 'notifications.dailyReminderHeader', 'Pengingat Harian')
-    const headline = translate(locale, 'notifications.snoozeHeadline', 'Waktunya catat pengeluaran.')
-    const bullet1 = translate(locale, 'notifications.snoozeBullet1', 'Cek pengeluaran yang belum dicatat.')
-    const bullet2 = translate(locale, 'notifications.snoozeBullet2', 'Saldo menunggu pembaruan.')
-    const bullet3 = translate(locale, 'notifications.snoozeBullet3', 'Tekan tombol di bawah untuk catat cepat.')
-    const largeBody = `${header}\n${headline}\n${bullet1}\n${bullet2}\n${bullet3}`
+    const largeBody = body
 
     await LocalNotifications.schedule({
       notifications: [
@@ -448,29 +431,9 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
         `${catDisplayName}: ${formattedSpent} dari ${formattedLimit}.`,
         { category: catDisplayName, spent: formattedSpent, limit: formattedLimit }
       )
-
-      const header = translate(locale, 'notifications.budgetExceededHeader', 'Peringatan Anggaran • FinTrack')
-      const headline = translate(
-        locale,
-        'notifications.budgetExceededHeadline',
-        `${catDisplayName} melebihi batas anggaran.`,
-        { category: catDisplayName }
-      )
-      const metricLine = translate(
-        locale,
-        'notifications.budgetExceededMetric',
-        `• Terpakai: ${formattedSpent} / ${formattedLimit}.`,
-        { spent: formattedSpent, limit: formattedLimit }
-      )
-      const actionLine = translate(
-        locale,
-        'notifications.budgetExceededAction',
-        '• Tinjau pengeluaran di menu Anggaran.'
-      )
-      largeBody = `${header}\n${headline}\n${metricLine}\n${actionLine}`
+      largeBody = alertBody
     } else if (spentRatio >= 0.8) {
       const pct = Math.round(spentRatio * 100)
-      const remaining = formatCurrency(Math.max(0, budgetLimit - totalSpent), budgetCurrency, locale)
       alertTitle = translate(
         locale,
         'notifications.budgetWarningTitle',
@@ -483,26 +446,7 @@ export async function checkBudgetAlertsAfterExpense({ category, amount, date }) 
         `${catDisplayName}: ${formattedSpent} dari ${formattedLimit} (${pct}%).`,
         { category: catDisplayName, percent: pct, spent: formattedSpent, limit: formattedLimit }
       )
-
-      const header = translate(locale, 'notifications.budgetWarningHeader', 'Peringatan Anggaran • FinTrack')
-      const headline = translate(
-        locale,
-        'notifications.budgetWarningHeadline',
-        `${catDisplayName} sudah ${pct}% terpakai.`,
-        { category: catDisplayName, percent: pct }
-      )
-      const metricLine = translate(
-        locale,
-        'notifications.budgetWarningMetric',
-        `• Terpakai: ${formattedSpent} / ${formattedLimit} (sisa: ${remaining}).`,
-        { spent: formattedSpent, limit: formattedLimit, remaining }
-      )
-      const actionLine = translate(
-        locale,
-        'notifications.budgetWarningAction',
-        '• Kurangi belanja kategori ini.'
-      )
-      largeBody = `${header}\n${headline}\n${metricLine}\n${actionLine}`
+      largeBody = alertBody
     }
 
     if (alertTitle && alertBody) {
