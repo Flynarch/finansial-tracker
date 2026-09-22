@@ -193,12 +193,14 @@ function TodoList() {
     const notifs = []
 
     if (scheduleDate > now) {
+      const title = t('todo.notif.dueTodayTitle', 'Tenggat Komitmen Hari Ini')
+      const body = `${todo.title} • ${t('todo.notif.dueTodayBadge', 'Jatuh tempo hari ini')}`
       notifs.push({
         id: id * 10 + 1,
-        title: t('todo.notif.dueTodayTitle', 'Tenggat Komitmen Hari Ini'),
-        body: `${todo.title} • ${t('todo.notif.dueTodayBadge', 'Jatuh tempo hari ini')}`,
-        largeBody: `${t('notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')}\n${todo.title}\n• ${t('todo.notif.dueTodayDetail', 'Komitmen dijadwalkan selesai hari ini.')}\n• ${t('notifications.todoDueBullet2', 'Selesaikan tugas atau tandai lunas setelah transaksi.')}`,
-        summaryText: t('notifications.summaryCommitment', 'Jadwal & Komitmen'),
+        title,
+        body,
+        largeBody: body,
+        summaryText: t('notifications.summaryCommitment', 'Jadwal'),
         channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
         actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
         schedule: { at: scheduleDate },
@@ -211,12 +213,14 @@ function TodoList() {
 
     const dMinus1 = subDays(scheduleDate, 1)
     if (dMinus1 > now) {
+      const title = t('todo.notif.dueTomorrowTitle', 'Pengingat Komitmen Besok')
+      const body = `${todo.title} • ${t('todo.notif.dueTomorrowBadge', 'Jatuh tempo besok')}`
       notifs.push({
         id: id * 10 + 2,
-        title: t('todo.notif.dueTomorrowTitle', 'Pengingat Komitmen Besok'),
-        body: `${todo.title} • ${t('todo.notif.dueTomorrowBadge', 'Jatuh tempo besok')}`,
-        largeBody: `${t('notifications.billReminderHeader', 'Jadwal Komitmen • FinTrack')}\n${todo.title}\n• ${t('todo.notif.dueTomorrowDetail', 'Komitmen dijadwalkan jatuh tempo besok.')}\n• ${t('notifications.todoDueBullet2', 'Siapkan alokasi dana sebelum tenggat waktu.')}`,
-        summaryText: t('notifications.summaryCommitment', 'Jadwal & Komitmen'),
+        title,
+        body,
+        largeBody: body,
+        summaryText: t('notifications.summaryCommitment', 'Jadwal'),
         channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
         actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
         schedule: { at: dMinus1 },

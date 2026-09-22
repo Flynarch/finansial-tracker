@@ -29,13 +29,14 @@ export default function useNotificationEngine() {
       const currentTimeStr = format(now, 'HH:mm')
       const todayStr = format(now, 'yyyy-MM-dd')
       const locale = useSettingsStore.getState().locale || 'id'
+      const isEn = locale === 'en'
 
       const isCreatedToday = (createdVal) => {
         if (!createdVal) return false
         try {
           return format(new Date(createdVal), 'yyyy-MM-dd') === todayStr
         } catch (err){
-      console.warn('[useNotificationEngine]', err)
+          console.warn('[useNotificationEngine]', err)
           return false
         }
       }
@@ -48,8 +49,8 @@ export default function useNotificationEngine() {
               .toArray()
             
             if (existing.length === 0) {
-              const title = translate(locale, 'notifications.todoDueTitle', 'Jatuh Tempo')
-              const message = `${todo.title} • ${translate(locale, 'notifications.todoDueBodySuffix', 'jatuh tempo hari ini')}`
+              const title = translate(locale, 'notifications.todoDueTitle', isEn ? 'Due Today' : 'Jatuh Tempo')
+              const message = `${todo.title} • ${translate(locale, 'notifications.todoDueBodySuffix', isEn ? 'due today' : 'jatuh tempo hari ini')}`
 
               await db.notifications.add({
                 type: 'todo',
@@ -62,7 +63,7 @@ export default function useNotificationEngine() {
 
               if (Capacitor.isNativePlatform()) {
                 const largeBody = message
-                const summaryText = translate(locale, 'notifications.summaryCommitment', 'Jadwal')
+                const summaryText = translate(locale, 'notifications.summaryCommitment', isEn ? 'Schedule' : 'Jadwal')
 
                 await LocalNotifications.schedule({
                   notifications: [
@@ -102,8 +103,8 @@ export default function useNotificationEngine() {
                 .toArray()
                 
               if (existing.length === 0) {
-                const title = translate(locale, 'notifications.habitTitle', 'Pengingat Kebiasaan')
-                const message = `${habit.title} • ${translate(locale, 'notifications.habitBodySuffix', 'Waktunya selesaikan target hari ini')}`
+                const title = translate(locale, 'notifications.habitTitle', isEn ? 'Habit Reminder' : 'Pengingat Kebiasaan')
+                const message = `${habit.title} • ${translate(locale, 'notifications.habitBodySuffix', isEn ? "Time to complete today's target" : 'Waktunya selesaikan target hari ini')}`
 
                 await db.notifications.add({
                   type: 'habit',
@@ -116,7 +117,7 @@ export default function useNotificationEngine() {
   
                 if (Capacitor.isNativePlatform()) {
                   const largeBody = message
-                  const summaryText = translate(locale, 'notifications.summaryHabit', 'Kebiasaan')
+                  const summaryText = translate(locale, 'notifications.summaryHabit', isEn ? 'Habits' : 'Kebiasaan')
 
                   await LocalNotifications.schedule({
                     notifications: [

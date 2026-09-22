@@ -222,7 +222,7 @@ describe('Phase 1 - Data Integrity & Atomicity', () => {
 
     const notifs = await db.notifications.toArray()
     expect(notifs.length).toBeGreaterThan(0)
-    expect(notifs[0].message).toContain('Total Anggaran')
+    expect(notifs[0].message).toMatch(/Total Anggaran|Total Budget/)
   })
 
   it('throws error when walletId is missing and defaultWalletId is null', async () => {

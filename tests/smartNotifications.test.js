@@ -316,5 +316,17 @@ describe('smartNotifications - Branding & Locale Parity Suite', () => {
     expect(payload.title).not.toMatch(/^FinTrack\s*•/i)
     expect(['Catat Pengeluaran', 'Evaluasi Arus Kas Harian', 'Daily Financial Check-in', 'Log Expenses']).toContain(payload.title)
   })
+
+  it('verifies localized budget category display names in both id and en locales', async () => {
+    const { formatExpenseCategory } = await import('../src/lib/expenseCategories')
+    const { translate } = await import('../src/lib/i18n')
+
+    expect(translate('id', 'notifications.totalBudget', 'Total Anggaran')).toBe('Total Anggaran')
+    expect(translate('en', 'notifications.totalBudget', 'Total Budget')).toBe('Total Budget')
+
+    expect(formatExpenseCategory('makanan', 'id')).toBe('Makanan')
+    expect(formatExpenseCategory('makanan', 'en')).toBe('Food')
+    expect(formatExpenseCategory('transportasi', 'en')).toBe('Transport')
+  })
 })
 

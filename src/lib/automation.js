@@ -53,11 +53,9 @@ async function notifyIfAllowed(title, body, route = '/settings/recurring', extra
   if (Capacitor.isNativePlatform()) {
     try {
       const locale = useSettingsStore.getState?.()?.locale || 'id'
-      const largeHeader = translate(locale, 'notifications.recurringHeader', 'Eksekusi Transaksi Terjadwal • FinTrack')
-      const line1 = translate(locale, 'notifications.recurringLine1', '• Status: Transaksi terjadwal berhasil dieksekusi.')
-      const line2 = translate(locale, 'notifications.recurringLine2', '• Tindakan: Tinjau mutasi dan saldo akun di menu Transaksi.')
-      const largeBody = `${largeHeader}\n${title}\n${body}\n${line1}\n${line2}`
-      const summaryText = translate(locale, 'notifications.summaryRecurring', 'Transaksi Otomatis')
+      const isEn = locale === 'en'
+      const largeBody = body
+      const summaryText = translate(locale, 'notifications.summaryRecurring', isEn ? 'Automated' : 'Otomatis')
 
       await LocalNotifications.schedule({
         notifications: [
@@ -100,7 +98,8 @@ export async function processRecurringTransactions(currentDate = new Date()) {
   const todayKey = dateKey(today)
   const allRecurring = await db.recurringTransactions.toArray()
   const recurringItems = allRecurring.filter(shouldAutoExecuteRecurring)
-  const isEn = useSettingsStore.getState().locale === 'en'
+  const locale = useSettingsStore.getState().locale || 'id'
+  const isEn = locale === 'en'
 
   for (const item of recurringItems) {
     if (!item.nextDate || typeof item.nextDate !== 'string') continue
@@ -134,37 +133,52 @@ export async function processRecurringTransactions(currentDate = new Date()) {
         await db.recurringTransactions.update(item.id, { nextDate: nextKey, anchorDay })
 
         try {
+          const formattedAmount = formatCurrency(item.amount, item.currency || 'IDR', locale)
+          const notifTitle = translate(locale, 'notifications.recurringAutoTitle', isEn ? 'Recurring Bill' : 'Tagihan Rutin')
+          const notifMsg = translate(
+            locale,
+            'notifications.recurringAutoMsg',
+            isEn ? `"${item.title}" auto-logged (${formattedAmount})` : `"${item.title}" otomatis dicatat (${formattedAmount})`,
+            { title: item.title, amount: formattedAmount }
+          )
+
           await db.notifications.add({
             type: 'recurring_auto',
-            title: isEn ? 'Recurring Bill' : 'Tagihan Rutin',
-            message: isEn
-              ? `"${item.title}" auto-logged (${formatCurrency(item.amount, item.currency || 'IDR', 'en')})`
-              : `"${item.title}" otomatis dicatat (${formatCurrency(item.amount, item.currency || 'IDR', 'id')})`,
+            title: notifTitle,
+            message: notifMsg,
             read: false,
             relatedId: item.id,
             createdAt: Date.now(),
           })
         } catch (err){
-      console.warn('[automation]', err)
+          console.warn('[automation]', err)
           // Ignore notification storage error
         }
       } catch (err) {
-      console.warn('[automation]', err)
+        console.warn('[automation]', err)
         // When execution fails, advance nextDate to next cycle and notify user rather than freezing execution indefinitely
         try {
           await db.recurringTransactions.update(item.id, { nextDate: nextKey, anchorDay })
-          await db.notifications.add({
-            type: 'recurring_failed',
-            title: isEn ? 'Recurring Bill Failed' : 'Gagal Catat Tagihan',
-            message: isEn
+          const failTitle = translate(locale, 'notifications.recurringFailedTitle', isEn ? 'Recurring Bill Failed' : 'Gagal Catat Tagihan')
+          const failMsg = translate(
+            locale,
+            'notifications.recurringFailedMsg',
+            isEn
               ? `Failed to log "${item.title}": ${err?.message || 'Error'}.`
               : `Gagal mencatat "${item.title}": ${err?.message || 'Terjadi kesalahan'}.`,
+            { title: item.title, error: err?.message || (isEn ? 'Error' : 'Terjadi kesalahan') }
+          )
+
+          await db.notifications.add({
+            type: 'recurring_failed',
+            title: failTitle,
+            message: failMsg,
             read: false,
             relatedId: item.id,
             createdAt: Date.now(),
           })
         } catch (err){
-      console.warn('[automation]', err)
+          console.warn('[automation]', err)
           // Ignore secondary notification/update errors
         }
         break
@@ -186,18 +200,24 @@ export async function notifyTodayEvents() {
     db.recurringTransactions.where('nextDate').equals(todayKey).toArray(),
   ])
 
-  const isEn = useSettingsStore.getState().locale === 'en'
+  const locale = useSettingsStore.getState().locale || 'id'
+  const isEn = locale === 'en'
+
   for (const event of events) {
-    const title = isEn ? 'Calendar Reminder' : 'Pengingat Agenda'
+    const title = translate(locale, 'notifications.calendarReminderTitle', isEn ? 'Calendar Reminder' : 'Pengingat Agenda')
     await notifyIfAllowed(title, event.title, '/calendar', { type: 'calendar' })
   }
 
   const activeRecurring = recurring.filter((item) => item.enabled === true || item.enabled === 1)
   for (const item of activeRecurring) {
-    const title = isEn ? 'Recurring Bill Reminder' : 'Pengingat Tagihan Rutin'
-    const body = isEn
-      ? `${item.title} (${item.frequency}) is due today!`
-      : `${item.title} (${item.frequency}) jatuh tempo hari ini!`
+    const freqLabel = translate(locale, `settings.recurring.frequency.${item.frequency}`, item.frequency)
+    const title = translate(locale, 'notifications.recurringBillReminderTitle', isEn ? 'Recurring Bill Reminder' : 'Pengingat Tagihan Rutin')
+    const body = translate(
+      locale,
+      'notifications.recurringBillDueToday',
+      isEn ? `${item.title} (${freqLabel}) is due today.` : `${item.title} (${freqLabel}) jatuh tempo hari ini.`,
+      { title: item.title, frequency: freqLabel }
+    )
     await notifyIfAllowed(title, body, '/settings/recurring', { recurringId: item.id, type: 'recurring' })
   }
 
