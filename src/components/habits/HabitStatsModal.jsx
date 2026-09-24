@@ -84,6 +84,10 @@ export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }
               </div>
               <textarea
                 value={tempNotes}
+                autoCorrect="on"
+                autoCapitalize="sentences"
+                spellCheck={true}
+                autoComplete="on"
                 onChange={(e) => setTempNotes(e.target.value)}
                 placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
                 className="ft-field mt-0 w-full font-medium min-h-[80px] resize-y text-sm bg-[var(--field-bg)] border-[color-mix(in_srgb,var(--border)_50%,transparent)]"

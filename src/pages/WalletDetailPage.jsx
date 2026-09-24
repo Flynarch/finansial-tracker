@@ -752,6 +752,7 @@ export default function WalletDetailPage() {
               </>
             ) : (
               <EmptyState
+                variant="transactions"
                 title={t('wallets.emptyTxTitle', 'Belum Ada Transaksi')}
                 description={t('wallets.emptyTxDesc', 'Belum ada catatan transaksi di akun dompet ini.')}
               />
@@ -1053,6 +1054,10 @@ export default function WalletDetailPage() {
             <textarea
               rows={2}
               value={editWalletForm.notes}
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              spellCheck={true}
+              autoComplete="on"
               onChange={(e) => setEditWalletForm((p) => ({ ...p, notes: e.target.value }))}
               placeholder={t('wallets.notesPlaceholder', 'Catatan penggunaan akun...')}
               className="w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] px-4 py-3 text-xs font-medium text-[var(--fg)] outline-none focus:border-[var(--accent)] resize-none"

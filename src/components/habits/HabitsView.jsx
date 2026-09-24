@@ -469,6 +469,10 @@ export default function HabitsView() {
             </label>
             <textarea
               value={addForm.notes}
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              spellCheck={true}
+              autoComplete="on"
               onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
               placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
               className="ft-field mt-0 font-medium min-h-[80px] resize-y"
@@ -626,6 +630,10 @@ export default function HabitsView() {
             </label>
             <textarea
               value={editForm.notes}
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              spellCheck={true}
+              autoComplete="on"
               onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
               placeholder={t('habits.notesPlaceholder', 'Tujuan atau detail cara ngerjain habit ini...')}
               className="ft-field mt-0 font-medium min-h-[80px] resize-y"

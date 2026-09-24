@@ -9,6 +9,27 @@ import useSettingsStore from '../../store/useSettingsStore'
 import AnimatedCounter from '../ui/AnimatedCounter'
 import MaskedBalance from '../ui/MaskedBalance'
 
+const STORAGE_KEY = 'dashboard_carousel_slide'
+
+const getSavedSlide = () => {
+  try {
+    const val = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
+    const parsed = parseInt(val, 10)
+    return parsed === 1 ? 1 : 0
+  } catch {
+    return 0
+  }
+}
+
+const saveSlide = (index) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, index.toString())
+    sessionStorage.setItem(STORAGE_KEY, index.toString())
+  } catch {
+    // Ignore storage quota/permission errors in restricted environments
+  }
+}
+
 export default function WalletCarousel({ 
   monthIncome, 
   monthExpense, 
@@ -21,13 +42,14 @@ export default function WalletCarousel({
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const hideBalance = useSettingsStore((state) => state.hideBalance)
   const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
-  const [activeSlide, setActiveSlide] = useState(() => {
-    const saved = sessionStorage.getItem('dashboard_carousel_slide')
-    return saved ? parseInt(saved, 10) : 0
-  })
+  const [activeSlide, setActiveSlide] = useState(getSavedSlide)
+  const activeSlideRef = useRef(activeSlide)
   const scrollRef = useRef(null)
-  const isRestoring = useRef(activeSlide > 0)
-  const hasRestored = useRef(false)
+  const hasRestoredScroll = useRef(false)
+
+  useEffect(() => {
+    activeSlideRef.current = activeSlide
+  }, [activeSlide])
 
   const activeWallets = wallets?.filter(w => !w.isArchived) || []
   const sisaKeuangan = monthIncome - monthExpense
@@ -40,41 +62,98 @@ export default function WalletCarousel({
     if (!scrollRef.current) return
     const slides = scrollRef.current.children
     if (slides[index]) {
-      scrollRef.current.scrollTo({
-        left: slides[index].offsetLeft,
-        behavior: 'smooth'
-      })
+      activeSlideRef.current = index
+      setActiveSlide(index)
+      saveSlide(index)
+      if (typeof scrollRef.current.scrollTo === 'function') {
+        scrollRef.current.scrollTo({
+          left: slides[index].offsetLeft,
+          behavior: 'smooth'
+        })
+      } else {
+        scrollRef.current.scrollLeft = slides[index].offsetLeft
+      }
     }
   }
 
-  // Restore scroll position when wallets are loaded
+  // Restore scroll position when carousel element mounts and wallets load
   useEffect(() => {
-    let timerId = null
-    if (wallets !== undefined && !hasRestored.current) {
-      hasRestored.current = true
-      if (scrollRef.current && activeSlide > 0) {
-        requestAnimationFrame(() => {
-          if (scrollRef.current) {
-            const slides = scrollRef.current.children
-            if (slides[activeSlide]) {
-              scrollRef.current.scrollTo({
-                left: slides[activeSlide].offsetLeft,
-                behavior: 'auto'
-              })
-            }
-          }
-          timerId = window.setTimeout(() => {
-            isRestoring.current = false
-          }, 150)
-        })
-      } else {
-        isRestoring.current = false
+    if (!scrollRef.current || hasRestoredScroll.current) return
+    hasRestoredScroll.current = true
+
+    if (activeSlide > 0) {
+      const slides = scrollRef.current.children
+      if (slides[activeSlide]) {
+        if (typeof scrollRef.current.scrollTo === 'function') {
+          scrollRef.current.scrollTo({
+            left: slides[activeSlide].offsetLeft,
+            behavior: 'instant'
+          })
+        } else {
+          scrollRef.current.scrollLeft = slides[activeSlide].offsetLeft
+        }
       }
     }
-    return () => {
-      if (timerId) window.clearTimeout(timerId)
-    }
   }, [wallets, activeSlide])
+
+  const handleScroll = () => {
+    if (!scrollRef.current || !hasRestoredScroll.current) return
+    const container = scrollRef.current
+    const scrollLeft = container.scrollLeft
+    const slides = container.children
+    if (!slides || slides.length === 0) return
+
+    let closestIndex = 0
+    let minDistance = Infinity
+
+    for (let i = 0; i < slides.length; i++) {
+      const dist = Math.abs(slides[i].offsetLeft - scrollLeft)
+      if (dist < minDistance) {
+        minDistance = dist
+        closestIndex = i
+      }
+    }
+
+    if (closestIndex !== activeSlideRef.current) {
+      activeSlideRef.current = closestIndex
+      setActiveSlide(closestIndex)
+      saveSlide(closestIndex)
+    }
+  }
+
+  // Listen for scrollend to ensure exact indicator sync on touch flick / CSS snap completion
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || typeof el.addEventListener !== 'function') return
+    const onScrollEnd = () => handleScroll()
+    el.addEventListener('scrollend', onScrollEnd, { passive: true })
+    return () => {
+      el.removeEventListener('scrollend', onScrollEnd)
+    }
+  }, [wallets])
+
+  // Handle window resize or orientation changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (!scrollRef.current) return
+      const current = activeSlideRef.current
+      if (current > 0) {
+        const slides = scrollRef.current.children
+        if (slides[current]) {
+          if (typeof scrollRef.current.scrollTo === 'function') {
+            scrollRef.current.scrollTo({
+              left: slides[current].offsetLeft,
+              behavior: 'instant'
+            })
+          } else {
+            scrollRef.current.scrollLeft = slides[current].offsetLeft
+          }
+        }
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Loading state handling
   if (wallets === undefined || wallets === null) {
@@ -96,21 +175,6 @@ export default function WalletCarousel({
         </div>
       </section>
     )
-  }
-
-  const handleScroll = () => {
-    if (!scrollRef.current || isRestoring.current) return
-    const scrollLeft = scrollRef.current.scrollLeft
-    const width = scrollRef.current.offsetWidth
-    
-    // Prevent divide by zero if width isn't ready
-    if (width === 0) return 
-
-    const index = Math.round(scrollLeft / width)
-    if (index !== activeSlide) {
-      setActiveSlide(index)
-      sessionStorage.setItem('dashboard_carousel_slide', index.toString())
-    }
   }
 
 

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { Sparkles, X, Mic, MicOff, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
-import { parseTransactionFromText, distributeReceiptTransactions } from '../../lib/gemini'
+import { parseTransactionFromText, distributeReceiptTransactions, parseShortTransactionFast } from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
 import { createTransaction as addTransaction } from '../../services/transactionService'
@@ -397,11 +397,17 @@ export default function AiQuickLogModal() {
   useEffect(() => {
     let timeoutId
     let frameId
+    let focusTimer
 
     if (isOpen) {
       frameId = requestAnimationFrame(() => {
         setIsAnimatingIn(true)
       })
+      focusTimer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+        }
+      }, 100)
     } else {
       if (recognitionRef.current) {
         try {
@@ -422,12 +428,13 @@ export default function AiQuickLogModal() {
         setRecordedTransactions([])
         setErrorMessage('')
         setDragOffset(0)
-      }, 320)
+      }, 200)
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
       if (frameId) cancelAnimationFrame(frameId)
+      if (focusTimer) clearTimeout(focusTimer)
     }
   }, [isOpen])
 
@@ -655,18 +662,32 @@ function isObviousNonTransaction(text) {
       return
     }
 
-    setModalMode('analyzing')
-
     const clampedText = cleanText ? String(cleanText).slice(0, 4000) : ''
 
+    // 2. Zero-Latency Fast Path:
+    // If the input is a clean financial transaction ("makan siang 35rb", "kopi 25rb bca", "gaji 5jt"),
+    // parse it instantly in 0ms locally without waiting or entering the analyzing loading spinner!
+    let preParsedResult = null
+    if (!imageToSubmit && clampedText) {
+      const fastResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
+      if (fastResult && (fastResult.type === 'transactions' || (Array.isArray(fastResult.transactions) && fastResult.transactions.length > 0))) {
+        preParsedResult = fastResult
+      }
+    }
+
+    if (!preParsedResult) {
+      setModalMode('analyzing')
+    }
+
     try {
-      const result = await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
+      const result = preParsedResult || (await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
         locale,
         defaultCurrency,
         wallets,
         imageData: imageToSubmit,
         scanMode: modeToUse,
-      })
+        preferFastNlp: true,
+      }))
 
       if (result.error) {
         throw new Error(result.message || 'Gagal memproses dengan AI.')
@@ -788,8 +809,8 @@ function isObviousNonTransaction(text) {
       {/* Backdrop */}
       <button
         type="button"
-        className={`absolute inset-0 cursor-pointer transition-opacity duration-300 ease-out ${
-          isAnimatingIn ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0'
+        className={`absolute inset-0 cursor-pointer transition-opacity duration-200 ease-out ${
+          isAnimatingIn ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0 pointer-events-none'
         }`}
         onClick={closeQuickLog}
         aria-label={t('common.close', 'Tutup Modal AI')}
@@ -805,7 +826,9 @@ function isObviousNonTransaction(text) {
             : 'translate3d(0, 100%, 0)',
           transition: isDragging
             ? 'none'
-            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
+            : isAnimatingIn
+            ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+            : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
         }}
         className={`absolute left-0 right-0 bottom-0 w-full ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
       >
@@ -913,6 +936,10 @@ function isObviousNonTransaction(text) {
                   }}
                   placeholder={inputPlaceholder}
                   rows={2}
+                  autoCorrect="on"
+                  autoCapitalize="sentences"
+                  spellCheck={true}
+                  autoComplete="on"
                   className="w-full resize-none bg-transparent text-[15px] sm:text-sm font-medium text-[var(--fg)] placeholder:text-[var(--muted)]/80 focus:outline-none min-h-[64px] leading-relaxed"
                 />
 

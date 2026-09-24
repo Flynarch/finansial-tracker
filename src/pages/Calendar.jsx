@@ -438,7 +438,7 @@ function Calendar() {
                 </h4>
                 <div className="space-y-2">
                   {dayItems.transactions.length === 0 ? (
-                    <EmptyState title={t('calendar.noTransactions')} />
+                    <EmptyState variant="transactions" title={t('calendar.noTransactions')} />
                   ) : (
                     dayItems.transactions.map((tx) => (
                       <div
@@ -515,7 +515,7 @@ function Calendar() {
                 </h4>
                 <div className="space-y-2">
                   {dayItems.events.length === 0 && dayItems.loans.length === 0 ? (
-                    <EmptyState title={t('calendar.noImportantDates')} />
+                    <EmptyState variant="calendar" title={t('calendar.noImportantDates')} />
                   ) : (
                     <>
                       {dayItems.loans.map((loan) => (
@@ -590,7 +590,7 @@ function Calendar() {
                 </div>
                 <div className="space-y-2">
                   {dayItems.todos.length === 0 ? (
-                    <EmptyState title={t('calendar.noTodos', 'Tidak ada tugas to-do pada tanggal ini.')} />
+                    <EmptyState variant="todos" title={t('calendar.noTodos', 'Tidak ada tugas to-do pada tanggal ini.')} />
                   ) : (
                     dayItems.todos.map((todo) => (
                       <div

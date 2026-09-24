@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
+import { formatGrowthPercentage } from '../../hooks/dashboard/dashboardStats'
 import { MiniChartCard } from './DashboardStatComponents'
 
 export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
@@ -35,7 +36,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
   const hasGrowth = Boolean(
-    netWorthGrowth && (netWorthGrowth.net !== 0 || Math.round(netWorthGrowth.pct) !== 0)
+    netWorthGrowth && (netWorthGrowth.net !== 0 || Math.abs(netWorthGrowth.pct) >= 0.05)
   )
 
   const rangeLabelMap = {
@@ -72,7 +73,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
               ) : null}
               <span className="leading-tight">
                 {isNetPositive ? '+' : ''}
-                {formatCurrency(netWorthGrowth.net, defaultCurrency)} ({isNetPositive ? '+' : ''}{Math.round(netWorthGrowth.pct)}%)
+                {formatCurrency(netWorthGrowth.net, defaultCurrency)} ({formatGrowthPercentage(netWorthGrowth.pct, true)})
               </span>
             </span>
           ) : null

@@ -622,6 +622,10 @@ export default function TransactionEditSheet({
             </div>
             <textarea
               value={formData.notes || ''}
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              spellCheck={true}
+              autoComplete="on"
               onChange={(e) => {
                 setFormData((p) => ({ ...p, notes: e.target.value }))
                 const el = e.target

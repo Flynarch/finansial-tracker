@@ -33,8 +33,8 @@ import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 import useTransactionStore from '../../store/useTransactionStore'
 import useAuthDeepLink from '../../hooks/useAuthDeepLink'
+import AiQuickLogModal from '../chat/AiQuickLogModal'
 
-const AiQuickLogModal = lazy(() => import('../chat/AiQuickLogModal'))
 const QuickAddTransactionModal = lazy(() => import('../transactions/QuickAddTransactionModal'))
 import { primeThemeTransition } from '../../lib/themeTransition'
 import { ensureFirebaseAuthSynced } from '../../lib/auth'
@@ -578,7 +578,7 @@ function AppShell() {
                 : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
             }`}
           >
-            <div key={location.pathname} className="ft-page-transition">
+            <div key={location.pathname} className="ft-page-crossfade">
               <Suspense
                 fallback={<PageSkeleton variant={getSkeletonVariant(location.pathname)} />}
               >

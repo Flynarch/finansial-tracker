@@ -494,17 +494,29 @@ function TodoList() {
             </div>
 
             {!isDataReady ? (
-              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-sheet-enter'}`}>
+              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-fade-up'}`}>
                 {Array.from({ length: 4 }).map((_, i) => (
                   <li key={`todo-skeleton-${i}`}>
-                    <div className="h-[8.75rem] rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]">
-                      <div className="h-full animate-pulse rounded-xl bg-[color-mix(in_srgb,var(--field-bg)_70%,transparent)]" />
+                    <div className="h-[8.75rem] rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs ft-skeleton-card space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-5 w-5 rounded-full ft-skeleton shrink-0" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3.5 w-3/4 rounded-lg ft-skeleton" />
+                          <div className="h-2.5 w-1/2 rounded-md ft-skeleton" />
+                        </div>
+                      </div>
+                      <div className="h-2.5 w-20 rounded-md ft-skeleton" />
+                      <div className="flex gap-2 pt-1 mt-auto">
+                        <div className="h-5 w-14 rounded-full ft-skeleton" />
+                        <div className="h-5 w-16 rounded-full ft-skeleton" />
+                      </div>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : !sortedTodos?.length ? (
               <EmptyState
+                variant="todos"
                 title={t('todo.emptyState.title', 'Tidak ada tugas')}
                 description={
                   filter === 'all'

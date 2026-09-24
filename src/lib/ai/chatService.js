@@ -33,6 +33,7 @@ export async function parseTransactionFromText(userMessage, context = {}) {
     wallets = [],
     onStream = null,
     scanMode = 'all',
+    preferFastNlp = false,
     rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
   } = context || {}
 
@@ -185,10 +186,14 @@ export async function parseTransactionFromText(userMessage, context = {}) {
     }
   }
 
-  // Local validation: intercept missing nominal before making network request to save API quota and latency
+  // Local validation & fast-path NLP:
+  // Intercept missing nominal or resolve instant local NLP in 0ms when preferFastNlp is requested
   if (!imageData && userMessage) {
     const fastCheck = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
     if (fastCheck?.error && fastCheck?.message && fastCheck.message.includes('Nominal')) {
+      return fastCheck
+    }
+    if (preferFastNlp && fastCheck && (fastCheck.type === 'transactions' || (Array.isArray(fastCheck.transactions) && fastCheck.transactions.length > 0))) {
       return fastCheck
     }
   }
@@ -587,6 +592,12 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
     return { type: 'text', text: textOutput, chips, engine: 'online_ai', engineLabel: 'AI Gemini (Online)' }
   } catch (err) {
     console.error(err)
+    if (preferFastNlp && !imageData && userMessage) {
+      const fallbackFast = parseShortTransactionFast(userMessage, wallets, defaultCurrency)
+      if (fallbackFast && (fallbackFast.type === 'transactions' || fallbackFast.transactions?.length > 0)) {
+        return fallbackFast
+      }
+    }
     return { error: true, message: err.message || 'Terjadi kesalahan saat menghubungi AI.' }
   }
 }

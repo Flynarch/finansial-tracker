@@ -5,9 +5,69 @@ import { convertCurrency, isExcludeAnalyticsTx, roundCurrency, toSafeNumber } fr
  * Calculates net worth growth and percentage from start value to current value.
  */
 export function computeNetWorthGrowth(startVal, currentVal) {
-  const net = currentVal - startVal
-  const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
+  const start = Number(startVal) || 0
+  const current = Number(currentVal) || 0
+  const net = current - start
+  let pct = 0
+  if (start !== 0) {
+    pct = (net / Math.abs(start)) * 100
+  } else if (net > 0) {
+    pct = 100
+  } else if (net < 0) {
+    pct = -100
+  }
   return { net, pct }
+}
+
+/**
+ * Formats growth percentage cleanly without weird +0% or -0% artifacts.
+ */
+export function formatGrowthPercentage(pct, withSign = false) {
+  const num = Number(pct) || 0
+  if (num === 0) return '0%'
+  const abs = Math.abs(num)
+  const sign = withSign ? (num > 0 ? '+' : '-') : ''
+  let formatted = `${Math.round(abs)}%`
+  if (abs < 0.05) {
+    formatted = '<0.1%'
+  } else if (abs < 10 && !Number.isInteger(num)) {
+    formatted = `${parseFloat(abs.toFixed(1))}%`
+  }
+  return `${sign}${formatted}`
+}
+
+/**
+ * Calculates exact range-based net worth growth including all days of the selected period.
+ */
+export function calculateRangeNetWorthGrowth(range, currentNetWorth, chartData, todayStats) {
+  const currentVal = Number(currentNetWorth) || 0
+  let net = 0
+
+  if (range === '1d') {
+    net = todayStats?.todayNet ?? 0
+  } else {
+    let sourceData = []
+    if (range === '1w') sourceData = chartData?.data1w
+    else if (range === '1m') sourceData = chartData?.data1m
+    else if (range === '3m') sourceData = chartData?.data3m
+    else if (range === 'ytd') sourceData = chartData?.dataYtd
+    else if (range === '1y') sourceData = chartData?.data1y
+    else if (range === 'all') sourceData = chartData?.dataAll
+
+    if (Array.isArray(sourceData)) {
+      net = sourceData.reduce((sum, r) => sum + (Number(r?.net) || 0), 0)
+    }
+  }
+
+  const startVal = currentVal - net
+  const { pct } = computeNetWorthGrowth(startVal, currentVal)
+
+  return {
+    net,
+    pct,
+    startVal,
+    currentVal,
+  }
 }
 
 /**

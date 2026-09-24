@@ -35,7 +35,7 @@ export default function Loans() {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const motionDelay = reduceMotion ? 0 : 220
+  const motionDelay = reduceMotion ? 0 : 200
   const navigate = useNavigate()
 
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
@@ -488,6 +488,7 @@ export default function Loans() {
         <div className="space-y-3 pt-1">
           {filteredRows.length === 0 ? (
             <EmptyState
+              variant="loans"
               title={
                 statusFilter === 'forgiven'
                   ? t('loans.empty.forgiven.title', 'Belum Ada Catatan yang Diikhlaskan')

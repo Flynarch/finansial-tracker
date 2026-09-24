@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import useTranslation from '../../hooks/useTranslation'
@@ -23,13 +23,28 @@ export default function BottomSheet({
 
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isDismissing, setIsDismissing] = useState(false)
+  const [isSnappingBack, setIsSnappingBack] = useState(false)
+  const snapTimeoutRef = useRef(null)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
 
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
+
   const handleTouchStart = useCallback((e) => {
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
     touchStartY.current = e.touches[0].clientY
     touchStartTime.current = Date.now()
     setIsDragging(true)
+    setIsSnappingBack(false)
+    setIsDismissing(false)
   }, [])
 
   const handleTouchMove = useCallback((e) => {
@@ -47,19 +62,27 @@ export default function BottomSheet({
   }, [])
 
   const handleTouchEnd = useCallback(() => {
+    if (!touchStartY.current && !isDragging) return
     const elapsed = Date.now() - touchStartTime.current
     const velocity = dragOffset / (elapsed || 1) // px per ms
 
     setIsDragging(false)
+    touchStartY.current = 0
 
     // Threshold: dragged down > 80px OR high downward flick velocity
     if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
+      setIsDismissing(true)
       closeSheet()
+    } else if (dragOffset !== 0) {
+      // Elastic snap back
+      setIsSnappingBack(true)
+      setDragOffset(0)
+      snapTimeoutRef.current = setTimeout(() => {
+        setIsSnappingBack(false)
+        snapTimeoutRef.current = null
+      }, 200)
     }
-
-    setDragOffset(0)
-    touchStartY.current = 0
-  }, [dragOffset, closeSheet])
+  }, [dragOffset, isDragging, closeSheet])
 
   if (!isMounted || typeof document === 'undefined') return null
 
@@ -75,10 +98,7 @@ export default function BottomSheet({
         className={`absolute inset-0 bg-black/60 cursor-pointer ${
           sheetVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit'
         }`}
-        onClick={() => {
-          closeSheet()
-          onClose?.()
-        }}
+        onClick={closeSheet}
         aria-label={defaultCloseLabel}
       />
 
@@ -89,7 +109,7 @@ export default function BottomSheet({
           aria-modal="true"
           aria-label={typeof title === 'string' ? title : defaultCloseLabel}
           className={`flex flex-col ${maxHeight} w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu overflow-hidden ${
-            isDragging || dragOffset > 0
+            isDragging || isDismissing || isSnappingBack
               ? ''
               : sheetVisible
               ? 'ft-sheet-enter'
@@ -97,11 +117,23 @@ export default function BottomSheet({
           } ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            ...(isDragging || dragOffset > 0
+            ...(isDragging
               ? {
                   transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
                   opacity: Math.max(0.4, 1 - dragOffset / 300),
                   transition: 'none',
+                }
+              : isDismissing
+              ? {
+                  transform: 'translate3d(0, 100%, 0)',
+                  opacity: 0,
+                  transition: 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
+                }
+              : isSnappingBack
+              ? {
+                  transform: 'translate3d(0, 0, 0)',
+                  opacity: 1,
+                  transition: 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out',
                 }
               : {}),
           }}
@@ -136,7 +168,6 @@ export default function BottomSheet({
                     onClick={(e) => {
                       e.stopPropagation()
                       closeSheet()
-                      onClose?.()
                     }}
                     aria-label={defaultCloseLabel}
                   >

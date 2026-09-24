@@ -5,31 +5,31 @@ import { TransactionItemCard } from './TransactionItemCard'
 export function TransactionListSkeleton() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-3 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+      <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-4 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
         {[1, 2].map((groupKey) => (
-          <section key={groupKey} className="space-y-1.5 animate-pulse">
+          <section key={groupKey} className="space-y-2">
             {/* Shimmer Date Header Strip */}
-            <div className="flex items-center gap-2.5 px-1 py-1.5">
-              <div className="h-3 w-28 rounded-md bg-[var(--border)]/60" />
+            <div className="flex items-center gap-2.5 px-1 py-1">
+              <div className="h-3 w-28 ft-skeleton !rounded-md" />
               <div className="h-px flex-1 bg-[var(--border)]/40" />
-              <div className="h-3 w-16 rounded-md bg-[var(--border)]/40" />
+              <div className="h-3 w-16 ft-skeleton !rounded-md" />
             </div>
 
             {/* Shimmer Feed Group Card */}
             <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] divide-y divide-[var(--border)]/40 shadow-xs">
               {[1, 2, 3].map((itemKey) => (
-                <div key={itemKey} className="flex items-center justify-between p-3 gap-3">
+                <div key={itemKey} className="flex items-center justify-between p-3 sm:p-3.5 gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Shimmer Icon */}
-                    <div className="h-10 w-10 shrink-0 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]/60" />
+                    <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
                     {/* Shimmer Labels */}
                     <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="h-3.5 w-24 rounded-md bg-[var(--border)]/70" />
-                      <div className="h-2.5 w-36 rounded-md bg-[var(--border)]/40" />
+                      <div className="h-3.5 w-28 ft-skeleton !rounded-lg" />
+                      <div className="h-2.5 w-36 ft-skeleton !rounded-md" />
                     </div>
                   </div>
                   {/* Shimmer Amount */}
-                  <div className="h-4 w-20 rounded-md bg-[var(--border)]/60 shrink-0" />
+                  <div className="h-4.5 w-22 ft-skeleton !rounded-lg shrink-0" />
                 </div>
               ))}
             </div>
@@ -102,6 +102,7 @@ export const TransactionListSection = memo(function TransactionListSection({
     return (
       <div className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center py-12 px-4 my-auto">
         <EmptyState
+          variant="transactions"
           title={t('tx.emptyTitle', 'Belum Ada Transaksi')}
           description={t('tx.emptyDesc', 'Catat pengeluaran atau pemasukan pertamamu untuk mulai memantau arus kas.')}
         />

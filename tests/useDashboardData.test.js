@@ -19,6 +19,8 @@ import {
   getCachedDashboardWallets,
   setCachedDashboardWallets,
   computeNetWorthGrowth,
+  calculateRangeNetWorthGrowth,
+  formatGrowthPercentage,
   generateMonthlyData,
   calculatePeriodStats,
   calculate1DHourlyFlow,
@@ -167,6 +169,67 @@ describe('useDashboardData - Unit Tests', () => {
       const { net, pct } = computeNetWorthGrowth(-5000000, -7500000)
       expect(net).toBe(-2500000)
       expect(pct).toBe(-50)
+    })
+  })
+
+  describe('formatGrowthPercentage', () => {
+    it('formats positive and negative percentages with clean signs', () => {
+      expect(formatGrowthPercentage(15, true)).toBe('+15%')
+      expect(formatGrowthPercentage(-15, true)).toBe('-15%')
+      expect(formatGrowthPercentage(0, true)).toBe('0%')
+    })
+
+    it('formats decimal percentages cleanly with 1 decimal place when under 10%', () => {
+      expect(formatGrowthPercentage(2.4, true)).toBe('+2.4%')
+      expect(formatGrowthPercentage(-2.4, true)).toBe('-2.4%')
+      expect(formatGrowthPercentage(0.4, true)).toBe('+0.4%')
+      expect(formatGrowthPercentage(-0.4, true)).toBe('-0.4%')
+    })
+
+    it('handles tiny percentages without showing weird 0% artifacts', () => {
+      expect(formatGrowthPercentage(0.02, true)).toBe('+<0.1%')
+      expect(formatGrowthPercentage(-0.02, true)).toBe('-<0.1%')
+    })
+  })
+
+  describe('calculateRangeNetWorthGrowth', () => {
+    it('accurately includes Day 0 transactions in 7d (1w) net worth growth calculation', () => {
+      // Scenario: Current net worth is 10,000,000.
+      // In the last 7 days:
+      // Day 0 (7 days ago): user spent 300,000 (net: -300,000)
+      // Day 2 (5 days ago): user earned 100,000 (net: +100,000)
+      // Day 5 (2 days ago): user spent 50,000 (net: -50,000)
+      // Overall 7-day net flow: -300k + 100k - 50k = -250,000 (NEGATIVE)
+      const mockChartData = {
+        data1w: [
+          { date: '2026-09-18', net: -300000 },
+          { date: '2026-09-19', net: 0 },
+          { date: '2026-09-20', net: 100000 },
+          { date: '2026-09-21', net: 0 },
+          { date: '2026-09-22', net: 0 },
+          { date: '2026-09-23', net: -50000 },
+          { date: '2026-09-24', net: 0 },
+        ],
+      }
+
+      const result = calculateRangeNetWorthGrowth('1w', 10000000, mockChartData, null)
+
+      // Net must accurately be -250,000 (never falsely positive!)
+      expect(result.net).toBe(-250000)
+      // StartVal 7 days ago was 10,000,000 - (-250,000) = 10,250,000
+      expect(result.startVal).toBe(10250000)
+      // Percentage must be negative: (-250,000 / 10,250,000) * 100 = -2.439%
+      expect(result.pct).toBeCloseTo(-2.44, 1)
+      expect(formatGrowthPercentage(result.pct, true)).toBe('-2.4%')
+    })
+
+    it('accurately calculates 1d today net flow', () => {
+      const todayStats = { todayNet: 150000 }
+      const result = calculateRangeNetWorthGrowth('1d', 5000000, {}, todayStats)
+
+      expect(result.net).toBe(150000)
+      expect(result.startVal).toBe(4850000)
+      expect(result.pct).toBeCloseTo(3.09, 1)
     })
   })
 

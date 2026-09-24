@@ -41,8 +41,8 @@ function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-xs transition-opacity duration-260 ease-out ${
-        isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-xs ${
+        isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
       }`}
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
       onTouchMove={(event) => event.target === event.currentTarget && event.preventDefault()}
@@ -56,13 +56,17 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
-        className={`flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu ${className}`}
+        className={`flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu ${
+          isVisible ? 'ft-sheet-enter' : ''
+        } ${className}`}
         style={{
           boxShadow: 'var(--shadow-card)',
           transform: isVisible
             ? 'translate3d(0, 0, 0)'
             : 'translate3d(0, 100%, 0)',
-          transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease',
+          transition: isVisible
+            ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+            : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
         }}
       >
         {/* ZONE 1: FIXED TOP HEADER */}
@@ -75,7 +79,6 @@ function Modal({
                 onClick={(e) => {
                   e.stopPropagation()
                   closeSheet()
-                  onClose?.()
                 }}
                 className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}

@@ -31,7 +31,7 @@ export default function useBottomSheet(configOrState = false) {
   const closeTimeoutRef = useRef(null)
 
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const motionDelay = reduceMotion ? 0 : 220
+  const motionDelay = reduceMotion ? 0 : 200
 
   const [prevControlledIsOpen, setPrevControlledIsOpen] = useState(controlledIsOpen)
   if (isControlled && controlledIsOpen !== prevControlledIsOpen) {

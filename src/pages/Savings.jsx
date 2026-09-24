@@ -27,7 +27,7 @@ function Savings() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const motionDelay = reduceMotion ? 0 : 220
+  const motionDelay = reduceMotion ? 0 : 200
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -370,6 +370,7 @@ function Savings() {
 
           {displayedRows.length === 0 ? (
             <EmptyState
+              variant="savings"
               title={showArchive ? t('savings.archiveEmptyTitle', 'Belum Ada Tabungan di Arsip') : t('savings.emptyTitle')}
               description={
                 showArchive

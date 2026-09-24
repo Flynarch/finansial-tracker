@@ -9,6 +9,7 @@ import { formatExpenseCategory } from '../../lib/expenseCategories'
 import HabitHeatmapWidget from '../habits/HabitHeatmapWidget'
 import { ProgressBar } from './DashboardStatComponents'
 import { getCompactItems } from '../../hooks/useDashboardData'
+import { formatGrowthPercentage } from '../../hooks/dashboard/dashboardStats'
 import useBackButton from '../../hooks/useBackButton'
 
 export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
@@ -97,7 +98,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   const isNetPositive = (netWorthGrowth?.net ?? 0) > 0
   const isNetNegative = (netWorthGrowth?.net ?? 0) < 0
   const hasGrowth = Boolean(
-    netWorthGrowth && (netWorthGrowth.net !== 0 || Math.round(netWorthGrowth.pct) !== 0)
+    netWorthGrowth && (netWorthGrowth.net !== 0 || Math.abs(netWorthGrowth.pct) >= 0.05)
   )
 
   const handleTouchStart = (e) => {
@@ -130,7 +131,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 transition-opacity duration-300 ease-out ${
+      className={`fixed inset-0 z-50 transition-opacity duration-200 ease-out ${
         zoomVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
     >
@@ -151,7 +152,9 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
               : 'translate3d(0, 100%, 0)',
             transition: isDragging
               ? 'none'
-              : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease',
+              : zoomVisible
+              ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+              : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
             opacity: zoomVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
           }}
         >
@@ -403,7 +406,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       ) : null}
                       <span className="leading-tight">
                         {isNetPositive ? '+' : ''}
-                        {formatCurrency(netWorthGrowth.net, defaultCurrency, locale)} ({isNetPositive ? '+' : ''}{Math.round(netWorthGrowth.pct)}%)
+                        {formatCurrency(netWorthGrowth.net, defaultCurrency, locale)} ({formatGrowthPercentage(netWorthGrowth.pct, true)})
                       </span>
                     </span>
                   )}

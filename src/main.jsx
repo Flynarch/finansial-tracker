@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import { initFirebaseAnalytics } from './lib/firebase'
+import { initGlobalAutocorrect } from './lib/keyboardAutocorrect'
 
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
@@ -14,6 +15,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
     console.warn('Global error caught:', event.error || event.message)
   })
+  initGlobalAutocorrect()
 }
 
 void initFirebaseAnalytics()

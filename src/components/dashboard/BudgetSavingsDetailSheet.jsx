@@ -357,14 +357,18 @@ export default function BudgetSavingsDetailSheet({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/65 backdrop-blur-xs cursor-pointer"
+        className={`absolute inset-0 bg-black/65 backdrop-blur-xs cursor-pointer ${
+          sheetVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+        }`}
         onClick={closeSheet}
         aria-label={t('common.close', 'Tutup')}
       />
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full sm:max-w-lg sm:px-4 sm:pb-6">
         <div
-          className="max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar"
+          className={`max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${
+            sheetVisible ? 'ft-sheet-enter' : ''
+          }`}
           style={{
             boxShadow: 'var(--shadow-card)',
             transform: sheetVisible
@@ -372,7 +376,9 @@ export default function BudgetSavingsDetailSheet({
               : 'translate3d(0, 100%, 0)',
             transition: isDragging
               ? 'none'
-              : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease',
+              : sheetVisible
+              ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+              : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
             opacity: sheetVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
           }}
         >

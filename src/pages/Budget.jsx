@@ -26,7 +26,7 @@ function Budget() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const budgetCycleStartDay = useSettingsStore((state) => state.budgetCycleStartDay || 1)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const motionDelay = reduceMotion ? 0 : 220
+  const motionDelay = reduceMotion ? 0 : 200
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -403,7 +403,7 @@ function Budget() {
 
           {monthBudgets.length === 0 ? (
             <div className="space-y-4">
-              <EmptyState title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
+              <EmptyState variant="budget" title={t('budget.emptyTitle')} description={t('budget.emptyDesc')} />
               {prevMonthBudgets.length > 0 && (
                 <div className="text-center">
                   <button

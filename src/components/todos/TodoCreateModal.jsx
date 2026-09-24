@@ -30,6 +30,10 @@ export default function TodoCreateModal({
             onChange={(e) => setAddForm((p) => ({ ...p, title: e.target.value }))}
             required
             maxLength={200}
+            autoCorrect="on"
+            autoCapitalize="sentences"
+            spellCheck={true}
+            autoComplete="on"
           />
         </label>
         <label className="ft-label block">
@@ -40,6 +44,10 @@ export default function TodoCreateModal({
             value={addForm.description}
             onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))}
             maxLength={2000}
+            autoCorrect="on"
+            autoCapitalize="sentences"
+            spellCheck={true}
+            autoComplete="on"
           />
         </label>
         <div className="ft-label block">

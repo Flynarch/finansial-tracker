@@ -968,6 +968,10 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                 </div>
                 <textarea
                   value={form.notes}
+                  autoCorrect="on"
+                  autoCapitalize="sentences"
+                  spellCheck={true}
+                  autoComplete="on"
                   onChange={(e) => {
                     setForm((p) => ({ ...p, notes: e.target.value }))
                     const el = e.target

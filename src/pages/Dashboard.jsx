@@ -79,6 +79,7 @@ export default function Dashboard() {
     zoomRevenueAxisTicks,
     rangedSummaryStats,
     netWorthGrowth,
+    zoomNetWorthGrowth,
     zoomPeakAndFloor,
     assetBreakdownData,
     zoomCombinedChartSeries,
@@ -90,7 +91,7 @@ export default function Dashboard() {
     computeRevenueValue,
   } = dashboardData
 
-  const motionDelay = reduceMotion ? 0 : 220
+  const motionDelay = reduceMotion ? 0 : 200
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
@@ -310,7 +311,7 @@ export default function Dashboard() {
             zoomRevenueRange={zoomRevenueRange}
             setZoomRevenueRange={setZoomRevenueRange}
             zoomRevenueValue={zoomRevenueValue}
-            netWorthGrowth={netWorthGrowth}
+            netWorthGrowth={zoomNetWorthGrowth || netWorthGrowth}
             comparePrevious={comparePrevious}
             setComparePrevious={setComparePrevious}
             comparisonSummary={comparisonSummary}

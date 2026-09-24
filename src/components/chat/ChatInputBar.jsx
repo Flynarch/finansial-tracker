@@ -77,6 +77,10 @@ export default function ChatInputBar({
           ref={inputRef}
           rows={1}
           value={inputValue}
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          spellCheck={true}
+          autoComplete="on"
           onChange={(e) => {
             setInputValue(e.target.value)
             e.target.style.height = 'auto'

@@ -7,7 +7,7 @@ import { navItems } from './navItems'
 import { triggerHaptic } from '../../lib/haptics'
 
 function linkClassName({ isActive }) {
-  return `flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1 text-[11px] leading-tight transition-all duration-200 ${
+  return `flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1 text-[11px] leading-tight transition-colors duration-150 ${
     isActive
       ? 'text-[var(--nav-item-active)] bg-[var(--panel-strong)] shadow-2xs font-black'
       : 'text-[var(--nav-item-inactive)] hover:text-[var(--nav-item-hover)] font-medium'

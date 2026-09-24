@@ -1,16 +1,33 @@
 @import "tailwindcss";
 
 /* ── 120 FPS Buttery-Smooth View Transitions ── */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
 ::view-transition-old(root) {
+  animation: ft-view-fade-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  mix-blend-mode: normal;
   z-index: 1;
 }
 ::view-transition-new(root) {
+  animation: ft-view-fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  mix-blend-mode: normal;
   z-index: 99999;
+}
+
+@keyframes ft-view-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ft-view-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ── Mobile Native APK Pure App Touch & Viewport Lockdown ── */
@@ -171,22 +188,22 @@ img, svg, a, button {
 }
 
 .ft-sheet-enter {
-  animation: ft-sheet-slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ft-sheet-slide-up 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform;
 }
 
 .ft-sheet-exit {
-  animation: ft-sheet-slide-down 200ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: ft-sheet-slide-down 200ms cubic-bezier(0.4, 0, 1, 1) both;
   will-change: transform;
 }
 
 .ft-backdrop-enter {
-  animation: ft-backdrop-fade-in 240ms ease-out both;
+  animation: ft-backdrop-fade-in 220ms ease-out both;
   will-change: opacity;
 }
 
 .ft-backdrop-exit {
-  animation: ft-backdrop-fade-out 200ms ease-out both;
+  animation: ft-backdrop-fade-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
   will-change: opacity;
 }
 
@@ -457,11 +474,15 @@ img, svg, a, button {
     --field-border: rgba(255, 255, 255, 0.11);
     --field-border-hover: rgba(255, 255, 255, 0.20);
     --ring: rgba(71, 85, 105, 0.4);
-    --motion-duration: 280ms;
-    /* Smoother ease-out for page/tab/sheet transitions. */
-    --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --motion-duration-spring: 380ms;
+    --motion-duration-fast: 150ms;
+    --motion-duration-normal: 220ms;
+    --motion-duration-exit: 180ms;
+    --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --motion-duration: 220ms;
+    --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-duration-spring: 220ms;
 
     /* ── Clean solid tokens ────────────────────────────────────────────── */
     --glass-bg: var(--panel);
@@ -498,9 +519,10 @@ img, svg, a, button {
     --nav-fab-fg: #f8fafc;
     --nav-fab-ring: rgba(71, 85, 105, 0.4);
 
-    /* ── Skeleton / loading ──────────────────────────────────────────── */
-    --skeleton-base: rgba(255, 255, 255, 0.04);
-    --skeleton-shine: rgba(255, 255, 255, 0.08);
+    /* ── Skeleton / loading (Calibrated High-Visibility Shimmer) ───── */
+    --skeleton-base: rgba(255, 255, 255, 0.08);
+    --skeleton-shine: rgba(255, 255, 255, 0.18);
+    --skeleton-border: rgba(255, 255, 255, 0.06);
 
     /* ── Settings icon badge tokens ──────────────────────────────────── */
     --badge-bg: rgba(255, 255, 255, 0.08);
@@ -620,8 +642,9 @@ img, svg, a, button {
     --nav-fab-fg: #060913;
     --nav-fab-ring: rgba(56, 189, 248, 0.4);
 
-    --skeleton-base: rgba(56, 189, 248, 0.05);
-    --skeleton-shine: rgba(56, 189, 248, 0.1);
+    --skeleton-base: rgba(56, 189, 248, 0.09);
+    --skeleton-shine: rgba(56, 189, 248, 0.22);
+    --skeleton-border: rgba(56, 189, 248, 0.12);
 
     /* ── Settings icon badge tokens ──────────────────────────────────── */
     --badge-bg: rgba(56, 189, 248, 0.1);
@@ -739,8 +762,9 @@ img, svg, a, button {
     --nav-fab-fg: #ffffff;
     --nav-fab-ring: rgba(15, 23, 42, 0.25);
 
-    --skeleton-base: rgba(15, 23, 42, 0.05);
-    --skeleton-shine: rgba(15, 23, 42, 0.09);
+    --skeleton-base: rgba(15, 23, 42, 0.08);
+    --skeleton-shine: rgba(255, 255, 255, 0.7);
+    --skeleton-border: rgba(15, 23, 42, 0.06);
 
     /* ── Settings icon badge tokens (light) ─────────────────────────── */
     --badge-bg: #f1f5f9;
@@ -908,8 +932,8 @@ img, svg, a, button {
   }
 
   /* ── Motion / transitions ─────────────────────────────────────────── */
-  .ft-sheet-enter {
-    animation: ft-sheet-enter var(--motion-duration) var(--motion-ease);
+  .ft-fade-up {
+    animation: ft-fade-up var(--motion-duration) var(--motion-ease) both;
     will-change: transform, opacity;
   }
 
@@ -1167,53 +1191,94 @@ img, svg, a, button {
     padding: 0;
   }
 
-  /* ── Skeleton loading ────────────────────────────────────────────── */
+  /* ── Skeleton loading (Calibrated Shimmer Engine) ─────────────────── */
   .ft-skeleton {
     background: var(--skeleton-base);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     position: relative;
     overflow: hidden;
+    transform: translateZ(0);
   }
 
   .ft-skeleton::after {
     content: '';
     position: absolute;
     inset: 0;
+    transform: translateX(-100%);
     background: linear-gradient(
-      90deg,
-      transparent 0%,
+      105deg,
+      transparent 15%,
       var(--skeleton-shine) 50%,
-      transparent 100%
+      transparent 85%
     );
-    animation: ft-skeleton-pulse 1.8s ease-in-out infinite;
+    animation: ft-skeleton-shimmer 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    will-change: transform;
   }
 
-  /* ── Empty state ─────────────────────────────────────────────────── */
+  .ft-skeleton-card {
+    border-radius: 1.25rem;
+    border: 1px solid var(--border);
+    background: var(--panel-strong);
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Empty state (Layered Tactile Presentation) ───────────────────── */
   .ft-empty-state {
     @apply flex flex-col items-center justify-center px-6 py-10 text-center;
     border-radius: var(--radius-xl);
     border: 1px solid var(--border);
     background: var(--panel-strong);
     box-shadow: var(--shadow-card);
-    animation: ft-spring-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: ft-spring-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .ft-empty-badge-halo {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 1.75rem;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--field-bg) 80%, transparent);
+    box-shadow: var(--shadow-card);
+    margin-bottom: 1.25rem;
+    animation: ft-float 4.5s ease-in-out infinite;
+  }
+
+  .ft-empty-badge-core {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 1.125rem;
+    border: 1px solid var(--border-strong);
+    background: var(--panel-strong);
+    color: var(--accent);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   }
 
   .ft-empty-state-icon {
     @apply mb-5;
     color: var(--muted-2);
-    animation: ft-float 4s ease-in-out infinite;
+    animation: ft-float 4.5s ease-in-out infinite;
   }
 
   .ft-empty-state-title {
-    @apply text-[15px] font-bold;
+    @apply text-base font-black;
     font-family: var(--font-display);
     color: var(--fg);
+    letter-spacing: -0.02em;
   }
 
   .ft-empty-state-desc {
-    @apply mt-1 text-[12px];
+    @apply mt-1.5 text-xs font-medium leading-relaxed;
     color: var(--muted);
-    max-width: 280px;
+    max-width: 320px;
   }
 
   /* ── Settings: grouped list pattern (Clean, Spacious & Premium) ──── */
@@ -1415,16 +1480,6 @@ img, svg, a, button {
 }
 
 /* ── Keyframes ──────────────────────────────────────────────────────── */
-@keyframes ft-sheet-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 
 @keyframes ft-todo-card-enter {
   from {
@@ -1456,6 +1511,15 @@ img, svg, a, button {
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ft-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -2379,10 +2443,20 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
   .ft-motion-page,
   .ft-motion-overlay,
   .ft-motion-panel,
   .ft-sheet-enter,
+  .ft-sheet-exit,
+  .ft-backdrop-enter,
+  .ft-backdrop-exit,
+  .ft-page-transition,
+  .ft-page-crossfade,
+  .ft-fade-up,
   .ft-todo-card-enter,
   .ft-page-enter > *,
   .ft-skeleton::after,
@@ -2399,8 +2473,7 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 .ft-interactive-card,
 .ft-todo-card,
 .ft-item-card,
-section,
-[role="button"] {
+.ft-composited-layer {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
@@ -2659,21 +2732,19 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
 }
 
 /* ── High-Performance 60fps GPU Animation Engine ────────────── */
-@keyframes ft-page-enter {
-  0% {
+@keyframes ft-page-fade-in {
+  from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
   }
-  100% {
+  to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
+.ft-page-crossfade,
 .ft-page-transition {
-  animation: ft-page-enter 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+  animation: ft-page-fade-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
 }
 
 /* GPU acceleration helper */

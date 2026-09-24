@@ -29,6 +29,8 @@ export {
 
 export {
   computeNetWorthGrowth,
+  calculateRangeNetWorthGrowth,
+  formatGrowthPercentage,
   generateMonthlyData,
   calculatePeriodStats,
   calculate1DHourlyFlow,
@@ -42,6 +44,7 @@ import {
 import {
   calculatePeriodStats,
   calculate1DHourlyFlow,
+  calculateRangeNetWorthGrowth,
 } from './dashboard/dashboardStats'
 
 export function useDashboardData() {
@@ -81,6 +84,12 @@ export function useDashboardData() {
   const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans)
   const walletsWithBalance = useLiveQuery(
     async () => {
+      // Establish active live dependency on transactions & walletBalanceCache
+      // so any created/updated/deleted transaction immediately triggers balance recalculation!
+      await db.transactions.limit(1).toArray()
+      if (db.walletBalanceCache) {
+        await db.walletBalanceCache.limit(1).toArray()
+      }
       const rawWallets = await db.wallets.toArray()
       if (!rawWallets || rawWallets.length === 0) return []
       return await getAllWalletBalances(rawWallets, rates)
@@ -816,24 +825,15 @@ export function useDashboardData() {
     )
   }, [zoomRevenueRange, todayIncome, todayStats, data1w, data1m, data3m, dataYtd, data1y, dataAll])
 
-  const netWorthGrowth = useMemo(() => {
-    if (miniRevenueSeries && miniRevenueSeries.length >= 2) {
-      const startVal = miniRevenueSeries[0].value
-      const currentVal = miniRevenueSeries[miniRevenueSeries.length - 1].value
-      const net = currentVal - startVal
-      const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
-      return { net, pct }
-    }
-    const net = rangedSummaryStats.net ?? 0
-    const currentVal = zoomRevenueValue ?? 0
-    const startVal = currentVal - net
-    const pct = startVal !== 0 ? (net / Math.abs(startVal)) * 100 : net > 0 ? 100 : 0
+  const miniNetWorthGrowth = useMemo(() => {
+    return calculateRangeNetWorthGrowth(miniRevenueRange, netWorth, chartData, todayStats)
+  }, [miniRevenueRange, netWorth, chartData, todayStats])
 
-    return {
-      net,
-      pct,
-    }
-  }, [miniRevenueSeries, rangedSummaryStats.net, zoomRevenueValue])
+  const zoomNetWorthGrowth = useMemo(() => {
+    return calculateRangeNetWorthGrowth(zoomRevenueRange, netWorth, chartData, todayStats)
+  }, [zoomRevenueRange, netWorth, chartData, todayStats])
+
+  const netWorthGrowth = miniNetWorthGrowth
 
   const buildPreviousPeriodRevenueSeries = useCallback(
     (rangeId, currentSeries) => {
@@ -1211,6 +1211,8 @@ export function useDashboardData() {
     zoomRevenueAxisTicks,
     rangedSummaryStats,
     netWorthGrowth,
+    miniNetWorthGrowth,
+    zoomNetWorthGrowth,
     zoomPeakAndFloor,
     assetBreakdownData,
     zoomCombinedChartSeries,

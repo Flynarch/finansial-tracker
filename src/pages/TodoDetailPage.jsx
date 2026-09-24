@@ -594,6 +594,10 @@ export default function TodoDetailPage() {
                 <textarea
                   ref={descRef}
                   rows={1}
+                  autoCorrect="on"
+                  autoCapitalize="sentences"
+                  spellCheck={true}
+                  autoComplete="on"
                   className="mt-1 w-full bg-transparent p-0 text-sm leading-relaxed text-[var(--fg)] placeholder:text-[var(--muted)]/50 focus:outline-none resize-none border-none overflow-hidden block break-words [overflow-wrap:anywhere]"
                   placeholder={t('todo.notes.placeholder', 'Tulis catatan atau detail tambahan...')}
                   defaultValue={todo.description || ''}
@@ -773,7 +777,7 @@ export default function TodoDetailPage() {
           </>
         ) : (
           /* ── EDIT FORM MODE ────────────────────────────────────────── */
-          <form onSubmit={saveEdit} className="ft-sheet-enter space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs">
+          <form onSubmit={saveEdit} className="ft-fade-up space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-xs">
             {editError && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-500">
                 {editError}
@@ -788,6 +792,10 @@ export default function TodoDetailPage() {
                 onChange={(e) => setEditDraft((p) => ({ ...p, title: e.target.value }))}
                 required
                 maxLength={200}
+                autoCorrect="on"
+                autoCapitalize="sentences"
+                spellCheck={true}
+                autoComplete="on"
               />
             </div>
 
@@ -798,6 +806,10 @@ export default function TodoDetailPage() {
                 value={editDraft.description}
                 onChange={(e) => setEditDraft((p) => ({ ...p, description: e.target.value }))}
                 maxLength={2000}
+                autoCorrect="on"
+                autoCapitalize="sentences"
+                spellCheck={true}
+                autoComplete="on"
               />
             </div>
 
