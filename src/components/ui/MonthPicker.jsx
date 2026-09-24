@@ -378,7 +378,7 @@ export default function MonthPicker({ value, onChange, className = '', compact =
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 border-t border-[var(--border)]/40 px-5 py-3.5">
+            <div className="flex items-center gap-2 border-t border-[var(--border)]/40 px-5 pt-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
               <button
                 type="button"
                 onClick={closePicker}

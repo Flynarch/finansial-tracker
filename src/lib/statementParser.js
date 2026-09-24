@@ -1,6 +1,7 @@
 import { format, isValid } from 'date-fns'
 import { toSafeNumber } from './utils'
 import { cleanMutationMerchant, matchCategoryFromDescription } from './merchantUtils'
+import { getRememberedCategory } from './ai/merchantCategorizer'
 
 /**
  * Configure PapaParse using dynamic import (offline capable)
@@ -279,7 +280,8 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
 
 function finalizeParsedTx(tx) {
   const cleanMerchant = cleanMutationMerchant(tx.rawDescription)
-  const category = matchCategoryFromDescription(cleanMerchant, tx.type)
+  const remembered = getRememberedCategory(cleanMerchant, tx.type)
+  const category = remembered || matchCategoryFromDescription(cleanMerchant, tx.type)
   return {
     ...tx,
     cleanMerchant,

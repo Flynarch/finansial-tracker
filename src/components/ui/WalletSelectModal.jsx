@@ -411,7 +411,7 @@ export default function WalletSelectModal({
         </div>
 
         {/* Footer Shortcut */}
-        <div className="p-4 border-t border-[var(--border)]/60 bg-[var(--panel)] flex justify-between items-center">
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-[var(--border)]/60 bg-[var(--panel)] flex justify-between items-center">
           <button
             type="button"
             onClick={() => {

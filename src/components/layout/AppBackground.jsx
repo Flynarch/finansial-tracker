@@ -21,7 +21,7 @@ export const AppBackground = memo(function AppBackground() {
         style={{
           background: 'radial-gradient(ellipse, var(--accent), transparent 70%)',
           opacity: 0.07,
-          transform: 'translate3d(-50%, 0, 0)',
+          transform: 'translate3d(0, 0, 0)',
         }}
       />
 

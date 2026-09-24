@@ -41,6 +41,7 @@ import TransactionFilterSheet from '../components/transactions/TransactionFilter
 import TransactionBulkBar from '../components/transactions/TransactionBulkBar'
 import SplitBillModal from '../components/split-bill/SplitBillModal'
 import StagingReviewInbox from '../components/transactions/StagingReviewInbox'
+import { rememberMerchantCategory } from '../lib/ai/merchantCategorizer'
 
 const StatementImportModal = lazy(() => import('../components/transactions/StatementImportModal'))
 
@@ -472,7 +473,15 @@ function Transactions() {
         receiptImage: editFormData.receiptImage || null,
         isSplit: Boolean(editFormData.isSplit),
         splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
+        isPendingReview: false,
       })
+
+      // If user confirms/edits a transaction from staging, learn the merchant categorization
+      if (editFormData.category && editFormData.category !== 'lainnya_kategori/umum' && editFormData.category !== 'lainnya/umum') {
+        const merchant = editingTransaction.cleanMerchant || editFormData.notes || editingTransaction.notes || ''
+        rememberMerchantCategory(merchant, editFormData.category, editFormData.type)
+      }
+
       setEditingTransaction(null)
     } catch (err) {
       console.error('[Transactions:handleSaveEdit]', err)
@@ -490,6 +499,7 @@ function Transactions() {
           ...transaction,
           date: todayStr,
           createdAt: Date.now(),
+          isPendingReview: false,
         }
         delete payload.id
         await addTransaction(payload)
@@ -669,6 +679,8 @@ function Transactions() {
           wallets={allWallets}
           formatCurrency={formatCurrency}
           defaultCurrency={defaultCurrency}
+          locale={locale}
+          onEditTransaction={openEditTransaction}
           t={t}
         />
 

@@ -15,7 +15,7 @@ function Button({ children, className = '', disabled = false, variant = 'primary
     <button
       type={type}
       disabled={disabled}
-      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-black transition-[transform,opacity] duration-150 ease-out ${variantCls} ${disabledCls} ${className}`}
+      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-black transition-[translate,scale,opacity] duration-150 ease-out ${variantCls} ${disabledCls} ${className}`}
       {...props}
     >
       {children}

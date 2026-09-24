@@ -18,12 +18,24 @@ describe('statementParser', () => {
 
     const raw3 = 'TRANSFER KE REK 1234567890 Bpk Budi Santoso'
     expect(cleanMutationMerchant(raw3)).toBe('Bpk Budi Santoso')
+
+    const raw4 = 'Pembayaran Berhasil Rp 45.000 di Kopi Kenangan'
+    expect(cleanMutationMerchant(raw4)).toBe('Kopi Kenangan')
+
+    const raw5 = 'Pembayaran Rp35.000 ke Solaria berhasil'
+    expect(cleanMutationMerchant(raw5)).toBe('Solaria')
+
+    const raw6 = 'Kamu menerima transfer dana Rp 100.000 dari Budi'
+    expect(cleanMutationMerchant(raw6)).toBe('Budi')
   })
 
   it('matches category accurately from clean merchant description', () => {
-    expect(matchCategoryFromDescription('Kopi Kenangan Grand Indonesia', 'expense')).toBe('makanMinum/kopi')
-    expect(matchCategoryFromDescription('Restoran Padang Sederhana', 'expense')).toBe('makanMinum/restoran')
+    expect(matchCategoryFromDescription('Kopi Kenangan Grand Indonesia', 'expense')).toBe('makanan/kopi')
+    expect(matchCategoryFromDescription('Restoran Padang Sederhana', 'expense')).toBe('makanan/makan_diluar')
+    expect(matchCategoryFromDescription('McDonalds Sarinah Jakarta', 'expense')).toBe('makanan/makan_diluar')
     expect(matchCategoryFromDescription('Tagihan Listrik PLN Bulanan', 'expense')).toBe('tagihan/listrik')
+    expect(matchCategoryFromDescription('Apotek Kimia Farma Tebet', 'expense')).toBe('kesehatan/obat')
+    expect(matchCategoryFromDescription('Tiket Kereta KAI Gambir', 'expense')).toBe('transportasi/kereta')
     expect(matchCategoryFromDescription('Gaji Pokok Karyawan PT ABC', 'income')).toBe('gaji/gaji_pokok')
   })
 
@@ -51,7 +63,7 @@ describe('statementParser', () => {
     expect(parsed[0].type).toBe('expense')
     expect(parsed[0].amount).toBe(50000)
     expect(parsed[0].cleanMerchant).toContain('Kopi Kenangan')
-    expect(parsed[0].category).toBe('makanMinum/kopi')
+    expect(parsed[0].category).toBe('makanan/kopi')
 
     // Transaction 2: Income Gaji
     expect(parsed[1].date).toBe('2026-08-10')

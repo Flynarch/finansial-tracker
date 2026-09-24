@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { matchPath, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
+import PageSkeleton from '../../components/ui/PageSkeleton'
 
 const ROUTES_META = [
   { path: '/settings/security', titleKey: 'settings.appLock' },
@@ -23,7 +24,7 @@ export default function SettingsLayout() {
   return (
     <div className="ft-settings-page">
       {meta ? (
-        <header className="sticky top-0 z-20 mb-5 flex items-center gap-3.5 bg-[var(--bg)] py-3.5 border-b border-[var(--border)]/40 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        <header className="sticky top-0 z-20 mb-5 flex items-center gap-3.5 bg-[var(--bg)] pt-[max(env(safe-area-inset-top,0px),0.875rem)] pb-3.5 border-b border-[var(--border)]/40 -mx-4 px-4 sm:-mx-6 sm:px-6">
           <button
             type="button"
             onClick={() => navigate('/settings')}
@@ -40,11 +41,7 @@ export default function SettingsLayout() {
         </header>
       ) : null}
       <Suspense
-        fallback={
-          <div className="flex items-center justify-center min-h-[30vh]">
-            <div className="h-6 w-6 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
-          </div>
-        }
+        fallback={<PageSkeleton variant="settings" />}
       >
         <Outlet />
       </Suspense>

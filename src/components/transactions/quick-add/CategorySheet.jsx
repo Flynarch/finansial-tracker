@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import CategoryIcon from '../../ui/CategoryIcon'
 import Button from '../../ui/Button'
 import { getCategoryToneClass } from '../../../lib/categoryIcon'
@@ -105,7 +106,7 @@ export default function CategorySheet({
     touchStartY.current = 0
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex flex-col justify-end pointer-events-auto" role="presentation">
       <button
         type="button"
@@ -375,6 +376,7 @@ export default function CategorySheet({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

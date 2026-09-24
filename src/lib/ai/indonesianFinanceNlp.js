@@ -1209,7 +1209,7 @@ export function parseIndonesianFinancialText(
     if ((hasExplicitSpendingAction || hasExplicitIncomeAction) && totalAmt <= 0) {
       return {
         error: true,
-        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "beli kopi 20rb" atau "terima gaji 5jt").',
+        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "makan siang 30rb" atau "terima gaji 5jt").',
       }
     }
   }

@@ -26,12 +26,16 @@ public class FinTrackNotificationService extends NotificationListenerService {
     private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(
         "com.bca",
         "com.bca.mybca",
+        "com.bca.blu",
         "id.co.bankmandiri.livin",
         "id.co.bri.brimo",
         "id.co.bni.wondr",
         "src.bni",
         "com.btpn.jenius",
+        "id.co.bankbsi.mobile",
+        "com.bsi.mobile",
         "id.co.cimbniaga.octomobile",
+        "com.linecorp.linebank.id",
         "com.seabank.id",
         "com.jago.bank",
         "com.gojek.app",
@@ -67,6 +71,50 @@ public class FinTrackNotificationService extends NotificationListenerService {
         }
 
         if (title.isEmpty() && text.isEmpty()) {
+            return;
+        }
+
+        String lowerCombined = (title + " " + text).toLowerCase();
+
+        // Guard 1: Filter general Shopee e-commerce, shopping orders, and live-stream spam
+        if ("com.shopee.id".equalsIgnoreCase(packageName)) {
+            boolean isShopeeWallet = lowerCombined.contains("shopeepay") ||
+                lowerCombined.contains("isi saldo") ||
+                lowerCombined.contains("transfer") ||
+                lowerCombined.contains("pembayaran") ||
+                lowerCombined.contains("qris");
+            if (!isShopeeWallet) {
+                return;
+            }
+        }
+
+        // Guard 2: Filter obvious marketing clickbaits, engagement questions, and promo hype emojis
+        if (title.contains("?") || text.contains("?") ||
+            title.contains("👉") || text.contains("👉") ||
+            title.contains("🔥") || text.contains("🔥") ||
+            lowerCombined.contains("cek caranya") ||
+            lowerCombined.contains("saldo gratis") ||
+            lowerCombined.contains("gratis saldo") ||
+            lowerCombined.contains("bisa terima") ||
+            lowerCombined.contains("mau hemat") ||
+            lowerCombined.contains("voucher diskon") ||
+            lowerCombined.contains("gratis ongkir") ||
+            lowerCombined.contains("flash sale") ||
+            lowerCombined.contains("live stream")) {
+            return;
+        }
+
+        // Guard 3: Filter failed, rejected, cancelled transactions or unpaid reminders
+        if (lowerCombined.contains("gagal") ||
+            lowerCombined.contains("tidak berhasil") ||
+            lowerCombined.contains("belum berhasil") ||
+            lowerCombined.contains("dibatalkan") ||
+            lowerCombined.contains("kadaluarsa") ||
+            lowerCombined.contains("kedaluwarsa") ||
+            lowerCombined.contains("ditolak") ||
+            lowerCombined.contains("menunggu pembayaran") ||
+            lowerCombined.contains("tagihan telah terbit") ||
+            lowerCombined.contains("segera bayar")) {
             return;
         }
 
@@ -118,6 +166,18 @@ public class FinTrackNotificationService extends NotificationListenerService {
                 SharedPreferences prefs = getEncryptedPreferences(this);
                 String currentQueueJson = prefs.getString(KEY_QUEUE, "[]");
                 JSONArray queueArray = new JSONArray(currentQueueJson);
+
+                // Rapid duplicate suppression (within 3 seconds for identical package, title, and text)
+                if (queueArray.length() > 0) {
+                    JSONObject last = queueArray.getJSONObject(queueArray.length() - 1);
+                    if (packageName.equals(last.optString("packageName")) &&
+                        title.equals(last.optString("title")) &&
+                        text.equals(last.optString("text")) &&
+                        Math.abs(postTime - last.optLong("timestamp", 0)) < 3000) {
+                        Log.d(TAG, "Suppressed rapid duplicate notification from " + packageName);
+                        return;
+                    }
+                }
 
                 JSONObject item = new JSONObject();
                 item.put("id", "notif_" + postTime + "_" + (int)(Math.random() * 1000));

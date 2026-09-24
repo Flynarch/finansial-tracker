@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -821,7 +822,7 @@ export default function SavingsDetail() {
       </BottomSheet>
 
       {/* ── Celebration Certificate Modal ── */}
-      {isCelebrationModalOpen && (
+      {isCelebrationModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm ft-motion-overlay">
           <div className="w-full max-w-sm bg-[var(--panel-strong)] border border-[var(--earthy-green)]/40 rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-4">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[var(--earthy-green-soft)] border border-[var(--earthy-green)]/30 text-[var(--earthy-green)] shadow-sm">
@@ -869,7 +870,8 @@ export default function SavingsDetail() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── AI Prediction Bottom Sheet ── */}

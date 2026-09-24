@@ -4,7 +4,7 @@
 
 **Enterprise-Grade Personal Finance Intelligence & Native Android Asset Management System**
 
-[![Version](https://img.shields.io/badge/Version-v5.0.0-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.0.0)
+[![Version](https://img.shields.io/badge/Version-v5.1.0-indigo.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.1.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.1-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -15,7 +15,7 @@
 
 *A privacy-first, offline-capable financial operations engine equipped with native Android home screen widgets, live sparkline trend analysis, Google Gemini AI receipt perception, local IndexedDB persistence, bank-grade biometric security, and 120 FPS mobile performance.*
 
-[Download Latest APK (v5.0.0)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.0.0) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
+[Download Latest APK (v5.1.0)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.1.0) • [Documentation](#table-of-contents) • [Architecture](#system-architecture) • [Getting Started](#getting-started)
 
 ---
 
@@ -336,7 +336,7 @@ cmd.exe /c "cd android && gradlew.bat assembleDebug"
 cd android && ./gradlew assembleDebug
 ```
 
-The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v5.0.0.apk` in the repository root.
+The compiled APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk` and copied to `FinTrack-v5.1.0.apk` in the repository root.
 
 ---
 

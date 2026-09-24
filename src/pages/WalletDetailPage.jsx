@@ -514,7 +514,7 @@ export default function WalletDetailPage() {
         {pageError ? <ToastBanner message={pageError} type="error" onDismiss={() => setPageError('')} /> : null}
 
         {/* ── 1. Clean Neutral Hero Section with Wallet Icon ────────────── */}
-        <div className="ft-wallet-detail-hero w-full pb-8 pt-3 px-4 text-center bg-[var(--panel)] border-b border-[var(--border)] relative overflow-hidden">
+        <div className="ft-wallet-detail-hero w-full pb-8 pt-[max(env(safe-area-inset-top,0px),0.75rem)] px-4 text-center bg-[var(--panel)] border-b border-[var(--border)] relative overflow-hidden">
           {/* Top Nav Bar with 3-Dots Action Button */}
           <PageHeader
             title={wallet.name}

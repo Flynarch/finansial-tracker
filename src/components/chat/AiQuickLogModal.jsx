@@ -24,7 +24,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang 35rb',
       'Gaji 5jt',
-      'Beli kopi 25rb',
+      'Sarapan 25rb',
       'Uang saku 50rb',
       'Bensin 30rb',
       'Belanja bulanan 250rb',
@@ -40,7 +40,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch 35k IDR',
       'Salary 5M IDR',
-      'Coffee 25k IDR',
+      'Breakfast 25k IDR',
       'Pocket money 50k IDR',
       'Gas 30k IDR',
       'Groceries 250k IDR',
@@ -58,7 +58,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang $5',
       'Gaji $3000',
-      'Beli kopi $3.5',
+      'Sarapan $4',
       'Uang saku $20',
       'Bensin $25',
       'Belanja bulanan $60',
@@ -74,7 +74,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch $5',
       'Salary $3000',
-      'Coffee $3.5',
+      'Breakfast $4',
       'Pocket money $20',
       'Gas $25',
       'Groceries $60',
@@ -92,7 +92,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang €5',
       'Gaji €2800',
-      'Beli kopi €3.5',
+      'Sarapan €4',
       'Uang saku €20',
       'Bensin €25',
       'Belanja bulanan €55',
@@ -108,7 +108,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch €5',
       'Salary €2800',
-      'Coffee €3.5',
+      'Breakfast €4',
       'Pocket money €20',
       'Gas €25',
       'Groceries €55',
@@ -126,7 +126,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang S$6',
       'Gaji S$4000',
-      'Beli kopi S$4',
+      'Sarapan S$4',
       'Uang saku S$25',
       'Bensin S$30',
       'Belanja bulanan S$70',
@@ -142,7 +142,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch S$6',
       'Salary S$4000',
-      'Coffee S$4',
+      'Breakfast S$4',
       'Pocket money S$25',
       'Gas S$30',
       'Groceries S$70',
@@ -160,7 +160,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang RM15',
       'Gaji RM3500',
-      'Beli kopi RM10',
+      'Sarapan RM10',
       'Uang saku RM40',
       'Bensin RM30',
       'Belanja bulanan RM150',
@@ -176,7 +176,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch RM15',
       'Salary RM3500',
-      'Coffee RM10',
+      'Breakfast RM10',
       'Pocket money RM40',
       'Gas RM30',
       'Groceries RM150',
@@ -194,7 +194,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang ¥800',
       'Gaji ¥300.000',
-      'Beli kopi ¥450',
+      'Sarapan ¥450',
       'Uang saku ¥3.000',
       'Bensin ¥3.500',
       'Belanja bulanan ¥8.000',
@@ -210,7 +210,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch ¥800',
       'Salary ¥300,000',
-      'Coffee ¥450',
+      'Breakfast ¥450',
       'Pocket money ¥3,000',
       'Gas ¥3,500',
       'Groceries ¥8,000',
@@ -228,7 +228,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     id: [
       'Makan siang £5',
       'Gaji £2500',
-      'Beli kopi £3.5',
+      'Sarapan £4',
       'Uang saku £20',
       'Bensin £25',
       'Belanja bulanan £50',
@@ -244,7 +244,7 @@ const CURRENCY_SAMPLE_TEMPLATES = {
     en: [
       'Lunch £5',
       'Salary £2500',
-      'Coffee £3.5',
+      'Breakfast £4',
       'Pocket money £20',
       'Gas £25',
       'Groceries £50',
@@ -317,12 +317,12 @@ export default function AiQuickLogModal() {
     }
     if (defaultCurrency === 'JPY') {
       return locale === 'en'
-        ? 'e.g., Lunch ¥800 & coffee ¥450 with Suica...'
+        ? 'e.g., Lunch ¥800 & gas ¥3000 with Suica...'
         : 'Contoh: Makan siang ¥800 & bensin ¥3000 pakai Cash...'
     }
     if (defaultCurrency === 'GBP') {
       return locale === 'en'
-        ? 'e.g., Lunch £6 & coffee £3.5 with Monzo...'
+        ? 'e.g., Lunch £6 & groceries £20 with Monzo...'
         : 'Contoh: Makan siang £5 & bensin £20 pakai Bank...'
     }
     return locale === 'en'
@@ -1001,7 +1001,7 @@ function isObviousNonTransaction(text) {
                         onClick={() => {
                           triggerHaptic('light')
                           setInputValue(chip)
-                          handleSubmit(chip)
+                          inputRef.current?.focus()
                         }}
                         className="flex items-center gap-1.5 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                       >

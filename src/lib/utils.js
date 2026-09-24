@@ -130,7 +130,9 @@ export function parseMoneyInput(value, currency = 'IDR') {
   if (!raw) return 0
   const isNegative = raw.startsWith('-')
   if (currency === 'IDR') {
-    const num = toSafeNumber(raw.replace(/[^\d]/g, ''))
+    const trimmed = raw.replace(/[^\d]+$/, '')
+    const cleanSen = trimmed.replace(/[,.]00$/, '')
+    const num = toSafeNumber(cleanSen.replace(/[^\d]/g, ''))
     return isNegative ? -num : num
   }
 

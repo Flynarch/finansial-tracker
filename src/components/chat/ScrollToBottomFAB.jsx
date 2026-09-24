@@ -19,7 +19,7 @@ const ScrollToBottomFAB = ({ isVisible = false, unreadCount = 0, onClick }) => {
 
   return (
     <div
-      className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-10 transition-all duration-200 ${
+      className={`absolute bottom-20 left-1/2 -translate-x-1/2 z-30 transition-all duration-200 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
       }`}
     >

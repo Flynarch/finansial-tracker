@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { Camera, Image as ImageIcon, ChevronRight, X } from 'lucide-react'
 import { translate } from '../../lib/i18n'
 import { triggerHaptic } from '../../lib/haptics'
@@ -37,7 +38,7 @@ export default function MediaSourcePickerModal({
 
   const isEn = locale === 'en'
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-[ft-backdrop-fade-in_0.2s_ease-out_both]"
       onClick={onClose}
@@ -127,6 +128,7 @@ export default function MediaSourcePickerModal({
           {translate(locale, 'common.cancel') || (isEn ? 'Cancel' : 'Batal')}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

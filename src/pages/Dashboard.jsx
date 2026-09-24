@@ -1,4 +1,8 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { Inbox, ArrowRight } from 'lucide-react'
+import { db } from '../lib/db'
 import { useDashboardData } from '../hooks/useDashboardData'
 import { formatCurrency } from '../lib/utils'
 import WalletCarousel from '../components/dashboard/WalletCarousel'
@@ -17,6 +21,7 @@ import EmailVerificationBanner from '../components/auth/EmailVerificationBanner'
 import syncNativeWidgetData from '../lib/nativeWidgetSync'
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [isEntering, setIsEntering] = useState(false)
   const [isMobileScreen, setIsMobileScreen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false))
   const [zoomedChart, setZoomedChart] = useState(null)
@@ -26,6 +31,17 @@ export default function Dashboard() {
   const [isLoanSheetOpen, setIsLoanSheetOpen] = useState(false)
   const [payLoan, setPayLoan] = useState(null)
   const [isPayOpen, setIsPayOpen] = useState(false)
+
+  const pendingReviewCount = useLiveQuery(
+    async () => {
+      const items = await db.transactions
+        .filter((tx) => !tx.deletedAt && (tx.isPendingReview === true || tx.isPendingReview === 1))
+        .toArray()
+      return items.length
+    },
+    [],
+    0
+  )
 
   // Budget & Savings Detail Sheet state
   const [detailSheetMode, setDetailSheetMode] = useState(null) // 'budget' | 'savings' | null
@@ -174,6 +190,33 @@ export default function Dashboard() {
             rates={rates}
           />
         </div>
+
+        {/* Staging Review Alert Banner */}
+        {pendingReviewCount > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3.5 sm:p-4 text-[var(--fg)] shadow-xs animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-white shadow-2xs">
+                <Inbox className="h-4.5 w-4.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold truncate">
+                  {t('tx.staging.bannerTitle', 'Mutasi Bank Menunggu Tinjauan')}
+                </p>
+                <p className="text-[11px] font-medium text-[var(--muted)]">
+                  {t('tx.staging.bannerDesc', 'Ada {{count}} transaksi baru dari notifikasi siap diperiksa.', { count: pendingReviewCount })}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/transactions')}
+              className="flex shrink-0 items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <span>{t('tx.staging.reviewNow', 'Tinjau')}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* 2. Transaksi Terakhir Card */}
         <DashboardRecentTx

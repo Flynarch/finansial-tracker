@@ -17,6 +17,7 @@ import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import { triggerHaptic } from '../../lib/haptics'
 import { detectDuplicateTransactions, detectBankPreset, extractTextFromPdf, parseBcaStatementLines, parseCsvStatement, parseGenericCsvRows } from '../../lib/statementParser'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
+import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 import { format } from 'date-fns'
 
 export default function StatementImportModal({
@@ -185,11 +186,12 @@ export default function StatementImportModal({
       const formattedForDb = selectedTxs.map((tx) => ({
         date: tx.date || format(new Date(), 'yyyy-MM-dd'),
         type: tx.type || 'expense',
-        category: tx.category || 'lainnya/pengeluaran_lain',
+        category: tx.category || (tx.type === 'income' ? 'lainnya/umum' : 'lainnya_kategori/umum'),
         amount: toSafeNumber(tx.amount),
         currency: tx.currency || txCurrency,
         walletId: Number(selectedWalletId),
         notes: tx.notes || tx.cleanMerchant || 'Impor Rekening Koran',
+        cleanMerchant: tx.cleanMerchant || tx.merchant || '',
         source: 'e_statement_import',
         createdAt: Date.now(),
       }))
@@ -199,6 +201,7 @@ export default function StatementImportModal({
 
       // Invalidate balance cache so computeWalletBalance reflects new transactions
       await invalidateWalletBalance([Number(selectedWalletId)])
+      scheduleNativeWidgetSync()
 
       if (onImportComplete) onImportComplete(formattedForDb.length)
       handleReset()

@@ -11,6 +11,8 @@ import {
   Wallet,
   ArrowRight,
   Loader2,
+  ShieldCheck,
+  Trash2,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -22,6 +24,8 @@ import {
 import {
   FinTrackNotificationPlugin,
   syncNotificationQueue,
+  scanSuspectPromoTransactions,
+  cleanSuspectPromoTransactions,
 } from '../../lib/notificationIngestion'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -38,6 +42,8 @@ export default function SettingsNotifications() {
   const setDailyReminderTime = useSettingsStore((s) => s.setDailyReminderTime)
   const budgetAlertsEnabled = useSettingsStore((s) => s.budgetAlertsEnabled)
   const setBudgetAlertsEnabled = useSettingsStore((s) => s.setBudgetAlertsEnabled)
+  const notificationAutoApprove = useSettingsStore((s) => s.notificationAutoApprove)
+  const setNotificationAutoApprove = useSettingsStore((s) => s.setNotificationAutoApprove)
 
   // Wallet list for auto-assignment
   const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
@@ -49,6 +55,12 @@ export default function SettingsNotifications() {
   const [isDisclosureOpen, setIsDisclosureOpen] = useState(false)
   const [isSyncingQueue, setIsSyncingQueue] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState('')
+
+  // Suspect Promo Cleaner State
+  const [suspectTxs, setSuspectTxs] = useState(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [isCleaning, setIsCleaning] = useState(false)
+  const [cleanFeedback, setCleanFeedback] = useState('')
 
   const [hasPermission, setHasPermission] = useState(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -113,6 +125,52 @@ export default function SettingsNotifications() {
     setHasPermission(ok)
   }
 
+  const handleToggleAutoApprove = async () => {
+    triggerHaptic('selection')
+    const next = !notificationAutoApprove
+    await setNotificationAutoApprove(next)
+  }
+
+  const handleScanPromo = async () => {
+    triggerHaptic('selection')
+    setIsScanning(true)
+    setCleanFeedback('')
+    try {
+      const found = await scanSuspectPromoTransactions()
+      setSuspectTxs(found)
+      if (found.length === 0) {
+        setCleanFeedback(t('notif.scanClean', 'Tidak ada mutasi promosi yang terdeteksi. Data Anda bersih.'))
+      }
+    } catch (err) {
+      console.warn('[SettingsNotifications:handleScanPromo]', err)
+      setCleanFeedback(t('common.error.generic', 'Gagal memindai transaksi.'))
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  const handleCleanPromo = async () => {
+    if (!suspectTxs || suspectTxs.length === 0) return
+    triggerHaptic('medium')
+    setIsCleaning(true)
+    try {
+      const ids = suspectTxs.map((t) => t.id)
+      const res = await cleanSuspectPromoTransactions(ids)
+      triggerHaptic('success')
+      setCleanFeedback(
+        t('notif.cleanSuccess', 'Berhasil membersihkan {{count}} transaksi promosi dan memulihkan saldo dompet.', {
+          count: res.deletedCount,
+        })
+      )
+      setSuspectTxs([])
+    } catch (err) {
+      console.warn('[SettingsNotifications:handleCleanPromo]', err)
+      setCleanFeedback(t('common.error.generic', 'Gagal membersihkan transaksi promosi.'))
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
   const handleManualSyncNotifs = async () => {
     triggerHaptic('selection')
     setIsSyncingQueue(true)
@@ -122,6 +180,7 @@ export default function SettingsNotifications() {
       const result = await syncNotificationQueue({
         defaultWalletId: autoWalletId,
         defaultCurrency,
+        notificationAutoApprove,
       })
 
       if (result.syncedCount > 0) {
@@ -256,8 +315,39 @@ export default function SettingsNotifications() {
                 </select>
               </div>
 
+              {/* Safe Staging Review Switch */}
+              <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3.5">
+                <div>
+                  <span className="block text-xs font-bold text-[var(--fg)]">
+                    {t('notif.stagingReviewTitle', 'Wajibkan Tinjauan Sebelum Masuk Saldo')}
+                  </span>
+                  <span className="block text-[11px] font-medium text-[var(--muted)] mt-0.5 max-w-sm">
+                    {t(
+                      'notif.stagingReviewDesc',
+                      'Mutasi notifikasi menunggu persetujuan Anda di halaman Transaksi, mencegah saldo dompet berkurang otomatis oleh notifikasi keliru.'
+                    )}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!notificationAutoApprove}
+                  onClick={handleToggleAutoApprove}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    !notificationAutoApprove ? 'bg-emerald-600' : 'bg-zinc-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      !notificationAutoApprove ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Sync Action Button */}
-              <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={handleManualSyncNotifs}
@@ -277,6 +367,92 @@ export default function SettingsNotifications() {
                     {syncFeedback}
                   </span>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+      </SettingsSection>
+
+      {/* Group 1B: Pembersih Transaksi Promosi & Spam */}
+      <SettingsSection
+        label={t('notif.cleanerSection', 'Pembersih Mutasi Promosi & Spam')}
+        footnote={t(
+          'notif.cleanerFootnote',
+          'Pindai dan bersihkan transaksi promosi atau marketing clickbait yang tidak sengaja tercatat di riwayat mutasi Anda, serta pulihkan saldo dompet yang terpotong.'
+        )}
+      >
+        <div className="ft-settings-cell space-y-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="block text-sm font-extrabold text-[var(--fg)]">
+                  {t('notif.scanTitle', 'Pindai Transaksi Promosi')}
+                </span>
+                <span className="block text-xs font-medium text-[var(--muted)] mt-0.5">
+                  {t('notif.scanSubtitle', 'Deteksi mutasi yang berasal dari teks penawaran / promo e-wallet.')}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isScanning}
+              onClick={handleScanPromo}
+              className="h-9 px-3.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {isScanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              <span>{t('notif.scanAction', 'Pindai')}</span>
+            </button>
+          </div>
+
+          {/* Scan Results / Feedback */}
+          {cleanFeedback && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3 text-xs font-semibold text-[var(--fg)]">
+              {cleanFeedback}
+            </div>
+          )}
+
+          {suspectTxs && suspectTxs.length > 0 && (
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-3.5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                    {t('notif.foundSuspect', 'Ditemukan {{count}} transaksi promosi marketing:', {
+                      count: suspectTxs.length,
+                    })}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isCleaning}
+                  onClick={handleCleanPromo}
+                  className="h-8 px-3 rounded-lg bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 hover:bg-rose-700"
+                >
+                  {isCleaning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  <span>{t('notif.cleanAll', 'Hapus & Pulihkan Saldo')}</span>
+                </button>
+              </div>
+
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {suspectTxs.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--panel)] border border-[var(--border)] text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-[var(--fg)] truncate">{tx.notes || tx.category}</p>
+                      <p className="text-[10px] text-[var(--muted)]">{tx.date}</p>
+                    </div>
+                    <span className="font-bold text-rose-500 shrink-0">
+                      -Rp {Number(tx.amount || 0).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

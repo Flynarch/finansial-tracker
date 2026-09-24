@@ -218,27 +218,28 @@ export default function InAppNotificationToast() {
   const { Icon, color, bg } = getToastIcon(activeToast?.type, activeToast?.title, activeToast?.message)
 
   return createPortal(
-    <div
-      role="alert"
-      tabIndex={0}
-      onClick={handleToastClick}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className={`fixed top-[max(1.25rem,calc(env(safe-area-inset-top)+0.75rem))] left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm cursor-pointer select-none transition-all duration-350 ease-out transform-gpu pointer-events-auto ${
-        isVisible
-          ? 'opacity-100 scale-100'
-          : 'opacity-0 scale-95 pointer-events-none'
-      }`}
-      style={{
-        transform: isVisible
-          ? `translate3d(-50%, ${dragOffset}px, 0)`
-          : 'translate3d(-50%, -40px, 0) scale(0.95)',
-        transition: dragOffset !== 0 ? 'none' : 'transform 360ms cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 280ms ease-out, scale 280ms ease-out',
-        touchAction: 'pan-y',
-      }}
-    >
-      <div className="relative overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-2xl p-3.5 shadow-2xl shadow-black/20 flex items-start gap-3 active:scale-[0.98] transition-transform">
+    <div className="fixed top-[max(1.25rem,calc(env(safe-area-inset-top)+0.75rem))] inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+      <div
+        role="alert"
+        tabIndex={0}
+        onClick={handleToastClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`w-full max-w-sm cursor-pointer select-none pointer-events-auto transition-all duration-350 ease-out transform-gpu ${
+          isVisible
+            ? 'opacity-100'
+            : 'opacity-0 pointer-events-none'
+        }`}
+        style={{
+          transform: isVisible
+            ? `translate3d(0, ${dragOffset}px, 0) scale(1)`
+            : 'translate3d(0, -40px, 0) scale(0.95)',
+          transition: dragOffset !== 0 ? 'none' : 'transform 360ms cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 280ms ease-out',
+          touchAction: 'pan-y',
+        }}
+      >
+        <div className="relative overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-2xl p-3.5 shadow-2xl shadow-black/20 flex items-start gap-3 active:scale-[0.98] transition-transform">
         {/* Icon Badge */}
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg} ${color} shadow-xs`}>
           <Icon size={18} strokeWidth={2.2} />
@@ -280,7 +281,8 @@ export default function InAppNotificationToast() {
           />
         </div>
       </div>
-    </div>,
-    document.body
-  )
+    </div>
+  </div>,
+  document.body
+)
 }

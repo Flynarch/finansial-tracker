@@ -123,8 +123,8 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   return (
     <div className={`ft-page-enter flex flex-col ${isOnboarding ? 'h-full w-full' : 'min-h-screen bg-[var(--bg)]'}`}>
       {/* ── Sticky Top Header & Filters ─────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-2.5 border-b border-[var(--border)] shadow-xs w-full">
-        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-4 pb-2">
+      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5 border-b border-[var(--border)] shadow-xs w-full">
+        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-1 sm:pt-2 pb-2">
           <PageHeader
             title={t('wallets.chooseInstitution', 'Pilih Institusi / Dompet')}
             onBack={() => (isOnboarding && onBack ? onBack() : navigate(-1))}

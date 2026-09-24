@@ -22,15 +22,15 @@ const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0
     {
       id: 'record',
       icon: Receipt,
-      title: isEn ? 'Quick Record' : 'Catat Cepat',
-      prompt: isEn ? 'Lunch 35k via GoPay' : 'Makan siang 35rb via GoPay',
+      title: isEn ? 'Record Transaction' : 'Catat Transaksi',
+      prompt: isEn ? 'I want to record a transaction' : 'Aku mau catat transaksi',
       colors: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
     },
     {
       id: 'budget',
       icon: PieChart,
       title: isEn ? 'Check Budget' : 'Cek Budget',
-      prompt: isEn ? 'Remaining entertainment budget?' : 'Sisa budget hiburan bulan ini?',
+      prompt: isEn ? 'Remaining budget this month?' : 'Sisa budget bulan ini?',
       colors: 'bg-sky-500/15 border-sky-500/25 text-sky-500',
     },
     {

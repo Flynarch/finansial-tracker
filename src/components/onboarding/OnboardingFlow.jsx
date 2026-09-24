@@ -5,6 +5,7 @@ import { db } from '../../lib/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { formatCurrency } from '../../lib/utils'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
@@ -386,6 +387,8 @@ export default function OnboardingFlow() {
     }
     goTo(Math.max(step - 1, 0))
   }, [step, editingUsernameFromStep4, cameFromStep4, goTo])
+
+  useBackButton(handleBack, step > 0)
 
   const handleEditUsernameFromStep4 = useCallback(() => {
     setEditingUsernameFromStep4(true)

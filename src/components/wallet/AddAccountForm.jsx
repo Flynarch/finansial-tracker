@@ -104,8 +104,8 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
   return (
     <div className="ft-page-enter min-h-full flex flex-col bg-[var(--bg)]">
       {/* ── Top App Bar Navigation ────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-[var(--panel-strong)]/90 backdrop-blur-xl border-b border-[var(--border)] shadow-xs">
-        <div className="max-w-xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-20 bg-[var(--panel-strong)]/90 backdrop-blur-xl pt-[max(env(safe-area-inset-top,0px),0.75rem)] border-b border-[var(--border)] shadow-xs">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBack}

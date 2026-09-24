@@ -67,3 +67,15 @@ export {
 export {
   scanReceiptImage,
 } from './ai/receiptScanner'
+
+// 11. Hybrid 3-Tier Intelligent Merchant Categorizer
+export {
+  classifyMerchantHybrid,
+  classifyMerchantWithAi,
+  getRememberedCategory,
+  rememberMerchantCategory,
+  preseedMerchantMemoryFromDb,
+  enrichPendingMutationsWithAi,
+  clearMerchantMemory,
+  getMerchantMemoryEntries,
+} from './ai/merchantCategorizer'

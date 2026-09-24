@@ -24,7 +24,7 @@ import { callApiStreamWithFallback } from './client'
  * @param {object} context - Context options
  * @returns {Promise<object>} Chat response object
  */
-export async function parseTransactionFromText(userMessage, context) {
+export async function parseTransactionFromText(userMessage, context = {}) {
   const {
     locale = 'id',
     defaultCurrency = 'IDR',
@@ -34,9 +34,31 @@ export async function parseTransactionFromText(userMessage, context) {
     onStream = null,
     scanMode = 'all',
     rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
-  } = context
+  } = context || {}
 
   const normUserText = String(userMessage || '').toLowerCase()
+
+  const trimmedLower = normUserText.trim().replace(/[.!?]+$/, '')
+  const isGeneralRecordIntent =
+    /^(aku\s+|saya\s+)?(mau|ingin|pengen)?\s*(catat|mencatat|rekam|tambah)\s*(transaksi|pengeluaran|pemasukan)?$/i.test(trimmedLower) ||
+    /^(i\s+)?(want\s+to|wanna)?\s*(record|log|add)\s*(a\s+)?(transaction|expense|income)?$/i.test(trimmedLower) ||
+    trimmedLower === 'aku mau catat transaksi' ||
+    trimmedLower === 'catat transaksi' ||
+    trimmedLower === 'i want to record a transaction' ||
+    trimmedLower === 'record a transaction'
+
+  if (isGeneralRecordIntent) {
+    const isEn = locale === 'en'
+    return {
+      type: 'text',
+      text: isEn
+        ? 'Sure! What transaction would you like to record? Please mention the item description, amount, and wallet used.'
+        : 'Tentu! Transaksi apa yang ingin dicatat? Sebutkan nama transaksi (pengeluaran atau pemasukan), nominal, dan dompet yang digunakan.',
+      chips: isEn
+        ? ['Record Expense', 'Record Income', 'Transfer Wallets']
+        : ['Catat Pengeluaran', 'Catat Pemasukan', 'Transfer Dompet'],
+    }
+  }
 
   if (
     normUserText.includes('kesehatan keuangan') ||
@@ -120,13 +142,13 @@ export async function parseTransactionFromText(userMessage, context) {
       return {
         type: 'text',
         text: textMsg,
-        chips: [`Setor Tabungan: ${formatCurrency(50000, defaultCurrency)}`, 'Buat Target Baru: Dana Darurat', 'Analisis Keuangan']
+        chips: ['Setor Tabungan', 'Buat Target Tabungan', 'Analisis Keuangan']
       }
     } else {
       return {
         type: 'text',
         text: 'Saat ini belum ada **Target Tabungan** yang dibuat. Menentukan target tabungan (seperti Dana Darurat, Liburan, atau Beli Gadget) sangat efektif untuk menjaga konsistensi keuangan Anda.\n\nMau saya bantu buatkan target tabungan baru sekarang?',
-        chips: ['Buat Target: Dana Darurat 5 Juta', 'Buat Target: Liburan 3 Juta', 'Analisis Keuangan']
+        chips: ['Buat Target Tabungan', 'Tips Menabung', 'Analisis Keuangan']
       }
     }
   }
@@ -157,8 +179,8 @@ export async function parseTransactionFromText(userMessage, context) {
     } else {
       return {
         type: 'text',
-        text: 'Saat ini belum ada **Habit Harian** yang aktif. Anda bisa membuat kebiasaan finansial atau produktif harian (seperti *Tidak beli kopi di luar*, *Catat pengeluaran harian*, atau *Menabung 10rb*).\n\nMau mulai buat habit baru?',
-        chips: ['Buat Habit: Hemat Kopi', 'Buat Habit: Menabung Harian', 'Analisis Keuangan']
+        text: 'Saat ini belum ada **Habit Harian** yang aktif. Anda bisa membuat kebiasaan finansial atau produktif harian (seperti *Catat pengeluaran harian* atau *Menabung harian*).\n\nMau mulai buat habit baru?',
+        chips: ['Buat Habit Harian', 'Tips Membangun Habit', 'Analisis Keuangan']
       }
     }
   }

@@ -50,6 +50,7 @@ const useSettingsStore = create((set, get) => ({
   dailyReminderTime: '20:00',
   budgetAlertsEnabled: true,
   budgetCycleStartDay: 1,
+  notificationAutoApprove: false,
   emailVerified: false,
   emailVerificationDismissed: false,
   hideBalance: typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false,
@@ -88,6 +89,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
       budgetCycleStartDay: next.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(next.budgetCycleStartDay) || 1))) : 1,
+      notificationAutoApprove: Boolean(next.notificationAutoApprove),
       hideBalance: Boolean(next.hideBalance),
     })
   },
@@ -209,6 +211,11 @@ const useSettingsStore = create((set, get) => ({
     const next = Math.min(28, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
     set({ budgetCycleStartDay: next })
     await get().persist({ budgetCycleStartDay: next })
+  },
+  setNotificationAutoApprove: async (notificationAutoApprove) => {
+    const next = Boolean(notificationAutoApprove)
+    set({ notificationAutoApprove: next })
+    await get().persist({ notificationAutoApprove: next })
   },
   setReduceMotion: (reduceMotion) => {
     set({ reduceMotion: Boolean(reduceMotion) })
@@ -359,6 +366,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
       budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
+      notificationAutoApprove: Boolean(record.notificationAutoApprove),
       hideBalance: record.hideBalance !== undefined
         ? Boolean(record.hideBalance)
         : (typeof window !== 'undefined' ? window.localStorage?.getItem?.('ft_hide_balance') === '1' : false),

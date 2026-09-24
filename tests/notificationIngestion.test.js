@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto'
 import { describe, it, expect } from 'vitest'
 import {
   parseWithBankRegex,
@@ -7,9 +8,42 @@ import {
   findBestMatchingWallet,
   correlateInternalTransfers,
   FinTrackNotificationPlugin,
+  scanSuspectPromoTransactions,
+  cleanSuspectPromoTransactions,
+  parseAmountFromRegexMatch,
 } from '../src/lib/notificationIngestion'
+import { db } from '../src/lib/db'
 
 describe('notificationIngestion - 3-Tier Parsing Cascade', () => {
+  it('correctly handles decimal sen (,00 or .00) in bank notifications without 100x multiplication error', () => {
+    expect(parseAmountFromRegexMatch('50.000,00')).toBe(50000)
+    expect(parseAmountFromRegexMatch('1.500.000,00')).toBe(1500000)
+    expect(parseAmountFromRegexMatch('25000.00')).toBe(25000)
+
+    const bcaWithSen = parseWithBankRegex(
+      'm-BCA',
+      'm-Transfer Berhasil. Transfer Rp 75.000,00 ke 1234567890 Bpk Budi',
+      'com.bca'
+    )
+    expect(bcaWithSen).not.toBeNull()
+    expect(bcaWithSen.amount).toBe(75000)
+
+    const mandiriWithSen = parseWithBankRegex(
+      'Livin by Mandiri',
+      'Pembayaran Berhasil Rp 120.000,00 di Supermarket',
+      'id.co.bankmandiri.livin'
+    )
+    expect(mandiriWithSen).not.toBeNull()
+    expect(mandiriWithSen.amount).toBe(120000)
+
+    const tokenBoundaryWithSen = parseWithTokenBoundary(
+      'Bank Digital',
+      'Transaksi sukses didebit IDR 30.000,00 di Merchant'
+    )
+    expect(tokenBoundaryWithSen).not.toBeNull()
+    expect(tokenBoundaryWithSen.amount).toBe(30000)
+  })
+
   it('correctly parses Tier 1 BCA transfer and payment notifications', () => {
     // Expense
     const bcaExpense = parseWithBankRegex(
@@ -90,8 +124,105 @@ describe('notificationIngestion - 3-Tier Parsing Cascade', () => {
     expect(full).not.toBeNull()
     expect(full.amount).toBe(25000)
     expect(full.type).toBe('expense')
-    expect(full.category).toBe('makanMinum/kopi')
+    expect(full.category).toBe('makanan/kopi')
     expect(full.cleanMerchant).toContain('Kopi Fore')
+  })
+
+  it('correctly parses Tier 1 Seabank, Bank Jago, Blu, Jenius, BSI, CIMB Niaga, and LINE Bank notifications', () => {
+    // Seabank
+    const seabankIncome = parseWithBankRegex(
+      'SeaBank',
+      'Transfer Masuk Berhasil. Transfer Rp 150.000 dari BCA',
+      'com.seabank.id'
+    )
+    expect(seabankIncome).not.toBeNull()
+    expect(seabankIncome.institution).toBe('Seabank')
+    expect(seabankIncome.amount).toBe(150000)
+    expect(seabankIncome.type).toBe('income')
+
+    const seabankExpense = parseWithBankRegex(
+      'SeaBank',
+      'Transfer Keluar Berhasil Rp 50.000 ke DANA',
+      'com.seabank.id'
+    )
+    expect(seabankExpense).not.toBeNull()
+    expect(seabankExpense.amount).toBe(50000)
+    expect(seabankExpense.type).toBe('expense')
+
+    // Bank Jago
+    const jagoIncome = parseWithBankRegex(
+      'Bank Jago',
+      'Uang Masuk: Rp 250.000 dari Tokopedia',
+      'com.jago.bank'
+    )
+    expect(jagoIncome).not.toBeNull()
+    expect(jagoIncome.institution).toBe('Bank Jago')
+    expect(jagoIncome.amount).toBe(250000)
+    expect(jagoIncome.type).toBe('income')
+
+    const jagoExpense = parseWithBankRegex(
+      'Bank Jago',
+      'Uang Keluar: Rp 35.000 di Kopi Kenangan',
+      'com.jago.bank'
+    )
+    expect(jagoExpense).not.toBeNull()
+    expect(jagoExpense.amount).toBe(35000)
+    expect(jagoExpense.type).toBe('expense')
+
+    // Blu by BCA Digital
+    const bluExpense = parseWithBankRegex(
+      'blu',
+      'Pembayaran QRIS Berhasil Rp 20.000 di Indomaret',
+      'com.bca.blu'
+    )
+    expect(bluExpense).not.toBeNull()
+    expect(bluExpense.institution).toBe('Blu')
+    expect(bluExpense.amount).toBe(20000)
+    expect(bluExpense.type).toBe('expense')
+
+    // Jenius
+    const jeniusIncome = parseWithBankRegex(
+      'Jenius',
+      'Uang masuk: Rp 500.000 dari PT Maju Jaya',
+      'com.btpn.jenius'
+    )
+    expect(jeniusIncome).not.toBeNull()
+    expect(jeniusIncome.institution).toBe('Jenius')
+    expect(jeniusIncome.amount).toBe(500000)
+    expect(jeniusIncome.type).toBe('income')
+
+    // BSI
+    const bsiExpense = parseWithBankRegex(
+      'BSI Mobile',
+      'Pembayaran QRIS Rp 25.000 berhasil di Kopi Kenangan',
+      'com.bsi.mobile'
+    )
+    expect(bsiExpense).not.toBeNull()
+    expect(bsiExpense.institution).toBe('BSI')
+    expect(bsiExpense.amount).toBe(25000)
+    expect(bsiExpense.type).toBe('expense')
+
+    // CIMB Niaga OCTO Mobile
+    const cimbExpense = parseWithBankRegex(
+      'OCTO Mobile',
+      'Pembayaran QRIS Rp 45.000 di Solaria',
+      'id.co.cimbniaga.octomobile'
+    )
+    expect(cimbExpense).not.toBeNull()
+    expect(cimbExpense.institution).toBe('CIMB Niaga')
+    expect(cimbExpense.amount).toBe(45000)
+    expect(cimbExpense.type).toBe('expense')
+
+    // LINE Bank
+    const lineExpense = parseWithBankRegex(
+      'LINE Bank',
+      'Pembayaran QRIS Rp 30.000 berhasil di Mixue',
+      'com.linecorp.linebank.id'
+    )
+    expect(lineExpense).not.toBeNull()
+    expect(lineExpense.institution).toBe('LINE Bank')
+    expect(lineExpense.amount).toBe(30000)
+    expect(lineExpense.type).toBe('expense')
   })
 })
 
@@ -103,9 +234,44 @@ describe('notificationIngestion - Anti-Spam & Promo Guardrails', () => {
     expect(isFinancialMutation('Info Login', 'Perangkat baru terdeteksi pada akun Anda', 'com.bca')).toBe(false)
   })
 
+  it('rejects user-reported marketing push notifications and clickbaits', () => {
+    // Exact user screenshot 1: ShopeePay promo about free Seabank balance
+    expect(
+      isFinancialMutation(
+        'ShopeePay',
+        'Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini 👉',
+        'com.shopee.id'
+      )
+    ).toBe(false)
+
+    // Exact user screenshot 2: DANA marketing notification with question mark & CTA
+    expect(
+      isFinancialMutation(
+        'DANA',
+        'Dana 🔥mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
+        'id.dana'
+      )
+    ).toBe(false)
+
+    // Marketing question hooks and CTAs
+    expect(isFinancialMutation('DANA Promo', 'Mau Saldo Gratis Rp 50.000? Cek di sini!', 'id.dana')).toBe(false)
+    expect(isFinancialMutation('ShopeePay', 'Klaim Saldo Gratis Rp 100.000 Buruan klik sekarang', 'com.shopee.id')).toBe(false)
+    expect(isFinancialMutation('GoPay', 'Ajak teman dan dapatkan saldo Rp25.000 sekarang juga!', 'com.gojek.app')).toBe(false)
+  })
+
+  it('rejects failed, cancelled, expired, or unpaid reminder notifications', () => {
+    expect(isFinancialMutation('BCA', 'Pembayaran QRIS sebesar Rp 50.000 GAGAL', 'com.bca')).toBe(false)
+    expect(isFinancialMutation('Mandiri', 'Transfer Rp 100.000 tidak berhasil', 'id.co.bankmandiri.livin')).toBe(false)
+    expect(isFinancialMutation('DANA', 'Transaksi dibatalkan Rp 25.000', 'id.dana')).toBe(false)
+    expect(isFinancialMutation('Shopee', 'Pesanan menunggu pembayaran sebesar Rp 75.000', 'com.shopee.id')).toBe(false)
+    expect(isFinancialMutation('PLN', 'Tagihan telah terbit sebesar Rp 250.000 jatuh tempo besok', 'com.pln')).toBe(false)
+  })
+
   it('accepts genuine financial mutation notifications', () => {
     expect(isFinancialMutation('DANA', 'Pembayaran berhasil Rp 40.000 ke Merchant Kopi', 'id.dana')).toBe(true)
     expect(isFinancialMutation('BCA', 'm-Transfer Berhasil. Transfer Rp 150.000 ke Rekening 88912', 'com.bca')).toBe(true)
+    expect(isFinancialMutation('ShopeePay', 'Pembayaran sebesar Rp 75.000 ke Solaria berhasil', 'com.shopee.id')).toBe(true)
+    expect(isFinancialMutation('SeaBank', 'Transfer Masuk Berhasil Rp 500.000 dari BCA', 'com.seabank.id')).toBe(true)
   })
 })
 
@@ -121,6 +287,13 @@ describe('notificationIngestion - Fuzzy Wallet Matching', () => {
     expect(result.wallet).not.toBeNull()
     expect(result.wallet.id).toBe(3)
     expect(result.isAmbiguous).toBe(false)
+  })
+
+  it('does NOT match ShopeePay notification to DANA wallet just because both are e-wallets', () => {
+    // User does NOT have a ShopeePay wallet. It must NOT silently match DANA!
+    const result = findBestMatchingWallet('ShopeePay', wallets, 'Pembayaran berhasil Rp 50.000')
+    expect(result.wallet).toBeNull()
+    expect(result.matches.length).toBe(0)
   })
 
   it('correctly matches BCA via 4-digit account number', () => {
@@ -176,11 +349,143 @@ describe('notificationIngestion - Internal Transfer Correlation', () => {
     expect(correlated[0].amount).toBe(200000)
     expect(correlated[0].walletId).toBe(1) // from BCA
     expect(correlated[0].targetWalletId).toBe(2) // to GoPay
+    expect(correlated[0].cleanMerchant).toContain('Pindah Dana')
+    // By default without auto-approve: requires manual review
+    expect(correlated[0].isPendingReview).toBe(true)
+
+    // With notificationAutoApprove enabled: auto-approves unambiguous matches
+    const { correlated: autoAppr } = correlateInternalTransfers(rawMutations, wallets, { notificationAutoApprove: true })
+    expect(autoAppr[0].isPendingReview).toBe(false)
+  })
+
+  it('correlates internal transfers when timestamps are numeric strings (e.g. from JSON)', () => {
+    const baseMs = 1727050000000
+    const rawMutations = [
+      {
+        institution: 'BCA',
+        amount: 150000,
+        type: 'expense',
+        rawDescription: 'Transfer ke GoPay Rp 150.000',
+        date: '2026-08-30',
+        createdAt: String(baseMs),
+      },
+      {
+        institution: 'GoPay',
+        amount: 150000,
+        type: 'income',
+        rawDescription: 'Top up saldo Rp 150.000 dari BCA',
+        date: '2026-08-30',
+        createdAt: String(baseMs + 10000),
+      },
+    ]
+
+    const { correlated, transfersCreated } = correlateInternalTransfers(rawMutations, wallets)
+    expect(transfersCreated).toBe(1)
+    expect(correlated.length).toBe(1)
+    expect(correlated[0].type).toBe('transfer')
+    expect(correlated[0].amount).toBe(150000)
+  })
+
+  it('requires manual review (isPendingReview: true) when both ends match the same wallet even if auto-approve is enabled', () => {
+    // Single generic wallet
+    const singleWallet = [{ id: 1, name: 'Rekening Bank', institutionType: 'bank', balance: 500000 }]
+    const rawMutations = [
+      {
+        institution: 'BCA',
+        amount: 100000,
+        type: 'expense',
+        rawDescription: 'Transfer Rp 100.000',
+        date: '2026-08-30',
+        createdAt: Date.now(),
+      },
+      {
+        institution: 'BCA',
+        amount: 100000,
+        type: 'income',
+        rawDescription: 'Transfer Masuk Rp 100.000',
+        date: '2026-08-30',
+        createdAt: Date.now() + 5000,
+      },
+    ]
+
+    const { correlated } = correlateInternalTransfers(rawMutations, singleWallet, { notificationAutoApprove: true })
+    expect(correlated[0].type).toBe('transfer')
+    expect(correlated[0].isPendingReview).toBe(true)
+  })
+
+  it('safely parses amounts with trailing sen and punctuation via parseAmountFromRegexMatch', () => {
+    expect(parseAmountFromRegexMatch('50.000,00')).toBe(50000)
+    expect(parseAmountFromRegexMatch('50.000,00.')).toBe(50000)
+    expect(parseAmountFromRegexMatch('50.000,00.-')).toBe(50000)
+    expect(parseAmountFromRegexMatch('1.500.000,00')).toBe(1500000)
+    expect(parseAmountFromRegexMatch('25000.00')).toBe(25000)
+    expect(parseAmountFromRegexMatch('')).toBe(0)
   })
 
   it('FinTrackNotificationPlugin supports drainQueuedMutations', async () => {
     const res = await FinTrackNotificationPlugin.drainQueuedMutations()
     expect(res).toBeDefined()
     expect(Array.isArray(res.mutations)).toBe(true)
+  })
+})
+
+describe('notificationIngestion - Promo Scanner & Bulk Cleanup', () => {
+  it('identifies and cleans suspect promo transactions from the ledger', async () => {
+    // Insert mock suspect promo transactions into dexie
+    const tx1Id = await db.transactions.add({
+      date: '2026-09-18',
+      type: 'expense',
+      amount: 200000,
+      currency: 'IDR',
+      notes: '[Auto: ShopeePay] Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini 👉',
+      source: 'notification_listener',
+      category: 'lainnya_kategori/umum',
+    })
+
+    const tx2Id = await db.transactions.add({
+      date: '2026-09-21',
+      type: 'expense',
+      amount: 10,
+      currency: 'IDR',
+      notes: '[Auto: DANA] Dana 🔥mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
+      source: 'notification_listener',
+      category: 'lainnya_kategori/umum',
+    })
+
+    // Legitimate transaction should NOT be identified as suspect promo
+    const txValidId = await db.transactions.add({
+      date: '2026-09-21',
+      type: 'expense',
+      amount: 45000,
+      currency: 'IDR',
+      notes: '[Auto: DANA] Pembayaran Berhasil ke Solaria',
+      source: 'notification_listener',
+      category: 'makanMinum/restoran',
+    })
+
+    // 1. Scan
+    const suspect = await scanSuspectPromoTransactions()
+    const suspectIds = suspect.map((t) => t.id)
+    expect(suspectIds).toContain(tx1Id)
+    expect(suspectIds).toContain(tx2Id)
+    expect(suspectIds).not.toContain(txValidId)
+
+    // 2. Clean suspect transactions
+    const cleanResult = await cleanSuspectPromoTransactions([tx1Id, tx2Id])
+    expect(cleanResult.deletedCount).toBe(2)
+
+    // 3. Confirm soft-deletion
+    const after1 = await db.transactions.get(tx1Id)
+    const after2 = await db.transactions.get(tx2Id)
+    const afterValid = await db.transactions.get(txValidId)
+
+    expect(after1.deletedAt).toBeDefined()
+    expect(after2.deletedAt).toBeDefined()
+    expect(afterValid.deletedAt).toBeUndefined()
+
+    // Cleanup valid test tx
+    await db.transactions.delete(txValidId)
+    await db.transactions.delete(tx1Id)
+    await db.transactions.delete(tx2Id)
   })
 })

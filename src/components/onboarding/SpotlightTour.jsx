@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 
 function getVisibleElement(selector) {
   if (typeof document === 'undefined' || !selector) return null
@@ -384,6 +385,8 @@ export default function SpotlightTour() {
     completeSpotlightTour()
     setCurrentStepIndex(0)
   }, [completeSpotlightTour])
+
+  useBackButton(handleSkip, Boolean(isSpotlightTourActive))
 
   // Keyboard navigation support
   useEffect(() => {

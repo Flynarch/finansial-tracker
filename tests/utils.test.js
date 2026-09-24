@@ -74,6 +74,17 @@ describe('utils - parseMoneyInput & formatMoneyInput', () => {
     expect(parsed).toBe(150000)
   })
 
+  it('safely strips trailing sen (,00 or .00) for IDR inputs without 100x multiplication error', () => {
+    expect(parseMoneyInput('50.000,00', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('50.000.00', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('1.500.000,00', 'IDR')).toBe(1500000)
+    expect(parseMoneyInput('25000,00', 'IDR')).toBe(25000)
+    expect(parseMoneyInput('25000.00', 'IDR')).toBe(25000)
+    expect(parseMoneyInput('50.000,00.', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('50.000,00.-', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('Rp 50.000,00.', 'IDR')).toBe(50000)
+  })
+
   it('formats and parses foreign currency decimal inputs', () => {
     const formatted = formatMoneyInput('1250,50', 'USD')
     expect(formatted).toBe('1.250,50')

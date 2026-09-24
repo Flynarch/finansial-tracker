@@ -30,8 +30,8 @@ export default function CurrencyPickerPage({ selectedCurrency = 'IDR', onSelect,
   return (
     <div className="ft-page-enter min-h-full flex flex-col bg-[var(--bg)]">
       {/* ── Sticky Top Header ────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl border-b border-[var(--border)] shadow-xs">
-        <div className="px-4 sm:px-6 pt-4 pb-3">
+      <div className="sticky top-0 z-30 bg-[var(--panel-strong)]/95 backdrop-blur-xl border-b border-[var(--border)] shadow-xs pt-[max(env(safe-area-inset-top,0px),0.75rem)]">
+        <div className="px-4 sm:px-6 pt-1 sm:pt-2 pb-3">
           <div className="flex items-center justify-between gap-3 mb-3">
             <button
               type="button"

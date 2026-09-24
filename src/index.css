@@ -190,6 +190,98 @@ img, svg, a, button {
   will-change: opacity;
 }
 
+/* ── Tailwind v4 Animation Utility Fallbacks (tailwindcss-animate compatibility) ── */
+@keyframes ft-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+.animate-in {
+  animation-name: ft-enter;
+  animation-duration: var(--tw-duration, 200ms);
+  animation-timing-function: var(--tw-ease, cubic-bezier(0.16, 1, 0.3, 1));
+  animation-fill-mode: both;
+}
+
+.fade-in,
+.fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+
+.zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+
+.zoom-in-90 {
+  --tw-enter-scale: 0.9;
+}
+
+.zoom-in-75 {
+  --tw-enter-scale: 0.75;
+}
+
+.zoom-in-50 {
+  --tw-enter-scale: 0.5;
+}
+
+.slide-in-from-bottom {
+  --tw-enter-translate-y: 100%;
+}
+
+.slide-in-from-bottom-1 {
+  --tw-enter-translate-y: 0.25rem;
+}
+
+.slide-in-from-bottom-2 {
+  --tw-enter-translate-y: 0.5rem;
+}
+
+.slide-in-from-bottom-4 {
+  --tw-enter-translate-y: 1rem;
+}
+
+.slide-in-from-top-1 {
+  --tw-enter-translate-y: -0.25rem;
+}
+
+.slide-in-from-top-2 {
+  --tw-enter-translate-y: -0.5rem;
+}
+
+.slide-in-from-top-4 {
+  --tw-enter-translate-y: -1rem;
+}
+
+.duration-100 {
+  --tw-duration: 100ms;
+}
+
+.duration-150 {
+  --tw-duration: 150ms;
+}
+
+.duration-200 {
+  --tw-duration: 200ms;
+}
+
+.duration-250 {
+  --tw-duration: 250ms;
+}
+
+.duration-300 {
+  --tw-duration: 300ms;
+}
+
+.duration-500 {
+  --tw-duration: 500ms;
+}
+
 /* High-performance off-screen list rendering & GPU layer */
 .ft-content-visibility-auto {
   content-visibility: auto;
@@ -822,8 +914,8 @@ img, svg, a, button {
   }
 
   .ft-motion-page {
-    transition: transform var(--motion-duration) var(--motion-ease), opacity var(--motion-duration) var(--motion-ease);
-    will-change: transform, opacity;
+    transition: transform var(--motion-duration) var(--motion-ease), translate var(--motion-duration) var(--motion-ease), opacity var(--motion-duration) var(--motion-ease);
+    will-change: transform, translate, opacity;
   }
 
   .ft-motion-overlay {

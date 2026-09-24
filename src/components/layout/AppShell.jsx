@@ -14,6 +14,7 @@ import {
   registerNotificationTapListener,
 } from '../../lib/smartNotifications'
 import { syncNotificationQueue } from '../../lib/notificationIngestion'
+import { preseedMerchantMemoryFromDb } from '../../lib/ai/merchantCategorizer'
 import { prefetchCriticalRoutes } from '../../lib/routePrefetcher'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -27,6 +28,7 @@ import BottomNav from './BottomNav'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import AiTriggerBar from '../chat/AiTriggerBar'
+import PageSkeleton from '../ui/PageSkeleton'
 import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 import useTransactionStore from '../../store/useTransactionStore'
@@ -40,6 +42,26 @@ import { uploadLatestBackup } from '../../lib/cloudBackup'
 import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import { getSessionMnemonicPhrase, purgeLegacyMnemonicStorage } from '../../lib/mnemonicCrypto'
 import AppBackground from './AppBackground'
+
+/** Resolves a route pathname to the appropriate PageSkeleton variant. */
+function getSkeletonVariant(pathname) {
+  if (pathname === '/dashboard' || pathname === '/') return 'dashboard'
+  if (pathname === '/transactions') return 'transactions'
+  if (pathname === '/calendar') return 'calendar'
+  if (pathname === '/budget') return 'budget'
+  if (pathname === '/reports') return 'reports'
+  if (pathname === '/loans') return 'loans'
+  if (pathname === '/savings') return 'savings'
+  if (pathname.startsWith('/savings/')) return 'savings-detail'
+  if (pathname === '/todos') return 'todo'
+  if (pathname.startsWith('/todos/')) return 'todo-detail'
+  if (pathname === '/profile') return 'profile'
+  if (pathname.startsWith('/wallet/')) return 'wallet-detail'
+  if (pathname === '/add-account') return 'add-account'
+  if (pathname.startsWith('/settings')) return 'settings'
+  if (pathname === '/ai-chat' || pathname === '/chat' || pathname === '/ai-finance') return 'chat'
+  return 'generic'
+}
 
 function AppShell() {
   useNotificationEngine()
@@ -272,11 +294,12 @@ function AppShell() {
         await processRecurringTransactions()
         await notifyTodayEvents()
         await initNotificationChannels()
-        const { dailyReminderEnabled, dailyReminderTime, defaultCurrency, defaultWalletId } = useSettingsStore.getState()
+        const { dailyReminderEnabled, dailyReminderTime, defaultCurrency, defaultWalletId, notificationAutoApprove } = useSettingsStore.getState()
         if (dailyReminderEnabled) {
           await syncDailyReminderSchedule(true, dailyReminderTime)
         }
-        await syncNotificationQueue({ defaultCurrency, defaultWalletId })
+        await syncNotificationQueue({ defaultCurrency, defaultWalletId, notificationAutoApprove })
+        await preseedMerchantMemoryFromDb().catch(() => {})
       } catch (err){
       console.warn('[AppShell]', err)
         // automation failure should not block app rendering
@@ -411,6 +434,7 @@ function AppShell() {
         syncNotificationQueue({
           defaultCurrency: currentSettings.defaultCurrency,
           defaultWalletId: currentSettings.defaultWalletId,
+          notificationAutoApprove: currentSettings.notificationAutoApprove,
         }).catch((err) => console.warn('[AppShell]', err))
       }
     }
@@ -533,11 +557,7 @@ function AppShell() {
         <Sidebar />
         {location.pathname === '/ai-chat' || location.pathname === '/chat' || location.pathname === '/ai-finance' ? (
           <Suspense
-            fallback={
-              <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-                <div className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
-              </div>
-            }
+            fallback={<PageSkeleton variant="chat" />}
           >
             <ErrorBoundary>
               <Outlet />
@@ -551,6 +571,8 @@ function AppShell() {
               location.pathname.startsWith('/savings/') ||
               location.pathname === '/add-account'
                 ? 'px-0 pt-0 pb-12'
+                : location.pathname === '/dashboard' || location.pathname === '/'
+                ? 'px-4 pt-1 pb-[calc(10rem+env(safe-area-inset-bottom))]'
                 : isDetailPage
                 ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-12'
                 : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
@@ -558,11 +580,7 @@ function AppShell() {
           >
             <div key={location.pathname} className="ft-page-transition">
               <Suspense
-                fallback={
-                  <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-                    <div className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
-                  </div>
-                }
+                fallback={<PageSkeleton variant={getSkeletonVariant(location.pathname)} />}
               >
                 <ErrorBoundary>
                   <Outlet />

@@ -84,8 +84,8 @@ export async function handleTransactionAction(result, {
     if (!matchedTx) {
       const isVagueDelete = result.action === 'delete' && !result.transactionId && !sq
       const vagueMsg = locale === 'en'
-        ? 'Please specify which transaction you would like to delete (for example: "delete transaction coffee 30k" or "delete latest transaction").'
-        : 'Mohon sebutkan transaksi mana yang ingin Anda hapus (contoh: "hapus transaksi kopi 30rb" atau "hapus transaksi terakhir").'
+        ? 'Please specify which transaction you would like to delete (for example: "delete transaction lunch" or "delete latest transaction").'
+        : 'Mohon sebutkan transaksi mana yang ingin Anda hapus (contoh: "hapus transaksi makan siang" atau "hapus transaksi terakhir").'
       const notFoundMsg = locale === 'en'
         ? 'Sorry, the requested transaction was not found in your history.'
         : 'Maaf, transaksi yang dimaksud tidak ditemukan di riwayat Anda.'
