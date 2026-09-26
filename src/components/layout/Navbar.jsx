@@ -128,10 +128,12 @@ function Navbar() {
         </div>
       </div>
 
-      <NotificationDrawerSheet
-        isOpen={showNotifications}
-        onClose={() => setShowNotifications(false)}
-      />
+      {showNotifications && (
+        <NotificationDrawerSheet
+          isOpen={showNotifications}
+          onClose={() => setShowNotifications(false)}
+        />
+      )}
     </header>
   )
 }

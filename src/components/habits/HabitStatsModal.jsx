@@ -10,8 +10,20 @@ import { safeFormatDate } from '../../lib/utils'
 
 export default function HabitStatsModal({ isOpen, onClose, habit, allHabitLogs }) {
   const { t } = useTranslation()
-  const liveHabit = useLiveQuery(() => habit ? db.habits.get(habit.id) : null, [habit])
-  const activeHabit = liveHabit || habit
+  const [cachedHabit, setCachedHabit] = useState(habit)
+  if (habit && habit !== cachedHabit) {
+    setCachedHabit(habit)
+  }
+  const currentHabit = habit || cachedHabit
+
+  const liveHabit = useLiveQuery(
+    () => {
+      if (!isOpen || !currentHabit?.id) return null
+      return db.habits.get(currentHabit.id)
+    },
+    [isOpen, currentHabit?.id]
+  )
+  const activeHabit = liveHabit || currentHabit
 
   const stats = useMemo(() => {
     if (!activeHabit) return null

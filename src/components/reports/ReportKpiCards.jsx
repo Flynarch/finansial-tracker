@@ -1,4 +1,4 @@
-﻿import { TrendingUp, TrendingDown, ShieldCheck, AlertTriangle, ArrowUpRight, ArrowDownRight, Scale, Inbox } from 'lucide-react'
+import { TrendingUp, TrendingDown, ShieldCheck, AlertTriangle, ArrowUpRight, ArrowDownRight, Scale, Inbox } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency, toSafeNumber } from '../../lib/utils'
@@ -42,19 +42,19 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
               </span>
             )}
             {healthTier === 'surplus' && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--status-income)]/30 bg-[var(--status-income-soft)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--status-income)]">
                 <ShieldCheck className="h-3 w-3" />
                 {t('reports.healthSurplus', 'Surplus Prima')}
               </span>
             )}
             {healthTier === 'stable' && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--status-warning)]/30 bg-[var(--status-warning-soft)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--status-warning)]">
                 <Scale className="h-3 w-3" />
                 {t('reports.healthStable', 'Stabil')}
               </span>
             )}
             {healthTier === 'deficit' && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-extrabold text-red-600 dark:text-red-400">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--status-expense)]/30 bg-[var(--status-expense-soft)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--status-expense)]">
                 <AlertTriangle className="h-3 w-3" />
                 {t('reports.healthDeficit', 'Defisit')}
               </span>
@@ -64,9 +64,9 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
           <p
             className={`mt-1 text-2xl sm:text-3xl font-black tracking-tight tabular-nums truncate ${
               healthTier === 'surplus'
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-[var(--status-income)]'
                 : healthTier === 'deficit'
-                  ? 'text-red-600 dark:text-red-400'
+                  ? 'text-[var(--status-expense)]'
                   : 'text-[var(--fg)]'
             }`}
           >
@@ -86,10 +86,10 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
                 !hasData
                   ? 'text-[var(--muted)]'
                   : savingsRate >= 20
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-[var(--status-income)]'
                     : savingsRate > 0
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-red-600 dark:text-red-400'
+                      ? 'text-[var(--status-warning)]'
+                      : 'text-[var(--status-expense)]'
               }`}
             >
               {hasData ? `${savingsRate}%` : '0%'}
@@ -99,7 +99,7 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
             {hasData && savingsRate !== 0 ? (
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  savingsRate >= 20 ? 'bg-emerald-500' : savingsRate > 0 ? 'bg-amber-500' : 'bg-red-500'
+                  savingsRate >= 20 ? 'bg-[var(--status-income)]' : savingsRate > 0 ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-expense)]'
                 }`}
                 style={{ width: `${Math.min(100, Math.abs(savingsRate))}%` }}
               />
@@ -115,22 +115,22 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
         {hasData ? (
           <>
             <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-[var(--muted)]">
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-extrabold">
+              <span className="flex items-center gap-1.5 text-[var(--status-income)] font-extrabold">
                 <ArrowDownRight className="h-3.5 w-3.5" />
                 {t('reports.income', 'Pemasukan')} ({incomePercent}%)
               </span>
-              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-extrabold">
+              <span className="flex items-center gap-1.5 text-[var(--status-expense)] font-extrabold">
                 {t('reports.expense', 'Pengeluaran')} ({expensePercent}%)
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </span>
             </div>
             <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
               <div
-                className="h-full bg-emerald-500 transition-all duration-500"
+                className="h-full bg-[var(--status-income)] transition-all duration-500"
                 style={{ width: `${incomePercent}%` }}
               />
               <div
-                className="h-full bg-red-500 transition-all duration-500"
+                className="h-full bg-[var(--status-expense)] transition-all duration-500"
                 style={{ width: `${expensePercent}%` }}
               />
             </div>
@@ -151,12 +151,12 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
             <span className="text-[11px] font-extrabold text-[var(--muted)] truncate">
               {t('reports.income', 'Pemasukan')}
             </span>
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-emerald-500/12 text-emerald-500 border border-emerald-500/20">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/20">
               <TrendingUp className="h-3.5 w-3.5" />
             </div>
           </div>
           <p
-            className="mt-2 text-base sm:text-xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 truncate"
+            className="mt-2 text-base sm:text-xl font-black tracking-tight text-[var(--status-income)] truncate"
             title={formatCurrency(income, defaultCurrency)}
           >
             {formatCurrency(income, defaultCurrency)}
@@ -172,12 +172,12 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
             <span className="text-[11px] font-extrabold text-[var(--muted)] truncate">
               {t('reports.expense', 'Pengeluaran')}
             </span>
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-red-500/12 text-red-500 border border-red-500/20">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-[var(--status-expense-soft)] text-[var(--status-expense)] border border-[var(--status-expense)]/20">
               <TrendingDown className="h-3.5 w-3.5" />
             </div>
           </div>
           <p
-            className="mt-2 text-base sm:text-xl font-black tracking-tight text-red-600 dark:text-red-400 truncate"
+            className="mt-2 text-base sm:text-xl font-black tracking-tight text-[var(--status-expense)] truncate"
             title={formatCurrency(expense, defaultCurrency)}
           >
             {formatCurrency(expense, defaultCurrency)}

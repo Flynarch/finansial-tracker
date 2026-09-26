@@ -11,7 +11,7 @@ import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 export default function LoanForgiveModal({
   isOpen,
   onClose,
-  loan = null,
+  loan: incomingLoan = null,
   onSuccess,
 }) {
   const { t } = useTranslation()
@@ -20,6 +20,14 @@ export default function LoanForgiveModal({
   const [notes, setNotes] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const [cachedLoan, setCachedLoan] = useState(incomingLoan)
+  const [prevIncomingLoan, setPrevIncomingLoan] = useState(incomingLoan)
+  if (incomingLoan && incomingLoan !== prevIncomingLoan) {
+    setPrevIncomingLoan(incomingLoan)
+    setCachedLoan(incomingLoan)
+  }
+  const loan = incomingLoan || cachedLoan
 
   if (!loan) return null
 

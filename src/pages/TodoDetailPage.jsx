@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
+import useBackButton from '../hooks/useBackButton'
 import EmptyState from '../components/ui/EmptyState'
 import {
   NOTIFICATION_CHANNELS,
@@ -145,6 +146,11 @@ export default function TodoDetailPage() {
   const [editDraft, setEditDraft] = useState(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [editError, setEditError] = useState('')
+
+  useBackButton(() => setCategoryOpen(false), Boolean(categoryOpen))
+  useBackButton(() => setMoreMenuOpen(false), Boolean(moreMenuOpen && !categoryOpen))
+  useBackButton(() => setDeleteConfirmOpen(false), Boolean(deleteConfirmOpen))
+  useBackButton(() => setIsEditing(false), Boolean(isEditing && !categoryOpen && !moreMenuOpen && !deleteConfirmOpen))
 
   const todo = useLiveQuery(async () => {
     if (!isValidId) return null

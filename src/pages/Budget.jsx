@@ -590,24 +590,26 @@ function Budget() {
             setDeletingBudget(budgetToDelete)
           }}
         />
-        <ConfirmDeleteModal
-          isOpen={!!deletingBudget}
-          onClose={() => setDeletingBudget(null)}
-          onConfirm={async () => {
-            if (deletingBudget) {
-              try {
-                const targetId = Number(deletingBudget.id) || deletingBudget.id
-                await db.budgets.delete(targetId)
-              } catch (err){
-      console.warn('[Budget]', err)
-                await db.budgets.where('id').equals(deletingBudget.id).delete()
+        {Boolean(deletingBudget) && (
+          <ConfirmDeleteModal
+            isOpen={!!deletingBudget}
+            onClose={() => setDeletingBudget(null)}
+            onConfirm={async () => {
+              if (deletingBudget) {
+                try {
+                  const targetId = Number(deletingBudget.id) || deletingBudget.id
+                  await db.budgets.delete(targetId)
+                } catch (err){
+                  console.warn('[Budget]', err)
+                  await db.budgets.where('id').equals(deletingBudget.id).delete()
+                }
+                setDeletingBudget(null)
               }
-              setDeletingBudget(null)
-            }
-          }}
-          title={t('budget.delete', 'Hapus Anggaran')}
-          message={t('budget.deleteConfirm', 'Hapus anggaran untuk kategori ini?')}
-        />
+            }}
+            title={t('budget.delete', 'Hapus Anggaran')}
+            message={t('budget.deleteConfirm', 'Hapus anggaran untuk kategori ini?')}
+          />
+        )}
         <BudgetCycleModal
           isOpen={isCycleModalOpen}
           onClose={() => setIsCycleModalOpen(false)}

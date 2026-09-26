@@ -21,7 +21,7 @@ import ReportBarChart from '../components/reports/ReportBarChart'
 import ReportDonutSection from '../components/reports/ReportDonutSection'
 import ReportNetWorthChart from '../components/reports/ReportNetWorthChart'
 import ReportStatementModal from '../components/reports/ReportStatementModal'
-import QuickAddTransactionModal from '../components/transactions/QuickAddTransactionModal'
+import useTransactionStore from '../store/useTransactionStore'
 
 export default function Reports() {
   const { t, locale } = useTranslation()
@@ -32,7 +32,7 @@ export default function Reports() {
   const [selectedDrilldownParent, setSelectedDrilldownParent] = useState(null)
   const [selectedWalletFilter, setSelectedWalletFilter] = useState('all')
   const [compactDonut, setCompactDonut] = useState(false)
-  const [isAddTxOpen, setIsAddTxOpen] = useState(false)
+  const openQuickAdd = useTransactionStore((s) => s.openQuickAdd)
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false)
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
@@ -97,10 +97,7 @@ export default function Reports() {
     []
   )
   const txCount = useLiveQuery(
-    async () => {
-      const all = await db.transactions.toArray()
-      return (all || []).filter((tx) => !tx.deletedAt).length
-    },
+    () => db.transactions.filter((tx) => !tx.deletedAt).count(),
     [],
     0
   )
@@ -431,7 +428,7 @@ export default function Reports() {
                   type="button"
                   onClick={() => {
                     triggerHaptic('medium')
-                    setIsAddTxOpen(true)
+                    openQuickAdd()
                   }}
                   className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3 text-xs sm:text-sm font-black text-white shadow-md hover:brightness-110 active:scale-95 transition cursor-pointer"
                 >
@@ -528,11 +525,6 @@ export default function Reports() {
           </>
         )}
 
-        {/* Quick Add Transaction Modal triggered by CTA */}
-        <QuickAddTransactionModal
-          isOpen={isAddTxOpen}
-          onClose={() => setIsAddTxOpen(false)}
-        />
 
         {/* In-App Financial Statement Preview Modal */}
         {isStatementModalOpen && (

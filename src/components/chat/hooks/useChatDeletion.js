@@ -106,8 +106,17 @@ export function useChatDeletion({ setMessages, locale = 'id' }) {
       setMessages((prev) => prev.filter((m) => m.id !== msgId))
     } catch (err) {
       console.error('[useChatDeletion.handleUndoTransaction] Failed to undo transactions:', err)
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: locale === 'en' ? 'Undo Failed' : 'Gagal Membatalkan',
+            message: err.message || (locale === 'en' ? 'Could not delete transaction' : 'Gagal menghapus transaksi'),
+            type: 'error',
+          },
+        }),
+      )
     }
-  }, [setMessages])
+  }, [setMessages, locale])
 
   return {
     deletingMsgIdsRef,

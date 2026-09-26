@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WelcomeHero from '../src/components/chat/WelcomeHero'
 import AiQuickLogModal from '../src/components/chat/AiQuickLogModal'
+import { AiBubble } from '../src/components/chat/ChatBubble'
 import useSettingsStore from '../src/store/useSettingsStore'
 import useChatStore from '../src/store/useChatStore'
 import { db } from '../src/lib/db'
@@ -164,6 +165,59 @@ describe('AI Chat General Quick Chips & Intent Invariants', () => {
 
       const txCount = await db.transactions.count()
       expect(txCount).toBe(0)
+    })
+  })
+
+  describe('AiBubble Markdown Link Security & Platform Behavior', () => {
+    it('renders safe https markdown links as external links with noopener', () => {
+      render(
+        <AiBubble
+          content="Silakan cek [Dokumentasi](https://fintrack.example.com/docs)"
+          timestamp="12:00"
+        />
+      )
+
+      const link = screen.getByRole('link', { name: 'Dokumentasi' })
+      expect(link).toBeDefined()
+      expect(link.getAttribute('href')).toBe('https://fintrack.example.com/docs')
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toContain('noopener')
+    })
+
+    it('sanitizes unsafe javascript links and renders them as plain text without an anchor tag', () => {
+      render(
+        <AiBubble
+          content="Klik [XSS Payload](javascript:alert(1))"
+          timestamp="12:00"
+        />
+      )
+
+      expect(screen.queryByRole('link')).toBeNull()
+      expect(screen.getByText('XSS Payload')).toBeDefined()
+    })
+
+    it('delegates to window.open with _system on native Capacitor platform', () => {
+      const originalCapacitor = window.Capacitor
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
+
+      window.Capacitor = {
+        isNativePlatform: () => true,
+      }
+
+      render(
+        <AiBubble
+          content="Buka [Laporan](https://example.com/report)"
+          timestamp="12:00"
+        />
+      )
+
+      const link = screen.getByRole('link', { name: 'Laporan' })
+      fireEvent.click(link)
+
+      expect(openSpy).toHaveBeenCalledWith('https://example.com/report', '_system')
+
+      openSpy.mockRestore()
+      window.Capacitor = originalCapacitor
     })
   })
 })

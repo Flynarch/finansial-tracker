@@ -16,6 +16,7 @@ export default function ChatMessageItem({
   locale = 'id',
   onSend,
   onMsgTouchStart,
+  onMsgTouchMove,
   onMsgTouchEnd,
   onMsgContextMenu,
   onConfirmDelete,
@@ -28,6 +29,7 @@ export default function ChatMessageItem({
         <div
           className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full cursor-pointer"
           onTouchStart={() => onMsgTouchStart?.(msg)}
+          onTouchMove={onMsgTouchMove}
           onTouchEnd={onMsgTouchEnd}
           onContextMenu={(e) => onMsgContextMenu?.(e, msg)}
         >
@@ -53,6 +55,7 @@ export default function ChatMessageItem({
           <div
             className="w-full min-w-0 max-w-full cursor-pointer"
             onTouchStart={() => onMsgTouchStart?.(msg)}
+            onTouchMove={onMsgTouchMove}
             onTouchEnd={onMsgTouchEnd}
             onContextMenu={(e) => onMsgContextMenu?.(e, msg)}
           >

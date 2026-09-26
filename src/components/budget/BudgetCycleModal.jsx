@@ -15,10 +15,10 @@ export default function BudgetCycleModal({ isOpen, onClose, currentMonth }) {
 
   const monthStr = currentMonth || format(new Date(), 'yyyy-MM')
 
-  const previewRange = useMemo(
-    () => getBudgetPeriodDateRange(monthStr, selectedDay, locale),
-    [monthStr, selectedDay, locale]
-  )
+  const previewRange = useMemo(() => {
+    if (!isOpen) return { startDate: '', endDate: '', formattedRange: '' }
+    return getBudgetPeriodDateRange(monthStr, selectedDay, locale)
+  }, [isOpen, monthStr, selectedDay, locale])
 
   const handleSelectDay = (day) => {
     setSelectedDay(day)

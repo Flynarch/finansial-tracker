@@ -27,6 +27,7 @@ import useSettingsStore from '../../store/useSettingsStore'
 import { deleteTransaction, updateTransaction } from '../../services/transactionService'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
+import { copyToClipboard } from '../../lib/clipboard'
 
 function generateReceiptRef() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -167,10 +168,12 @@ export default function AiDigitalReceipt({
     }
   }
 
-  const handleCopyRef = () => {
-    navigator.clipboard?.writeText(refCode)
-    setCopiedRef(true)
-    setTimeout(() => setCopiedRef(false), 2000)
+  const handleCopyRef = async () => {
+    const success = await copyToClipboard(refCode)
+    if (success) {
+      setCopiedRef(true)
+      setTimeout(() => setCopiedRef(false), 2000)
+    }
   }
 
   const handleViewTransactions = () => {

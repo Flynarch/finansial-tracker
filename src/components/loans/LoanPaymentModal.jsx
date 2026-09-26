@@ -22,13 +22,21 @@ import LoanForgiveModal from './LoanForgiveModal'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import { getLocalDateString } from '../../lib/dateUtils'
 
-export default function LoanPaymentModal({ isOpen, onClose, loan = null, initialAmount = null, onSaved, onOpenForgive }) {
+export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan = null, initialAmount = null, onSaved, onOpenForgive }) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const recordPayment = useLoanStore((state) => state.recordPayment)
   const [sheetError, setSheetError] = useState('')
   const amountInputRef = useRef(null)
+
+  const [cachedLoan, setCachedLoan] = useState(incomingLoan)
+  const [prevIncomingLoan, setPrevIncomingLoan] = useState(incomingLoan)
+  if (incomingLoan && incomingLoan !== prevIncomingLoan) {
+    setPrevIncomingLoan(incomingLoan)
+    setCachedLoan(incomingLoan)
+  }
+  const loan = incomingLoan || cachedLoan
 
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(getLocalDateString())
@@ -37,16 +45,23 @@ export default function LoanPaymentModal({ isOpen, onClose, loan = null, initial
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [isForgiveOpen, setIsForgiveOpen] = useState(false)
 
-  const allWallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const allWallets = useLiveQuery(
+    () => {
+      if (!isOpen) return []
+      return db.wallets.toArray()
+    },
+    [isOpen],
+    []
+  )
 
   const selectedPaymentWallet = (allWallets || []).find((w) => String(w.id) === String(paymentWalletId || loan?.walletId || defaultWalletId))
 
   const paymentLogs = useLiveQuery(
     async () => {
-      if (!loan?.id) return []
+      if (!isOpen || !loan?.id) return []
       return await db.loanPayments.where('loanId').equals(loan.id).reverse().toArray()
     },
-    [loan?.id],
+    [isOpen, loan?.id],
     [],
   )
 

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../src/lib/db'
-import { createTransaction, updateTransaction } from '../src/services/transactionService'
+import { createTransaction, updateTransaction, deleteTransaction } from '../src/services/transactionService'
 import { generateInstallmentSchedule } from '../src/lib/loanUtils'
 import { isExcludeAnalyticsTx } from '../src/lib/utils'
 import { generateBalanceSheet, generateIncomeStatement, generateCashFlowStatement } from '../src/lib/accountingEngine'
@@ -267,6 +267,34 @@ describe('Audit Phase 5 Remediation - Deep Verification Suite', () => {
 
       const updatedParent = await db.transactions.get(parentTxId)
       expect(updatedParent.amount).toBe(250000)
+
+      // Add user personal share transaction linked to same split bill
+      const personalTxId = await createTransaction({
+        amount: 50000,
+        type: 'expense',
+        category: 'makanan/makan_diluar',
+        splitBillId,
+        walletId,
+        date: '2026-03-01',
+      })
+
+      // Personal share transaction update should succeed even though amount (60,000) < active loans sum (200,000)
+      await expect(
+        updateTransaction(personalTxId, { amount: 60000 })
+      ).resolves.toBe(1)
+
+      const updatedPersonal = await db.transactions.get(personalTxId)
+      expect(updatedPersonal.amount).toBe(60000)
+
+      // Deleting personal share transaction should succeed
+      await expect(deleteTransaction(personalTxId)).resolves.toBeUndefined()
+      const deletedPersonal = await db.transactions.get(personalTxId)
+      expect(deletedPersonal.deletedAt).toBeTruthy()
+
+      // Deleting talangan transaction (parentTxId) should still be blocked while active loans exist
+      await expect(deleteTransaction(parentTxId)).rejects.toThrow(
+        'Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.'
+      )
     })
   })
 

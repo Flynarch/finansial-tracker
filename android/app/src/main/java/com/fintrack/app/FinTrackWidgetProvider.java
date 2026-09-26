@@ -119,8 +119,13 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
         String btnText = getSafeString(prefs, "fintrack_widget_btn_text", "+ Catat");
         String balanceLabel = getSafeString(prefs, "fintrack_widget_balance_label", "Kekayaan Bersih");
+        String dateText = getSafeString(prefs, "fintrack_widget_date", null);
+        if (dateText == null || dateText.trim().isEmpty()) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
+            dateText = sdf.format(new java.util.Date());
+        }
 
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, btnText, balanceLabel);
+        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, btnText, balanceLabel, dateText);
     }
 
     public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
@@ -131,13 +136,30 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
     public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
                                       String balance, String income, String expense, String period, String sparklineJson,
                                       String btnText, String balanceLabel) {
+        String dateText = getSafeString(context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE), "fintrack_widget_date", null);
+        if (dateText == null || dateText.trim().isEmpty()) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
+            dateText = sdf.format(new java.util.Date());
+        }
+        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, btnText, balanceLabel, dateText);
+    }
+
+    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
+                                      String balance, String income, String expense, String period, String sparklineJson,
+                                      String btnText, String balanceLabel, String dateText) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_fintrack_balance);
         views.setTextViewText(R.id.widget_total_balance, balance != null ? balance : "Rp 0");
-        views.setTextViewText(R.id.widget_income_text, income != null ? income : "Masuk: Rp 0");
-        views.setTextViewText(R.id.widget_expense_text, expense != null ? expense : "Keluar: Rp 0");
-        views.setTextViewText(R.id.widget_period_label, period != null ? period : "Bulan Ini");
+        views.setTextViewText(R.id.widget_income_text, income != null ? income : "Masuk: +Rp 0");
+        views.setTextViewText(R.id.widget_expense_text, expense != null ? expense : "Keluar: -Rp 0");
+        views.setTextViewText(R.id.widget_period_label, period != null ? period : "7 Hari Terakhir");
         views.setTextViewText(R.id.widget_balance_label, balanceLabel != null ? balanceLabel : "Kekayaan Bersih");
         views.setTextViewText(R.id.widget_btn_add, btnText != null ? btnText : "+ Catat");
+
+        if (dateText == null || dateText.trim().isEmpty()) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
+            dateText = sdf.format(new java.util.Date());
+        }
+        views.setTextViewText(R.id.widget_date_text, dateText);
 
         // Render trend sparkline
         Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson);

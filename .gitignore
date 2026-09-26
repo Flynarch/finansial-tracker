@@ -27,6 +27,7 @@ dist-ssr
 *.sln
 *.sw?
 *.apk
+*.zip
 repomix.md
 .agents/*/
 !.agents/skills/

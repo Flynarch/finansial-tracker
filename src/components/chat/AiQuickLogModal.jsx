@@ -5,7 +5,12 @@ import { format } from 'date-fns'
 import { Sparkles, X, Mic, MicOff, Camera, Send, ArrowUpRight, Loader2, Wallet, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
-import { parseTransactionFromText, distributeReceiptTransactions, parseShortTransactionFast } from '../../lib/gemini'
+import {
+  parseTransactionFromText,
+  distributeReceiptTransactions,
+  parseShortTransactionFast,
+  rememberTransactionEntity,
+} from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
 import { createTransaction as addTransaction } from '../../services/transactionService'
@@ -18,6 +23,7 @@ import ReceiptScanModePicker from './ReceiptScanModePicker'
 import VoiceVisualizer from './VoiceVisualizer'
 import MediaSourcePickerModal from './MediaSourcePickerModal'
 import { triggerHaptic } from '../../lib/haptics'
+import { compressImage } from '../../lib/imageCompression'
 
 const CURRENCY_SAMPLE_TEMPLATES = {
   IDR: {
@@ -287,7 +293,21 @@ export default function AiQuickLogModal() {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
-  const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [], [])
+  const queriedWallets = useLiveQuery(
+    () => {
+      if (!isOpen) return []
+      return db.wallets.filter((w) => !w.isArchived).toArray()
+    },
+    [isOpen],
+    []
+  )
+  const [cachedWallets, setCachedWallets] = useState([])
+  const [prevQueriedWallets, setPrevQueriedWallets] = useState(queriedWallets)
+  if (queriedWallets && queriedWallets.length > 0 && queriedWallets !== prevQueriedWallets) {
+    setPrevQueriedWallets(queriedWallets)
+    setCachedWallets(queriedWallets)
+  }
+  const wallets = (queriedWallets && queriedWallets.length > 0) ? queriedWallets : cachedWallets
 
   const sampleChips = useMemo(
     () => generateSampleChips(wallets || [], defaultCurrency, locale),
@@ -339,6 +359,7 @@ export default function AiQuickLogModal() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordedTransactions, setRecordedTransactions] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
+  const [omissionData, setOmissionData] = useState(null)
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
@@ -388,8 +409,9 @@ export default function AiQuickLogModal() {
     setIsDragging(false)
     if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
       closeQuickLog()
+    } else {
+      setDragOffset(0)
     }
-    setDragOffset(0)
     touchStartY.current = 0
   }, [dragOffset, closeQuickLog])
 
@@ -409,6 +431,9 @@ export default function AiQuickLogModal() {
         }
       }, 100)
     } else {
+      frameId = requestAnimationFrame(() => {
+        setIsAnimatingIn(false)
+      })
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
@@ -427,6 +452,7 @@ export default function AiQuickLogModal() {
         setRecordedMerchant('')
         setRecordedTransactions([])
         setErrorMessage('')
+        setOmissionData(null)
         setDragOffset(0)
       }, 200)
     }
@@ -608,15 +634,28 @@ export default function AiQuickLogModal() {
   }
 
   // Image select handler
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0]
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        setSelectedImage(ev.target.result)
-        setModalMode('scan_mode')
+      try {
+        const compressed = await compressImage(file, 1024, 0.75)
+        if (compressed) {
+          setSelectedImage(compressed)
+          setModalMode('scan_mode')
+        }
+      } catch (err) {
+        console.warn('[AiQuickLogModal.handleImageSelect] Compression failed, falling back:', err)
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          setSelectedImage(ev.target.result)
+          setModalMode('scan_mode')
+        }
+        reader.readAsDataURL(file)
+      } finally {
+        if (e.target) {
+          e.target.value = ''
+        }
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -655,6 +694,7 @@ function isObviousNonTransaction(text) {
 
     setLastSubmittedPrompt(cleanText || (imageToSubmit ? (modeToUse === 'per_item' ? 'Scan struk per item' : 'Scan struk total') : 'Upload struk/gambar'))
     setErrorMessage('')
+    setOmissionData(null)
 
     // 1. Instant check for obvious non-transaction / questions
     if (!imageToSubmit && isObviousNonTransaction(cleanText)) {
@@ -690,6 +730,16 @@ function isObviousNonTransaction(text) {
       }))
 
       if (result.error) {
+        if (result.type === 'omission_clarification' || (Array.isArray(result.chips) && result.chips.length > 0)) {
+          setOmissionData({
+            message: result.message,
+            chips: result.chips,
+            pendingFrame: result.pendingFrame || null,
+            originalText: clampedText,
+          })
+          setModalMode('input')
+          return
+        }
         throw new Error(result.message || 'Gagal memproses dengan AI.')
       }
 
@@ -726,6 +776,7 @@ function isObviousNonTransaction(text) {
             engineLabel: txEngineLabel,
             amount: numericAmount,
             date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+            time: tx.time || format(new Date(), 'HH:mm'),
             category: itemCategory,
             walletId: finalWalletId,
             currency: txCurrency,
@@ -735,6 +786,7 @@ function isObviousNonTransaction(text) {
             tax: typeof tx.tax === 'number' ? tx.tax : undefined,
             discount: typeof tx.discount === 'number' ? tx.discount : undefined,
             paymentMethod: tx.paymentMethod || undefined,
+            receiptImage: imageToSubmit || undefined,
             createdAt: Date.now(),
           }
 
@@ -745,6 +797,7 @@ function isObviousNonTransaction(text) {
 
           const createdId = await addTransaction(txToSave)
           txToSave.id = createdId
+          rememberTransactionEntity(txToSave)
           savedTxs.push(txToSave)
         }
 
@@ -890,6 +943,51 @@ function isObviousNonTransaction(text) {
             <div className="mb-3.5 flex items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-500 animate-in fade-in duration-200">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Omission Clarification Banner with Interactive Chips */}
+          {omissionData && (
+            <div className="mb-3.5 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3 text-xs text-[var(--fg)] animate-in fade-in duration-200">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--accent)]" />
+                  <span className="font-semibold text-xs text-[var(--fg)]">{omissionData.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOmissionData(null)}
+                  className="rounded-full p-1 text-[var(--muted)] hover:text-[var(--fg)] cursor-pointer"
+                  aria-label={t('common.close', 'Tutup')}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {Array.isArray(omissionData.chips) && omissionData.chips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {omissionData.chips.map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('light')
+                        if (chip === 'Nominal Lain' || chip === 'Custom Amount') {
+                          inputRef.current?.focus()
+                          setOmissionData(null)
+                        } else {
+                          const combined = `${omissionData.originalText} ${chip}`
+                          setInputValue(combined)
+                          setOmissionData(null)
+                          handleSubmit(combined)
+                        }
+                      }}
+                      className="rounded-xl border border-[var(--accent)]/40 bg-[var(--panel-strong)] px-3 py-1.5 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition active:scale-95 cursor-pointer shadow-sm"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

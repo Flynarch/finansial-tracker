@@ -31,7 +31,7 @@ import {
 export default function TransactionDetailSheet({
   isOpen,
   onClose,
-  transaction,
+  transaction: incomingTransaction,
   openEditTransaction,
   deleteTransaction,
   wallets = [],
@@ -43,6 +43,14 @@ export default function TransactionDetailSheet({
   t,
 }) {
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
+
+  const [cachedTx, setCachedTx] = useState(incomingTransaction)
+  const [prevIncomingTx, setPrevIncomingTx] = useState(incomingTransaction)
+  if (incomingTransaction && incomingTransaction !== prevIncomingTx) {
+    setPrevIncomingTx(incomingTransaction)
+    setCachedTx(incomingTransaction)
+  }
+  const transaction = incomingTransaction || cachedTx
 
   const dateLocaleObj = useMemo(() => (locale === 'id' ? idLocale : enUS), [locale])
 

@@ -49,8 +49,9 @@ export default function CustomDatePickerModal({
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
 
   const calendarDays = useMemo(() => {
+    if (!isOpen) return []
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd })
-  }, [calendarStart, calendarEnd])
+  }, [isOpen, calendarStart, calendarEnd])
 
   const parsedStart = useMemo(() => (tempStart ? parseISO(tempStart) : null), [tempStart])
   const parsedEnd = useMemo(() => (tempEnd ? parseISO(tempEnd) : null), [tempEnd])
@@ -103,8 +104,6 @@ export default function CustomDatePickerModal({
     setTempStart('')
     setTempEnd('')
   }
-
-  if (!isOpen) return null
 
   const dayHeaders = activeLocale === 'en'
     ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { useChatSpeech } from '../../../hooks/useChatSpeech'
+import { compressImage } from '../../../lib/imageCompression'
 
 export function useChatInputState({ locale = 'id', onSpeechError }) {
   const [inputValue, setInputValue] = useState('')
@@ -11,15 +12,28 @@ export function useChatInputState({ locale = 'id', onSpeechError }) {
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
 
-  const handleImageSelect = useCallback((e) => {
+  const handleImageSelect = useCallback(async (e) => {
     const file = e.target?.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        setSelectedImage(ev.target.result)
-        setShowScanModePicker(true)
+      try {
+        const compressed = await compressImage(file, 1024, 0.75)
+        if (compressed) {
+          setSelectedImage(compressed)
+          setShowScanModePicker(true)
+        }
+      } catch (err) {
+        console.warn('[useChatInputState.handleImageSelect] Compression failed, falling back:', err)
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          setSelectedImage(ev.target.result)
+          setShowScanModePicker(true)
+        }
+        reader.readAsDataURL(file)
+      } finally {
+        if (e.target) {
+          e.target.value = ''
+        }
       }
-      reader.readAsDataURL(file)
     }
   }, [])
 

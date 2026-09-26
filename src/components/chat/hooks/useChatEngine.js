@@ -99,6 +99,16 @@ export function useChatEngine({
         })
 
         if (result?.error) {
+          if (result.type === 'omission_clarification' || (Array.isArray(result.chips) && result.chips.length > 0)) {
+            setMessages((prev) => {
+              const exists = prev.some((m) => m.id === aiMsgId)
+              if (exists) {
+                return prev.map((m) => (m.id === aiMsgId ? { ...m, content: result.message, chips: result.chips } : m))
+              }
+              return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: result.message, chips: result.chips }]
+            })
+            return
+          }
           throw new Error(result.message)
         }
 

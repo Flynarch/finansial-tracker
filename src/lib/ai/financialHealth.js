@@ -31,7 +31,8 @@ export async function calculateDirectFinancialHealth({
 } = {}) {
   const activeRates = rates || getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
   const allWallets = await db.wallets.toArray()
-  const txs = await db.transactions.toArray()
+  const rawTxs = await db.transactions.toArray()
+  const txs = rawTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
   const loans = await db.loans.toArray()
 
   const computedWallets = computeAllWalletBalances(allWallets, txs, activeRates)

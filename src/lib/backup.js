@@ -48,10 +48,12 @@ export async function exportAllDataAsJson() {
   let expenseCustom = null
   let incomeCustom = null
   try {
-    const rawExp = localStorage.getItem('ft_expense_category_custom_v1')
-    if (rawExp) expenseCustom = JSON.parse(rawExp)
-    const rawInc = localStorage.getItem('ft_income_category_custom_v1')
-    if (rawInc) incomeCustom = JSON.parse(rawInc)
+    if (typeof localStorage !== 'undefined') {
+      const rawExp = localStorage.getItem('ft_expense_category_custom_v1')
+      if (rawExp) expenseCustom = JSON.parse(rawExp)
+      const rawInc = localStorage.getItem('ft_income_category_custom_v1')
+      if (rawInc) incomeCustom = JSON.parse(rawInc)
+    }
   } catch (err){
       console.warn('[backup]', err)
     /* ignore */
@@ -108,9 +110,13 @@ export async function importAllDataFromJsonPayload(payload) {
 
   if (payload.categoryCustomizations?.expense) {
     try {
-      localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
-      window.dispatchEvent(new CustomEvent('ft-expense-category-custom-changed'))
-      window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ft-expense-category-custom-changed'))
+        window.dispatchEvent(new CustomEvent('ft_expense_category_custom_changed'))
+      }
     } catch (err){
       console.warn('[backup]', err)
       /* ignore */
@@ -118,9 +124,13 @@ export async function importAllDataFromJsonPayload(payload) {
   }
   if (payload.categoryCustomizations?.income) {
     try {
-      localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
-      window.dispatchEvent(new CustomEvent('ft-income-category-custom-changed'))
-      window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ft-income-category-custom-changed'))
+        window.dispatchEvent(new CustomEvent('ft_income_category_custom_changed'))
+      }
     } catch (err){
       console.warn('[backup]', err)
       /* ignore */
@@ -188,7 +198,10 @@ export async function importAllDataFromJsonPayload(payload) {
   // Ensure at least one wallet exists if none were in the backup
   const walletCount = await db.wallets.count()
   if (walletCount === 0) {
-    const defaultCurrency = localStorage.getItem('ft_default_currency') || 'IDR'
+    const defaultCurrency =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('ft_default_currency') || 'IDR'
+        : 'IDR'
     await db.wallets.add({
       name: 'Kas Utama',
       institutionType: 'cash',

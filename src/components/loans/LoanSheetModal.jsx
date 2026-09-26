@@ -41,7 +41,14 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   const [showSimulator, setShowSimulator] = useState(false)
   const totalAmountInputRef = useRef(null)
 
-  const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [], [])
+  const wallets = useLiveQuery(
+    () => {
+      if (!isOpen) return []
+      return db.wallets.filter((w) => !w.isArchived).toArray()
+    },
+    [isOpen],
+    []
+  )
 
   const [form, setForm] = useState({
     type: defaultType,

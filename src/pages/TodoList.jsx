@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
+import useBackButton from '../hooks/useBackButton'
 import HabitsView from '../components/habits/HabitsView'
 import useSwipeAction from '../hooks/useSwipeAction'
 import { triggerHaptic } from '../lib/haptics'
@@ -54,6 +55,12 @@ function TodoList() {
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTodoId, setDeleteTodoId] = useState(null)
+
+  useBackButton(() => setSortOpen(false), Boolean(sortOpen))
+  useBackButton(() => {
+    setDeleteConfirmOpen(false)
+    setDeleteTodoId(null)
+  }, Boolean(deleteConfirmOpen))
 
   const {
     swipedId: swipeTodoId,

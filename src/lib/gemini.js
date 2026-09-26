@@ -28,6 +28,7 @@ export {
 export {
   sanitizeUserTurn,
   wrapUserTurn,
+  sanitizeGeminiContents,
 } from './ai/sanitizer'
 
 // 4. Streaming & Event Parsers
@@ -79,3 +80,25 @@ export {
   clearMerchantMemory,
   getMerchantMemoryEntries,
 } from './ai/merchantCategorizer'
+
+// 12. Adaptive Self-Learning Entity Memory
+export {
+  rememberTransactionEntity,
+  findHistoricalEntity,
+  predictOmissionSuggestion,
+  preseedEntityMemoryFromDb,
+  clearEntityMemory,
+  getEntityMemoryEntries,
+  getFrequentUserEntities,
+} from './ai/entityMemory'
+
+// 13. Semantic Slot Filler
+export {
+  extractTimeSlot,
+  extractVenueSlot,
+  extractQuantitySlot,
+  extractCleanSubjectEntity,
+  splitMultiItemSegments,
+  normalizeSlangText,
+} from './ai/semanticSlotFiller'
+

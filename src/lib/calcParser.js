@@ -63,7 +63,7 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
   sanitized = sanitized
     .replace(/([0-9.]+)\s*(jt|juta|m(?:illion)?)(?!\w)/gi, '($1*1000000)')
     .replace(/([0-9.]+)\s*(k|rb|ribu)(?!\w)/gi, '($1*1000)')
-    .replace(/([0-9.]+)\s*(b|milyar|billion)(?!\w)/gi, '($1*1000000000)')
+    .replace(/([0-9.]+)\s*(b|miliar|milyar|billion)(?!\w)/gi, '($1*1000000000)')
 
   // Only allow valid numeric & math characters
   if (!/^[0-9.+\-*/() ]+$/.test(sanitized)) {

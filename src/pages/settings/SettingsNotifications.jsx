@@ -588,16 +588,18 @@ export default function SettingsNotifications() {
       </div>
 
       {/* Prominent Disclosure Modal for Google Play Compliance */}
-      <ProminentDisclosureModal
-        isOpen={isDisclosureOpen}
-        onClose={() => {
-          setIsDisclosureOpen(false)
-          checkNativePermission()
-        }}
-        onPermissionRequested={() => {
-          checkNativePermission()
-        }}
-      />
+      {isDisclosureOpen && (
+        <ProminentDisclosureModal
+          isOpen={isDisclosureOpen}
+          onClose={() => {
+            setIsDisclosureOpen(false)
+            checkNativePermission()
+          }}
+          onPermissionRequested={() => {
+            checkNativePermission()
+          }}
+        />
+      )}
     </div>
   )
 }

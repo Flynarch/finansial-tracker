@@ -10,6 +10,7 @@ import {
   maskDateExpressions,
   findWalletInText,
   parseMultiClauseTransactions,
+  extractCurrencyFromText,
 } from '../src/lib/ai/indonesianFinanceNlp'
 import { parseShortTransactionFast } from '../src/lib/gemini'
 import { sanitizeCategoryPath } from '../src/lib/categorySanitizer'
@@ -530,6 +531,31 @@ describe('Indonesian Finance NLP Parser & Heuristics', () => {
       expect(sakuRes).not.toBeNull()
       expect(sakuRes.error).toBe(true)
       expect(sakuRes.message).toContain('Nominal transaksi belum disebutkan')
+    })
+  })
+
+  describe('Currency extraction disambiguation & Billion amounts', () => {
+    it('correctly disambiguates SGD / S$ without false positive match on USD $', () => {
+      expect(extractCurrencyFromText('beli buku s$ 50')).toBe('SGD')
+      expect(extractCurrencyFromText('tukar s$ ke rupiah')).toBe('SGD')
+      expect(extractCurrencyFromText('makan di orchard 25 sgd')).toBe('SGD')
+      expect(extractCurrencyFromText('langganan vps $10')).toBe('USD')
+      expect(extractCurrencyFromText('tukar $ ke rupiah')).toBe('USD')
+      expect(extractCurrencyFromText('beli software 20 usd')).toBe('USD')
+      expect(extractCurrencyFromText('tukar € ke idr')).toBe('EUR')
+      expect(extractCurrencyFromText('tukar £ ke idr')).toBe('GBP')
+      expect(extractCurrencyFromText('tukar ¥ ke idr')).toBe('JPY')
+      expect(extractCurrencyFromText('makan siang 35rb')).toBe('IDR')
+    })
+
+    it('correctly parses indonesian amounts in miliar, milyar, and b', () => {
+      expect(parseIndonesianAmount('1miliar')).toBe(1000000000)
+      expect(parseIndonesianAmount('2.5milyar')).toBe(2500000000)
+      expect(parseIndonesianAmount('3b')).toBe(3000000000)
+      expect(parseIndonesianAmount('1.2 miliar rupiah')).toBe(1200000000)
+      expect(parseIndonesianAmount('500rb rp')).toBe(500000)
+      expect(extractMonetaryAmountFromText('beli rumah 1.2 miliar')).toBe(1200000000)
+      expect(extractMonetaryAmountFromText('investasi 500m')).toBe(500000000)
     })
   })
 })

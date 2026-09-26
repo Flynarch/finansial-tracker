@@ -26,7 +26,14 @@ export const getTools = () => [
                       'Kode mata uang 3-huruf ISO (IDR, USD, SGD, MYR, EUR, JPY, GBP) yang terdeteksi pada transaksi atau struk.',
                   },
                   date: { type: 'STRING', description: 'YYYY-MM-DD' },
-                  notes: { type: 'STRING', description: 'Deskripsi transaksi atau nama barang.' },
+                  time: {
+                    type: 'STRING',
+                    description: 'Waktu transaksi dalam format HH:mm 24-jam (misal: 17:00 jika user menyebut jam 5 sore atau 09:30).',
+                  },
+                  notes: {
+                    type: 'STRING',
+                    description: 'Nama entitas atau barang utama dalam Title Case bersih TANPA kata keterangan waktu, nominal, atau kata kerja beli/bayar (misal: "Matcha", "Nasi Padang", "Bensin Pertalite").',
+                  },
                   merchant: {
                     type: 'STRING',
                     description: 'Nama toko/merchant jika ada (misal: Indomaret, Alfamart, Starbucks).',
@@ -51,6 +58,21 @@ export const getTools = () => [
                   paymentMethod: {
                     type: 'STRING',
                     description: 'Metode pembayaran pada struk (misal: BCA, GoPay, QRIS, Tunai).',
+                  },
+                  isSplit: { type: 'BOOLEAN', description: 'True jika transaksi terdiri dari beberapa pos alokasi (split transaction).' },
+                  splitItems: {
+                    type: 'ARRAY',
+                    items: {
+                      type: 'OBJECT',
+                      properties: {
+                        category: { type: 'STRING', description: 'Kategori pos split.' },
+                        amount: { type: 'NUMBER', description: 'Nominal pos split.' },
+                        notes: { type: 'STRING', description: 'Keterangan pos split.' },
+                        isExcludeAnalyticsTx: { type: 'BOOLEAN', description: 'True jika pos dikecualikan dari analitik.' },
+                      },
+                      required: ['category', 'amount'],
+                    },
+                    description: 'Rincian pos kategori dan nominal untuk transaksi split.',
                   },
                 },
                 required: ['type', 'category', 'amount', 'date', 'notes'],
@@ -91,6 +113,21 @@ export const getTools = () => [
                 walletId: { type: 'NUMBER', description: 'ID Dompet baru jika ingin memindahkan dompet transaksi.' },
                 targetWalletId: { type: 'NUMBER', description: 'ID Dompet tujuan baru (untuk transfer).' },
                 type: { type: 'STRING', enum: ['income', 'expense', 'transfer'] },
+                isSplit: { type: 'BOOLEAN', description: 'True jika transaksi diubah menjadi split.' },
+                splitItems: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      category: { type: 'STRING', description: 'Kategori pos split.' },
+                      amount: { type: 'NUMBER', description: 'Nominal pos split.' },
+                      notes: { type: 'STRING', description: 'Keterangan pos split.' },
+                      isExcludeAnalyticsTx: { type: 'BOOLEAN', description: 'True jika pos dikecualikan dari analitik.' },
+                    },
+                    required: ['category', 'amount'],
+                  },
+                  description: 'Rincian pos kategori dan nominal baru untuk split.',
+                },
               },
             },
             replyMessage: { type: 'STRING', description: 'Pesan konfirmasi perubahan yang ramah.' },
@@ -390,3 +427,26 @@ export const getTools = () => [
     ],
   },
 ]
+
+/**
+ * Returns pruned tools depending on conversation context to conserve prompt tokens.
+ * In quick_log or receipt scan mode, only transaction recording and wallet management tools are returned.
+ *
+ * @param {'full'|'quick_log'|'receipt'} [mode='full']
+ * @returns {Array<object>}
+ */
+export function getPrunedTools(mode = 'full') {
+  const allTools = getTools()
+  if (mode === 'quick_log' || mode === 'receipt') {
+    const allowedNames = ['record_transactions', 'manage_wallet']
+    return [
+      {
+        functionDeclarations: allTools[0].functionDeclarations.filter((fd) =>
+          allowedNames.includes(fd.name)
+        ),
+      },
+    ]
+  }
+  return allTools
+}
+

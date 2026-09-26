@@ -13,6 +13,7 @@ export default function ChatMessageList({
   onScroll,
   onSend,
   onMsgTouchStart,
+  onMsgTouchMove,
   onMsgTouchEnd,
   onMsgContextMenu,
   onConfirmDelete,
@@ -64,6 +65,7 @@ export default function ChatMessageList({
               locale={locale}
               onSend={onSend}
               onMsgTouchStart={onMsgTouchStart}
+              onMsgTouchMove={onMsgTouchMove}
               onMsgTouchEnd={onMsgTouchEnd}
               onMsgContextMenu={onMsgContextMenu}
               onConfirmDelete={onConfirmDelete}

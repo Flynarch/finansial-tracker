@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import useSettingsStore from '../../store/useSettingsStore'
 import { getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { formatCurrency } from '../../lib/utils'
+import { getChartPalette } from '../../lib/chartTheme'
 import ExpandableSection from './ExpandableSection'
 
 function getCurrentTimeStr(timestamp) {
@@ -51,6 +52,44 @@ const POSITION_RADIUS = {
   last: 'rounded-2xl rounded-tl-lg',
 }
 
+function isSafeHttpUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const markdownComponents = {
+  a: ({ href, children }) => {
+    if (!isSafeHttpUrl(href)) {
+      return <span className="break-all">{children}</span>
+    }
+
+    const handleClick = (e) => {
+      e.stopPropagation()
+      if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()) {
+        e.preventDefault()
+        window.open(href, '_system')
+      }
+    }
+
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--accent)] underline hover:opacity-80 break-all"
+        onClick={handleClick}
+      >
+        {children}
+      </a>
+    )
+  },
+}
+
 export const AiBubble = memo(function AiBubble({
   content,
   timestamp,
@@ -72,7 +111,7 @@ export const AiBubble = memo(function AiBubble({
       <div className={`flex-1 min-w-0 overflow-hidden flex flex-col gap-2 ${radiusClass} bg-[var(--field-bg)] border border-[var(--border)] p-4 shadow-xs`}>
         {content && (
           <div className="ft-md-prose leading-relaxed text-[13.5px] text-[var(--fg)] break-words [overflow-wrap:anywhere]">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {content}
             </ReactMarkdown>
             {isStreaming && <span className="ft-chat-caret" />}
@@ -83,7 +122,7 @@ export const AiBubble = memo(function AiBubble({
           <ExpandableSection title={expandableDetails.title || 'Rincian Tambahan'}>
             {typeof expandableDetails.content === 'string' ? (
               <div className="ft-md-prose text-xs text-[var(--muted)]">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {expandableDetails.content}
                 </ReactMarkdown>
               </div>
@@ -155,8 +194,6 @@ export const ReasoningIndicator = memo(function ReasoningIndicator() {
 export const TypingIndicator = ReasoningIndicator
 
 // ── Chart Bubble ──
-import { getChartPalette } from '../../lib/chartTheme'
-
 function CustomTooltip({ active, payload, defaultCurrency = 'IDR' }) {
   if (active && payload && payload.length) {
     const d = payload[0].payload

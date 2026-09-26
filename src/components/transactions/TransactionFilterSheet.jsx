@@ -5,7 +5,7 @@ import { ALL_TYPES } from '../../hooks/useTransactionFilters'
 import { formatCategoryName, getCategoryColorClass } from '../../lib/categoryIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useTranslation from '../../hooks/useTranslation'
-import useBackButton from '../../hooks/useBackButton'
+import useBottomSheet from '../../hooks/useBottomSheet'
 
 export default function TransactionFilterSheet({
   isOpen,
@@ -38,28 +38,26 @@ export default function TransactionFilterSheet({
     }
   }
 
-  useBackButton(() => {
-    onClose()
-  }, isOpen)
+  const { isMounted, isVisible, closeSheet } = useBottomSheet({
+    isOpen,
+    onClose,
+  })
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
+    if (isMounted) {
       document.body.classList.add('hide-bottom-nav')
     } else {
-      document.body.style.overflow = ''
       document.body.classList.remove('hide-bottom-nav')
     }
     return () => {
-      document.body.style.overflow = ''
       document.body.classList.remove('hide-bottom-nav')
     }
-  }, [isOpen])
+  }, [isMounted])
 
   const allWalletIds = useMemo(() => userWallets.map((w) => String(w.id)), [userWallets])
   const allCategoryKeys = useMemo(() => [...usedCategories], [usedCategories])
 
-  if (!isOpen || typeof document === 'undefined') return null
+  if (!isMounted || typeof document === 'undefined') return null
 
   const getDatesForQuickRange = (rangeKey) => {
     const now = new Date()
@@ -140,15 +138,21 @@ export default function TransactionFilterSheet({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center">
+    <div className={`fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center ${
+      isVisible ? 'pointer-events-auto' : 'pointer-events-none'
+    }`}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+          isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+        }`}
+        onClick={closeSheet}
       />
 
       {/* Sheet Content */}
-      <div className="relative z-10 flex w-full max-h-[85svh] sm:max-w-md flex-col rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-250">
+      <div className={`relative z-10 flex w-full max-h-[85svh] sm:max-w-md flex-col rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl overflow-hidden transform-gpu ${
+        isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
+      }`}>
         {/* Drag handle / Header */}
         <div className="shrink-0 pt-3 pb-2 px-5 border-b border-[var(--border)] flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -159,7 +163,7 @@ export default function TransactionFilterSheet({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeSheet}
             className="rounded-full p-1.5 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition cursor-pointer"
             aria-label={t('common.close', 'Tutup')}
           >
@@ -541,7 +545,7 @@ export default function TransactionFilterSheet({
               setDraftFilters(resetValues)
               onApplyFilters(resetValues)
               setDraftPeriodPreset(null)
-              onClose()
+              closeSheet()
             }}
           >
             {t('common.reset', 'Reset')}
@@ -553,7 +557,7 @@ export default function TransactionFilterSheet({
               if (draftFilters) {
                 onApplyFilters(draftFilters)
               }
-              onClose()
+              closeSheet()
             }}
           >
             {t('tx.filter.apply', 'Terapkan Filter')}

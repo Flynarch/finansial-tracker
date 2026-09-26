@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
+import useBottomSheet from '../../hooks/useBottomSheet'
 
 export default function TransactionBulkBar({
   isBulkMode,
@@ -11,11 +12,18 @@ export default function TransactionBulkBar({
   onCancel,
 }) {
   const { t } = useTranslation()
+  const { isMounted, isVisible } = useBottomSheet({
+    isOpen: isBulkMode,
+    useBackButton: false,
+    lockBodyScroll: false,
+  })
 
-  if (!isBulkMode || typeof document === 'undefined') return null
+  if (!isMounted || typeof document === 'undefined') return null
 
   return createPortal(
-    <div className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-50 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-in slide-in-from-bottom duration-200">
+    <div className={`fixed bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-50 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl transform-gpu ${
+      isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit pointer-events-none'
+    }`}>
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-[var(--fg)]">
           {selectedTxIds.size} {t('tx.bulk.selected', 'Dipilih')}

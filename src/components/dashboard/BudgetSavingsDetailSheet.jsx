@@ -124,7 +124,7 @@ export default function BudgetSavingsDetailSheet({
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetView, setSheetView] = useState('detail') // 'detail' | 'create-budget' | 'create-goal'
 
   // Reset view when opening
@@ -286,8 +286,9 @@ export default function BudgetSavingsDetailSheet({
     setIsDragging(false)
     if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
       closeSheet()
+    } else {
+      setDragOffset(0)
     }
-    setDragOffset(0)
     touchStartY.current = 0
   }
 
@@ -347,12 +348,12 @@ export default function BudgetSavingsDetailSheet({
     }
   }, [budgetGoalSummary, defaultCurrency, rates])
 
-  if ((!isOpen && !sheetVisible) || typeof document === 'undefined') return null
+  if (!isMounted || typeof document === 'undefined') return null
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 transition-opacity duration-300 ease-out ${
-        sheetVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      className={`fixed inset-0 z-50 ${
+        sheetVisible ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
     >
       <button
@@ -367,19 +368,17 @@ export default function BudgetSavingsDetailSheet({
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full sm:max-w-lg sm:px-4 sm:pb-6">
         <div
           className={`max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${
-            sheetVisible ? 'ft-sheet-enter' : ''
+            isDragging ? '' : sheetVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
           }`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            transform: sheetVisible
-              ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
-              : 'translate3d(0, 100%, 0)',
-            transition: isDragging
-              ? 'none'
-              : sheetVisible
-              ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
-              : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
-            opacity: sheetVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
+            ...(isDragging
+              ? {
+                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
+                  transition: 'none',
+                  opacity: Math.max(0.4, 1 - dragOffset / 300),
+                }
+              : {}),
           }}
         >
           <div

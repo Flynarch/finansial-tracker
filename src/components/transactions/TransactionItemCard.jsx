@@ -27,6 +27,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   rates,
   contextWalletId,
   wallets: walletsProp,
+  isNew: isNewProp,
   newestTransactionId,
   isBulkMode,
   isSelected,
@@ -39,6 +40,8 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     const found = wallets?.find((w) => String(w.id) === String(id))
     return found?.name || 'Wallet'
   }
+
+  const isNew = Boolean(isNewProp !== undefined ? isNewProp : (newestTransactionId && String(transaction.id) === String(newestTransactionId)))
 
   let iconKey = resolveTransactionIconKey(transaction.category, transaction.type)
   let colorClass = getCategoryColorClass(iconKey, transaction.type, transaction.category)
@@ -140,6 +143,16 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           onDelete: () => (onDelete ? onDelete(transaction) : deleteTransaction?.(transaction.id)),
         }) : {})}
       >
+        {/* Top-Right Badge: BARU / NEW */}
+        {isNew ? (
+          <span
+            data-testid="badge-new-tx"
+            className="absolute top-1.5 right-2 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[8px] sm:text-[8.5px] font-black tracking-wider text-white uppercase leading-none shadow-2xs z-20 pointer-events-none select-none animate-in fade-in duration-200"
+          >
+            {t('common.new', 'BARU')}
+          </span>
+        ) : null}
+
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* Avatar Icon */}
           <div className="relative shrink-0">
@@ -251,10 +264,9 @@ export const TransactionItemCard = memo(function TransactionItemCard({
         {/* Right Section: Amount & Strictly Right-Aligned Badges */}
         {(() => {
           const receiptSrc = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
-          const isNewest = Boolean(newestTransactionId && String(transaction.id) === String(newestTransactionId))
 
           return (
-            <div className="shrink-0 max-w-[48%] pl-2 text-right flex flex-col items-end justify-center ml-auto">
+            <div className={`shrink-0 max-w-[48%] pl-2 text-right flex flex-col items-end justify-center ml-auto ${isNew ? 'pt-2 sm:pt-2.5' : ''}`}>
               <p
                 className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
               >
@@ -276,32 +288,25 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                 </p>
               ) : null}
 
-              {/* Right-aligned Badges: Struk Attachment & BARU */}
-              {isNewest || receiptSrc ? (
+              {/* Right-aligned Badges: Struk Attachment */}
+              {receiptSrc ? (
                 <div className="mt-1.5 flex items-center justify-end gap-1.5 flex-wrap ml-auto">
-                  {receiptSrc ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (onPreviewReceipt) {
-                          onPreviewReceipt(transaction)
-                        } else if (onViewDetail) {
-                          onViewDetail(transaction)
-                        }
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md bg-[var(--receipt-soft)] border border-[var(--receipt)]/30 px-1.5 py-0.5 text-[9.5px] font-extrabold text-[var(--receipt)] hover:bg-[var(--receipt)]/25 transition shrink-0 cursor-pointer shadow-2xs leading-normal active:scale-95"
-                      title={t('transactions.viewReceipt', 'Lihat Bukti Transaksi')}
-                    >
-                      <Paperclip className="h-2.5 w-2.5 shrink-0" />
-                      <span>{t('transactions.receiptBadge', 'Struk')}</span>
-                    </button>
-                  ) : null}
-                  {isNewest ? (
-                    <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[9.5px] font-black tracking-wider text-white shrink-0 uppercase leading-normal shadow-2xs">
-                      {t('common.new', 'BARU')}
-                    </span>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onPreviewReceipt) {
+                        onPreviewReceipt(transaction)
+                      } else if (onViewDetail) {
+                        onViewDetail(transaction)
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md bg-[var(--receipt-soft)] border border-[var(--receipt)]/30 px-1.5 py-0.5 text-[9.5px] font-extrabold text-[var(--receipt)] hover:bg-[var(--receipt)]/25 transition shrink-0 cursor-pointer shadow-2xs leading-normal active:scale-95"
+                    title={t('transactions.viewReceipt', 'Lihat Bukti Transaksi')}
+                  >
+                    <Paperclip className="h-2.5 w-2.5 shrink-0" />
+                    <span>{t('transactions.receiptBadge', 'Struk')}</span>
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -316,7 +321,8 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     (prevProps.swipedTransactionId === prevProps.transaction?.id) === (nextProps.swipedTransactionId === nextProps.transaction?.id) &&
     (prevProps.isSwipingId === prevProps.transaction?.id) === (nextProps.isSwipingId === nextProps.transaction?.id) &&
     (prevProps.highlightedTransactionId === String(prevProps.transaction?.id)) === (nextProps.highlightedTransactionId === String(nextProps.transaction?.id)) &&
-    (String(prevProps.newestTransactionId) === String(prevProps.transaction?.id)) === (String(nextProps.newestTransactionId) === String(nextProps.transaction?.id)) &&
+    Boolean(prevProps.isNew ?? (prevProps.newestTransactionId && String(prevProps.newestTransactionId) === String(prevProps.transaction?.id))) ===
+      Boolean(nextProps.isNew ?? (nextProps.newestTransactionId && String(nextProps.newestTransactionId) === String(nextProps.transaction?.id))) &&
     prevProps.isBulkMode === nextProps.isBulkMode &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.locale === nextProps.locale &&

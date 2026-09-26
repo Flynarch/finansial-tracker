@@ -1,43 +1,63 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-export function useChatSpeech({ locale = 'id', inputValue = '', setInputValue, onError }) {
+export function useChatSpeech({ locale = 'id', inputValue = '', setInputValue, onError, onAutoSubmit }) {
   const [isRecording, setIsRecording] = useState(false)
   const recognitionRef = useRef(null)
+  const silenceTimerRef = useRef(null)
   const baseInputBeforeRecordingRef = useRef('')
 
   useEffect(() => {
     return () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop()
+          recognitionRef.current.onresult = null
+          recognitionRef.current.onerror = null
+          recognitionRef.current.onend = null
+          if (typeof recognitionRef.current.abort === 'function') {
+            recognitionRef.current.abort()
+          } else {
+            recognitionRef.current.stop()
+          }
         } catch (err){
-      console.warn('[useChatSpeech]', err)
-          // ignore
+          console.warn('[useChatSpeech:cleanup]', err)
         }
+        recognitionRef.current = null
       }
     }
   }, [])
 
   const handleStopRecording = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
       } catch (err){
-      console.warn('[useChatSpeech]', err)
-        // ignore
+        console.warn('[useChatSpeech]', err)
       }
+      recognitionRef.current = null
     }
     setIsRecording(false)
   }, [])
 
   const handleCancelRecording = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
       } catch (err){
-      console.warn('[useChatSpeech]', err)
-        // ignore
+        console.warn('[useChatSpeech]', err)
       }
+      recognitionRef.current = null
     }
     setIsRecording(false)
     if (setInputValue) {
@@ -104,9 +124,25 @@ export function useChatSpeech({ locale = 'id', inputValue = '', setInputValue, o
 
         const fullText = (baseInputBeforeRecordingRef.current + finalTranscript + interimTranscript).trim()
         setInputValue?.(fullText)
+
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+        if (finalTranscript.trim() || interimTranscript.trim()) {
+          silenceTimerRef.current = setTimeout(() => {
+            handleStopRecording()
+            onAutoSubmit?.()
+          }, 4500)
+        }
       }
 
       recognition.onerror = (event) => {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+        recognitionRef.current = null
         setIsRecording(false)
         if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
           onError?.(
@@ -123,13 +159,25 @@ export function useChatSpeech({ locale = 'id', inputValue = '', setInputValue, o
         }
       }
 
-      recognition.onend = () => setIsRecording(false)
+      recognition.onend = () => {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+        recognitionRef.current = null
+        setIsRecording(false)
+      }
       recognition.start()
     } catch (err){
       console.warn('[useChatSpeech]', err)
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+      recognitionRef.current = null
       setIsRecording(false)
     }
-  }, [isRecording, locale, inputValue, setInputValue, onError, handleStopRecording])
+  }, [isRecording, locale, inputValue, setInputValue, onError, handleStopRecording, onAutoSubmit])
 
   return {
     isRecording,

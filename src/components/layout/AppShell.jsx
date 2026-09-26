@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { App } from '@capacitor/app'
 import { StatusBar, Style } from '@capacitor/status-bar'
@@ -15,6 +15,7 @@ import {
 } from '../../lib/smartNotifications'
 import { syncNotificationQueue } from '../../lib/notificationIngestion'
 import { preseedMerchantMemoryFromDb } from '../../lib/ai/merchantCategorizer'
+import { preseedEntityMemoryFromDb } from '../../lib/ai/entityMemory'
 import { prefetchCriticalRoutes } from '../../lib/routePrefetcher'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -33,8 +34,7 @@ import useNotificationEngine from '../../hooks/useNotificationEngine'
 import InAppNotificationToast from '../notifications/InAppNotificationToast'
 import useTransactionStore from '../../store/useTransactionStore'
 import useAuthDeepLink from '../../hooks/useAuthDeepLink'
-import AiQuickLogModal from '../chat/AiQuickLogModal'
-
+const AiQuickLogModal = lazy(() => import('../chat/AiQuickLogModal'))
 const QuickAddTransactionModal = lazy(() => import('../transactions/QuickAddTransactionModal'))
 import { primeThemeTransition } from '../../lib/themeTransition'
 import { ensureFirebaseAuthSynced } from '../../lib/auth'
@@ -300,6 +300,7 @@ function AppShell() {
         }
         await syncNotificationQueue({ defaultCurrency, defaultWalletId, notificationAutoApprove })
         await preseedMerchantMemoryFromDb().catch(() => {})
+        await preseedEntityMemoryFromDb().catch(() => {})
       } catch (err){
       console.warn('[AppShell]', err)
         // automation failure should not block app rendering

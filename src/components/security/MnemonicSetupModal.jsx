@@ -21,6 +21,7 @@ import {
   getSessionMnemonicPhrase,
   setSessionMnemonicPhrase,
 } from '../../lib/mnemonicCrypto'
+import { copyToClipboard } from '../../lib/clipboard'
 
 export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
   const { t } = useTranslation()
@@ -74,11 +75,13 @@ export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
     }
   }, [isOpen])
 
-  const handleCopyPhrase = () => {
+  const handleCopyPhrase = async () => {
     triggerHaptic('light')
-    navigator.clipboard.writeText(phrase)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const success = await copyToClipboard(phrase)
+    if (success) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   const handleProceedToChallenge = () => {

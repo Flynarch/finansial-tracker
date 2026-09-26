@@ -50,6 +50,7 @@ const useSettingsStore = create((set, get) => ({
   dailyReminderTime: '20:00',
   budgetAlertsEnabled: true,
   budgetCycleStartDay: 1,
+  widgetRange: '7d', // '7d' | 'month'
   notificationAutoApprove: false,
   emailVerified: false,
   emailVerificationDismissed: false,
@@ -89,6 +90,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
       budgetCycleStartDay: next.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(next.budgetCycleStartDay) || 1))) : 1,
+      widgetRange: next.widgetRange === 'month' ? 'month' : '7d',
       notificationAutoApprove: Boolean(next.notificationAutoApprove),
       hideBalance: Boolean(next.hideBalance),
     })
@@ -211,6 +213,17 @@ const useSettingsStore = create((set, get) => ({
     const next = Math.min(28, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
     set({ budgetCycleStartDay: next })
     await get().persist({ budgetCycleStartDay: next })
+  },
+  setWidgetRange: async (widgetRange) => {
+    const next = widgetRange === 'month' ? 'month' : '7d'
+    set({ widgetRange: next })
+    await get().persist({ widgetRange: next })
+    try {
+      const { scheduleNativeWidgetSync } = await import('../lib/nativeWidgetSync')
+      scheduleNativeWidgetSync(100)
+    } catch (err) {
+      console.error('[useSettingsStore:setWidgetRange]', err)
+    }
   },
   setNotificationAutoApprove: async (notificationAutoApprove) => {
     const next = Boolean(notificationAutoApprove)
@@ -366,6 +379,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
       budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
+      widgetRange: record.widgetRange === 'month' ? 'month' : '7d',
       notificationAutoApprove: Boolean(record.notificationAutoApprove),
       hideBalance: record.hideBalance !== undefined
         ? Boolean(record.hideBalance)

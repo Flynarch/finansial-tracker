@@ -18,16 +18,38 @@ export default function ReceiptPreviewModal({
   const { t } = useTranslation()
   const [failedImageSrc, setFailedImageSrc] = useState(null)
 
-  if (!imageSrc) return null
+  const [cachedImage, setCachedImage] = useState(imageSrc)
+  const [cachedMeta, setCachedMeta] = useState({ title, amountFormatted, date, notes, description, category })
 
-  const imgError = Boolean(imageSrc && failedImageSrc === imageSrc)
-  const displayNotes = notes || description
+  if (imageSrc) {
+    if (imageSrc !== cachedImage) {
+      setCachedImage(imageSrc)
+    }
+    if (
+      title !== cachedMeta.title ||
+      amountFormatted !== cachedMeta.amountFormatted ||
+      date !== cachedMeta.date ||
+      notes !== cachedMeta.notes ||
+      description !== cachedMeta.description ||
+      category !== cachedMeta.category
+    ) {
+      setCachedMeta({ title, amountFormatted, date, notes, description, category })
+    }
+  }
+
+  const activeImageSrc = imageSrc || cachedImage
+  const activeMeta = imageSrc ? { title, amountFormatted, date, notes, description, category } : cachedMeta
+
+  if (!activeImageSrc) return null
+
+  const imgError = Boolean(activeImageSrc && failedImageSrc === activeImageSrc)
+  const displayNotes = activeMeta.notes || activeMeta.description
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={title || t('transactions.receiptModalTitle', 'Bukti Transaksi')}
+      title={activeMeta.title || t('transactions.receiptModalTitle', 'Bukti Transaksi')}
       maxWidth="max-w-lg"
       zIndex={zIndex}
     >
@@ -42,48 +64,48 @@ export default function ReceiptPreviewModal({
             </div>
           ) : (
             <img
-              src={imageSrc}
+              src={activeImageSrc}
               alt="Receipt / Proof"
-              onError={() => setFailedImageSrc(imageSrc)}
+              onError={() => setFailedImageSrc(activeImageSrc)}
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl select-none"
             />
           )}
         </div>
 
         {/* Transaction Metadata Strip */}
-        {(amountFormatted || date || displayNotes || category) && (
+        {(activeMeta.amountFormatted || activeMeta.date || displayNotes || activeMeta.category) && (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2 text-xs overflow-hidden min-w-0">
-            {category && (
+            {activeMeta.category && (
               <div className="flex items-center justify-between gap-2 min-w-0">
                 <span className="font-bold text-[var(--muted)] flex items-center gap-1.5 shrink-0">
                   <Tag className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
                   {t('tx.category', 'Kategori')}:
                 </span>
                 <span className="font-bold text-[var(--fg)] truncate text-right ml-2">
-                  {category}
+                  {activeMeta.category}
                 </span>
               </div>
             )}
 
-            {amountFormatted && (
+            {activeMeta.amountFormatted && (
               <div className="flex items-center justify-between gap-2 min-w-0 border-t border-[var(--border)]/60 pt-2">
                 <span className="font-bold text-[var(--muted)] flex items-center gap-1.5 shrink-0">
                   <Wallet className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
                   {t('common.amount', 'Jumlah')}:
                 </span>
                 <span className="font-black text-sm tracking-tight text-[var(--fg)] tabular-nums break-all text-right ml-2">
-                  {amountFormatted}
+                  {activeMeta.amountFormatted}
                 </span>
               </div>
             )}
 
-            {date && (
+            {activeMeta.date && (
               <div className="flex items-center justify-between gap-2 min-w-0 border-t border-[var(--border)]/60 pt-2">
                 <span className="font-bold text-[var(--muted)] flex items-center gap-1.5 shrink-0">
                   <Calendar className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
                   {t('common.date', 'Tanggal')}:
                 </span>
-                <span className="font-bold text-[var(--fg)] tabular-nums break-all text-right ml-2">{date}</span>
+                <span className="font-bold text-[var(--fg)] tabular-nums break-all text-right ml-2">{activeMeta.date}</span>
               </div>
             )}
 

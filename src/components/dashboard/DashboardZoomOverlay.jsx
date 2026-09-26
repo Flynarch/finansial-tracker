@@ -124,38 +124,41 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
     setIsDragging(false)
     if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
       onCloseZoom()
+    } else {
+      setDragOffset(0)
     }
-    setDragOffset(0)
     touchStartY.current = 0
   }
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 transition-opacity duration-200 ease-out ${
-        zoomVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      className={`fixed inset-0 z-50 ${
+        zoomVisible ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
     >
       <button
         type="button"
         onClick={onCloseZoom}
-        className="absolute inset-0 bg-black/60 backdrop-blur-xs cursor-pointer"
+        className={`absolute inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+          zoomVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+        }`}
         aria-label={t('dashboard.zoom.close')}
       />
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl sm:px-3 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
-          className="origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu ft-hide-scrollbar"
+          className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu ft-hide-scrollbar ${
+            isDragging ? '' : zoomVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
+          }`}
           style={{
             boxShadow: 'var(--shadow)',
-            transform: zoomVisible
-              ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
-              : 'translate3d(0, 100%, 0)',
-            transition: isDragging
-              ? 'none'
-              : zoomVisible
-              ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
-              : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
-            opacity: zoomVisible ? (dragOffset > 0 ? Math.max(0.4, 1 - dragOffset / 300) : 1) : 0,
+            ...(isDragging
+              ? {
+                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
+                  transition: 'none',
+                  opacity: Math.max(0.4, 1 - dragOffset / 300),
+                }
+              : {}),
           }}
         >
           {/* Top Tactile Handle */}

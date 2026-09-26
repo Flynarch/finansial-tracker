@@ -1,5 +1,6 @@
 import { getMergedExpenseTree } from '../expenseCategories'
 import { getMergedIncomeTree } from '../incomeCategories'
+import { getFrequentUserEntities } from './entityMemory'
 
 export function buildCategoryContext(locale = 'id') {
   const isEn = locale === 'en'
@@ -133,6 +134,13 @@ export function buildSystemPrompt({
   const activeSummary = monthSummary || recentSummary || ''
   const categoriesContext = buildCategoryContext(locale)
 
+  const frequentEntities = getFrequentUserEntities(5)
+  const frequentEntitiesContext = frequentEntities.length > 0
+    ? frequentEntities
+        .map((e) => `- "${e.name}" (Kategori: ${e.category}${e.avgAmount ? `, Nominal Biasa: Rp ${Number(e.avgAmount).toLocaleString('id-ID')}` : ''})`)
+        .join('\n')
+    : ''
+
   const walletListStr = wallets.length > 0
     ? wallets.map((w) => {
         const safeName = String(w.name || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 40)
@@ -225,6 +233,11 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
        - "indrive" -> merchant = "inDrive", category = "transportasi/ojol".
        - "bluebird" -> merchant = "Bluebird", category = "transportasi/taksi".
      * DILARANG KERAS mengisi properti 'merchant' dengan kalimat mentah pengguna (seperti "Kemarin hari sabtu...")! Properti 'merchant' HANYA BOLEH diisi nama merek/toko bersih (misal: "Maxim", "Indomaret", "Starbucks").
+    - ATURAN FORMAT FIELD 'notes', 'merchant', DAN 'time' (CLEAN TITLE-CASE NOTES RULE - SANGAT PENTING):
+      * DILARANG KERAS menyalin kalimat mentah pengguna (seperti "tadi jam 5 beli matcha", "kemarin beli bakso di warung") ke properti 'notes'!
+      * Properti 'notes' HANYA BOLEH berisi nama subjek / barang dalam Title Case bersih (misal: "Matcha", "Bakso", "Kopi Susu", "Nasi Padang", "Uang Saku").
+      * Properti 'merchant' HANYA BOLEH berisi nama toko / tempat / brand jika terpisah dari barang (misal: jika user bilang "beli matcha di kulo", maka notes = "Matcha" dan merchant = "Kulo").
+      * Properti 'time' (HH:mm 24-jam): jika user menyebutkan waktu/jam (misal: "jam 5", "jam 5 sore", "tadi sore", "pukul 17:00", "jam setengah 6"), WAJIB ekstrak ke properti 'time' (misal: "17:00" atau "17:30"). JANGAN biarkan angka jam masuk ke nominal atau ke notes!
     - POLA SINGKAT NAMA BARANG/MAKANAN + NOMINAL (CONTOH: "bakso 20k", "kopi 25rb", "nasgor 15k", "bensin 30k"):
       * INI ADALAH TRANSAKSI PENGELUARAN LENGKAP (EXPENSE).
       * WAJIB LANGSUNG PANGGIL 'record_transactions' dengan type: "expense", amount yang sesuai, dan kategori yang cocok.
@@ -297,7 +310,7 @@ DAFTAR 15 TRANSAKSI TERAKHIR PENGGUNA:
 <user_untrusted_transactions>
 ${recentTxsContext || 'Belum ada transaksi sebelumnya.'}
 </user_untrusted_transactions>
-
+${frequentEntitiesContext ? `\nPREFERENSI ENTITAS PENGGUNA TERAKHIR (FEW-SHOT):\n${frequentEntitiesContext}\n` : ''}
 Daftar Kategori:
 ${categoriesContext}`
 }

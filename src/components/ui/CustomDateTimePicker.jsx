@@ -127,11 +127,14 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
   const selectedDate = useMemo(() => (dateValue ? new Date(dateValue) : null), [dateValue])
   const tempSelectedDate = useMemo(() => (tempDate ? new Date(tempDate) : null), [tempDate])
 
-  // Always generate a fixed 6-week grid (42 days) to prevent layout shifts when changing months
-  const monthStart = startOfMonth(viewDate)
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const endDate = addDays(startDate, 41)
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
+  // Always generate a fixed 6-week grid (42 days) to prevent layout shifts when changing months - only compute when open
+  const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate])
+  const calendarDays = useMemo(() => {
+    if (!isOpen) return []
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
+    const endDate = addDays(startDate, 41)
+    return eachDayOfInterval({ start: startDate, end: endDate })
+  }, [isOpen, monthStart])
 
   const setQuickDate = (daysToAdd) => {
     const target = addDays(new Date(), daysToAdd)

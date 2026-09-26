@@ -27,6 +27,7 @@ import {
   toSafeNumber,
 } from '../lib/utils'
 import { exportTransactionsToCsv } from '../lib/exportReports'
+import { getLastSeenTxTimestamp, updateLastSeenTxTimestamp } from '../lib/transactionLastSeen'
 
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import PageHeader from '../components/ui/PageHeader'
@@ -139,6 +140,10 @@ function Transactions() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isStatementImportOpen, setIsStatementImportOpen] = useState(false)
+  const [hasOpenedStatementImport, setHasOpenedStatementImport] = useState(false)
+  if (isStatementImportOpen && !hasOpenedStatementImport) {
+    setHasOpenedStatementImport(true)
+  }
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
@@ -236,6 +241,31 @@ function Transactions() {
 
     return () => window.cancelAnimationFrame(frameId)
   }, [pendingFocusTransactionId, filteredTransactions.length])
+
+  // Track session last seen timestamp to determine new transactions
+  const sessionLastSeenTimestamp = useMemo(() => getLastSeenTxTimestamp(), [])
+
+  useEffect(() => {
+    // Commit last seen after 3.5 seconds of active view
+    const timer = setTimeout(() => {
+      updateLastSeenTxTimestamp()
+    }, 3500)
+
+    // Commit when app or tab is backgrounded
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        updateLastSeenTxTimestamp()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      // Commit last seen on unmount (user navigated away)
+      updateLastSeenTxTimestamp()
+    }
+  }, [])
 
   // Grouped entries for TransactionListSection
   const newestTransactionId = useMemo(() => {
@@ -718,6 +748,7 @@ function Transactions() {
           convertCurrency={convertCurrency}
           rates={rates}
           allWallets={allWallets}
+          sessionLastSeenTimestamp={sessionLastSeenTimestamp}
           newestTransactionId={newestTransactionId}
         />
       </div>
@@ -874,7 +905,7 @@ function Transactions() {
       />
 
       {/* Universal e-Statement & Bank Mutation Import Modal */}
-      {isStatementImportOpen && (
+      {hasOpenedStatementImport && (
         <Suspense fallback={null}>
           <StatementImportModal
             isOpen={isStatementImportOpen}

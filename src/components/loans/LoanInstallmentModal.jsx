@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Modal from '../ui/Modal'
 import { db } from '../../lib/db'
@@ -23,20 +23,28 @@ import {
 export default function LoanInstallmentModal({
   isOpen,
   onClose,
-  loan = null,
+  loan: incomingLoan = null,
   onPayInstallment = null,
 }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
+  const [cachedLoan, setCachedLoan] = useState(incomingLoan)
+  const [prevIncomingLoan, setPrevIncomingLoan] = useState(incomingLoan)
+  if (incomingLoan && incomingLoan !== prevIncomingLoan) {
+    setPrevIncomingLoan(incomingLoan)
+    setCachedLoan(incomingLoan)
+  }
+  const loan = incomingLoan || cachedLoan
+
   useBackButton(onClose, isOpen)
 
   const payments = useLiveQuery(
     async () => {
-      if (!loan?.id) return []
+      if (!isOpen || !loan?.id) return []
       return await db.loanPayments.where('loanId').equals(loan.id).reverse().toArray()
     },
-    [loan?.id],
+    [isOpen, loan?.id],
     []
   )
 

@@ -19,6 +19,7 @@ import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { createTransaction } from '../../services/transactionService'
 import { formatCurrency, formatMoneyInput, parseMoneyInput, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../../lib/api'
+import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 
@@ -56,19 +57,24 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   useEffect(() => {
-    fetchCurrencyRates('USD')
-      .then((r) => r && setRates(r))
-      .catch((err) => console.warn('[SplitBillModal]', err))
-  }, [])
+    if (!isOpen) return
+    const timer = setTimeout(() => {
+      fetchCurrencyRates('USD')
+        .then((r) => r && setRates(r))
+        .catch((err) => console.warn('[SplitBillModal]', err))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [isOpen])
 
   const wallets = useLiveQuery(
     async () => {
+      if (!isOpen) return []
       const raw = await db.wallets.filter((w) => !w.isArchived).toArray()
       if (!raw || raw.length === 0) return []
       return await getAllWalletBalances(raw, rates)
     },
-    [rates],
-    []
+    [isOpen, rates],
+    getCachedDashboardWallets() || []
   )
 
   const selectedWallet = useMemo(() => {
@@ -202,69 +208,78 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
         : parseMoneyInput(payer?.amount || 0, activeCurrency)
       const friendsShare = parsedTotal - userShare
 
-      // 1. Record User's Personal Share as Operational Expense Transaction (affecting analytics & budget)
+      // 1. Record transactions and loans atomically inside a Dexie transaction
       let personalTxId = null
-      if (userShare > 0) {
-        personalTxId = await createTransaction({
-          date: effectiveDate,
-          amount: userShare,
-          type: 'expense',
-          category: category || 'makanan/makan_diluar',
-          notes: `Split Bill (Porsi Saya): ${billTitle}`,
-          currency: activeCurrency,
-          walletId: Number(activeWalletId),
-          tags: ['patungan', 'splitbill'],
-        })
-      }
-
-      // 2. Record Friends' Portion as Non-Analytic Loan Disbursement Transaction
       let friendsTxId = null
-      if (friendsShare > 0) {
-        friendsTxId = await createTransaction({
-          date: effectiveDate,
-          amount: friendsShare,
-          type: 'expense',
-          category: 'Pinjaman Diberikan',
-          isExcludeAnalyticsTx: true,
-          excludeFromAnalytics: true,
-          isExcludeFromAnalytics: true,
-          splitBillId,
-          notes: `Split Bill (Talangan Teman): ${billTitle}`,
-          currency: activeCurrency,
-          walletId: Number(activeWalletId),
-          tags: ['patungan', 'splitbill', 'exclude_analytics'],
-        })
-      }
-
-      // 3. Create Receivable Loans for each non-payer participant
       const receivablesCreated = []
-      for (let i = 0; i < participants.length; i++) {
-        const p = participants[i]
-        if (p.isPayer) continue
-        const shareAmount = splitMode === 'equal' ? friendShareEqual : parseMoneyInput(p.amount, activeCurrency)
-        if (shareAmount > 0) {
-          const loanId = await db.loans.add({
-            type: 'receivable', // piutang (teman berhutang pada kita)
-            personName: p.name.trim(),
-            title: `Patungan: ${billTitle}`,
-            totalAmount: shareAmount,
-            remainingAmount: shareAmount,
-            currency: activeCurrency,
-            startDate: effectiveDate,
-            status: 'active',
-            notes: `Auto-generated from Split Bill (${billTitle})`,
-            walletId: Number(activeWalletId),
-            initialTransactionId: friendsTxId || personalTxId,
-            splitBillId,
-            createdAt: Date.now(),
-          })
-          receivablesCreated.push({
-            id: loanId,
-            personName: p.name.trim(),
-            amount: shareAmount,
-          })
+
+      await db.transaction(
+        'rw',
+        [db.transactions, db.loans, db.wallets, db.walletBalanceCache, db.budgets, db.goals, db.goalLogs, db.loanPayments, db.notifications],
+        async () => {
+          // User's Personal Share as Operational Expense Transaction
+          if (userShare > 0) {
+            personalTxId = await createTransaction({
+              date: effectiveDate,
+              amount: userShare,
+              type: 'expense',
+              category: category || 'makanan/makan_diluar',
+              notes: `Split Bill (Porsi Saya): ${billTitle}`,
+              currency: activeCurrency,
+              walletId: Number(activeWalletId),
+              tags: ['patungan', 'splitbill'],
+              splitBillId,
+            })
+          }
+
+          // Friends' Portion as Non-Analytic Loan Disbursement Transaction
+          if (friendsShare > 0) {
+            friendsTxId = await createTransaction({
+              date: effectiveDate,
+              amount: friendsShare,
+              type: 'expense',
+              category: 'Pinjaman Diberikan',
+              isExcludeAnalyticsTx: true,
+              excludeFromAnalytics: true,
+              isExcludeFromAnalytics: true,
+              splitBillId,
+              notes: `Split Bill (Talangan Teman): ${billTitle}`,
+              currency: activeCurrency,
+              walletId: Number(activeWalletId),
+              tags: ['patungan', 'splitbill', 'exclude_analytics'],
+            })
+          }
+
+          // Receivable Loans for each non-payer participant
+          for (let i = 0; i < participants.length; i++) {
+            const p = participants[i]
+            if (p.isPayer) continue
+            const shareAmount = splitMode === 'equal' ? friendShareEqual : parseMoneyInput(p.amount, activeCurrency)
+            if (shareAmount > 0) {
+              const loanId = await db.loans.add({
+                type: 'receivable', // piutang (teman berhutang pada kita)
+                personName: p.name.trim(),
+                title: `Patungan: ${billTitle}`,
+                totalAmount: shareAmount,
+                remainingAmount: shareAmount,
+                currency: activeCurrency,
+                startDate: effectiveDate,
+                status: 'active',
+                notes: `Auto-generated from Split Bill (${billTitle})`,
+                walletId: Number(activeWalletId),
+                initialTransactionId: friendsTxId || personalTxId,
+                splitBillId,
+                createdAt: Date.now(),
+              })
+              receivablesCreated.push({
+                id: loanId,
+                personName: p.name.trim(),
+                amount: shareAmount,
+              })
+            }
+          }
         }
-      }
+      )
 
       setCreatedSummary({
         title: billTitle,

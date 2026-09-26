@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -7,6 +6,7 @@ import { invalidateWalletBalance } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useBackButton from '../hooks/useBackButton'
+import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
 import EmptyState from '../components/ui/EmptyState'
 import CustomDatePicker from '../components/ui/CustomDatePicker'
@@ -822,57 +822,59 @@ export default function SavingsDetail() {
       </BottomSheet>
 
       {/* ── Celebration Certificate Modal ── */}
-      {isCelebrationModalOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm ft-motion-overlay">
-          <div className="w-full max-w-sm bg-[var(--panel-strong)] border border-[var(--earthy-green)]/40 rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-4">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[var(--earthy-green-soft)] border border-[var(--earthy-green)]/30 text-[var(--earthy-green)] shadow-sm">
-              <Trophy className="h-8 w-8 animate-bounce" />
-            </div>
-
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--earthy-green)]">
-                {t('savings.congratsGoalReached', 'Selamat! Target 100% Tercapai')}
-              </span>
-              <h3 className="text-xl font-black text-[var(--fg)] mt-1">{goal.name}</h3>
-              <p className="mt-1 text-2xl font-black text-[var(--earthy-green)] tabular-nums">
-                {formatCurrency(goal.targetAmount, currency)}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-[var(--muted)] leading-relaxed">
-                {t('savings.celebrationDesc', 'Kamu telah berhasil menabung seluruh target nominal! Pilih bagaimana kamu ingin menyimpan pencapaian ini:')}
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCelebrationModalOpen(false)
-                  setCashoutWalletId('')
-                  setIsCashoutSheetOpen(true)
-                }}
-                className="w-full py-3.5 rounded-2xl font-black text-xs text-white bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)] shadow-md transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wider"
-              >
-                <Wallet className="h-4 w-4" />
-                {t('savings.disburseToWallet', 'Cairkan Dana ke Dompet')}
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  await db.goals.update(goal.id, { isCompleted: true, isArchived: true })
-                  setIsCelebrationModalOpen(false)
-                  navigate('/savings?view=archive')
-                }}
-                className="w-full py-3 rounded-2xl font-extrabold text-xs text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)] transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Check className="h-4 w-4 text-[var(--earthy-green)]" />
-                {t('savings.markCompletedAndArchive', 'Tandai Selesai & Masukkan Arsip')}
-              </button>
-            </div>
+      <Modal
+        isOpen={isCelebrationModalOpen}
+        onClose={() => setIsCelebrationModalOpen(false)}
+        maxWidth="max-w-sm"
+        showHeader={false}
+      >
+        <div className="p-6 text-center space-y-4">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[var(--earthy-green-soft)] border border-[var(--earthy-green)]/30 text-[var(--earthy-green)] shadow-sm">
+            <Trophy className="h-8 w-8 animate-bounce" />
           </div>
-        </div>,
-        document.body
-      )}
+
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--earthy-green)]">
+              {t('savings.congratsGoalReached', 'Selamat! Target 100% Tercapai')}
+            </span>
+            <h3 className="text-xl font-black text-[var(--fg)] mt-1">{goal.name}</h3>
+            <p className="mt-1 text-2xl font-black text-[var(--earthy-green)] tabular-nums">
+              {formatCurrency(goal.targetAmount, currency)}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-[var(--muted)] leading-relaxed">
+              {t('savings.celebrationDesc', 'Kamu telah berhasil menabung seluruh target nominal! Pilih bagaimana kamu ingin menyimpan pencapaian ini:')}
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCelebrationModalOpen(false)
+                setCashoutWalletId('')
+                setIsCashoutSheetOpen(true)
+              }}
+              className="w-full py-3.5 rounded-2xl font-black text-xs text-white bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)] shadow-md transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wider"
+            >
+              <Wallet className="h-4 w-4" />
+              {t('savings.disburseToWallet', 'Cairkan Dana ke Dompet')}
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await db.goals.update(goal.id, { isCompleted: true, isArchived: true })
+                setIsCelebrationModalOpen(false)
+                navigate('/savings?view=archive')
+              }}
+              className="w-full py-3 rounded-2xl font-extrabold text-xs text-[var(--fg)] bg-[var(--field-bg)] border border-[var(--border)] hover:bg-[var(--panel)] transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Check className="h-4 w-4 text-[var(--earthy-green)]" />
+              {t('savings.markCompletedAndArchive', 'Tandai Selesai & Masukkan Arsip')}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── AI Prediction Bottom Sheet ── */}
       <BottomSheet

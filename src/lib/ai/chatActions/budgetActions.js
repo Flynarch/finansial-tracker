@@ -15,8 +15,10 @@ export async function handleBudgetAction(result, {
   const allTxs = await db.transactions.toArray()
   const fuzzyMatch = (str, query) => str?.toLowerCase().includes((query || '').toLowerCase())
   const budgetCycleStartDay = useSettingsStore.getState().budgetCycleStartDay || 1
-  const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
-  const period = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
+  const targetMonthKey = (result.month && /^\d{4}-\d{2}$/.test(String(result.month).trim()))
+    ? String(result.month).trim()
+    : getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
+  const period = getBudgetPeriodDateRange(targetMonthKey, budgetCycleStartDay, locale)
   const monthExpenseTxs = allTxs.filter((tx) => (tx.date || '') >= period.startDate && (tx.date || '') <= period.endDate)
   const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
 
@@ -44,7 +46,7 @@ export async function handleBudgetAction(result, {
     return bLower === budgetCatKey.toLowerCase() || fuzzyMatch(bCat, budgetCatKey) || fuzzyMatch(bCat, rawCategory)
   }
 
-  const matched = budgets.find((b) => b.month === currentMonthKey && isBudgetCategoryMatch(b.category))
+  const matched = budgets.find((b) => b.month === targetMonthKey && isBudgetCategoryMatch(b.category))
   const effectiveCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
     ? result.currency.trim().toUpperCase()
     : (matched?.currency || defaultCurrency)
@@ -95,7 +97,7 @@ export async function handleBudgetAction(result, {
       await db.budgets.add({
         category: budgetCatKey,
         limit: numLimit,
-        month: currentMonthKey,
+        month: targetMonthKey,
         currency: effectiveCurrency,
       })
       newMsgs.push({

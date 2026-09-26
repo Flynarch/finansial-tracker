@@ -56,11 +56,14 @@ export default function CustomDatePicker({
     }
   }, [tempDate])
 
-  // Fixed 6-week grid (42 days)
-  const monthStart = startOfMonth(viewDate)
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const endDate = addDays(startDate, 41)
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
+  // Fixed 6-week grid (42 days) - only compute when picker is open
+  const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate])
+  const calendarDays = useMemo(() => {
+    if (!isOpen) return []
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
+    const endDate = addDays(startDate, 41)
+    return eachDayOfInterval({ start: startDate, end: endDate })
+  }, [isOpen, monthStart])
 
   const setQuickDate = (daysToAdd) => {
     const target = addDays(new Date(), daysToAdd)

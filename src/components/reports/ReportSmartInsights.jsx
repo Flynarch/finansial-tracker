@@ -149,10 +149,10 @@ export default function ReportSmartInsights({
                 !hasHistory
                   ? 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
                   : isLower
-                    ? 'bg-emerald-500/12 text-emerald-500 border border-emerald-500/20'
+                    ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/20'
                     : isHigher
-                      ? 'bg-red-500/12 text-red-500 border border-red-500/20'
-                      : 'bg-amber-500/12 text-amber-500 border border-amber-500/20'
+                      ? 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border border-[var(--status-expense)]/20'
+                      : 'bg-[var(--status-warning-soft)] text-[var(--status-warning)] border border-[var(--status-warning)]/20'
               }`}
             >
               {!hasHistory ? (

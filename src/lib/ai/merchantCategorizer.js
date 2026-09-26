@@ -275,13 +275,6 @@ export async function classifyMerchantWithAi(merchantName = '', type = 'expense'
     return null
   }
 
-  let apiKey = options.apiKey
-  if (apiKey === undefined) {
-    const { keysToTry } = getApiKeysToTry()
-    apiKey = keysToTry && keysToTry[0]?.key
-  }
-  if (!apiKey) return null
-
   const prompt = `Anda adalah sistem kategorisasi transaksi keuangan cerdas di Indonesia.
 Tugas Anda: Klasifikasikan nama merchant/toko/pembayaran ini ke salah satu kategori resmi FinTrack.
 
@@ -336,52 +329,67 @@ OUTPUT HARUS PERSIS FORMAT JSON MURNI:
   "confidence": 0.95
 }`
 
-  const model = FAST_TRANSACTION_MODELS[0] || 'gemini-3.5-flash-lite'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+  if (options.apiKey !== undefined && (!options.apiKey || !options.apiKey.trim())) {
+    return null
+  }
+  const keys = options.apiKey !== undefined
+    ? [{ key: options.apiKey.trim(), isUserKey: true }]
+    : getApiKeysToTry().keysToTry
 
-  try {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 6000)
+  if (!keys || keys.length === 0) return null
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 150,
-          responseMimeType: 'application/json',
-        },
-      }),
-      signal: ctrl.signal,
-    })
+  for (const keyObj of keys) {
+    for (const model of FAST_TRANSACTION_MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-    clearTimeout(timer)
+      try {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 6000)
 
-    if (!response.ok) {
-      return null
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': keyObj.key.trim(),
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 150,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: ctrl.signal,
+        })
+
+        clearTimeout(timer)
+
+        if (!response.ok) {
+          if (response.status === 429 || response.status >= 500) {
+            continue
+          }
+          break
+        }
+
+        const data = await response.json()
+        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
+        if (!content) continue
+
+        const parsedJson = JSON.parse(content)
+        const rawCategory = parsedJson?.category
+        if (!rawCategory) continue
+
+        const sanitized = sanitizeCategoryPath(rawCategory, type)
+        if (sanitized && sanitized !== 'lainnya_kategori/umum' && sanitized !== 'lainnya/umum') {
+          rememberMerchantCategory(merchantName, sanitized, type)
+          return sanitized
+        }
+      } catch (err) {
+        console.warn('[merchantCategorizer:classifyMerchantWithAi]', err.message || err)
+        break
+      }
     }
-
-    const data = await response.json()
-    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!content) return null
-
-    const parsedJson = JSON.parse(content)
-    const rawCategory = parsedJson?.category
-    if (!rawCategory) return null
-
-    const sanitized = sanitizeCategoryPath(rawCategory, type)
-    if (sanitized && sanitized !== 'lainnya_kategori/umum' && sanitized !== 'lainnya/umum') {
-      rememberMerchantCategory(merchantName, sanitized, type)
-      return sanitized
-    }
-  } catch (err) {
-    // Graceful offline/timeout fallback without throwing
-    console.warn('[merchantCategorizer:classifyMerchantWithAi]', err.message || err)
   }
 
   return null

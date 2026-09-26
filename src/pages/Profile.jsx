@@ -155,23 +155,16 @@ function Profile() {
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
 
   const txCount = useLiveQuery(
-    async () => {
-      const all = await db.transactions.toArray()
-      return (all || []).filter((tx) => !tx.deletedAt).length
-    },
+    () => db.transactions.filter((tx) => !tx.deletedAt).count(),
     [],
     0,
   )
   const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
-  const goalsCount = useLiveQuery(async () => {
-    try {
-      const all = await db.goals.toArray()
-      return all.filter((g) => !g.isCompleted && !g.isArchived).length
-    } catch (err) {
-      console.warn('[Profile:goalsCount]', err)
-      return 0
-    }
-  }, [], 0)
+  const goalsCount = useLiveQuery(
+    () => db.goals.filter((g) => !g.isCompleted && !g.isArchived).count(),
+    [],
+    0
+  )
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
@@ -417,14 +410,16 @@ function Profile() {
       </Modal>
 
       {/* ── Change Photo Modal ── */}
-      <ChangePhotoModal
-        isOpen={photoModalOpen}
-        onClose={() => setPhotoModalOpen(false)}
-        currentPhoto={profilePhoto}
-      />
+      {photoModalOpen && (
+        <ChangePhotoModal
+          isOpen={photoModalOpen}
+          onClose={() => setPhotoModalOpen(false)}
+          currentPhoto={profilePhoto}
+        />
+      )}
 
       {/* ── Split Bill Modal ── */}
-      <SplitBillModal isOpen={splitBillOpen} onClose={() => setSplitBillOpen(false)} />
+      {splitBillOpen && <SplitBillModal isOpen={splitBillOpen} onClose={() => setSplitBillOpen(false)} />}
     </div>
   )
 }

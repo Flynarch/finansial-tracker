@@ -12,6 +12,7 @@ import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
+import useBackButton from '../hooks/useBackButton'
 import useSwipeAction from '../hooks/useSwipeAction'
 import {
   clampPercent,
@@ -82,6 +83,7 @@ function Savings() {
   const [deletingGoal, setDeletingGoal] = useState(null)
   const [liquidationWalletId, setLiquidationWalletId] = useState('')
   const [menuOpenId, setMenuOpenId] = useState(null)
+  useBackButton(() => setMenuOpenId(null), Boolean(menuOpenId))
   const { setSwipedId } = useSwipeAction()
 
   const promptDeleteGoal = useCallback(

@@ -15,7 +15,8 @@ export async function handleLoanAction(result, {
 }) {
   const newMsgs = []
 
-  if (result.action === 'create') {
+  try {
+    if (result.action === 'create') {
     let selectedWalletId = result.walletId ? Number(result.walletId) : null
     if (!selectedWalletId || !wallets.find((w) => w.id === selectedWalletId)) {
       const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
@@ -270,7 +271,18 @@ export async function handleLoanAction(result, {
       preserveContent: true,
       content: summaryText,
     })
-  }
+    }
 
-  return newMsgs
+    return newMsgs
+  } catch (err) {
+    console.error('[handleLoanAction]', err)
+    return [{
+      id: Date.now() + 4,
+      role: 'ai',
+      type: 'text',
+      isError: true,
+      content: err?.message || (locale === 'en' ? 'Failed to process loan action.' : 'Gagal memproses aksi pinjaman.'),
+    }]
+  }
 }
+

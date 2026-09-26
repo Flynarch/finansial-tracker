@@ -8,6 +8,7 @@ import { getLocalDateString } from '../lib/dateUtils'
 import useSettingsStore from '../store/useSettingsStore'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 import { AppError, transformDbError } from '../lib/errors'
+import { rememberTransactionEntity, updateEntityMemory, forgetTransactionEntity } from '../lib/ai/entityMemory'
 
 export { AppError, transformDbError }
 
@@ -135,6 +136,21 @@ export async function createTransaction(payload) {
   }
 
   scheduleNativeWidgetSync()
+
+  if (payload?.type !== 'transfer' && (payload?.notes || payload?.merchant)) {
+    try {
+      rememberTransactionEntity({
+        notes: payload.notes,
+        category: payload.category,
+        amount: cleanAmount,
+        walletId: cleanWalletId,
+        merchant: payload.merchant,
+      })
+    } catch (e) {
+      console.warn('[transactionService:rememberEntity]', e)
+    }
+  }
+
   return createdId
 }
 
@@ -191,18 +207,25 @@ export async function updateTransaction(id, fields) {
     const oldCurrency = existing.currency || defaultCurrency
     const newCurrency = fields.currency || existing.currency || defaultCurrency
 
-    // 1. Guard: Parent Split Bill Transaction Update
+    // 1. Guard: Parent Split Bill Transaction Update (talangan / fronted transaction only)
     if (existing.splitBillId) {
       const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
-      const activeParticipantLoans = linkedLoans.filter(
-        (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
-      )
-      const activeLoansSum = activeParticipantLoans.reduce(
-        (sum, l) => sum + (Number(l.remainingAmount) || 0),
-        0,
-      )
-      if (newAmt < activeLoansSum) {
-        throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari sisa pinjaman aktif partisipan.')
+      const isTalanganTx =
+        linkedLoans.some((l) => l.initialTransactionId === existing.id) ||
+        Boolean(existing.isExcludeAnalyticsTx) ||
+        existing.category === 'Pinjaman Diberikan'
+
+      if (isTalanganTx) {
+        const activeParticipantLoans = linkedLoans.filter(
+          (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
+        )
+        const activeLoansSum = activeParticipantLoans.reduce(
+          (sum, l) => sum + (Number(l.remainingAmount) || 0),
+          0,
+        )
+        if (newAmt < activeLoansSum) {
+          throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari sisa pinjaman aktif partisipan.')
+        }
       }
     }
 
@@ -347,6 +370,18 @@ export async function updateTransaction(id, fields) {
   }
 
   scheduleNativeWidgetSync()
+
+  if (existing) {
+    try {
+      const merged = { ...existing, ...fields }
+      if (merged.type !== 'transfer' && (merged.notes || merged.merchant)) {
+        updateEntityMemory(existing, merged)
+      }
+    } catch (e) {
+      console.warn('[transactionService:updateEntityMemory]', e)
+    }
+  }
+
   return 1
 }
 
@@ -368,14 +403,21 @@ export async function deleteTransaction(id) {
       const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
       const rates = getCachedCurrencyRates('USD')
 
-      // 1. Guard: Parent Split Bill Transaction Deletion
+      // 1. Guard: Parent Split Bill Transaction Deletion (talangan / fronted transaction only)
       if (existing.splitBillId) {
         const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
-        const activeParticipantLoans = linkedLoans.filter(
-          (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
-        )
-        if (activeParticipantLoans.length > 0) {
-          throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
+        const isTalanganTx =
+          linkedLoans.some((l) => l.initialTransactionId === existing.id) ||
+          Boolean(existing.isExcludeAnalyticsTx) ||
+          existing.category === 'Pinjaman Diberikan'
+
+        if (isTalanganTx) {
+          const activeParticipantLoans = linkedLoans.filter(
+            (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
+          )
+          if (activeParticipantLoans.length > 0) {
+            throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
+          }
         }
       }
 
@@ -474,6 +516,14 @@ export async function deleteTransaction(id) {
   }
 
   scheduleNativeWidgetSync()
+
+  if (existing && existing.type !== 'transfer' && (existing.notes || existing.merchant)) {
+    try {
+      forgetTransactionEntity(existing)
+    } catch (e) {
+      console.warn('[transactionService:forgetEntity]', e)
+    }
+  }
 }
 
 /**

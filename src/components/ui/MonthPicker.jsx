@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
-import useBackButton from '../../hooks/useBackButton'
 
 const ITEM_HEIGHT = 48
 const VISIBLE_ITEMS = 5
@@ -185,7 +184,6 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
 export default function MonthPicker({ value, onChange, className = '', compact = false, size = 'md' }) {
   const { locale, t } = useTranslation()
   const { isOpen, isVisible: visible, openSheet, closeSheet: closePicker } = useBottomSheet(false)
-  useBackButton(closePicker, Boolean(isOpen))
 
   const isCompact = compact || size === 'sm'
 
@@ -317,7 +315,7 @@ export default function MonthPicker({ value, onChange, className = '', compact =
 
           {/* Panel */}
           <div
-            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-300 ${
+            className={`relative w-full max-w-[360px] overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transition-all duration-200 ${
               visible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-12 sm:translate-y-4 opacity-0 scale-95'
             }`}
             style={{

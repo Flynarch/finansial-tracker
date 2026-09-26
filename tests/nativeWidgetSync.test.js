@@ -63,6 +63,11 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(payload.period).toBe('Bulan Ini')
     expect(payload.btnText).toBe('+ Catat')
     expect(payload.balanceLabel).toBe('Kekayaan Bersih')
+    expect(payload.dateText).toBeDefined()
+    expect(typeof payload.dateText).toBe('string')
+    expect(/Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu/i.test(payload.dateText)).toBe(true)
+    expect(payload.incomeValue).toContain('+Rp')
+    expect(payload.expenseValue).toContain('-Rp')
     expect(payload.sparklinePoints).toEqual([100000, 200000])
   })
 
@@ -86,6 +91,10 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(payload.period).toBe('This Month')
     expect(payload.btnText).toBe('+ Add')
     expect(payload.balanceLabel).toBe('Net Worth')
+    expect(payload.dateText).toBeDefined()
+    expect(/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i.test(payload.dateText)).toBe(true)
+    expect(payload.incomeValue).toContain('+$')
+    expect(payload.expenseValue).toContain('-$')
     expect(payload.sparklinePoints).toEqual([500])
   })
 
@@ -107,10 +116,11 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(emojiRegex.test(payload.period)).toBe(false)
     expect(emojiRegex.test(payload.btnText)).toBe(false)
     expect(emojiRegex.test(payload.balanceLabel)).toBe(false)
+    expect(emojiRegex.test(payload.dateText)).toBe(false)
   })
 
-  it('aggregates balances and split transactions correctly in syncNativeWidgetFromDb', async () => {
-    useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+  it('aggregates balances and split transactions correctly in syncNativeWidgetFromDb with 7-day adaptive default', async () => {
+    useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR', widgetRange: '7d' })
     const todayStr = new Date().toISOString().slice(0, 10)
 
     db.wallets.toArray.mockResolvedValue([
@@ -146,9 +156,38 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
     const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
 
+    expect(payload.period).toBe('7 Hari Terakhir')
     expect(payload.monthIncome).toContain('Masuk:')
     expect(payload.monthExpense).toContain('Keluar:')
     expect(payload.sparklinePoints).toBeDefined()
     expect(payload.sparklinePoints.length).toBe(7)
+  })
+
+  it('respects monthly widgetRange setting in syncNativeWidgetFromDb', async () => {
+    useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR', widgetRange: 'month' })
+    const todayStr = new Date().toISOString().slice(0, 10)
+
+    db.wallets.toArray.mockResolvedValue([
+      { id: 1, name: 'Main Wallet', balance: 2000000, currency: 'IDR', isArchived: 0 },
+    ])
+
+    db.transactions.toArray.mockResolvedValue([
+      {
+        id: 103,
+        date: todayStr,
+        walletId: 1,
+        type: 'income',
+        amount: 1000000,
+        currency: 'IDR',
+      },
+    ])
+
+    await syncNativeWidgetFromDb()
+
+    expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
+    const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+
+    expect(payload.period).toBe('Bulan Ini')
+    expect(payload.monthIncome).toContain('Masuk:')
   })
 })

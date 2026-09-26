@@ -57,16 +57,10 @@ function Modal({
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
         className={`flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu ${
-          isVisible ? 'ft-sheet-enter' : ''
+          isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
         } ${className}`}
         style={{
           boxShadow: 'var(--shadow-card)',
-          transform: isVisible
-            ? 'translate3d(0, 0, 0)'
-            : 'translate3d(0, 100%, 0)',
-          transition: isVisible
-            ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
-            : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
         }}
       >
         {/* ZONE 1: FIXED TOP HEADER */}

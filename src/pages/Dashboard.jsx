@@ -19,6 +19,7 @@ import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
 import EmailVerificationBanner from '../components/auth/EmailVerificationBanner'
 import syncNativeWidgetData from '../lib/nativeWidgetSync'
+import useSettingsStore from '../store/useSettingsStore'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -62,6 +63,7 @@ export default function Dashboard() {
     netWorth,
     monthIncome,
     monthExpense,
+    sevenDaysStats,
     groupedRecentEntries,
     budgetGoalSummary,
     loanSummary,
@@ -91,6 +93,7 @@ export default function Dashboard() {
     computeRevenueValue,
   } = dashboardData
 
+  const widgetRange = useSettingsStore((s) => s.widgetRange) || '7d'
   const motionDelay = reduceMotion ? 0 : 200
 
   useEffect(() => {
@@ -107,15 +110,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     const points = Array.isArray(miniRevenueSeries) ? miniRevenueSeries.map((p) => Number(p.value) || 0) : []
+    const isEn = locale === 'en'
+    const use7d = miniRevenueRange === '1w' || (widgetRange === '7d' && miniRevenueRange !== '1m')
+    const activeIncome = use7d ? (sevenDaysStats?.income ?? 0) : Number(monthIncome) || 0
+    const activeExpense = use7d ? (sevenDaysStats?.expense ?? 0) : Number(monthExpense) || 0
+    const activePeriod = use7d
+      ? (isEn ? 'Last 7 Days' : '7 Hari Terakhir')
+      : (currentMonthLabel || (isEn ? 'This Month' : 'Bulan Ini'))
+
     syncNativeWidgetData({
       totalBalance: Number(netWorth ?? totalWalletBalance) || 0,
-      monthIncome: Number(monthIncome) || 0,
-      monthExpense: Number(monthExpense) || 0,
+      monthIncome: activeIncome,
+      monthExpense: activeExpense,
       defaultCurrency: defaultCurrency || 'IDR',
-      period: currentMonthLabel || 'Bulan Ini',
+      period: activePeriod,
       sparklinePoints: points,
     })
-  }, [netWorth, totalWalletBalance, monthIncome, monthExpense, defaultCurrency, currentMonthLabel, miniRevenueSeries])
+  }, [netWorth, totalWalletBalance, monthIncome, monthExpense, sevenDaysStats, defaultCurrency, currentMonthLabel, miniRevenueSeries, miniRevenueRange, widgetRange, locale])
 
   const closeZoom = useCallback(() => {
     if (zoomedChart === 'revenue') {
@@ -299,36 +310,38 @@ export default function Dashboard() {
         />
 
         {/* Zoom Details Modal Overlay */}
-        <Suspense fallback={null}>
-          <DashboardZoomOverlay
-            zoomedChart={zoomedChart}
-            zoomVisible={zoomVisible}
-            onCloseZoom={closeZoom}
-            defaultCurrency={defaultCurrency}
-            locale={locale}
-            t={t}
-            reduceMotion={reduceMotion}
-            zoomRevenueRange={zoomRevenueRange}
-            setZoomRevenueRange={setZoomRevenueRange}
-            zoomRevenueValue={zoomRevenueValue}
-            netWorthGrowth={zoomNetWorthGrowth || netWorthGrowth}
-            comparePrevious={comparePrevious}
-            setComparePrevious={setComparePrevious}
-            comparisonSummary={comparisonSummary}
-            zoomCombinedChartSeries={zoomCombinedChartSeries}
-            zoomRevenueChartDomain={zoomRevenueChartDomain}
-            zoomRevenueAxisTicks={zoomRevenueAxisTicks}
-            formatAxisCurrency={formatAxisCurrency}
-            rangedSummaryStats={rangedSummaryStats}
-            zoomPeakAndFloor={zoomPeakAndFloor}
-            assetBreakdownData={assetBreakdownData}
-            zoomTooltipDismissed={zoomTooltipDismissed}
-            setZoomTooltipDismissed={setZoomTooltipDismissed}
-            globalWeeklyTrend={globalWeeklyTrend}
-            budgetGoalSummary={budgetGoalSummary}
-            currentMonthLabel={currentMonthLabel}
-          />
-        </Suspense>
+        {Boolean(zoomedChart) && (
+          <Suspense fallback={null}>
+            <DashboardZoomOverlay
+              zoomedChart={zoomedChart}
+              zoomVisible={zoomVisible}
+              onCloseZoom={closeZoom}
+              defaultCurrency={defaultCurrency}
+              locale={locale}
+              t={t}
+              reduceMotion={reduceMotion}
+              zoomRevenueRange={zoomRevenueRange}
+              setZoomRevenueRange={setZoomRevenueRange}
+              zoomRevenueValue={zoomRevenueValue}
+              netWorthGrowth={zoomNetWorthGrowth || netWorthGrowth}
+              comparePrevious={comparePrevious}
+              setComparePrevious={setComparePrevious}
+              comparisonSummary={comparisonSummary}
+              zoomCombinedChartSeries={zoomCombinedChartSeries}
+              zoomRevenueChartDomain={zoomRevenueChartDomain}
+              zoomRevenueAxisTicks={zoomRevenueAxisTicks}
+              formatAxisCurrency={formatAxisCurrency}
+              rangedSummaryStats={rangedSummaryStats}
+              zoomPeakAndFloor={zoomPeakAndFloor}
+              assetBreakdownData={assetBreakdownData}
+              zoomTooltipDismissed={zoomTooltipDismissed}
+              setZoomTooltipDismissed={setZoomTooltipDismissed}
+              globalWeeklyTrend={globalWeeklyTrend}
+              budgetGoalSummary={budgetGoalSummary}
+              currentMonthLabel={currentMonthLabel}
+            />
+          </Suspense>
+        )}
 
         {/* Action Modals */}
         <BudgetSheetModal

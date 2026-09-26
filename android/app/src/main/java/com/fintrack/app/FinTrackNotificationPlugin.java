@@ -213,6 +213,11 @@ public class FinTrackNotificationPlugin extends Plugin {
 
             String btnText = call.getString("btnText", "+ Catat");
             String balanceLabel = call.getString("balanceLabel", "Kekayaan Bersih");
+            String dateText = call.getString("dateText");
+            if (dateText == null || dateText.trim().isEmpty()) {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new java.util.Locale("id", "ID"));
+                dateText = sdf.format(new java.util.Date());
+            }
 
             SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
             prefs.edit()
@@ -227,6 +232,7 @@ public class FinTrackNotificationPlugin extends Plugin {
                 .putString("expense", expense)
                 .putString("fintrack_widget_period", period)
                 .putString("period", period)
+                .putString("fintrack_widget_date", dateText)
                 .putString("fintrack_widget_sparkline", sparklineData)
                 .putString("sparklineData", sparklineData)
                 .putString("fintrack_widget_btn_text", btnText)
@@ -239,7 +245,7 @@ public class FinTrackNotificationPlugin extends Plugin {
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
             if (appWidgetIds != null && appWidgetIds.length > 0) {
                 for (int appWidgetId : appWidgetIds) {
-                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, btnText, balanceLabel);
+                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, btnText, balanceLabel, dateText);
                 }
             }
 

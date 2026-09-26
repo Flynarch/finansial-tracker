@@ -692,12 +692,14 @@ export default function TransactionEditSheet({
       />
 
       {/* AI Receipt Scanner Modal */}
-      <ReceiptScannerModal
-        isOpen={isReceiptScannerOpen}
-        onClose={() => setIsReceiptScannerOpen(false)}
-        onApplyReceipt={handleApplyAiReceipt}
-        enableBackButton={false}
-      />
+      {isReceiptScannerOpen && (
+        <ReceiptScannerModal
+          isOpen={isReceiptScannerOpen}
+          onClose={() => setIsReceiptScannerOpen(false)}
+          onApplyReceipt={handleApplyAiReceipt}
+          enableBackButton={false}
+        />
+      )}
     </BottomSheet>
   )
 }

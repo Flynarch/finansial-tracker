@@ -465,6 +465,21 @@ export function useDashboardData() {
 
   const { data1w, data1m, data3m, dataYtd, data1y, dataAll } = chartData
 
+  const sevenDaysStats = useMemo(() => {
+    if (!Array.isArray(data1w)) return { income: 0, expense: 0, net: 0 }
+    let income = 0
+    let expense = 0
+    for (const d of data1w) {
+      income += Number(d.income) || 0
+      expense += Number(d.expense) || 0
+    }
+    return {
+      income,
+      expense,
+      net: income - expense,
+    }
+  }, [data1w])
+
   const loanSummary = useMemo(() => {
     const safeLoans = loans ?? []
     const activeLoans = safeLoans
@@ -1182,6 +1197,7 @@ export function useDashboardData() {
     totalWalletBalance,
     monthIncome,
     monthExpense,
+    sevenDaysStats,
     monthDelta,
     monthDeltaTone,
     monthDeltaPct,

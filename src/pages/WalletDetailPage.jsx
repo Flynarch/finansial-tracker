@@ -48,6 +48,7 @@ import { exportTransactionsToCsv } from '../lib/exportReports'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useTranslation from '../hooks/useTranslation'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../lib/categoryIcon'
+import { getLastSeenTxTimestamp, updateLastSeenTxTimestamp, isTransactionNew } from '../lib/transactionLastSeen'
 
 export default function WalletDetailPage() {
   const { id } = useParams()
@@ -74,6 +75,27 @@ export default function WalletDetailPage() {
   const allWallets = useMemo(() => {
     return dbWallets || []
   }, [dbWallets])
+
+  const sessionLastSeenTimestamp = useMemo(() => getLastSeenTxTimestamp(), [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateLastSeenTxTimestamp()
+    }, 3500)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        updateLastSeenTxTimestamp()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      updateLastSeenTxTimestamp()
+    }
+  }, [])
 
   const allTransactions = useLiveQuery(async () => {
     if (!walletId || isNaN(walletId)) return []
@@ -733,6 +755,7 @@ export default function WalletDetailPage() {
                           getSwipeHandlers={getSwipeHandlers}
                           contextWalletId={walletId}
                           wallets={allWallets}
+                          isNew={isTransactionNew(tx, sessionLastSeenTimestamp)}
                         />
                       ))}
                     </div>

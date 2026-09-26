@@ -730,27 +730,6 @@ export default function SettingsRecurring() {
           </div>
         </form>
       </Modal>
-
-      {/* Category Picker for Edit Form */}
-      <CategoryPickerModal
-        isOpen={isEditCategoryPickerOpen}
-        onClose={() => setIsEditCategoryPickerOpen(false)}
-        txType={editForm.type || 'expense'}
-        selectedCategory={editForm.category}
-        onSelectCategory={(cat) => setEditForm((prev) => ({ ...prev, category: cat }))}
-      />
-
-      {/* Wallet Picker for Edit Form */}
-      <WalletSelectModal
-        isOpen={isEditWalletPickerOpen}
-        onClose={() => setIsEditWalletPickerOpen(false)}
-        wallets={wallets || []}
-        selectedWalletId={editForm.walletId}
-        onSelectWallet={(wId) => {
-          setEditForm((prev) => ({ ...prev, walletId: wId }))
-          setIsEditWalletPickerOpen(false)
-        }}
-      />
     </>
   )
 }

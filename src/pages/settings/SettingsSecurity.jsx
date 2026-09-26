@@ -464,19 +464,23 @@ export default function SettingsSecurity() {
       </SettingsSection>
 
       {/* Modals */}
-      <PinPadModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSave={handleSavePin}
-        currentSecret={securityMethod === 'pin' ? lockSecret : ''}
-      />
+      {isPinModalOpen && (
+        <PinPadModal
+          isOpen={isPinModalOpen}
+          onClose={() => setIsPinModalOpen(false)}
+          onSave={handleSavePin}
+          currentSecret={securityMethod === 'pin' ? lockSecret : ''}
+        />
+      )}
 
-      <PatternLockModal
-        isOpen={isPatternModalOpen}
-        onClose={() => setIsPatternModalOpen(false)}
-        onSave={handleSavePattern}
-        currentSecret={securityMethod === 'pattern' ? lockSecret : ''}
-      />
+      {isPatternModalOpen && (
+        <PatternLockModal
+          isOpen={isPatternModalOpen}
+          onClose={() => setIsPatternModalOpen(false)}
+          onSave={handleSavePattern}
+          currentSecret={securityMethod === 'pattern' ? lockSecret : ''}
+        />
+      )}
 
       {isSetupModalOpen && (
         <MnemonicSetupModal

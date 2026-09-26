@@ -810,11 +810,13 @@ export default function SettingsHome() {
       </Modal>
 
       {/* Modal Connect Account / Switch Account (Google / Email / Register) */}
-      <AuthModal
-        isOpen={isConnectModalOpen}
-        onClose={() => setIsConnectModalOpen(false)}
-        onSuccess={() => setIsConnectModalOpen(false)}
-      />
+      {isConnectModalOpen && (
+        <AuthModal
+          isOpen={isConnectModalOpen}
+          onClose={() => setIsConnectModalOpen(false)}
+          onSuccess={() => setIsConnectModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

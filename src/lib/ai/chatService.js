@@ -9,9 +9,11 @@ import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES 
 import { getCachedCurrencyRates } from '../api'
 import useSettingsStore from '../../store/useSettingsStore'
 import { extractMerchantAndCategory } from './indonesianFinanceNlp'
-import { getTools } from './toolSchemas'
+import { extractTimeSlot, extractCleanSubjectEntity, extractVenueSlot } from './semanticSlotFiller'
+import { rememberTransactionEntity } from './entityMemory'
+import { getPrunedTools } from './toolSchemas'
 import { buildSystemPrompt } from './promptBuilder'
-import { wrapUserTurn } from './sanitizer'
+import { wrapUserTurn, sanitizeGeminiContents } from './sanitizer'
 import { parseShortTransactionFast } from './fastNlp'
 import { calculateDirectFinancialHealth } from './financialHealth'
 import { callApiStreamWithFallback } from './client'
@@ -239,6 +241,11 @@ export async function parseTransactionFromText(userMessage, context = {}) {
   let lastRole = null
 
   previousMessages.slice(-6).forEach((msg) => {
+    // Avoid leading model turns in conversation history
+    if (contents.length === 0 && (msg.role === 'ai' || msg.type === 'welcome')) {
+      return
+    }
+
     const role = msg.role === 'ai' ? 'model' : 'user'
     let text = msg.content
 
@@ -358,11 +365,17 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
     contents.push({ role: 'user', parts: userParts })
   }
 
+  const isReceipt = Boolean(imageData)
+  const isQuickLog = Boolean(context.isQuickLog || context.preferFastNlp)
+  const toolMode = isReceipt ? 'receipt' : (isQuickLog ? 'quick_log' : 'full')
+
   const callApi = (reqContents) => callApiStreamWithFallback(reqContents, {
     sysPrompt,
-    tools: getTools(),
+    tools: getPrunedTools(toolMode),
     onStream,
   })
+
+  contents = sanitizeGeminiContents(contents)
 
   try {
     let response = await callApi(contents)
@@ -383,6 +396,11 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           }
         } else if (userExtraction.merchant) {
           extractedMerchant = userExtraction.merchant
+        } else {
+          const venueSlot = extractVenueSlot(userMessage)
+          if (venueSlot?.merchant) {
+            extractedMerchant = venueSlot.merchant
+          }
         }
         const overallCurrency = fnCall.args.currency
 
@@ -419,9 +437,15 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
             }
           }
 
-          let cleanNotes = t.notes || itemMerchant || ''
-          if (cleanNotes && (cleanNotes.length > 30 || /\b(kemarin|hari|habisin|masing)\b/i.test(cleanNotes))) {
-            cleanNotes = itemMerchant || cleanNotes
+          let candidateNotes = t.notes || itemMerchant || ''
+          let cleanNotes = candidateNotes
+          if (candidateNotes) {
+            const refined = extractCleanSubjectEntity(candidateNotes, { txType: t.type, merchant: itemMerchant })
+            if (refined && refined.trim()) {
+              cleanNotes = refined
+            } else if (candidateNotes.length > 30 || /\b(kemarin|hari|habisin|masing)\b/i.test(candidateNotes)) {
+              cleanNotes = itemMerchant || candidateNotes
+            }
           }
 
           let cleanCat = sanitizeCategoryPath(t.category, t.type)
@@ -430,12 +454,27 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
             cleanCat = 'transportasi/ojol'
           }
 
+          let txTime = t.time
+          if (!txTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(txTime)) {
+            const timeSlot = extractTimeSlot(userMessage) || (t.notes ? extractTimeSlot(t.notes) : null)
+            txTime = timeSlot?.timeStr || currentTime || format(new Date(), 'HH:mm')
+          }
+
+          rememberTransactionEntity({
+            notes: cleanNotes,
+            category: cleanCat,
+            amount: t.amount,
+            walletId: resolvedWalletId,
+            merchant: itemMerchant,
+          })
+
           return {
             ...t,
             category: cleanCat,
             currency: txCurrency,
             merchant: itemMerchant,
             notes: cleanNotes,
+            time: txTime,
             walletId: resolvedWalletId,
             items: Array.isArray(t.items) && t.items.length > 0 ? t.items : undefined,
             subtotal: typeof t.subtotal === 'number' ? t.subtotal : undefined,
@@ -566,7 +605,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
 
         contents.push({ role: 'model', parts: [{ functionCall: fnCall }] })
         contents.push({
-          role: 'function',
+          role: 'user',
           parts: [{ functionResponse: { name: fnCall.name, response: { content: dbResult } } }],
         })
 

@@ -29,7 +29,14 @@ export default function SavingsFundSheetModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const inputRef = useRef(null)
 
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const wallets = useLiveQuery(
+    () => {
+      if (!isOpen) return []
+      return db.wallets.toArray()
+    },
+    [isOpen],
+    [],
+  )
   const selectedWallet = useMemo(() => (wallets || []).find((w) => String(w.id) === String(selectedWalletId)), [wallets, selectedWalletId])
 
   const [prevOpen, setPrevOpen] = useState(isOpen)

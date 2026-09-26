@@ -159,8 +159,6 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
     else updateIncomeCategoryName(activeParent.id, null, renameParentVal.trim(), renameParentVal.trim())
   }
 
-  if (!isOpen) return null
-
   return (
     <Modal
       isOpen={isOpen}

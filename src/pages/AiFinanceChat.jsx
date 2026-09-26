@@ -8,7 +8,7 @@ import useBackButton from '../hooks/useBackButton'
 import { getCachedCurrencyRates } from '../lib/api'
 import { getLocalDateString } from '../lib/dateUtils'
 import { triggerHaptic } from '../lib/haptics'
-import { FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
+import { FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency, formatCurrency } from '../lib/utils'
 
 // UI & Subcomponents
 import ChatHeaderToolbar from '../components/chat/ChatHeaderToolbar'
@@ -19,6 +19,8 @@ import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import ReceiptScanModePicker from '../components/chat/ReceiptScanModePicker'
 import MediaSourcePickerModal from '../components/chat/MediaSourcePickerModal'
 import MessageContextMenu from '../components/chat/MessageContextMenu'
+import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
+import { copyToClipboard } from '../lib/clipboard'
 
 // Hooks
 import {
@@ -83,6 +85,7 @@ export default function AiFinanceChat() {
   const [showTexturePicker, setShowTexturePicker] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [contextMenuMsg, setContextMenuMsg] = useState(null)
+  const [editingTransaction, setEditingTransaction] = useState(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   const textureDropdownRef = useRef(null)
@@ -215,8 +218,12 @@ export default function AiFinanceChat() {
     locale,
   })
 
-  // Android Hardware Back Button - Strict 6-Tier Dismissal Queue
+  // Android Hardware Back Button - Strict 7-Tier Dismissal Queue
   useBackButton(() => {
+    if (editingTransaction) {
+      setEditingTransaction(null)
+      return
+    }
     if (contextMenuMsg) {
       setContextMenuMsg(null)
       return
@@ -250,6 +257,13 @@ export default function AiFinanceChat() {
       triggerHaptic('medium')
       setContextMenuMsg(msg)
     }, 450)
+  }, [])
+
+  const handleMsgTouchMove = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
   }, [])
 
   const handleMsgTouchEnd = useCallback(() => {
@@ -364,6 +378,7 @@ export default function AiFinanceChat() {
         onScroll={handleScroll}
         onSend={handleSend}
         onMsgTouchStart={handleMsgTouchStart}
+        onMsgTouchMove={handleMsgTouchMove}
         onMsgTouchEnd={handleMsgTouchEnd}
         onMsgContextMenu={handleMsgContextMenu}
         onConfirmDelete={handleConfirmDelete}
@@ -397,9 +412,15 @@ export default function AiFinanceChat() {
         onClose={() => setContextMenuMsg(null)}
         messageContent={contextMenuMsg?.content || ''}
         messageType={contextMenuMsg?.role === 'user' ? 'user' : contextMenuMsg?.type === 'success' ? 'transaction' : 'ai'}
-        onCopyText={(text) => {
-          if (navigator?.clipboard?.writeText) {
-            navigator.clipboard.writeText(text)
+        messageData={contextMenuMsg?.data}
+        onCopyText={async (text) => {
+          let textToCopy = text || contextMenuMsg?.content || ''
+          if (!textToCopy && contextMenuMsg?.type === 'success' && contextMenuMsg?.data) {
+            const tx = Array.isArray(contextMenuMsg.data) ? contextMenuMsg.data[0] : contextMenuMsg.data
+            textToCopy = `${tx.notes || tx.category || 'Transaksi'}: ${formatCurrency(tx.amount, tx.currency || defaultCurrency)}`
+          }
+          const success = await copyToClipboard(textToCopy)
+          if (success) {
             window.dispatchEvent(
               new CustomEvent('ft-show-toast', {
                 detail: {
@@ -411,9 +432,14 @@ export default function AiFinanceChat() {
             )
           }
         }}
-        onCopyAmount={(amt) => {
-          if (navigator?.clipboard?.writeText) {
-            navigator.clipboard.writeText(amt)
+        onCopyAmount={async (amt) => {
+          let amtToCopy = amt
+          if (!amtToCopy && contextMenuMsg?.data) {
+            const tx = Array.isArray(contextMenuMsg.data) ? contextMenuMsg.data[0] : contextMenuMsg.data
+            if (tx?.amount != null) amtToCopy = String(tx.amount)
+          }
+          const success = await copyToClipboard(amtToCopy)
+          if (success) {
             window.dispatchEvent(
               new CustomEvent('ft-show-toast', {
                 detail: {
@@ -425,12 +451,27 @@ export default function AiFinanceChat() {
             )
           }
         }}
+        onEditTransaction={(data) => {
+          const tx = Array.isArray(data) ? data[0] : (data || contextMenuMsg?.data)
+          if (tx) {
+            setEditingTransaction(tx)
+          }
+        }}
         onDeleteMessage={() => {
           if (contextMenuMsg) {
             setMessages((prev) => prev.filter((m) => m.id !== contextMenuMsg.id))
           }
         }}
       />
+
+      {Boolean(editingTransaction) && (
+        <TransactionEditSheet
+          isOpen={Boolean(editingTransaction)}
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onSaved={() => setEditingTransaction(null)}
+        />
+      )}
     </div>
   )
 }

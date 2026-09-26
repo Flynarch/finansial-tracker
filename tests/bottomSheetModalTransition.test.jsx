@@ -5,6 +5,8 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import Modal from '../src/components/ui/Modal'
 import BottomSheet from '../src/components/ui/BottomSheet'
 import useBottomSheet from '../src/hooks/useBottomSheet'
+import ReceiptPreviewModal from '../src/components/transactions/ReceiptPreviewModal'
+import HabitStatsModal from '../src/components/habits/HabitStatsModal'
 
 afterEach(() => {
   cleanup()
@@ -230,6 +232,146 @@ describe('Motion, Transition & Lifecycle Synchronization Tests', () => {
 
       expect(dialog.style.transform).toBe('translate3d(0, 100%, 0)')
       expect(dialog.style.transition).toContain('transform 200ms')
+    })
+  })
+
+  describe('ReceiptPreviewModal & HabitStatsModal Visual Retention on Exit Tests', () => {
+    function ReceiptWrapper({ initialImage, initialNotes }) {
+      const [isOpen, setIsOpen] = useState(true)
+      const [imageSrc, setImageSrc] = useState(initialImage)
+      const [notes, setNotes] = useState(initialNotes)
+
+      const handleClose = () => {
+        setIsOpen(false)
+        setImageSrc(null)
+      }
+
+      return (
+        <div>
+          <button type="button" onClick={() => setImageSrc(null)} data-testid="nullify-image-btn">
+            Nullify Image
+          </button>
+          <button type="button" onClick={() => setNotes('Updated notes text')} data-testid="update-notes-btn">
+            Update Notes
+          </button>
+          <ReceiptPreviewModal
+            isOpen={isOpen}
+            onClose={handleClose}
+            imageSrc={imageSrc}
+            notes={notes}
+            title="Bukti Struk Resto"
+            amountFormatted="Rp 75.000"
+            date="2026-03-31"
+          />
+        </div>
+      )
+    }
+
+    it('retains receipt image and metadata via lastImageRef when imageSrc becomes null', () => {
+      render(<ReceiptWrapper initialImage="https://example.com/receipt.jpg" initialNotes="Lunch with team" />)
+
+      expect(screen.getByText('Bukti Struk Resto')).toBeDefined()
+      expect(screen.getByText(/Lunch with team/)).toBeDefined()
+      expect(screen.getByText('Rp 75.000')).toBeDefined()
+
+      // Parent nullifies imageSrc
+      fireEvent.click(screen.getByTestId('nullify-image-btn'))
+
+      // Component must STILL render the image and metadata via lastImageRef instead of returning null
+      expect(screen.getByText('Bukti Struk Resto')).toBeDefined()
+      expect(screen.getByText(/Lunch with team/)).toBeDefined()
+      expect(screen.getByText('Rp 75.000')).toBeDefined()
+
+      // Now click the modal's close button to initiate exit animation
+      const closeBtn = screen.getByRole('button', { name: /close|tutup/i })
+      fireEvent.click(closeBtn)
+
+      // Mid-flight (100ms): Still rendered
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
+      expect(screen.getByText('Bukti Struk Resto')).toBeDefined()
+
+      // After 200ms: Modal unmounts
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
+      expect(screen.queryByText('Bukti Struk Resto')).toBeNull()
+    })
+
+    it('keeps metadata fresh in lastMetaRef even when imageSrc does not change', () => {
+      render(<ReceiptWrapper initialImage="https://example.com/receipt.jpg" initialNotes="Original notes" />)
+      expect(screen.getByText(/Original notes/)).toBeDefined()
+
+      // Update notes without changing imageSrc
+      fireEvent.click(screen.getByTestId('update-notes-btn'))
+      expect(screen.getByText(/Updated notes text/)).toBeDefined()
+
+      // Nullify imageSrc
+      fireEvent.click(screen.getByTestId('nullify-image-btn'))
+
+      // Metadata must reflect updated notes, not stale initial notes
+      expect(screen.getByText(/Updated notes text/)).toBeDefined()
+      expect(screen.queryByText(/Original notes/)).toBeNull()
+    })
+
+    function HabitWrapper({ initialHabit }) {
+      const [isOpen, setIsOpen] = useState(true)
+      const [habit, setHabit] = useState(initialHabit)
+
+      const handleClose = () => {
+        setIsOpen(false)
+        setHabit(null)
+      }
+
+      return (
+        <div>
+          <button type="button" onClick={() => setHabit(null)} data-testid="nullify-habit-btn">
+            Nullify Habit
+          </button>
+          <HabitStatsModal
+            isOpen={isOpen}
+            onClose={handleClose}
+            habit={habit}
+            allHabitLogs={[]}
+          />
+        </div>
+      )
+    }
+
+    it('retains habit details via lastHabitRef when habit prop becomes null', () => {
+      const sampleHabit = {
+        id: 99,
+        title: 'Minum Air 2L',
+        color: '#3b82f6',
+        createdAt: '2026-01-01',
+        targetDaysPerWeek: 7,
+      }
+      render(<HabitWrapper initialHabit={sampleHabit} />)
+
+      expect(screen.getByText('Minum Air 2L')).toBeDefined()
+
+      // Parent nullifies habit prop
+      fireEvent.click(screen.getByTestId('nullify-habit-btn'))
+
+      // Component must STILL render the habit details via lastHabitRef instead of returning null
+      expect(screen.getByText('Minum Air 2L')).toBeDefined()
+
+      // Now close modal via close button
+      const closeBtn = screen.getByRole('button', { name: /close|tutup/i })
+      fireEvent.click(closeBtn)
+
+      // Mid-flight (100ms): Still rendered
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
+      expect(screen.getByText('Minum Air 2L')).toBeDefined()
+
+      // After 200ms: Modal unmounts
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
+      expect(screen.queryByText('Minum Air 2L')).toBeNull()
     })
   })
 })

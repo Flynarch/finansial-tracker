@@ -30,11 +30,15 @@ export function useChatScroll({
     setUnreadCount(0)
   }, [])
 
+  const prevMsgLengthRef = useRef(messages.length)
+
   useEffect(() => {
     const el = chatScrollContainerRef.current
     if (!el) return
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     const isNear = distanceToBottom < 150
+    const hasNewMessage = messages.length > prevMsgLengthRef.current
+    prevMsgLengthRef.current = messages.length
 
     if (isLoading) {
       if (isNear) {
@@ -45,7 +49,7 @@ export function useChatScroll({
         if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
           messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
-      } else {
+      } else if (hasNewMessage) {
         setUnreadCount((c) => c + 1)
       }
     }

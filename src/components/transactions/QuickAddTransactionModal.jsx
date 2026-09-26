@@ -38,6 +38,7 @@ import {
 } from '../../lib/api'
 import { db } from '../../lib/db'
 import { getAllWalletBalances } from '../../lib/balanceEngine'
+import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
   formatMoneyInput,
@@ -102,24 +103,43 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     fundingSource: 'balance',
   }))
 
-  const ownedInvestments = useLiveQuery(() => db.investments.toArray(), [], [])
+  const ownedInvestments = useLiveQuery(
+    () => (isOpen && txType === 'investment' ? db.investments.toArray() : []),
+    [isOpen, txType],
+    []
+  )
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   useEffect(() => {
-    fetchCurrencyRates('USD')
-      .then((r) => r && setRates(r))
-      .catch((err) => console.warn('[QuickAddTransactionModal]', err))
-  }, [])
+    if (!isOpen) return
+    const timer = setTimeout(() => {
+      fetchCurrencyRates('USD')
+        .then((r) => r && setRates(r))
+        .catch((err) => console.warn('[QuickAddTransactionModal]', err))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [isOpen])
 
-  const wallets = useLiveQuery(
+  const initialCachedWallets = useMemo(() => getCachedDashboardWallets() || [], [])
+
+  const queriedWallets = useLiveQuery(
     async () => {
+      if (!isOpen) return []
       const raw = await db.wallets.toArray()
       if (!raw || raw.length === 0) return []
       return await getAllWalletBalances(raw, rates)
     },
-    [rates],
-    []
+    [isOpen, rates],
+    initialCachedWallets
   )
+
+  const [cachedWallets, setCachedWallets] = useState(initialCachedWallets)
+  const [prevQueriedWallets, setPrevQueriedWallets] = useState(queriedWallets)
+  if (queriedWallets && queriedWallets.length > 0 && queriedWallets !== prevQueriedWallets) {
+    setPrevQueriedWallets(queriedWallets)
+    setCachedWallets(queriedWallets)
+  }
+  const wallets = (queriedWallets && queriedWallets.length > 0) ? queriedWallets : cachedWallets
 
   const [walletModalMode, setWalletModalMode] = useState(null)
   const [tags, setTags] = useState([])
@@ -302,22 +322,28 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   }, [])
 
   const [prevOpen, setPrevOpen] = useState(isOpen)
-  if (prevOpen !== isOpen) {
+  const [prevNonce, setPrevNonce] = useState(nonce)
+  if (prevOpen !== isOpen || prevNonce !== nonce) {
     setPrevOpen(isOpen)
+    setPrevNonce(nonce)
     if (isOpen) {
       setTxType('expense')
       setCategoryError(false)
       setWalletError(false)
       setAmountError(false)
       setSubmitError('')
+      const availableWallets = wallets?.length > 0 ? wallets : initialCachedWallets
+      const activeWalletId = initialWalletId || defaultWalletId || (availableWallets?.length > 0 ? availableWallets[0].id : '')
+      const activeWallet = availableWallets?.find((w) => String(w.id) === String(activeWalletId))
+      const activeCurrency = activeWallet?.currency || defaultCurrency
       setForm((prev) => ({
         ...prev,
         date: format(new Date(), 'yyyy-MM-dd'),
         amount: '',
         category: '',
         notes: '',
-        currency: defaultCurrency,
-        walletId: initialWalletId || (wallets?.length > 0 ? wallets[0].id : ''),
+        currency: activeCurrency,
+        walletId: activeWalletId,
         targetWalletId: '',
         receiptImage: '',
       }))
@@ -733,7 +759,6 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   return (
     <Modal
-      key={nonce}
       isOpen={isOpen}
       title={t('addTx.title')}
       onClose={onClose}
@@ -1023,20 +1048,22 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       />
 
       {/* Wallet Select Modal */}
-      <WalletSelectModal
-        isOpen={Boolean(walletModalMode)}
-        onClose={() => setWalletModalMode(null)}
-        wallets={wallets}
-        selectedWalletId={walletModalMode === 'targetWalletId' ? form.targetWalletId : form.walletId}
-        onSelectWallet={handleSelectWallet}
-        title={
-          walletModalMode === 'targetWalletId'
-            ? t('tx.transferTo', 'Pilih Dompet Tujuan')
-            : txType === 'transfer'
-            ? t('tx.transferFrom', 'Pilih Dompet Asal')
-            : t('loans.selectWallet', 'Pilih Dompet / Akun')
-        }
-      />
+      {Boolean(walletModalMode) && (
+        <WalletSelectModal
+          isOpen={Boolean(walletModalMode)}
+          onClose={() => setWalletModalMode(null)}
+          wallets={wallets}
+          selectedWalletId={walletModalMode === 'targetWalletId' ? form.targetWalletId : form.walletId}
+          onSelectWallet={handleSelectWallet}
+          title={
+            walletModalMode === 'targetWalletId'
+              ? t('tx.transferTo', 'Pilih Dompet Tujuan')
+              : txType === 'transfer'
+              ? t('tx.transferFrom', 'Pilih Dompet Asal')
+              : t('loans.selectWallet', 'Pilih Dompet / Akun')
+          }
+        />
+      )}
 
       {/* Receipt Fullscreen Preview Modal */}
       <ReceiptPreviewModal
@@ -1048,12 +1075,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       />
 
       {/* AI Receipt Scanner Modal */}
-      <ReceiptScannerModal
-        isOpen={isReceiptScannerOpen}
-        onClose={() => setIsReceiptScannerOpen(false)}
-        onApplyReceipt={handleApplyAiReceipt}
-        enableBackButton={false}
-      />
+      {isReceiptScannerOpen && (
+        <ReceiptScannerModal
+          isOpen={isReceiptScannerOpen}
+          onClose={() => setIsReceiptScannerOpen(false)}
+          onApplyReceipt={handleApplyAiReceipt}
+          enableBackButton={false}
+        />
+      )}
     </Modal>
   )
 }

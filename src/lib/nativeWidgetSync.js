@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { format, subDays } from 'date-fns'
+import { id as idLocale, enUS } from 'date-fns/locale'
 import { formatCurrency, isExcludeAnalyticsTx, convertCurrency, FALLBACK_EXCHANGE_RATES } from './utils'
 import { getCachedCurrencyRates } from './api'
 import { FinTrackNotificationPlugin } from './notificationIngestion'
@@ -17,6 +18,7 @@ let syncDebounceTimer = null
  * @param {number|string} [params.monthExpense]
  * @param {string} [params.defaultCurrency]
  * @param {string} [params.period]
+ * @param {string} [params.dateText]
  * @param {number[]} [params.sparklinePoints]
  */
 export async function syncNativeWidgetData({
@@ -25,6 +27,7 @@ export async function syncNativeWidgetData({
   monthExpense = 0,
   defaultCurrency = 'IDR',
   period = 'Bulan Ini',
+  dateText: customDateText = null,
   sparklinePoints = [],
 } = {}) {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
@@ -34,6 +37,7 @@ export async function syncNativeWidgetData({
   try {
     const locale = useSettingsStore?.getState?.()?.locale || 'id'
     const isEn = locale === 'en'
+    const dateLocale = isEn ? enUS : idLocale
 
     const cleanBalNum = typeof totalBalance === 'number' ? totalBalance : Number(totalBalance) || 0
     const cleanIncNum = typeof monthIncome === 'number' ? monthIncome : Number(monthIncome) || 0
@@ -42,9 +46,12 @@ export async function syncNativeWidgetData({
     const formattedBalance = formatCurrency(cleanBalNum, defaultCurrency, locale)
     const incomePrefix = isEn ? 'In: ' : 'Masuk: '
     const expensePrefix = isEn ? 'Out: ' : 'Keluar: '
-    const formattedIncome = `${incomePrefix}${formatCurrency(cleanIncNum, defaultCurrency, locale)}`
-    const formattedExpense = `${expensePrefix}${formatCurrency(cleanExpNum, defaultCurrency, locale)}`
-    const effectivePeriod = period || (isEn ? 'This Month' : 'Bulan Ini')
+    const incomeValue = cleanIncNum > 0 ? `+${formatCurrency(cleanIncNum, defaultCurrency, locale)}` : formatCurrency(cleanIncNum, defaultCurrency, locale)
+    const expenseValue = cleanExpNum > 0 ? `-${formatCurrency(cleanExpNum, defaultCurrency, locale)}` : formatCurrency(cleanExpNum, defaultCurrency, locale)
+    const formattedIncome = `${incomePrefix}${incomeValue}`
+    const formattedExpense = `${expensePrefix}${expenseValue}`
+    const effectivePeriod = period || (isEn ? 'Last 7 Days' : '7 Hari Terakhir')
+    const dateText = customDateText || format(new Date(), 'EEEE, d MMM', { locale: dateLocale })
     const btnText = isEn ? '+ Add' : '+ Catat'
     const balanceLabel = isEn ? 'Net Worth' : 'Kekayaan Bersih'
     const safePoints = Array.isArray(sparklinePoints) ? sparklinePoints.map((p) => Number(p) || 0) : []
@@ -56,6 +63,9 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_balance', formattedBalance)
         localStorage.setItem('fintrack_widget_income', formattedIncome)
         localStorage.setItem('fintrack_widget_expense', formattedExpense)
+        localStorage.setItem('fintrack_widget_income_val', incomeValue)
+        localStorage.setItem('fintrack_widget_expense_val', expenseValue)
+        localStorage.setItem('fintrack_widget_date', dateText)
         localStorage.setItem('fintrack_widget_period', effectivePeriod)
         localStorage.setItem('fintrack_widget_sparkline', sparklineJson)
         localStorage.setItem('fintrack_widget_btn_text', btnText)
@@ -74,8 +84,11 @@ export async function syncNativeWidgetData({
       wallet_balance: formattedBalance,
       income: formattedIncome,
       monthIncome: formattedIncome,
+      incomeValue,
       expense: formattedExpense,
       monthExpense: formattedExpense,
+      expenseValue,
+      dateText,
       period: effectivePeriod,
       sparklineData: sparklineJson,
       sparklinePoints: safePoints,
@@ -150,9 +163,11 @@ export async function syncNativeWidgetFromDb() {
       }
     }
 
-    // Generate 7-day sparkline trend data
+    // Generate 7-day sparkline trend data & 7-day cash flow metrics
     const now = new Date()
     const sparklinePoints = []
+    let sevenDaysIncome = 0
+    let sevenDaysExpense = 0
     for (let i = 6; i >= 0; i--) {
       const d = subDays(now, i)
       const dStr = format(d, 'yyyy-MM-dd')
@@ -177,25 +192,43 @@ export async function syncNativeWidgetFromDb() {
             if (isExcludeAnalyticsTx(itemTx)) continue
             const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
             const itemType = item.type || tx.type
-            if (itemType === 'income') dayNet += amt
-            else if (itemType === 'expense') dayNet -= amt
+            if (itemType === 'income') {
+              dayNet += amt
+              sevenDaysIncome += amt
+            } else if (itemType === 'expense') {
+              dayNet -= amt
+              sevenDaysExpense += amt
+            }
           }
         } else {
           if (isExcludeAnalyticsTx(tx)) continue
           const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-          if (tx.type === 'income') dayNet += amt
-          else if (tx.type === 'expense') dayNet -= amt
+          if (tx.type === 'income') {
+            dayNet += amt
+            sevenDaysIncome += amt
+          } else if (tx.type === 'expense') {
+            dayNet -= amt
+            sevenDaysExpense += amt
+          }
         }
       }
       sparklinePoints.push(dayNet)
     }
 
+    const widgetRange = settings.widgetRange || '7d'
+    const isSevenDays = widgetRange === '7d'
+    const effectiveIncome = isSevenDays ? sevenDaysIncome : monthIncome
+    const effectiveExpense = isSevenDays ? sevenDaysExpense : monthExpense
+    const effectivePeriod = isSevenDays
+      ? (isEn ? 'Last 7 Days' : '7 Hari Terakhir')
+      : periodLabel
+
     await syncNativeWidgetData({
       totalBalance,
-      monthIncome,
-      monthExpense,
+      monthIncome: effectiveIncome,
+      monthExpense: effectiveExpense,
       defaultCurrency,
-      period: periodLabel,
+      period: effectivePeriod,
       sparklinePoints,
     })
   } catch (err) {

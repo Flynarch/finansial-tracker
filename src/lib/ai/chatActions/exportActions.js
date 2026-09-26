@@ -2,7 +2,8 @@ import { db } from '../../db'
 
 export async function handleExportAction(result) {
   const newMsgs = []
-  const txs = await db.transactions.toArray()
+  const rawTxs = await db.transactions.toArray()
+  const txs = rawTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
   const filtered = result.month ? txs.filter((t) => (t?.date || '').startsWith(result.month)) : txs
 
   if (filtered.length === 0) {

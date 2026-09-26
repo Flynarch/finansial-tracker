@@ -11,7 +11,7 @@ import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
-import useBackButton from '../../hooks/useBackButton'
+import useBottomSheet from '../../hooks/useBottomSheet'
 import MaskedBalance from './MaskedBalance'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
@@ -152,20 +152,22 @@ export default function WalletSelectModal({
   const [search, setSearch] = useState('')
 
   const rates = useMemo(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }, [])
+  const hasPropWallets = Boolean(propWallets && propWallets.length > 0)
   const computedDbWallets = useLiveQuery(
     async () => {
+      if (!isOpen || hasPropWallets) return []
       const raw = await db.wallets.toArray()
       if (!raw || raw.length === 0) return []
       return await getAllWalletBalances(raw, rates)
     },
-    [rates],
-    []
+    [rates, isOpen, hasPropWallets],
+    propWallets || []
   )
 
   const enrichedWallets = useMemo(() => {
-    if (propWallets && propWallets.length > 0) return propWallets
+    if (hasPropWallets) return propWallets
     return computedDbWallets || []
-  }, [propWallets, computedDbWallets])
+  }, [hasPropWallets, propWallets, computedDbWallets])
 
   const activeWallets = useMemo(() => {
     return (enrichedWallets || []).filter((w) => !w.isArchived)
@@ -203,44 +205,58 @@ export default function WalletSelectModal({
     }
   }
 
+  const { isMounted, isVisible, closeSheet } = useBottomSheet({
+    isOpen,
+    onClose,
+  })
+
   const handleTouchEnd = () => {
     const elapsed = Date.now() - touchStartTime.current
     const velocity = dragOffset / (elapsed || 1)
     setIsDragging(false)
     if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      onClose()
+      closeSheet()
+    } else {
+      setDragOffset(0)
     }
-    setDragOffset(0)
     touchStartY.current = 0
   }
 
-  useBackButton(onClose, Boolean(isOpen))
-
-  if (!isOpen) return null
+  if (!isMounted) return null
 
   const handleSelect = (id) => {
     const selectedObj = enrichedWallets.find((w) => String(w.id) === String(id)) || { id }
     if (onSelectWallet) onSelectWallet(id)
     if (onSelect) onSelect(selectedObj)
-    onClose()
+    closeSheet()
   }
 
   const modalContent = (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4 pointer-events-auto">
+    <div className={`fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4 ${
+      isVisible ? 'pointer-events-auto' : 'pointer-events-none'
+    }`}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+          isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+        }`}
+        onClick={closeSheet}
       />
 
       {/* Modal Container */}
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-h-[85vh] flex flex-col z-10 transform-gpu"
+        className={`relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-h-[85vh] flex flex-col z-10 transform-gpu ${
+          isDragging ? '' : isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit pointer-events-none'
+        }`}
         style={{
-          transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
-          transition: isDragging
-            ? 'none'
-            : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+          boxShadow: 'var(--shadow-card)',
+          ...(isDragging
+            ? {
+                transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
+                opacity: Math.max(0.4, 1 - dragOffset / 300),
+                transition: 'none',
+              }
+            : {}),
         }}
       >
         {/* Drag handle for mobile */}
@@ -276,7 +292,7 @@ export default function WalletSelectModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeSheet}
             className="grid h-8 w-8 place-items-center rounded-full bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
             aria-label={t('common.close', 'Tutup')}
           >

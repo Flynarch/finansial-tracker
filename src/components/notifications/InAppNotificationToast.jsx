@@ -46,6 +46,7 @@ export default function InAppNotificationToast() {
   const [activeToast, setActiveToast] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
 
   const queueRef = useRef([])
   const isShowingRef = useRef(false)
@@ -177,6 +178,7 @@ export default function InAppNotificationToast() {
   // Touch handlers for swipe-up dismiss gesture with velocity tracking
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return
+    setIsDragging(true)
     touchStartRef.current = {
       y: e.touches[0].clientY,
       time: Date.now(),
@@ -199,6 +201,7 @@ export default function InAppNotificationToast() {
   }
 
   const handleTouchEnd = (e) => {
+    setIsDragging(false)
     const clientY = e.changedTouches?.[0]?.clientY ?? touchStartRef.current.y
     const dy = clientY - touchStartRef.current.y
     const dt = Math.max(1, Date.now() - touchStartRef.current.time)
@@ -206,7 +209,6 @@ export default function InAppNotificationToast() {
 
     if (dy < -40 || velocity > 0.4) {
       hapticImpact('light')
-      setDragOffset(-120)
       dismissToast()
     } else {
       setDragOffset(0)
@@ -226,7 +228,7 @@ export default function InAppNotificationToast() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`w-full max-w-sm cursor-pointer select-none pointer-events-auto transition-all duration-350 ease-out transform-gpu ${
+        className={`w-full max-w-sm cursor-pointer select-none pointer-events-auto transform-gpu ${
           isVisible
             ? 'opacity-100'
             : 'opacity-0 pointer-events-none'
@@ -234,8 +236,12 @@ export default function InAppNotificationToast() {
         style={{
           transform: isVisible
             ? `translate3d(0, ${dragOffset}px, 0) scale(1)`
-            : 'translate3d(0, -40px, 0) scale(0.95)',
-          transition: dragOffset !== 0 ? 'none' : 'transform 360ms cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 280ms ease-out',
+            : 'translate3d(0, -100%, 0) scale(0.95)',
+          transition: isDragging
+            ? 'none'
+            : isVisible
+            ? 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+            : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
           touchAction: 'pan-y',
         }}
       >

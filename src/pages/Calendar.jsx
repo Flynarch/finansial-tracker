@@ -725,13 +725,15 @@ function Calendar() {
                         <ChevronRight size={13} strokeWidth={2.5} />
                       </span>
                     </button>
-                    <CategoryPickerModal
-                      isOpen={isCatModalOpen}
-                      onClose={() => setIsCatModalOpen(false)}
-                      txType={txForm.type || 'expense'}
-                      selectedCategory={txForm.category}
-                      onSelectCategory={(cat) => setTxForm((prev) => ({ ...prev, category: cat }))}
-                    />
+                    {isCatModalOpen && (
+                      <CategoryPickerModal
+                        isOpen={isCatModalOpen}
+                        onClose={() => setIsCatModalOpen(false)}
+                        txType={txForm.type || 'expense'}
+                        selectedCategory={txForm.category}
+                        onSelectCategory={(cat) => setTxForm((prev) => ({ ...prev, category: cat }))}
+                      />
+                    )}
                   </div>
 
                   <div className="grid gap-1.5">
@@ -743,16 +745,18 @@ function Calendar() {
                       placeholder={t('wallets.selectPlaceholder', 'Pilih Dompet')}
                       onClick={() => setIsWalletModalOpen(true)}
                     />
-                    <WalletSelectModal
-                      isOpen={isWalletModalOpen}
-                      onClose={() => setIsWalletModalOpen(false)}
-                      wallets={wallets || []}
-                      selectedWalletId={txForm.walletId || defaultWalletId}
-                      onSelectWallet={(wId) => {
-                        setTxForm((prev) => ({ ...prev, walletId: wId }))
-                        setIsWalletModalOpen(false)
-                      }}
-                    />
+                    {isWalletModalOpen && (
+                      <WalletSelectModal
+                        isOpen={isWalletModalOpen}
+                        onClose={() => setIsWalletModalOpen(false)}
+                        wallets={wallets || []}
+                        selectedWalletId={txForm.walletId || defaultWalletId}
+                        onSelectWallet={(wId) => {
+                          setTxForm((prev) => ({ ...prev, walletId: wId }))
+                          setIsWalletModalOpen(false)
+                        }}
+                      />
+                    )}
                   </div>
 
                   <div className="grid gap-1.5">

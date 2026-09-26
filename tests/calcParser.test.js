@@ -42,6 +42,14 @@ describe('calcParser - evaluateExpression', () => {
     expect(evaluateExpression('3jt + 500k').result).toBe(3500000)
   })
 
+  it('evaluates shorthand suffix "miliar", "milyar", and "b"', () => {
+    expect(evaluateExpression('1miliar').result).toBe(1000000000)
+    expect(evaluateExpression('2.5milyar').result).toBe(2500000000)
+    expect(evaluateExpression('1,5 miliar').result).toBe(1500000000)
+    expect(evaluateExpression('1.5 miliar + 500 jt').result).toBe(2000000000)
+    expect(evaluateExpression('1b').result).toBe(1000000000)
+  })
+
   it('evaluates parentheses and operator precedence', () => {
     expect(evaluateExpression('(10k + 5k) * 2').result).toBe(30000)
     expect(evaluateExpression('10k + 5k * 2').result).toBe(20000)

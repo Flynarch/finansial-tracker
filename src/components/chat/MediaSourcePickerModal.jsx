@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom'
 import { Camera, Image as ImageIcon, ChevronRight, X } from 'lucide-react'
 import { translate } from '../../lib/i18n'
 import { triggerHaptic } from '../../lib/haptics'
-import useBackButton from '../../hooks/useBackButton'
+import useBottomSheet from '../../hooks/useBottomSheet'
 
 /**
  * MediaSourcePickerModal
@@ -15,24 +15,22 @@ export default function MediaSourcePickerModal({
   onSelectGallery,
   locale = 'id',
 }) {
-  useBackButton(() => {
-    if (isOpen) {
-      onClose()
-      return
-    }
-  }, isOpen)
+  const { isMounted, isVisible, closeSheet } = useBottomSheet({
+    isOpen,
+    onClose,
+  })
 
-  if (!isOpen) return null
+  if (!isMounted) return null
 
   const handleCamera = () => {
     triggerHaptic('light')
-    onClose()
+    closeSheet()
     onSelectCamera()
   }
 
   const handleGallery = () => {
     triggerHaptic('light')
-    onClose()
+    closeSheet()
     onSelectGallery()
   }
 
@@ -40,11 +38,20 @@ export default function MediaSourcePickerModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-[ft-backdrop-fade-in_0.2s_ease-out_both]"
-      onClick={onClose}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 ${
+        isVisible ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
     >
       <div
-        className="w-full max-w-md rounded-t-[28px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-2xl space-y-4 animate-[ft-spring-up_0.25s_cubic-bezier(0.16,1,0.3,1)_both] pb-[max(env(safe-area-inset-bottom,0px),1.25rem)]"
+        className={`fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+          isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+        }`}
+        onClick={closeSheet}
+      />
+      <div
+        className={`relative z-10 w-full max-w-md rounded-t-[28px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-2xl space-y-4 pb-[max(env(safe-area-inset-bottom,0px),1.25rem)] transform-gpu ${
+          isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit pointer-events-none'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle pill for mobile sheet indication */}
@@ -64,7 +71,7 @@ export default function MediaSourcePickerModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeSheet}
             className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] active:scale-95 transition cursor-pointer"
             aria-label={translate(locale, 'common.cancel') || (isEn ? 'Close' : 'Tutup')}
           >

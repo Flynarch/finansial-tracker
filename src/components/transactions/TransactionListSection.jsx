@@ -1,6 +1,7 @@
 import { memo, useState } from 'react'
 import EmptyState from '../ui/EmptyState'
 import { TransactionItemCard } from './TransactionItemCard'
+import { isTransactionNew } from '../../lib/transactionLastSeen'
 
 export function TransactionListSkeleton() {
   return (
@@ -73,6 +74,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   convertCurrency,
   rates,
   allWallets,
+  sessionLastSeenTimestamp,
   newestTransactionId,
 }) {
   const PAGE_CHUNK = 25
@@ -177,6 +179,7 @@ export const TransactionListSection = memo(function TransactionListSection({
                         convertCurrency={convertCurrency}
                         rates={rates}
                         wallets={allWallets}
+                        isNew={sessionLastSeenTimestamp ? isTransactionNew(transaction, sessionLastSeenTimestamp) : (newestTransactionId && String(transaction.id) === String(newestTransactionId))}
                         newestTransactionId={newestTransactionId}
                         isBulkMode={isBulkMode}
                         isSelected={selectedTxIds.has(transaction.id)}

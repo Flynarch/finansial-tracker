@@ -4,6 +4,7 @@
 import useSettingsStore from '../../store/useSettingsStore'
 import { processSseEventBlock } from './streamParsers'
 import { withRetry, NonRetryableError, RetryableError } from './withRetry'
+import { sanitizeGeminiContents } from './sanitizer'
 
 export const FAST_TRANSACTION_MODELS = [
   'gemini-3.5-flash-lite',
@@ -204,6 +205,11 @@ export async function callApiStreamWithFallback(reqContents, {
     throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
   }
 
+  const sanitizedContents = sanitizeGeminiContents(reqContents)
+  if (sanitizedContents.length === 0) {
+    throw new NonRetryableError('Payload percakapan AI tidak valid atau kosong.')
+  }
+
   let lastError = null
   let userKeyError = null
 
@@ -218,7 +224,7 @@ export async function callApiStreamWithFallback(reqContents, {
           let res
           try {
             const bodyPayload = {
-              contents: reqContents,
+              contents: sanitizedContents,
               generationConfig: { temperature: 0.1 },
             }
             if (sysPrompt) {
@@ -354,6 +360,11 @@ export async function callApiWithFallback(reqContents, {
     throw new Error('Kunci API Gemini belum diatur. Silakan tambahkan API key Anda di menu Pengaturan > Integrasi AI.')
   }
 
+  const sanitizedContents = sanitizeGeminiContents(reqContents)
+  if (sanitizedContents.length === 0) {
+    throw new NonRetryableError('Payload permintaan AI tidak valid atau kosong.')
+  }
+
   let lastError = null
   let userKeyError = null
   for (const keyObj of keysToTry) {
@@ -367,7 +378,7 @@ export async function callApiWithFallback(reqContents, {
           let res
           try {
             const bodyPayload = {
-              contents: reqContents,
+              contents: sanitizedContents,
               generationConfig: { temperature, responseMimeType },
             }
             if (sysInstruction) {

@@ -54,14 +54,26 @@ export function findMatchingTransactionForAction(allFreshTxs = [], result = {}) 
   if (sq === 'terakhir' || sq === 'latest' || sq === 'tadi' || sq === 'barusan') {
     return allFreshTxs[0] || null
   }
+
+  const tokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
+
   return (
     allFreshTxs.find((t) => {
       const matchesDate = !result.date || t.date === result.date
-      const matchesQuery =
-        !sq ||
-        (t.notes && t.notes.toLowerCase().includes(sq)) ||
-        (t.category && t.category.toLowerCase().includes(sq))
-      return matchesDate && matchesQuery
+      const notesLower = (t.notes || '').toLowerCase()
+      const merchantLower = (t.merchant || '').toLowerCase()
+      const categoryLower = (t.category || '').toLowerCase()
+
+      const directMatch =
+        (notesLower && notesLower.includes(sq)) ||
+        (merchantLower && merchantLower.includes(sq)) ||
+        (categoryLower && categoryLower.includes(sq))
+
+      const tokenMatch =
+        tokens.length > 0 &&
+        tokens.some((token) => notesLower.includes(token) || merchantLower.includes(token))
+
+      return matchesDate && (directMatch || tokenMatch)
     }) || null
   )
 }

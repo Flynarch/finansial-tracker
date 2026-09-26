@@ -1,7 +1,14 @@
-import { format, subDays } from 'date-fns'
+import { format, subDays, addDays } from 'date-fns'
 import { sanitizeCategoryPath } from '../categorySanitizer'
 import { formatCurrency } from '../utils'
+import { evaluateExpression } from '../calcParser'
 import useSettingsStore from '../../store/useSettingsStore'
+import {
+  extractTimeSlot,
+  extractVenueSlot,
+  extractCleanSubjectEntity,
+} from './semanticSlotFiller'
+import { predictOmissionSuggestion } from './entityMemory'
 
 /**
  * Common Indonesian day definitions and typos
@@ -121,6 +128,31 @@ export const KNOWN_MERCHANT_SERVICES = [
     name: 'Shell',
     category: 'transportasi/bensin',
   },
+  {
+    regex: /\b(kulo)\b/i,
+    name: 'Kulo',
+    category: 'makanan/kopi',
+  },
+  {
+    regex: /\b(fore|fore coffee)\b/i,
+    name: 'Fore Coffee',
+    category: 'makanan/kopi',
+  },
+  {
+    regex: /\b(mixue)\b/i,
+    name: 'Mixue',
+    category: 'makanan/minuman',
+  },
+  {
+    regex: /\b(point coffee|pointcoffee)\b/i,
+    name: 'Point Coffee',
+    category: 'makanan/kopi',
+  },
+  {
+    regex: /\b(tomoro|tomoro coffee)\b/i,
+    name: 'Tomoro Coffee',
+    category: 'makanan/kopi',
+  },
 ]
 
 /**
@@ -161,6 +193,15 @@ export function normalizeIndonesianNlpText(text) {
 
   // Replace typos for 'semalam'
   t = t.replace(/\b(smlm|semalem)\b/gi, 'semalam')
+
+  // Replace slang for 'transfer'
+  t = t.replace(/\b(tf|trf)\b/gi, 'transfer')
+
+  // Replace slang for 'besok'
+  t = t.replace(/\b(bsk|beso|besokk)\b/gi, 'besok')
+
+  // Replace slang for common drinks
+  t = t.replace(/\b(kopsu|kopisusu)\b/gi, 'kopi susu')
 
   // Replace variations of 'masing-masing'
   t = t.replace(/\b(masing\s+masing|masing2|msing\s+msing)\b/gi, 'masing-masing')
@@ -226,12 +267,16 @@ export function maskDateExpressions(text) {
   let t = text
   // 1. Day + Month Name: "9 september", "12 sep 2026", "tgl 25 agustus", "10 okt"
   t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}\s+(?:januari|jan|februari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|ags|agst|aug|september|sep|sept|oktober|okt|oct|november|nov|desember|des|dec)(?:\s+\d{4})?\b/gi, ' ')
-  // 2. Numeric date: "12/09/2026", "9/9", "25-08-2026"
-  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?\b/gi, ' ')
+  // 2. Numeric date: "12/09/2026", "9/9", "25-08-2026" (guarding against decimal amounts like "1.2 miliar" or "1.5 jt")
+  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?(?!\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b|billion|million|perak))\b/gi, ' ')
   // 3. Relative time expressions: "2 hari lalu", "3 jam lalu", "5 menit lalu"
   t = t.replace(/\b\d{1,2}\s+(?:hari|jam|menit|bulan|tahun)(?:\s+lalu)?\b/gi, ' ')
   // 4. Standalone tanggal/tgl + number: "tanggal 9", "tgl 12"
   t = t.replace(/\b(?:tanggal|tgl)\s+\d{1,2}\b/gi, ' ')
+  // 5. Clock times & time-of-day phrases: "jam 5", "jam 5 sore", "pukul 17:00", "jam setengah 6", "17:00"
+  t = t.replace(/\b(?:pukul|jam)\s+(?:setengah\s+)?\d{1,2}(?:[.:]\d{2})?(?:\s*(?:pagi|siang|sore|malam))?\b/gi, ' ')
+  t = t.replace(/\b(?:pukul|jam)\s+\d{1,2}\s+(?:kurang|lewat)\s+\d{1,2}(?:\s*menit)?\b/gi, ' ')
+  t = t.replace(/\b\d{1,2}[.:]\d{2}(?:\s*(?:wib|wita|wit))?\b/gi, ' ')
   return t
 }
 
@@ -327,6 +372,24 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
     }
   }
 
+  // 3.5. Relative Future: besok lusa, lusa, 2 hari lagi
+  if (/\b(besok\s+lusa|\blusa\b|2\s+hari\s+lagi)\b/i.test(lower)) {
+    const match = lower.match(/\b(besok\s+lusa|\blusa\b|2\s+hari\s+lagi)\b/i)
+    return {
+      dateStr: format(addDays(ref, 2), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'lusa',
+    }
+  }
+
+  // 3.6. Standalone besok, bsk, besok pagi/siang/sore/malam
+  if (/\b(besok|bsk)\b/i.test(lower)) {
+    const match = lower.match(/\b(besok|bsk)(?:\s+(?:pagi|siang|sore|malam))?\b/i)
+    return {
+      dateStr: format(addDays(ref, 1), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'besok',
+    }
+  }
+
   // 4. Relative Day: kemarin lusa, 2 hari lalu
   if (/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i.test(lower)) {
     const match = lower.match(/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i)
@@ -345,9 +408,9 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
     }
   }
 
-  // 6. Hari ini, tadi pagi, tadi siang, barusan
-  if (/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|barusan)\b/i.test(lower)) {
-    const match = lower.match(/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|barusan)\b/i)
+  // 6. Hari ini, tadi pagi, tadi siang, tadi sore, barusan, tadi
+  if (/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|tadi\s+sore|barusan|\btadi\b)/i.test(lower)) {
+    const match = lower.match(/\b(hari\s+ini|tadi\s+pagi|tadi\s+siang|tadi\s+sore|barusan|\btadi\b)/i)
     return {
       dateStr: format(ref, 'yyyy-MM-dd'),
       matchedText: match ? match[0] : 'hari ini',
@@ -365,7 +428,7 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
  */
 export function parseIndonesianAmount(raw) {
   if (!raw || typeof raw !== 'string') return 0
-  const clean = raw.trim().toLowerCase()
+  const clean = raw.trim().toLowerCase().replace(/\s*(rupiah|idr|rp\.?)\s*$/i, '')
 
   // Indonesian slang nominals
   if (clean === 'seceng') return 1000
@@ -384,6 +447,10 @@ export function parseIndonesianAmount(raw) {
     const numPart = parseFloat(clean.replace(/(k|rb|ribu)/g, '').replace(',', '.'))
     if (!isNaN(numPart)) return Math.round(numPart * 1000)
   }
+  if (clean.endsWith('miliar') || clean.endsWith('milyar') || clean.endsWith('b')) {
+    const numPart = parseFloat(clean.replace(/(miliar|milyar|b)/g, '').replace(',', '.'))
+    if (!isNaN(numPart)) return Math.round(numPart * 1000000000)
+  }
   if (clean.endsWith('jt') || clean.endsWith('juta') || clean.endsWith('m')) {
     const numPart = parseFloat(clean.replace(/(jt|juta|m)/g, '').replace(',', '.'))
     if (!isNaN(numPart)) return Math.round(numPart * 1000000)
@@ -392,6 +459,25 @@ export function parseIndonesianAmount(raw) {
   // Preceding Rp or bare digits
   const digitsOnly = clean.replace(/[^0-9]/g, '')
   return parseInt(digitsOnly, 10) || 0
+}
+
+/**
+ * Detects currency code from Indonesian text or symbols ($, €, S$, £, ¥, RM, etc.).
+ * @param {string} text
+ * @param {string} [defaultCurrency='IDR']
+ * @returns {string} 3-letter currency code (IDR, USD, EUR, SGD, MYR, GBP, JPY)
+ */
+export function extractCurrencyFromText(text, defaultCurrency = 'IDR') {
+  if (!text || typeof text !== 'string') return defaultCurrency
+  const lower = text.toLowerCase()
+  if (/(s\$|\bsgd\b)/i.test(lower) || /s\$\s*\d+/i.test(lower)) return 'SGD'
+  if (/(€|\beur\b)/i.test(lower) || /€\s*\d+/i.test(lower)) return 'EUR'
+  if (/(£|\bgbp\b)/i.test(lower) || /£\s*\d+/i.test(lower)) return 'GBP'
+  if (/(¥|\bjpy\b)/i.test(lower) || /¥\s*\d+/i.test(lower)) return 'JPY'
+  if (/(rm\s*\d+|\bmyr\b|\brm\b)/i.test(lower)) return 'MYR'
+  if (/(^|[^a-z])\$(\s*\d+|(?![a-z]))/i.test(lower) || /\busd\b/i.test(lower)) return 'USD'
+  if (/\b(rp|idr)\b/i.test(lower)) return 'IDR'
+  return defaultCurrency
 }
 
 /**
@@ -404,6 +490,38 @@ export function extractMonetaryAmountFromText(text) {
   const masked = maskDateExpressions(text)
   const lower = masked.toLowerCase()
 
+  // 0. Arithmetic expressions: e.g. "35k + 5k", "120k / 4", "50k - 10k", "20000 + 15000"
+  const arithmeticMatch = lower.match(
+    /\b(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b)?)\s*([+\-*/])\s*(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b)?)\b/i
+  )
+  if (arithmeticMatch) {
+    const expr = arithmeticMatch[0]
+    const evalRes = evaluateExpression(expr, 'IDR')
+    if (evalRes && evalRes.isValid && evalRes.result > 0) {
+      return evalRes.result
+    }
+  }
+
+  // 0.5. Multiplier expressions: e.g. "2 @ 25k", "3x 20rb", "2 cup per 15k", "2 porsi @ 30k"
+  const multiplierMatch = lower.match(
+    /\b(\d+)\s*(?:cup|porsi|pax|lusin|pcs|pc|gelas|piring|butir|bungkus)?\s*(?:@|per|satuan|x|masing-masing)\s*(?:rp\.?\s*|\$\s*|€\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b)?)\b/i
+  )
+  if (multiplierMatch) {
+    const qty = parseInt(multiplierMatch[1], 10)
+    const unitPrice = parseIndonesianAmount(multiplierMatch[2])
+    if (qty > 0 && unitPrice > 0) {
+      return qty * unitPrice
+    }
+  }
+
+  // 0.7. Foreign currency symbols (e.g. "$15", "$5", "€20", "S$12", "15 USD", "20 EUR")
+  const foreignMatch = lower.match(/(?:[$€£¥]|s\$|rm)\s*(\d+(?:[.,]\d+)?)\b/i) ||
+    lower.match(/\b(\d+(?:[.,]\d+)?)\s*(?:usd|eur|sgd|myr|jpy|gbp)\b/i)
+  if (foreignMatch && foreignMatch[1]) {
+    const foreignVal = parseFloat(foreignMatch[1].replace(',', '.'))
+    if (foreignVal > 0) return foreignVal
+  }
+
   // 1. Check for slang nominals first
   const slangMatch = lower.match(/\b(ceban|goceng|gocap|seceng|noceng|cenggo|nocenggo|cepek|pekgo|sejeti)\b/i)
   if (slangMatch && slangMatch[1]) {
@@ -413,7 +531,7 @@ export function extractMonetaryAmountFromText(text) {
 
   // 2. Spending/Receiving-verb bound amounts (e.g. "habisin 10k", "sebesar 25rb", "bayar 15k", "dapet 60k", "uang saku 60k")
   const verbMatch = lower.match(
-    /(?:habisin|keluarin|keluar|sebesar|bayar|beli|total|dapet|dapat|terima|masuk|saku|jajan|gaji|sangu)\s*(?:rp\.?\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)\b/i
+    /(?:habisin|keluarin|keluar|sebesar|bayar|beli|total|dapet|dapat|terima|masuk|saku|jajan|gaji|sangu)\s*(?:rp\.?\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b|perak)?)\b/i
   )
   if (verbMatch && verbMatch[1]) {
     const val = parseIndonesianAmount(verbMatch[1])
@@ -421,7 +539,7 @@ export function extractMonetaryAmountFromText(text) {
   }
 
   // 3. Amount with explicit currency suffix or prefix (e.g. "10k", "rp 50000", "25rb", "1.5jt", "60k")
-  const suffixMatch = lower.match(/\b(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak))\b/i)
+  const suffixMatch = lower.match(/\b(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b|perak))\b/i)
   if (suffixMatch && suffixMatch[1]) {
     const val = parseIndonesianAmount(suffixMatch[1])
     if (val > 0) return val
@@ -576,7 +694,7 @@ export function parseTransferTransaction(
   if (!normalizedText || typeof normalizedText !== 'string') return null
   const lower = normalizedText.toLowerCase()
 
-  const isTransfer = /\b(transfer|pindah\s+saldo|pindahkan\s+saldo|geser\s+saldo)\b/i.test(lower)
+  const isTransfer = /\b(transfer|tf|trf|pindah\s+saldo|pindahkan\s+saldo|geser\s+saldo)\b/i.test(lower)
   const isTarikTunai = /\b(tarik\s+tunai|tariktunai|ambil\s+tunai|tarik\s+uang|ambil\s+uang\s+di\s+atm)\b/i.test(lower)
   const isTopUp = /\b(top\s*up|topup|isi\s+saldo)\b/i.test(lower)
 
@@ -593,6 +711,8 @@ export function parseTransferTransaction(
   const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
   const todayStr = format(ref, 'yyyy-MM-dd')
   const currentTime = format(ref, 'HH:mm')
+  const timeSlot = extractTimeSlot(normalizedText, ref)
+  const resolvedTime = timeSlot ? timeSlot.timeStr : currentTime
   const defaultWalletId = useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1
 
   const amt = extractMonetaryAmountFromText(lower)
@@ -738,7 +858,7 @@ export function parseTransferTransaction(
         walletId: sourceWalletId,
         targetWalletId: targetWalletId,
         date: resolvedDate,
-        time: currentTime,
+        time: resolvedTime,
         notes: `Transfer ${srcName} ke ${dstName}`,
       },
     ],
@@ -784,6 +904,8 @@ export function parseMultiClauseTransactions(
   const clauseDetails = []
   let previousDateStr = null
 
+  const sentenceTimeSlot = extractTimeSlot(normalizedText, ref)
+
   for (const rawClause of rawClauses) {
     const clauseAmt = extractMonetaryAmountFromText(rawClause)
     if (clauseAmt <= 0) continue
@@ -801,6 +923,9 @@ export function parseMultiClauseTransactions(
       clauseDate = previousDateStr
     }
 
+    const clauseTimeSlot = extractTimeSlot(rawClause, ref) || sentenceTimeSlot
+    const clauseTime = clauseTimeSlot ? clauseTimeSlot.timeStr : currentTime
+
     // Determine type: income vs expense
     const isIncome =
       /\b(dapet|dapat|terima|diterima|uang\s+saku|uang\s+jajan|sangu|gaji|salary|pemasukan|penghasilan|masuk|kiriman|dikasih|bonus|thr|hadiah|kado|cashback|komisi|cuan|hasil\s+jual|penjualan|freelance|proyek|adsense|dividen)\b/i.test(
@@ -813,37 +938,21 @@ export function parseMultiClauseTransactions(
     const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
     const txCurrency = matchedWallet?.currency || defaultCurrency
 
-    // Clean notes: remove date, amount, wallet, and leading verbs
-    let cleanNotes = rawClause
-    if (dateMatchedText) {
-      cleanNotes = cleanNotes.replace(new RegExp(`\\b${escapeRegExp(dateMatchedText)}\\b`, 'gi'), ' ')
-    }
-    if (matchedWallet) {
-      cleanNotes = cleanNotes.replace(new RegExp(`\\(?\\b${escapeRegExp(matchedWallet.name)}\\b\\)?`, 'gi'), ' ')
-    }
-    // Remove standalone parenthesized wallet mentions like (dana) or (cash)
-    const walletCandidates = [
-      ...(wallets || []).map((w) => w.name),
-      'dana', 'cash', 'tunai', 'gopay', 'ovo', 'shopeepay', 'bca', 'bri', 'bni', 'mandiri', 'jago', 'bank', 'rekening', 'dompet'
-    ].filter(Boolean)
-    if (walletCandidates.length > 0) {
-      const walletPattern = walletCandidates.map(escapeRegExp).join('|')
-      cleanNotes = cleanNotes.replace(new RegExp(`\\(\\s*(?:${walletPattern})\\s*\\)`, 'gi'), ' ')
-    }
-
-    // Remove amount (e.g. 60k, 25k, rp 50000)
-    cleanNotes = cleanNotes.replace(/\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?\b/gi, ' ')
-    cleanNotes = cleanNotes.replace(/rp\.?\s*/gi, ' ')
-
-    // Remove leading action verbs
-    cleanNotes = cleanNotes
-      .replace(/^(?:dapet|dapat|terima|diterima|buat\s+beli|beli|buat|untuk|bayar|keluar|keluarin)\s+/i, '')
-      .replace(/\s+/g, ' ')
-      .trim()
+    // Semantic slot filling for subject entity and venue
+    const cleanNotes = extractCleanSubjectEntity(rawClause, {
+      txType,
+      dateMatchedText,
+      walletName: matchedWallet?.name,
+    })
+    const venueSlot = extractVenueSlot(rawClause, KNOWN_MERCHANT_SERVICES)
 
     // Determine category and merchant
     let category
     let merchant = undefined
+
+    if (venueSlot) {
+      merchant = venueSlot.venue
+    }
 
     if (txType === 'income') {
       category = sanitizeCategoryPath(cleanNotes || rawClause, 'income')
@@ -851,7 +960,7 @@ export function parseMultiClauseTransactions(
     } else {
       const extracted = extractMerchantAndCategory(cleanNotes || rawClause)
       category = extracted.category
-      if (extracted.merchant && !MONTH_NAME_REGEX.test(extracted.merchant)) {
+      if (!merchant && extracted.merchant && !MONTH_NAME_REGEX.test(extracted.merchant)) {
         merchant = extracted.merchant
       }
     }
@@ -859,16 +968,6 @@ export function parseMultiClauseTransactions(
     let finalNotes = cleanNotes
     if (!finalNotes) {
       finalNotes = txType === 'income' ? 'Pemasukan' : 'Pengeluaran'
-    } else {
-      finalNotes = finalNotes
-        .split(' ')
-        .map((w) => {
-          if (w.startsWith('(') && w.length > 1) {
-            return '(' + w.charAt(1).toUpperCase() + w.slice(2)
-          }
-          return w.charAt(0).toUpperCase() + w.slice(1)
-        })
-        .join(' ')
     }
 
     clauseDetails.push({
@@ -878,7 +977,7 @@ export function parseMultiClauseTransactions(
       currency: txCurrency,
       walletId: resolvedWalletId,
       date: clauseDate,
-      time: currentTime,
+      time: clauseTime,
       merchant,
       notes: finalNotes,
     })
@@ -944,6 +1043,8 @@ export function parseIndonesianFinancialText(
   const ref = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date()
   const todayStr = format(ref, 'yyyy-MM-dd')
   const currentTime = format(ref, 'HH:mm')
+  const timeSlot = extractTimeSlot(normalized, ref)
+  const resolvedTime = timeSlot ? timeSlot.timeStr : currentTime
   const defaultWalletId = useSettingsStore.getState?.().defaultWalletId || wallets[0]?.id || 1
 
   // 1A. PATTERN 0: Multi-clause transactions connecting multiple items (e.g. "9 september dapet uang saku 60k dan 12 sep 25k buat beli paketan (dana)")
@@ -1044,7 +1145,7 @@ export function parseIndonesianFinancialText(
         currency: txCurrency,
         walletId: resolvedWalletId,
         date: d.dateStr,
-        time: currentTime,
+        time: resolvedTime,
         merchant: cleanMerchant,
         notes: cleanNotes,
       }
@@ -1085,10 +1186,67 @@ export function parseIndonesianFinancialText(
   if (dateResult?.matchedText) {
     clean = clean.replace(new RegExp(`\\b${escapeRegExp(dateResult.matchedText)}\\b`, 'gi'), ' ')
   }
+  if (timeSlot?.matchedText) {
+    clean = clean.replace(new RegExp(`\\b${escapeRegExp(timeSlot.matchedText)}\\b`, 'gi'), ' ')
+  }
   clean = clean
-    .replace(/^(kemarin\s+|tadi\s+pagi\s+|tadi\s+siang\s+|tadi\s+malam\s+|hari\s+ini\s+|semalam\s+)/i, '')
+    .replace(/^(kemarin\s+|tadi\s+pagi\s+|tadi\s+siang\s+|tadi\s+sore\s+|tadi\s+malam\s+|hari\s+ini\s+|semalam\s+|tadi\s+|barusan\s+)/i, '')
     .replace(/^(beli|bayar|catat|tambah|pengeluaran|pemasukan|dapat|dapet|terima|makan(?!\s+(?:siang|pagi|malam))|minum)\s+/i, '')
     .trim()
+
+  if (/[@+\-*/]/.test(clean)) {
+    const mathAmt = extractMonetaryAmountFromText(clean)
+    if (mathAmt > 0) {
+      const cleanSub = extractCleanSubjectEntity(clean, {
+        txType: 'expense',
+        dateMatchedText: dateResult?.matchedText,
+        timeMatchedText: timeSlot?.matchedText,
+      })
+      const cleanSubject = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran' ? cleanSub : 'Pengeluaran'
+      const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
+      const cleanMerchant = venueSlot?.venue || undefined
+      const detectedCurrency = extractCurrencyFromText(normalized, defaultCurrency)
+      let resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)
+      if (detectedCurrency && detectedCurrency !== defaultCurrency) {
+        const currencyWallet = wallets.find((w) => (w.currency || '').toUpperCase() === detectedCurrency.toUpperCase())
+        if (currencyWallet) {
+          resolvedWalletId = currencyWallet.id
+        }
+      }
+      const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
+      const txCurrency = detectedCurrency || matchedWallet?.currency || defaultCurrency
+
+      const isIncome =
+        /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
+          cleanSubject.toLowerCase()
+        ) ||
+        /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
+      const txType = isIncome ? 'income' : 'expense'
+
+      return {
+        type: 'transactions',
+        action: 'create',
+        transactions: [
+          {
+            type: txType,
+            amount: mathAmt,
+            category: sanitizeCategoryPath(cleanSubject, txType),
+            currency: txCurrency,
+            walletId: resolvedWalletId,
+            date: resolvedDate,
+            time: resolvedTime,
+            merchant: cleanMerchant,
+            notes: cleanSubject,
+          },
+        ],
+        merchant: cleanMerchant,
+        currency: txCurrency,
+        text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${cleanSubject} sebesar ${formatCurrency(mathAmt, txCurrency)}.`,
+        chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+        isInstant: true,
+      }
+    }
+  }
 
   const match = clean.match(
     /^([a-zA-Z0-9\s\-_]+?)\s+(?:sebesar\s+|rp\.?\s*|\$\s*|€\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)?)(?:\s+(.*))?$/i
@@ -1102,21 +1260,45 @@ export function parseIndonesianFinancialText(
     if (rawItem && rawItem.length >= 2 && !/\bhabisin\b/i.test(rawItem) && rawItem.split(/\s+/).length <= 4) {
       const numericAmt = parseIndonesianAmount(rawAmt)
       if (numericAmt > 0) {
+        // Extract clean subject entity and venue using semantic slot filler
+        const venueSlot = extractVenueSlot(`${rawItem} ${rawTail} ${normalized}`, KNOWN_MERCHANT_SERVICES)
+        const cleanSub = extractCleanSubjectEntity(rawItem, {
+          txType: 'expense',
+          dateMatchedText: dateResult?.matchedText,
+          timeMatchedText: timeSlot?.matchedText,
+          merchant: venueSlot?.venue,
+        })
+        const cleanSubject = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran'
+          ? cleanSub
+          : (rawItem.charAt(0).toUpperCase() + rawItem.slice(1))
+
         const isIncome =
           /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
-            rawItem.toLowerCase()
+            cleanSubject.toLowerCase()
           ) ||
           /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
         const txType = isIncome ? 'income' : 'expense'
 
-        const { merchant, category } = extractMerchantAndCategory(rawTail ? `${rawItem} ${rawTail}` : rawItem)
-        const capitalizedItem = merchant || rawItem.charAt(0).toUpperCase() + rawItem.slice(1)
+        const { merchant: legacyMerchant, category: legacyCategory } = extractMerchantAndCategory(rawTail ? `${rawItem} ${rawTail}` : rawItem)
+        const finalMerchant = venueSlot?.venue || (txType === 'expense' ? legacyMerchant : undefined)
 
         const searchTarget = rawTail ? `${rawTail} ${rawItem} ${normalized}` : `${rawItem} ${normalized}`
-        const resolvedWalletId = findWalletInText(searchTarget, wallets, defaultWalletId)
+        const detectedCurrency = extractCurrencyFromText(`${rawItem} ${rawAmt} ${rawTail} ${normalized}`, defaultCurrency)
+        let resolvedWalletId = findWalletInText(searchTarget, wallets, defaultWalletId)
+        if (detectedCurrency && detectedCurrency !== defaultCurrency) {
+          const currencyWallet = wallets.find((w) => (w.currency || '').toUpperCase() === detectedCurrency.toUpperCase())
+          if (currencyWallet) {
+            resolvedWalletId = currencyWallet.id
+          }
+        }
 
         const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
-        const txCurrency = matchedWallet?.currency || defaultCurrency
+        const txCurrency = detectedCurrency || matchedWallet?.currency || defaultCurrency
+
+        let finalNotes = cleanSubject
+        if (rawTail && !venueSlot && !legacyMerchant) {
+          finalNotes += rawTail.startsWith('(') ? ` ${rawTail}` : ` (${rawTail})`
+        }
 
         return {
           type: 'transactions',
@@ -1125,21 +1307,82 @@ export function parseIndonesianFinancialText(
             {
               type: txType,
               amount: numericAmt,
-              category: category || sanitizeCategoryPath(rawItem, txType),
+              category: legacyCategory || sanitizeCategoryPath(cleanSubject, txType),
               currency: txCurrency,
               walletId: resolvedWalletId,
               date: resolvedDate,
-              time: currentTime,
-              merchant: txType === 'expense' ? capitalizedItem : undefined,
-              notes: capitalizedItem + (rawTail && !merchant ? ` (${rawTail})` : ''),
+              time: resolvedTime,
+              merchant: finalMerchant,
+              notes: finalNotes,
             },
           ],
-          merchant: txType === 'expense' ? capitalizedItem : undefined,
+          merchant: finalMerchant,
           currency: txCurrency,
-          text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${capitalizedItem} sebesar ${formatCurrency(numericAmt, txCurrency)}.`,
+          text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${finalNotes} sebesar ${formatCurrency(numericAmt, txCurrency)}.`,
           chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
           isInstant: true,
         }
+      }
+    }
+  }
+
+  // 4B. Semantic slot extraction fallback when regex boundary doesn't match clean word order
+  const fallbackAmt = extractMonetaryAmountFromText(clean)
+  if (fallbackAmt > 0) {
+    const cleanSub = extractCleanSubjectEntity(clean, {
+      txType: 'expense',
+      dateMatchedText: dateResult?.matchedText,
+      timeMatchedText: timeSlot?.matchedText,
+    })
+    const cleanSubject = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran' ? cleanSub : ''
+    if (
+      cleanSubject &&
+      cleanSubject.length >= 2 &&
+      !MONTH_NAME_REGEX.test(cleanSubject.toLowerCase()) &&
+      !/\b(habisin|keluarin)\b/i.test(cleanSubject)
+    ) {
+      const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
+      const isIncome =
+        /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
+          cleanSubject.toLowerCase()
+        ) ||
+        /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
+      const txType = isIncome ? 'income' : 'expense'
+      const cleanMerchant = venueSlot?.venue || undefined
+
+      const detectedCurrency = extractCurrencyFromText(normalized, defaultCurrency)
+      let resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)
+      if (detectedCurrency && detectedCurrency !== defaultCurrency) {
+        const currencyWallet = wallets.find((w) => (w.currency || '').toUpperCase() === detectedCurrency.toUpperCase())
+        if (currencyWallet) {
+          resolvedWalletId = currencyWallet.id
+        }
+      }
+
+      const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
+      const txCurrency = detectedCurrency || matchedWallet?.currency || defaultCurrency
+
+      return {
+        type: 'transactions',
+        action: 'create',
+        transactions: [
+          {
+            type: txType,
+            amount: fallbackAmt,
+            category: sanitizeCategoryPath(cleanSubject, txType),
+            currency: txCurrency,
+            walletId: resolvedWalletId,
+            date: resolvedDate,
+            time: resolvedTime,
+            merchant: cleanMerchant,
+            notes: cleanSubject,
+          },
+        ],
+        merchant: cleanMerchant,
+        currency: txCurrency,
+        text: `Berhasil mencatat ${txType === 'income' ? 'pemasukan' : 'pengeluaran'} ${cleanSubject} sebesar ${formatCurrency(fallbackAmt, txCurrency)}.`,
+        chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+        isInstant: true,
       }
     }
   }
@@ -1176,7 +1419,7 @@ export function parseIndonesianFinancialText(
               currency: txCurrency,
               walletId: resolvedWalletId,
               date: resolvedDate,
-              time: currentTime,
+              time: resolvedTime,
               merchant: cleanMerchant,
               notes: cleanMerchant,
             },
@@ -1207,9 +1450,44 @@ export function parseIndonesianFinancialText(
       )
     const totalAmt = extractMonetaryAmountFromText(lower)
     if ((hasExplicitSpendingAction || hasExplicitIncomeAction) && totalAmt <= 0) {
+      const omission = predictOmissionSuggestion(normalized, wallets, defaultCurrency, 'id')
+      const cleanSub = extractCleanSubjectEntity(normalized, {
+        txType: hasExplicitIncomeAction ? 'income' : 'expense',
+      })
+      const cleanName = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran' && cleanSub !== 'Pemasukan' ? cleanSub : ''
+
+      if (omission && omission.found && omission.message) {
+        return {
+          error: true,
+          type: 'omission_clarification',
+          pendingFrame: {
+            notes: omission.entity?.name || cleanName,
+            category: omission.suggestedCategory || (hasExplicitIncomeAction ? 'pendapatan/gaji' : 'makanan/makan_siang'),
+            walletId: omission.suggestedWalletId || defaultWalletId,
+            type: hasExplicitIncomeAction ? 'income' : 'expense',
+            date: resolvedDate,
+            time: resolvedTime,
+          },
+          suggestedAmount: omission.suggestedAmount || null,
+          message: `Nominal transaksi belum disebutkan untuk ${omission.entity?.name || 'transaksi ini'}. ${omission.message}`,
+          chips: omission.chips,
+        }
+      }
       return {
         error: true,
-        message: 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "makan siang 30rb" atau "terima gaji 5jt").',
+        type: 'omission_clarification',
+        pendingFrame: cleanName ? {
+          notes: cleanName,
+          category: hasExplicitIncomeAction ? 'pendapatan/gaji' : 'makanan/makan_siang',
+          walletId: defaultWalletId,
+          type: hasExplicitIncomeAction ? 'income' : 'expense',
+          date: resolvedDate,
+          time: resolvedTime,
+        } : null,
+        message: cleanName
+          ? `Nominal transaksi belum disebutkan untuk ${cleanName}. Silakan sertakan jumlah uangnya (contoh: "${cleanName} 20rb").`
+          : 'Nominal transaksi belum disebutkan. Silakan sertakan jumlah uangnya (contoh: "makan siang 30rb" atau "terima gaji 5jt").',
+        chips: cleanName ? ['10k', '20k', '50k', '100k'] : ['Catat 20rb', 'Catat 50rb', 'Batal'],
       }
     }
   }

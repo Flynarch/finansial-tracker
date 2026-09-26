@@ -9,6 +9,7 @@ export const VoiceVisualizer = memo(function VoiceVisualizer({
   locale = 'id',
 }) {
   const [seconds, setSeconds] = useState(0)
+  const [audioLevel, setAudioLevel] = useState(0)
 
   useEffect(() => {
     if (!isRecording) {
@@ -19,6 +20,74 @@ export const VoiceVisualizer = memo(function VoiceVisualizer({
       setSeconds((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(interval)
+  }, [isRecording])
+
+  useEffect(() => {
+    if (!isRecording || typeof window === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
+      setAudioLevel(0)
+      return undefined
+    }
+
+    let audioCtx = null
+    let analyser = null
+    let source = null
+    let stream = null
+    let animId = null
+    let isCancelled = false
+
+    async function initAudio() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext
+        if (!AudioContextClass) return
+
+        const userStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (isCancelled) {
+          userStream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        stream = userStream
+        audioCtx = new AudioContextClass()
+        analyser = audioCtx.createAnalyser()
+        analyser.fftSize = 64
+        source = audioCtx.createMediaStreamSource(stream)
+        source.connect(analyser)
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+        const tick = () => {
+          if (isCancelled) return
+          analyser.getByteFrequencyData(dataArray)
+          let sum = 0
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i]
+          }
+          const avg = sum / dataArray.length
+          const normalized = Math.min(1, Math.max(0, avg / 128))
+          setAudioLevel(normalized)
+          animId = requestAnimationFrame(tick)
+        }
+
+        tick()
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn('[VoiceVisualizer:initAudio]', err)
+        }
+      }
+    }
+
+    initAudio()
+
+    return () => {
+      isCancelled = true
+      if (animId) cancelAnimationFrame(animId)
+      if (stream) stream.getTracks().forEach((t) => t.stop())
+      if (source) {
+        try { source.disconnect() } catch { /* ignore */ }
+      }
+      if (audioCtx && audioCtx.state !== 'closed') {
+        try { audioCtx.close() } catch { /* ignore */ }
+      }
+    }
   }, [isRecording])
 
   if (!isRecording) return null
@@ -40,12 +109,16 @@ export const VoiceVisualizer = memo(function VoiceVisualizer({
 
         {/* Audio Waveform Bars */}
         <div className="flex items-center gap-0.5 h-5 px-1">
-          <span className="w-1 h-3 rounded-full bg-rose-500 ft-wave-bar-1" />
-          <span className="w-1 h-5 rounded-full bg-rose-500 ft-wave-bar-2" />
-          <span className="w-1 h-2.5 rounded-full bg-rose-500 ft-wave-bar-3" />
-          <span className="w-1 h-4 rounded-full bg-rose-500 ft-wave-bar-4" />
-          <span className="w-1 h-2 rounded-full bg-rose-500 ft-wave-bar-5" />
-          <span className="w-1 h-4.5 rounded-full bg-rose-500 ft-wave-bar-6" />
+          {[0.6, 1.0, 0.5, 0.8, 0.4, 0.9].map((scale, i) => {
+            const dynamicHeight = Math.max(4, Math.min(20, Math.round(20 * (0.2 + audioLevel * scale))))
+            return (
+              <span
+                key={i}
+                style={{ height: `${dynamicHeight}px` }}
+                className={`w-1 rounded-full bg-rose-500 transition-all duration-75 ft-wave-bar-${i + 1}`}
+              />
+            )
+          })}
         </div>
 
         {/* Status Text & Timer */}

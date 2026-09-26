@@ -185,20 +185,25 @@ export default function NotificationDrawerSheet({ isOpen, onClose }) {
   const openQuickAdd = useTransactionStore((s) => s.openQuickAdd)
   const [activeTab, setActiveTab] = useState('all')
 
-  const rawNotifications = useLiveQuery(async () => {
-    const data = await db.notifications.toArray()
-    return data.sort((a, b) => {
-      const timeA =
-        typeof a.createdAt === 'string'
-          ? new Date(a.createdAt).getTime()
-          : Number(a.createdAt || 0)
-      const timeB =
-        typeof b.createdAt === 'string'
-          ? new Date(b.createdAt).getTime()
-          : Number(b.createdAt || 0)
-      return timeB - timeA
-    })
-  })
+  const rawNotifications = useLiveQuery(
+    async () => {
+      if (!isOpen) return []
+      const data = await db.notifications.toArray()
+      return data.sort((a, b) => {
+        const timeA =
+          typeof a.createdAt === 'string'
+            ? new Date(a.createdAt).getTime()
+            : Number(a.createdAt || 0)
+        const timeB =
+          typeof b.createdAt === 'string'
+            ? new Date(b.createdAt).getTime()
+            : Number(b.createdAt || 0)
+        return timeB - timeA
+      })
+    },
+    [isOpen],
+    []
+  )
 
   const notifications = useMemo(() => rawNotifications || [], [rawNotifications])
 

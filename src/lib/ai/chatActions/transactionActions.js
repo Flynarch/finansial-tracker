@@ -5,6 +5,7 @@ import useSettingsStore from '../../../store/useSettingsStore'
 import { sanitizeCategoryPath } from '../../categorySanitizer'
 import { distributeReceiptTransactions } from '../receiptDistributor'
 import { findMatchingTransactionForAction } from '../aiChatHelpers'
+import { rememberTransactionEntity } from '../entityMemory'
 import { triggerHaptic } from '../../haptics'
 
 export async function handleTransactionAction(result, {
@@ -35,6 +36,17 @@ export async function handleTransactionAction(result, {
       const txEngine = tx.engine || result.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
       const txEngineLabel = tx.engineLabel || result.engineLabel || (txEngine === 'offline_nlp' ? 'NLP Lokal (Offline)' : 'AI Gemini (Online)')
 
+      const isSplit = Boolean(tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0)
+      const cleanSplitItems = isSplit
+        ? tx.splitItems.map((si) => ({
+            ...si,
+            category: sanitizeCategoryPath(si.category, tx.type || 'expense'),
+            amount: Number(si.amount) || 0,
+            notes: si.notes || '',
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+          }))
+        : undefined
+
       const txToSave = {
         ...tx,
         merchant: tx.merchant || result.merchant || undefined,
@@ -42,9 +54,12 @@ export async function handleTransactionAction(result, {
         engineLabel: txEngineLabel,
         amount: numericAmount,
         date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+        time: tx.time || format(new Date(), 'HH:mm'),
         category: sanitizeCategoryPath(tx.category, tx.type),
         walletId: finalWalletId,
         currency: txCurrency,
+        isSplit,
+        splitItems: cleanSplitItems,
         createdAt: Date.now(),
       }
 
@@ -55,6 +70,7 @@ export async function handleTransactionAction(result, {
 
       const newTxId = await addTransaction(txToSave)
       txToSave.id = newTxId
+      rememberTransactionEntity(txToSave)
       savedTxs.push(txToSave)
     }
 
@@ -75,7 +91,8 @@ export async function handleTransactionAction(result, {
   }
 
   if (result.action === 'update' || result.action === 'delete') {
-    const allFreshTxs = await db.transactions.toArray()
+    const rawFreshTxs = await db.transactions.toArray()
+    const allFreshTxs = rawFreshTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
     allFreshTxs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0))
 
     const matchedTx = findMatchingTransactionForAction(allFreshTxs, result)
@@ -110,6 +127,18 @@ export async function handleTransactionAction(result, {
         }
         if (updatedPayload.category) {
           updatedPayload.category = sanitizeCategoryPath(updatedPayload.category, matchedTx.type || 'expense')
+        }
+        if (updatedPayload.isSplit !== undefined) {
+          updatedPayload.isSplit = Boolean(updatedPayload.isSplit)
+        }
+        if (Array.isArray(updatedPayload.splitItems)) {
+          updatedPayload.splitItems = updatedPayload.splitItems.map((si) => ({
+            ...si,
+            category: sanitizeCategoryPath(si.category, matchedTx.type || 'expense'),
+            amount: Number(si.amount) || 0,
+            notes: si.notes || '',
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+          }))
         }
 
         await updateTransaction(matchedTx.id, updatedPayload)
