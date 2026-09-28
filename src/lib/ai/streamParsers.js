@@ -104,18 +104,42 @@ export function processSseEventBlock(eventBlock, state, onStream) {
     const data = JSON.parse(dataStr)
     const parts = data.candidates?.[0]?.content?.parts || []
     for (const p of parts) {
-      if (p.text) {
+      if (p.text && !p.thought) {
         state.fullText = (state.fullText || '') + p.text
         if (onStream) onStream(p.text)
       }
       if (p.functionCall) {
+        const sig =
+          p.thought_signature ||
+          p.thoughtSignature ||
+          p.functionCall.thought_signature ||
+          p.functionCall.thoughtSignature ||
+          null
+
         if (!state.functionCall) {
-          state.functionCall = { name: p.functionCall.name || '', args: {} }
+          state.functionCall = {
+            name: p.functionCall.name || '',
+            args: {},
+            thought_signature: sig,
+            thoughtSignature: sig,
+          }
         } else if (p.functionCall.name && !state.functionCall.name) {
           state.functionCall.name = p.functionCall.name
         }
+
+        if (sig && !state.functionCall.thought_signature) {
+          state.functionCall.thought_signature = sig
+          state.functionCall.thoughtSignature = sig
+        }
+
         if (p.functionCall.args) {
           mergeFunctionCallArgs(state.functionCall.args, p.functionCall.args)
+        }
+      } else if (p.thought_signature || p.thoughtSignature) {
+        const sig = p.thought_signature || p.thoughtSignature
+        if (state.functionCall && !state.functionCall.thought_signature) {
+          state.functionCall.thought_signature = sig
+          state.functionCall.thoughtSignature = sig
         }
       }
     }

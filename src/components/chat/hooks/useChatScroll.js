@@ -4,8 +4,10 @@ import { triggerHaptic } from '../../../lib/haptics'
 export function useChatScroll({
   messages = [],
   isLoading = false,
+  chatScrollContainerRef: externalContainerRef,
 }) {
-  const chatScrollContainerRef = useRef(null)
+  const internalContainerRef = useRef(null)
+  const chatScrollContainerRef = externalContainerRef || internalContainerRef
   const messagesEndRef = useRef(null)
   const [showScrollFAB, setShowScrollFAB] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -19,6 +21,7 @@ export function useChatScroll({
     if (!isFar) {
       setUnreadCount(0)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const scrollToBottom = useCallback(() => {
@@ -53,6 +56,7 @@ export function useChatScroll({
         setUnreadCount((c) => c + 1)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isLoading])
 
   return {

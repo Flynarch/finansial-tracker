@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import Modal from '../ui/Modal'
-import { Grid3X3, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react'
+import { Grid3X3, CheckCircle2, AlertCircle, RotateCcw, Fingerprint } from 'lucide-react'
 import { triggerHaptic } from '../../lib/haptics'
 import useTranslation from '../../hooks/useTranslation'
 
@@ -16,7 +16,7 @@ const DOTS = [
   { id: 8, x: 205, y: 205 },
 ]
 
-export default function PatternLockModal({ isOpen, onClose, onSave, currentSecret = '' }) {
+export default function PatternLockModal({ isOpen, onClose, onSave, currentSecret = '', initialBiometric = false }) {
   const { t } = useTranslation()
   const [step, setStep] = useState(1) // 1: draw pattern, 2: confirm pattern
   const [firstPattern, setFirstPattern] = useState([])
@@ -25,6 +25,7 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
   const [cursorPos, setCursorPos] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [useBiometrics, setUseBiometrics] = useState(initialBiometric)
 
   const svgRef = useRef(null)
 
@@ -36,8 +37,9 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
     setCursorPos(null)
     setErrorMsg('')
     setIsSuccess(false)
+    setUseBiometrics(initialBiometric)
     onClose()
-  }, [onClose])
+  }, [onClose, initialBiometric])
 
   const getSvgPoint = (e) => {
     if (!svgRef.current) return null
@@ -110,7 +112,7 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
         triggerHaptic('success')
         setIsSuccess(true)
         setTimeout(() => {
-          onSave(p1Str)
+          onSave(p1Str, useBiometrics)
           handleClose()
         }, 400)
       } else {
@@ -124,7 +126,7 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
         }, 1200)
       }
     }
-  }, [isDrawing, isSuccess, currentPath, step, firstPattern, onSave, handleClose, t])
+  }, [isDrawing, isSuccess, currentPath, step, firstPattern, onSave, handleClose, t, useBiometrics])
 
   const displayPath = currentPath
 
@@ -252,6 +254,34 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
             })}
           </svg>
         </div>
+
+        {/* Biometric Toggle Option */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light')
+            setUseBiometrics((prev) => !prev)
+          }}
+          className="flex items-center justify-between w-full max-w-[250px] px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs cursor-pointer hover:bg-[var(--panel)] transition active:scale-98"
+        >
+          <div className="flex items-center gap-2">
+            <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
+            <span className="text-[11px] font-bold text-[var(--fg)]">
+              {t('settings.biometricQuickOption', 'Buka juga via Biometrik')}
+            </span>
+          </div>
+          <div
+            className={`w-7 h-4 rounded-full transition-colors relative p-0.5 ${
+              useBiometrics ? 'bg-[var(--lock)]' : 'bg-[var(--border-strong)]'
+            }`}
+          >
+            <div
+              className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                useBiometrics ? 'translate-x-3' : 'translate-x-0'
+              }`}
+            />
+          </div>
+        </button>
 
         {/* Action Button: Reset Pattern */}
         <button

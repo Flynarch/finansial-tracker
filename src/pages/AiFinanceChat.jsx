@@ -160,6 +160,8 @@ export default function AiFinanceChat() {
     handleCancelRecording,
   } = useChatInputState({ locale, onSpeechError: handleSpeechError })
 
+  const chatScrollContainerRef = useRef(null)
+
   const {
     isLoading,
     handleSend,
@@ -171,14 +173,16 @@ export default function AiFinanceChat() {
     wallets,
     messages: useChatStore((s) => s.messages),
     setMessages: useChatStore((s) => s.setMessages),
+    chatScrollContainerRef,
     inputRef,
+    inputValue,
+    selectedImage,
     setSelectedImage,
     setInputValue,
     setShowScanModePicker,
   })
 
   const {
-    chatScrollContainerRef,
     messagesEndRef,
     showScrollFAB,
     unreadCount,
@@ -187,6 +191,7 @@ export default function AiFinanceChat() {
   } = useChatScroll({
     messages: useChatStore((s) => s.messages),
     isLoading,
+    chatScrollContainerRef,
   })
 
   const handleInitialPrompt = useCallback(
@@ -399,7 +404,7 @@ export default function AiFinanceChat() {
         isRecording={isRecording}
         isLoading={isLoading}
         selectedImage={selectedImage}
-        onSend={() => handleSend()}
+        onSend={(text, img) => handleSend(text ?? inputValue, img ?? selectedImage)}
         onToggleRecording={toggleRecording}
         onStopRecording={handleStopRecording}
         onCancelRecording={handleCancelRecording}

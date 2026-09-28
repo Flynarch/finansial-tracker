@@ -36,8 +36,14 @@ export default function useBottomSheet(configOrState = false) {
   const [prevControlledIsOpen, setPrevControlledIsOpen] = useState(controlledIsOpen)
   if (isControlled && controlledIsOpen !== prevControlledIsOpen) {
     setPrevControlledIsOpen(controlledIsOpen)
-    setIsExiting(false)
-    setIsClosingControlled(false)
+    if (controlledIsOpen) {
+      setIsExiting(false)
+      setIsClosingControlled(false)
+    } else {
+      if (!isExiting && !isClosingControlled) {
+        setIsExiting(true)
+      }
+    }
   }
 
   // Clear timeout only when controlled state transitions from closed to open
@@ -49,6 +55,16 @@ export default function useBottomSheet(configOrState = false) {
     }
     wasOpenRef.current = Boolean(controlledIsOpen)
   }, [controlledIsOpen])
+
+  // Timer for external controlled exit animation
+  useEffect(() => {
+    if (!isControlled || !isExiting || isClosingControlled || closeTimeoutRef.current) return undefined
+    const timer = window.setTimeout(() => {
+      setIsExiting(false)
+      setIsClosingControlled(true)
+    }, motionDelay)
+    return () => window.clearTimeout(timer)
+  }, [isControlled, isExiting, isClosingControlled, motionDelay])
 
   // Clean up timeout on unmount
   useEffect(() => {

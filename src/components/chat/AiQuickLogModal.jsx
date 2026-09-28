@@ -1028,6 +1028,8 @@ function isObviousNonTransaction(text) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
+                      if (e.nativeEvent?.isComposing || e.keyCode === 229) return
+                      if (!inputValue.trim() && !selectedImage) return
                       triggerHaptic('light')
                       handleSubmit()
                     }

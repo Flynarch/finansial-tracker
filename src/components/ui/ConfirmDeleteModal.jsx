@@ -13,6 +13,7 @@ export default function ConfirmDeleteModal({
   confirmText,
   cancelText,
   isLoading = false,
+  zIndex = 'z-[80]',
   children,
 }) {
   const { t } = useTranslation()
@@ -23,7 +24,7 @@ export default function ConfirmDeleteModal({
   const textCancel = cancelText || t('common.cancel')
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} zIndex="z-[60]">
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} zIndex={zIndex}>
       <div className="space-y-4 pt-1">
         <div className="flex gap-3 items-start p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-500">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-rose-500" />

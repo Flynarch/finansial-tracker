@@ -221,7 +221,7 @@ export default function Dashboard() {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/transactions')}
+              onClick={() => navigate('/transactions?tab=staging')}
               className="flex shrink-0 items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
             >
               <span>{t('tx.staging.reviewNow', 'Tinjau')}</span>

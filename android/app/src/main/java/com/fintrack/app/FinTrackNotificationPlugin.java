@@ -17,9 +17,28 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import android.Manifest;
+import android.database.Cursor;
+import android.net.Uri;
+import android.util.Log;
+import androidx.core.content.ContextCompat;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import java.util.Locale;
 import java.util.Set;
 
-@CapacitorPlugin(name = "FinTrackNotification")
+@CapacitorPlugin(
+    name = "FinTrackNotification",
+    permissions = {
+        @Permission(
+            alias = "sms",
+            strings = {
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_SMS
+            }
+        )
+    }
+)
 public class FinTrackNotificationPlugin extends Plugin {
 
     private static final String[] KNOWN_FINANCIAL_PACKAGES = {
@@ -37,7 +56,12 @@ public class FinTrackNotificationPlugin extends Plugin {
         "com.gopay.wallet",
         "ovo.id",
         "id.dana",
-        "com.shopee.id"
+        "com.shopee.id",
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms",
+        "com.coloros.mms",
+        "com.vivo.mms"
     };
 
     @PluginMethod
@@ -69,6 +93,141 @@ public class FinTrackNotificationPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Failed to open notification listener settings: " + e.getMessage());
         }
+    }
+
+    @PluginMethod
+    public void checkSmsPermission(PluginCall call) {
+        Context context = getContext();
+        boolean receiveGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED;
+        boolean readGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED;
+
+        JSObject ret = new JSObject();
+        ret.put("receiveGranted", receiveGranted);
+        ret.put("readGranted", readGranted);
+        ret.put("granted", receiveGranted && readGranted);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestSmsPermission(PluginCall call) {
+        requestPermissionForAlias("sms", call, "smsPermissionCallback");
+    }
+
+    @PermissionCallback
+    private void smsPermissionCallback(PluginCall call) {
+        checkSmsPermission(call);
+    }
+
+    @PluginMethod
+    public void scanHistoricalSms(PluginCall call) {
+        Context context = getContext();
+        int days = call.getInt("days", 30);
+        long cutoffTime = System.currentTimeMillis() - (days * 86400000L);
+
+        JSArray resultArr = new JSArray();
+
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("mutations", resultArr);
+            ret.put("error", "READ_SMS permission not granted");
+            call.resolve(ret);
+            return;
+        }
+
+        Uri uri = Uri.parse("content://sms/inbox");
+        String selection = "date >= ?";
+        String[] selectionArgs = new String[] { String.valueOf(cutoffTime) };
+        String sortOrder = "date DESC LIMIT 200";
+
+        try (Cursor cursor = context.getContentResolver().query(uri, new String[] { "_id", "address", "body", "date" }, selection, selectionArgs, sortOrder)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int idIdx = cursor.getColumnIndex("_id");
+                int addrIdx = cursor.getColumnIndex("address");
+                int bodyIdx = cursor.getColumnIndex("body");
+                int dateIdx = cursor.getColumnIndex("date");
+
+                do {
+                    String id = cursor.getString(idIdx);
+                    String address = cursor.getString(addrIdx);
+                    String body = cursor.getString(bodyIdx);
+                    long date = cursor.getLong(dateIdx);
+
+                    if (address == null) address = "";
+                    if (body == null) body = "";
+
+                    String upperAddress = address.toUpperCase(Locale.ROOT);
+                    String addressDigits = upperAddress.replaceAll("[^0-9]", "");
+                    String lowerBody = body.toLowerCase(Locale.ROOT);
+
+                    // Check if sender matches a financial institution or official shortcode
+                    boolean isFinancial = upperAddress.contains("BCA") ||
+                        upperAddress.contains("MANDIRI") ||
+                        upperAddress.contains("BRI") ||
+                        upperAddress.contains("BNI") ||
+                        upperAddress.contains("CIMB") ||
+                        upperAddress.contains("PERMATA") ||
+                        upperAddress.contains("DANAMON") ||
+                        upperAddress.contains("MEGA") ||
+                        upperAddress.contains("CITI") ||
+                        upperAddress.contains("HSBC") ||
+                        upperAddress.contains("BSI") ||
+                        upperAddress.contains("SEABANK") ||
+                        upperAddress.contains("JAGO") ||
+                        upperAddress.contains("JENIUS") ||
+                        upperAddress.contains("BLU") ||
+                        addressDigits.equals("69888") || addressDigits.equals("6269888") ||
+                        addressDigits.equals("83355") || addressDigits.equals("6283355") ||
+                        addressDigits.equals("3355") || addressDigits.equals("623355") ||
+                        addressDigits.equals("3300") || addressDigits.equals("623300") ||
+                        addressDigits.equals("3346") || addressDigits.equals("623346") ||
+                        addressDigits.equals("1418") || addressDigits.equals("621418") ||
+                        addressDigits.equals("3399") || addressDigits.equals("623399") ||
+                        addressDigits.equals("3377") || addressDigits.equals("623377") ||
+                        lowerBody.startsWith("bca:") ||
+                        lowerBody.startsWith("mandiri:") ||
+                        lowerBody.startsWith("bri:") ||
+                        lowerBody.startsWith("bni:") ||
+                        lowerBody.startsWith("cimb:") ||
+                        lowerBody.startsWith("permata:") ||
+                        lowerBody.startsWith("danamon:") ||
+                        lowerBody.startsWith("mega:") ||
+                        lowerBody.startsWith("citibank:") ||
+                        lowerBody.startsWith("hsbc:");
+
+                    // Reject OTP, security keywords, and loan spam instantly
+                    boolean isOtp = lowerBody.contains("otp") ||
+                        lowerBody.contains("kode rahasia") ||
+                        lowerBody.contains("jangan berikan") ||
+                        lowerBody.contains("verifikasi") ||
+                        lowerBody.contains("kode verifikasi") ||
+                        lowerBody.contains("kode autentikasi") ||
+                        lowerBody.contains("token") ||
+                        lowerBody.contains("http://") ||
+                        lowerBody.contains("https://") ||
+                        lowerBody.contains("klik link") ||
+                        lowerBody.contains("penawaran kta") ||
+                        lowerBody.contains("kta kilat") ||
+                        lowerBody.contains("dana tunai") ||
+                        lowerBody.contains("pinjaman kilat");
+
+                    if (isFinancial && !isOtp && (lowerBody.contains("rp") || lowerBody.contains("idr"))) {
+                        JSObject obj = new JSObject();
+                        obj.put("id", "sms_hist_" + id);
+                        obj.put("packageName", "android.provider.Telephony.SMS_RECEIVED");
+                        obj.put("title", address);
+                        obj.put("text", body);
+                        obj.put("timestamp", date);
+                        resultArr.put(obj);
+                    }
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("FinTrackNotifPlugin", "Failed to query SMS inbox", e);
+        }
+
+        JSObject ret = new JSObject();
+        ret.put("mutations", resultArr);
+        call.resolve(ret);
     }
 
     @PluginMethod

@@ -33,18 +33,14 @@ import {
 import {
   fetchGoldPricePerGramIDR,
   getGoldPriceHistory,
-  fetchCurrencyRates,
-  getCachedCurrencyRates,
 } from '../../lib/api'
 import { db } from '../../lib/db'
-import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
   formatMoneyInput,
   parseMoneyInput,
   toSafeNumber,
-  FALLBACK_EXCHANGE_RATES,
 } from '../../lib/utils'
 import { evaluateExpression } from '../../lib/calcParser'
 
@@ -108,38 +104,23 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     [isOpen, txType],
     []
   )
-  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
-
-  useEffect(() => {
-    if (!isOpen) return
-    const timer = setTimeout(() => {
-      fetchCurrencyRates('USD')
-        .then((r) => r && setRates(r))
-        .catch((err) => console.warn('[QuickAddTransactionModal]', err))
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [isOpen])
 
   const initialCachedWallets = useMemo(() => getCachedDashboardWallets() || [], [])
 
-  const queriedWallets = useLiveQuery(
+  const liveWallets = useLiveQuery(
     async () => {
-      if (!isOpen) return []
       const raw = await db.wallets.toArray()
       if (!raw || raw.length === 0) return []
-      return await getAllWalletBalances(raw, rates)
+      return raw.map((w) => ({
+        ...w,
+        currentBalance: w.balance ?? 0,
+      }))
     },
-    [isOpen, rates],
+    [],
     initialCachedWallets
   )
 
-  const [cachedWallets, setCachedWallets] = useState(initialCachedWallets)
-  const [prevQueriedWallets, setPrevQueriedWallets] = useState(queriedWallets)
-  if (queriedWallets && queriedWallets.length > 0 && queriedWallets !== prevQueriedWallets) {
-    setPrevQueriedWallets(queriedWallets)
-    setCachedWallets(queriedWallets)
-  }
-  const wallets = (queriedWallets && queriedWallets.length > 0) ? queriedWallets : cachedWallets
+  const wallets = (liveWallets && liveWallets.length > 0) ? liveWallets : initialCachedWallets
 
   const [walletModalMode, setWalletModalMode] = useState(null)
   const [tags, setTags] = useState([])
@@ -180,19 +161,20 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     [selectedWallet],
   )
 
-  const [prevInitialWalletId, setPrevInitialWalletId] = useState(initialWalletId || '')
-  const normalizedInitialWalletId = initialWalletId || ''
-  if (normalizedInitialWalletId !== prevInitialWalletId) {
-    setPrevInitialWalletId(normalizedInitialWalletId)
-    const matching = wallets?.find((w) => String(w.id) === String(initialWalletId))
-    const nextCurr = matching?.currency || defaultCurrency
-    setForm((p) => ({
-      ...p,
-      walletId: initialWalletId || '',
-      currency: nextCurr,
-      amount: formatMoneyInput(p.amount, nextCurr),
-    }))
-  }
+  const prevInitialWalletIdRef = useRef(initialWalletId || '')
+  useEffect(() => {
+    if (initialWalletId && initialWalletId !== prevInitialWalletIdRef.current) {
+      prevInitialWalletIdRef.current = initialWalletId
+      const matching = wallets?.find((w) => String(w.id) === String(initialWalletId))
+      const nextCurr = matching?.currency || defaultCurrency
+      setForm((p) => ({
+        ...p,
+        walletId: initialWalletId,
+        currency: nextCurr,
+        amount: formatMoneyInput(p.amount, nextCurr),
+      }))
+    }
+  }, [initialWalletId, wallets, defaultCurrency])
 
   const [categorySheetOpen, setCategorySheetOpen] = useState(() => false)
   const [categorySheetEnter, setCategorySheetEnter] = useState(() => false)
@@ -321,12 +303,15 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     }
   }, [])
 
-  const [prevOpen, setPrevOpen] = useState(isOpen)
-  const [prevNonce, setPrevNonce] = useState(nonce)
-  if (prevOpen !== isOpen || prevNonce !== nonce) {
-    setPrevOpen(isOpen)
-    setPrevNonce(nonce)
-    if (isOpen) {
+  const lastOpenRef = useRef(Boolean(isOpen))
+  const lastNonceRef = useRef(nonce)
+
+  useEffect(() => {
+    const isOpening = Boolean(isOpen) && (!lastOpenRef.current || lastNonceRef.current !== nonce)
+    lastOpenRef.current = Boolean(isOpen)
+    lastNonceRef.current = nonce
+
+    if (isOpening) {
       setTxType('expense')
       setCategoryError(false)
       setWalletError(false)
@@ -336,8 +321,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       const activeWalletId = initialWalletId || defaultWalletId || (availableWallets?.length > 0 ? availableWallets[0].id : '')
       const activeWallet = availableWallets?.find((w) => String(w.id) === String(activeWalletId))
       const activeCurrency = activeWallet?.currency || defaultCurrency
-      setForm((prev) => ({
-        ...prev,
+      setForm({
         date: format(new Date(), 'yyyy-MM-dd'),
         amount: '',
         category: '',
@@ -346,14 +330,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         walletId: activeWalletId,
         targetWalletId: '',
         receiptImage: '',
-      }))
+      })
       setPreviewImage(null)
       syncExpenseParentFromCategory('')
       syncIncomeParentFromCategory('')
       setExpenseParentId(null)
       setIncomeParentId(null)
     }
-  }
+  }, [isOpen, nonce, initialWalletId, defaultWalletId, wallets, initialCachedWallets, defaultCurrency, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
 
   useEffect(() => {
     if (txType !== 'investment') return

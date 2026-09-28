@@ -92,9 +92,13 @@ function LockScreen({ onUnlock }) {
     }
   }, [])
 
+  const isAuthenticatingRef = useRef(false)
+  const hasAutoPromptedRef = useRef(false)
+
   // Biometric Unlock with cascading wave animation
   const handleBiometricUnlock = useCallback(async () => {
-    if (isAuthenticating || isSuccessUnlocked || isBioFilling) return
+    if (isAuthenticatingRef.current || isSuccessUnlocked || isBioFilling) return
+    isAuthenticatingRef.current = true
     setIsAuthenticating(true)
     setError('')
     try {
@@ -144,22 +148,29 @@ function LockScreen({ onUnlock }) {
       console.warn('[LockScreen]', err)
       /* ignore */
     } finally {
+      isAuthenticatingRef.current = false
       if (isMountedRef.current) {
         setIsAuthenticating(false)
       }
     }
-  }, [isAuthenticating, isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock, setTrackedTimeout, setTrackedInterval, clearTrackedInterval])
+  }, [isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock, setTrackedTimeout, setTrackedInterval, clearTrackedInterval])
 
-  // Automatically prompt native biometric/device passcode on mount if biometric enabled
+  const handleBiometricUnlockRef = useRef(handleBiometricUnlock)
   useEffect(() => {
-    if (!biometricEnabled) return
+    handleBiometricUnlockRef.current = handleBiometricUnlock
+  })
+
+  // Automatically prompt native biometric/device passcode on mount AT MOST ONCE if biometric enabled
+  useEffect(() => {
+    if (!biometricEnabled || hasAutoPromptedRef.current) return
+    hasAutoPromptedRef.current = true
     const timer = setTimeout(() => {
       if (isMountedRef.current) {
-        handleBiometricUnlock()
+        handleBiometricUnlockRef.current?.()
       }
     }, 280)
     return () => clearTimeout(timer)
-  }, [biometricEnabled, handleBiometricUnlock])
+  }, [biometricEnabled])
 
   // Handle PIN digit input
   const handlePinDigit = async (digit) => {

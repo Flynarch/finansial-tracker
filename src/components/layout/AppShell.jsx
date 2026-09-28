@@ -116,6 +116,21 @@ function AppShell() {
     setHasOpenedQuickAdd(true)
   }
 
+  // Preload QuickAdd and AiQuickLog chunks on idle so initial user tap has 0ms loading lag
+  useEffect(() => {
+    const preload = () => {
+      import('../transactions/QuickAddTransactionModal')
+      import('../chat/AiQuickLogModal')
+    }
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = window.requestIdleCallback(preload)
+      return () => window.cancelIdleCallback(handle)
+    } else {
+      const timer = window.setTimeout(preload, 500)
+      return () => window.clearTimeout(timer)
+    }
+  }, [])
+
   useEffect(() => {
     const currentPath = location.pathname
     const currentKey = location.key || 'initial'
@@ -431,12 +446,6 @@ function AppShell() {
         backgroundTimeRef.current = Date.now()
       } else {
         checkAndLock()
-        const currentSettings = useSettingsStore.getState()
-        syncNotificationQueue({
-          defaultCurrency: currentSettings.defaultCurrency,
-          defaultWalletId: currentSettings.defaultWalletId,
-          notificationAutoApprove: currentSettings.notificationAutoApprove,
-        }).catch((err) => console.warn('[AppShell]', err))
       }
     }
 
@@ -448,6 +457,41 @@ function AppShell() {
       appListenerPromise.then((l) => l.remove?.())
     }
   }, [securityEnabled, autoLockTimeout, lock])
+
+  // Sync notification queue whenever the app returns to foreground, regardless of security lock status
+  useEffect(() => {
+    const handleForegroundSync = () => {
+      const currentSettings = typeof useSettingsStore.getState === 'function' ? useSettingsStore.getState() : {}
+      syncNotificationQueue({
+        defaultCurrency: currentSettings.defaultCurrency,
+        defaultWalletId: currentSettings.defaultWalletId,
+        notificationAutoApprove: currentSettings.notificationAutoApprove,
+      }).catch((err) => console.warn('[AppShell:syncNotificationQueue]', err))
+    }
+
+    // Immediately drain native notification queue on cold start mount
+    handleForegroundSync()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleForegroundSync()
+      }
+    }
+
+    const handleAppStateChange = (state) => {
+      if (state.isActive) {
+        handleForegroundSync()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    const appListenerPromise = App.addListener('appStateChange', handleAppStateChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      appListenerPromise.then((l) => l.remove?.())
+    }
+  }, [])
 
   // Ensure native and web Firebase SDK authentication sessions are aligned on startup
   useEffect(() => {
@@ -566,20 +610,29 @@ function AppShell() {
           </Suspense>
         ) : (
           <main
-            className={`min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
-              location.pathname.startsWith('/wallet/') ||
-              location.pathname.startsWith('/todos/') ||
-              location.pathname.startsWith('/savings/') ||
-              location.pathname === '/add-account'
-                ? 'px-0 pt-0 pb-12'
-                : location.pathname === '/dashboard' || location.pathname === '/'
-                ? 'px-4 pt-1 pb-[calc(10rem+env(safe-area-inset-bottom))]'
-                : isDetailPage
-                ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-12'
-                : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
+            className={`${
+              location.pathname === '/transactions'
+                ? 'h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] flex-1 min-w-0 flex flex-col overflow-hidden px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-0 md:h-[calc(100vh-65px)] md:max-h-[calc(100vh-65px)] md:px-6 md:pt-6 md:pb-4'
+                : `min-h-[calc(100dvh-64px)] flex-1 min-w-0 md:min-h-[calc(100vh-65px)] md:px-6 md:pb-6 md:pt-6 ${
+                    location.pathname.startsWith('/wallet/') ||
+                    location.pathname.startsWith('/todos/') ||
+                    location.pathname.startsWith('/savings/') ||
+                    location.pathname === '/add-account'
+                      ? 'px-0 pt-0 pb-12'
+                      : location.pathname === '/dashboard' || location.pathname === '/'
+                      ? 'px-4 pt-1 pb-[calc(10rem+env(safe-area-inset-bottom))]'
+                      : isDetailPage
+                      ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-12'
+                      : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
+                  }`
             }`}
           >
-            <div key={location.pathname} className="ft-page-crossfade">
+            <div
+              key={location.pathname}
+              className={`ft-page-crossfade ${
+                location.pathname === '/transactions' ? 'h-full flex-1 flex flex-col min-h-0 overflow-hidden' : ''
+              }`}
+            >
               <Suspense
                 fallback={<PageSkeleton variant={getSkeletonVariant(location.pathname)} />}
               >

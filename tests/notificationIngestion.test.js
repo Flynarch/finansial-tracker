@@ -239,7 +239,7 @@ describe('notificationIngestion - Anti-Spam & Promo Guardrails', () => {
     expect(
       isFinancialMutation(
         'ShopeePay',
-        'Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini 👉',
+        'Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini \u{1F449}',
         'com.shopee.id'
       )
     ).toBe(false)
@@ -248,7 +248,7 @@ describe('notificationIngestion - Anti-Spam & Promo Guardrails', () => {
     expect(
       isFinancialMutation(
         'DANA',
-        'Dana 🔥mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
+        'Dana \u{1F525}mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
         'id.dana'
       )
     ).toBe(false)
@@ -437,7 +437,7 @@ describe('notificationIngestion - Promo Scanner & Bulk Cleanup', () => {
       type: 'expense',
       amount: 200000,
       currency: 'IDR',
-      notes: '[Auto: ShopeePay] Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini 👉',
+      notes: '[Auto: ShopeePay] Terima Saldo Gratis Rp200.000-nya, Kak Ricopratama112 Bisa Terima Saldo Rp200.000 Gratis Dari Seabank di Sini \u{1F449}',
       source: 'notification_listener',
       category: 'lainnya_kategori/umum',
     })
@@ -447,7 +447,7 @@ describe('notificationIngestion - Promo Scanner & Bulk Cleanup', () => {
       type: 'expense',
       amount: 10,
       currency: 'IDR',
-      notes: '[Auto: DANA] Dana 🔥mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
+      notes: '[Auto: DANA] Dana \u{1F525}mau Hemat Berkali-kali S/d Rp1 0rb Transfer ke Bank? Cek Caranya Yuk!',
       source: 'notification_listener',
       category: 'lainnya_kategori/umum',
     })
@@ -487,5 +487,195 @@ describe('notificationIngestion - Promo Scanner & Bulk Cleanup', () => {
     await db.transactions.delete(txValidId)
     await db.transactions.delete(tx1Id)
     await db.transactions.delete(tx2Id)
+  })
+})
+
+describe('notificationIngestion - DANA Mutation Ingestion & Classification', () => {
+  it('correctly parses outgoing payment with celebratory emoji and di sini receipt confirmation as expense', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Kirim Uang Berhasil \u{1F389}! Kamu telah membayar Rp 50.000 ke Budi Santoso. Uang masuk ke saldo penerima. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(50000)
+    expect(parsed.type).toBe('expense')
+  })
+
+  it('correctly parses outgoing payment with IDR format as expense', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Kamu telah membayar IDR 35.000 di Kopi Kenangan. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(35000)
+    expect(parsed.type).toBe('expense')
+  })
+
+  it('correctly parses top up and balance increase (isi saldo) as income', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Isi Saldo Berhasil! Saldo bertambah Rp 100.000 via BCA Virtual Account. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(100000)
+    expect(parsed.type).toBe('income')
+  })
+
+  it('correctly parses incoming transfer (kirim uang diterima) as income', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Kirim Uang Diterima! Kamu menerima uang sebesar Rp 75.000 dari Siska. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(75000)
+    expect(parsed.type).toBe('income')
+  })
+
+  it('correctly parses incoming gift transfer (dapat kiriman) as income with IDR amount', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Dapat kiriman uang! Kiriman uang sebesar IDR 250.000 dari Ahmad telah masuk ke saldo.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(250000)
+    expect(parsed.type).toBe('income')
+  })
+
+  it('correctly parses completed transaction (transaksi selesai) as expense', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Transaksi Selesai! Kamu telah membayar Rp 120.000 ke Solaria. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(120000)
+    expect(parsed.type).toBe('expense')
+  })
+
+  it('rejects marketing promos containing click here or claim phrases', () => {
+    expect(
+      isFinancialMutation(
+        'DANA Promo',
+        'Klaim Saldo DANA Gratis Rp 50.000! Klik di sini sekarang',
+        'id.dana'
+      )
+    ).toBe(false)
+
+    expect(
+      isFinancialMutation(
+        'DANA',
+        'Promo di sini! Dapatkan voucher diskon hingga Rp 25.000',
+        'id.dana'
+      )
+    ).toBe(false)
+  })
+
+  it('correctly parses outgoing transfer (berhasil dikirim ke) as expense', () => {
+    const rawNotif = {
+      title: 'DANA',
+      text: 'Berhasil dikirim Rp 80.000 ke rekening BNI. Uang masuk ke rekening tujuan. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+
+    expect(isFinancialMutation(rawNotif.title, rawNotif.text, rawNotif.packageName)).toBe(true)
+
+    const parsed = parseFinancialNotification(rawNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(80000)
+    expect(parsed.type).toBe('expense')
+  })
+
+  it('permits authentic DANA receipts containing celebratory emojis', () => {
+    // 1. Transfer receipt with money-with-wings (\u{1F4B8})
+    const transferNotif = {
+      title: 'Kirim Uang Berhasil! \u{1F4B8}',
+      text: 'Kamu berhasil kirim Rp 50.000 ke Budi. Cek detail transaksi di sini.',
+      packageName: 'id.dana',
+    }
+    expect(isFinancialMutation(transferNotif.title, transferNotif.text, transferNotif.packageName)).toBe(true)
+    const parsedTransfer = parseFinancialNotification(transferNotif)
+    expect(parsedTransfer).not.toBeNull()
+    expect(parsedTransfer.amount).toBe(50000)
+    expect(parsedTransfer.type).toBe('expense')
+
+    // 2. QRIS payment receipt with sparkles (\u{2728})
+    const qrisNotif = {
+      title: 'Pembayaran Berhasil \u{2728}',
+      text: 'Pembayaran sebesar Rp 35.000 ke Fore Coffee berhasil.',
+      packageName: 'id.dana',
+    }
+    expect(isFinancialMutation(qrisNotif.title, qrisNotif.text, qrisNotif.packageName)).toBe(true)
+    const parsedQris = parseFinancialNotification(qrisNotif)
+    expect(parsedQris).not.toBeNull()
+    expect(parsedQris.amount).toBe(35000)
+    expect(parsedQris.type).toBe('expense')
+
+    // 3. Top-up receipt with party popper (\u{1F389})
+    const topupNotif = {
+      title: 'Isi Saldo Berhasil! \u{1F389}',
+      text: 'Saldo DANA kamu bertambah Rp 100.000 dari BCA',
+      packageName: 'id.dana',
+    }
+    expect(isFinancialMutation(topupNotif.title, topupNotif.text, topupNotif.packageName)).toBe(true)
+    const parsedTopup = parseFinancialNotification(topupNotif)
+    expect(parsedTopup).not.toBeNull()
+    expect(parsedTopup.amount).toBe(100000)
+    expect(parsedTopup.type).toBe('income')
+  })
+
+  it('correctly handles DANA Kaget notifications as income', () => {
+    const kagetNotif = {
+      title: 'DANA',
+      text: 'Kamu dapat DANA Kaget Rp 10.000 dari Sarah!',
+      packageName: 'id.dana',
+    }
+    expect(isFinancialMutation(kagetNotif.title, kagetNotif.text, kagetNotif.packageName)).toBe(true)
+    const parsed = parseFinancialNotification(kagetNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.amount).toBe(10000)
+    expect(parsed.type).toBe('income')
   })
 })

@@ -382,8 +382,10 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
 
     if (response.functionCall) {
       const fnCall = response.functionCall
+      const rawFnName = fnCall.name || ''
+      const fnName = rawFnName.includes(':') ? rawFnName.split(':').pop() : rawFnName
 
-      if (fnCall.name === 'record_transactions') {
+      if (fnName === 'record_transactions') {
         const defaultWalletId = useSettingsStore.getState().defaultWalletId || wallets[0]?.id || 1
         const userExtraction = extractMerchantAndCategory(userMessage || '')
         let extractedMerchant = fnCall.args.merchantName || fnCall.args.transactions?.[0]?.merchant || ''
@@ -500,7 +502,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
 
-      if (fnCall.name === 'update_transaction') {
+      if (fnName === 'update_transaction') {
         return {
           type: 'transactions',
           action: 'update',
@@ -512,7 +514,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
 
-      if (fnCall.name === 'delete_transaction') {
+      if (fnName === 'delete_transaction') {
         return {
           type: 'transactions',
           action: 'delete',
@@ -524,31 +526,31 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
 
-      if (fnCall.name === 'manage_habit') {
+      if (fnName === 'manage_habit') {
         return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'manage_todo') {
+      if (fnName === 'manage_todo') {
         return { type: 'todo', action: fnCall.args.action, title: fnCall.args.title, description: fnCall.args.description, category: fnCall.args.category, dueDate: fnCall.args.dueDate, priority: fnCall.args.priority, subTasks: fnCall.args.subTasks, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses to-do...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'manage_budget') {
+      if (fnName === 'manage_budget') {
         return { type: 'budget', action: fnCall.args.action, category: fnCall.args.category, limit: fnCall.args.limit, text: fnCall.args.replyMessage || "Memproses budget...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'manage_savings') {
+      if (fnName === 'manage_savings') {
         return { type: 'savings', action: fnCall.args.action, name: fnCall.args.name, amount: fnCall.args.amount, walletId: fnCall.args.walletId, text: fnCall.args.replyMessage || "Memproses tabungan...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'manage_recurring') {
+      if (fnName === 'manage_recurring') {
         return { type: 'recurring', action: fnCall.args.action, title: fnCall.args.title, amount: fnCall.args.amount, category: fnCall.args.category, frequency: fnCall.args.frequency, text: fnCall.args.replyMessage || "Memproses langganan...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'export_report') {
+      if (fnName === 'export_report') {
         return { type: 'export', month: fnCall.args.month, text: fnCall.args.replyMessage || "Menyiapkan file laporan Anda...", chips: fnCall.args.suggestedChips }
       }
 
-      if (fnCall.name === 'manage_wallet') {
+      if (fnName === 'manage_wallet') {
         return {
           type: 'wallet',
           action: fnCall.args.action,
@@ -563,7 +565,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
 
-      if (fnCall.name === 'manage_loans') {
+      if (fnName === 'manage_loans') {
         return {
           type: 'loan',
           action: fnCall.args.action,
@@ -578,7 +580,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         }
       }
 
-      if (fnCall.name === 'calculate_financial_health') {
+      if (fnName === 'calculate_financial_health') {
         return await calculateDirectFinancialHealth({
           defaultCurrency,
           locale,
@@ -588,7 +590,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
         })
       }
 
-      if (fnCall.name === 'query_database') {
+      if (fnName === 'query_database') {
         const dbResult = await queryTransactions(fnCall.args)
 
         // If renderChart is true, we return chart data immediately along with a generic text
@@ -603,7 +605,23 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           }
         }
 
-        contents.push({ role: 'model', parts: [{ functionCall: fnCall }] })
+        const signature =
+          fnCall.thought_signature ||
+          fnCall.thoughtSignature ||
+          'context_engineering_is_the_way_to_go'
+
+        contents.push({
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: fnCall.name,
+                args: fnCall.args,
+              },
+              thought_signature: signature,
+            },
+          ],
+        })
         contents.push({
           role: 'user',
           parts: [{ functionResponse: { name: fnCall.name, response: { content: dbResult } } }],

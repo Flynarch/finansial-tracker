@@ -6,7 +6,7 @@ import { isTransactionNew } from '../../lib/transactionLastSeen'
 export function TransactionListSkeleton() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-4 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+      <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-4 pt-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-6">
         {[1, 2].map((groupKey) => (
           <section key={groupKey} className="space-y-2">
             {/* Shimmer Date Header Strip */}
@@ -81,9 +81,13 @@ export const TransactionListSection = memo(function TransactionListSection({
   const [prevLength, setPrevLength] = useState(filteredTransactions.length)
   const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_CHUNK)
 
-  if (prevLength !== filteredTransactions.length) {
+  // Reset pagination only when list size changes significantly (e.g. filter/search changed),
+  // not on single-item mutations (delete/edit/undo) so user does not lose scroll position.
+  if (Math.abs(prevLength - filteredTransactions.length) > 2) {
     setPrevLength(filteredTransactions.length)
     setVisibleGroupCount(PAGE_CHUNK)
+  } else if (prevLength !== filteredTransactions.length) {
+    setPrevLength(filteredTransactions.length)
   }
 
   const handleScrollInternal = (event) => {
@@ -122,7 +126,7 @@ export const TransactionListSection = memo(function TransactionListSection({
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         onScroll={handleScrollInternal}
       >
-        <div className="min-h-full space-y-3 pt-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+        <div className="min-h-full space-y-3 pt-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-6">
           {visibleGroups.map((group, idx) => (
             <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
               {/* Date Header Strip */}

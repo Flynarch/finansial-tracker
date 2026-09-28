@@ -41,7 +41,7 @@ function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-xs ${
+      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 sm:backdrop-blur-xs ${
         isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
       }`}
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}

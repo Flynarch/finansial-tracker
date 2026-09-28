@@ -13,6 +13,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 public class FinTrackNotificationService extends NotificationListenerService {
@@ -42,7 +43,21 @@ public class FinTrackNotificationService extends NotificationListenerService {
         "com.gopay.wallet",
         "ovo.id",
         "id.dana",
-        "com.shopee.id"
+        "com.shopee.id",
+        // Default SMS / MMS Messaging Applications
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms",
+        "com.coloros.mms",
+        "com.vivo.mms"
+    ));
+
+    private static final Set<String> SMS_PACKAGES = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms",
+        "com.coloros.mms",
+        "com.vivo.mms"
     ));
 
     @Override
@@ -62,12 +77,38 @@ public class FinTrackNotificationService extends NotificationListenerService {
 
         CharSequence titleChar = extras.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence textChar = extras.getCharSequence(Notification.EXTRA_TEXT);
+        CharSequence bigTitleChar = extras.getCharSequence(Notification.EXTRA_TITLE_BIG);
         CharSequence bigTextChar = extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+        CharSequence subTextChar = extras.getCharSequence(Notification.EXTRA_SUB_TEXT);
 
         String title = titleChar != null ? titleChar.toString() : "";
+        if (title.isEmpty() && bigTitleChar != null) {
+            title = bigTitleChar.toString();
+        }
+
         String text = textChar != null ? textChar.toString() : "";
         if (bigTextChar != null && bigTextChar.length() > text.length()) {
             text = bigTextChar.toString();
+        }
+
+        if (text.isEmpty()) {
+            CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+            if (lines != null && lines.length > 0) {
+                StringBuilder sb = new StringBuilder();
+                for (CharSequence line : lines) {
+                    if (line != null && line.length() > 0) {
+                        if (sb.length() > 0) sb.append(" ");
+                        sb.append(line);
+                    }
+                }
+                text = sb.toString();
+            }
+        }
+
+        if (text.isEmpty() && subTextChar != null) {
+            text = subTextChar.toString();
+        } else if (title.isEmpty() && subTextChar != null) {
+            title = subTextChar.toString();
         }
 
         if (title.isEmpty() && text.isEmpty()) {
@@ -75,6 +116,41 @@ public class FinTrackNotificationService extends NotificationListenerService {
         }
 
         String lowerCombined = (title + " " + text).toLowerCase();
+
+        // Guard: For SMS apps, strictly verify that the sender or body matches a financial institution
+        if (isSmsPackage(packageName)) {
+            boolean hasBankSignature = lowerCombined.contains("bca") ||
+                lowerCombined.contains("mandiri") ||
+                lowerCombined.contains("bri") ||
+                lowerCombined.contains("bni") ||
+                lowerCombined.contains("cimb") ||
+                lowerCombined.contains("permata") ||
+                lowerCombined.contains("danamon") ||
+                lowerCombined.contains("mega") ||
+                lowerCombined.contains("citi") ||
+                lowerCombined.contains("hsbc") ||
+                lowerCombined.contains("seabank") ||
+                lowerCombined.contains("jago") ||
+                lowerCombined.contains("bsi") ||
+                lowerCombined.contains("jenius") ||
+                lowerCombined.contains("blu");
+
+            boolean hasCurrency = lowerCombined.contains("rp") || lowerCombined.contains("idr");
+            if (!hasBankSignature || !hasCurrency) {
+                return;
+            }
+
+            // Reject OTP and security codes instantly
+            if (lowerCombined.contains("otp") ||
+                lowerCombined.contains("kode rahasia") ||
+                lowerCombined.contains("jangan berikan") ||
+                lowerCombined.contains("verifikasi") ||
+                lowerCombined.contains("token") ||
+                lowerCombined.contains("http://") ||
+                lowerCombined.contains("https://")) {
+                return;
+            }
+        }
 
         // Guard 1: Filter general Shopee e-commerce, shopping orders, and live-stream spam
         if ("com.shopee.id".equalsIgnoreCase(packageName)) {
@@ -90,8 +166,8 @@ public class FinTrackNotificationService extends NotificationListenerService {
 
         // Guard 2: Filter obvious marketing clickbaits, engagement questions, and promo hype emojis
         if (title.contains("?") || text.contains("?") ||
-            title.contains("👉") || text.contains("👉") ||
-            title.contains("🔥") || text.contains("🔥") ||
+            title.contains("\uD83D\uDC49") || text.contains("\uD83D\uDC49") ||
+            title.contains("\uD83D\uDD25") || text.contains("\uD83D\uDD25") ||
             lowerCombined.contains("cek caranya") ||
             lowerCombined.contains("saldo gratis") ||
             lowerCombined.contains("gratis saldo") ||
@@ -119,11 +195,15 @@ public class FinTrackNotificationService extends NotificationListenerService {
         }
 
         long postTime = sbn.getPostTime();
-        saveNotificationToQueue(packageName, title, text, postTime);
+        saveNotificationToQueue(this, packageName, title, text, postTime);
     }
 
     private boolean isFinancialPackage(String pkg) {
         return WHITELISTED_PACKAGES.contains(pkg.toLowerCase());
+    }
+
+    private boolean isSmsPackage(String pkg) {
+        return SMS_PACKAGES.contains(pkg.toLowerCase());
     }
 
     public static SharedPreferences getEncryptedPreferences(Context context) {
@@ -160,22 +240,48 @@ public class FinTrackNotificationService extends NotificationListenerService {
         }
     }
 
-    private void saveNotificationToQueue(String packageName, String title, String text, long postTime) {
+    public static void saveNotificationToQueue(Context context, String packageName, String title, String text, long postTime) {
         synchronized (QUEUE_LOCK) {
             try {
-                SharedPreferences prefs = getEncryptedPreferences(this);
+                SharedPreferences prefs = getEncryptedPreferences(context);
                 String currentQueueJson = prefs.getString(KEY_QUEUE, "[]");
                 JSONArray queueArray = new JSONArray(currentQueueJson);
 
-                // Rapid duplicate suppression (within 3 seconds for identical package, title, and text)
-                if (queueArray.length() > 0) {
-                    JSONObject last = queueArray.getJSONObject(queueArray.length() - 1);
-                    if (packageName.equals(last.optString("packageName")) &&
-                        title.equals(last.optString("title")) &&
-                        text.equals(last.optString("text")) &&
-                        Math.abs(postTime - last.optLong("timestamp", 0)) < 3000) {
+                String normText = text != null ? text.replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT) : "";
+                String normTitle = title != null ? title.replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT) : "";
+
+                // Cross-channel deduplication: check recent entries (within 60 seconds)
+                // Suppresses duplicates even if package name differs between SMS receiver and messaging app
+                for (int i = queueArray.length() - 1; i >= 0 && i >= queueArray.length() - 25; i--) {
+                    JSONObject existing = queueArray.getJSONObject(i);
+                    long existingTime = existing.optLong("timestamp", 0);
+                    if (Math.abs(postTime - existingTime) > 60000) {
+                        continue;
+                    }
+
+                    String exPkg = existing.optString("packageName");
+                    String exTitle = existing.optString("title").replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT);
+                    String exText = existing.optString("text").replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT);
+
+                    // 1. Identical package, title, and text
+                    if (packageName.equals(exPkg) && normTitle.equals(exTitle) && normText.equals(exText)) {
                         Log.d(TAG, "Suppressed rapid duplicate notification from " + packageName);
                         return;
+                    }
+
+                    // 2. Cross-channel content match (SMS broadcast vs Notification listener)
+                    // If text content matches or one contains the other, suppress duplicate
+                    if (!normText.isEmpty() && !exText.isEmpty()) {
+                        String lowPkg = packageName.toLowerCase(Locale.ROOT);
+                        String lowExPkg = exPkg.toLowerCase(Locale.ROOT);
+                        boolean isSmsCrossChannel = lowPkg.contains("sms") || lowExPkg.contains("sms") ||
+                            lowPkg.contains("messaging") || lowExPkg.contains("messaging") ||
+                            lowPkg.contains("mms") || lowExPkg.contains("mms");
+
+                        if (normText.equals(exText) || (isSmsCrossChannel && (normText.contains(exText) || exText.contains(normText)))) {
+                            Log.d(TAG, "Suppressed cross-channel duplicate between " + packageName + " and " + exPkg);
+                            return;
+                        }
                     }
                 }
 

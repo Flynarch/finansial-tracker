@@ -41,7 +41,7 @@ const useSettingsStore = create((set, get) => ({
   hasCompletedSpotlightTour: false,
   isSpotlightTourActive: false,
   securityEnabled: false,
-  securityMethod: 'biometric',
+  securityMethod: 'none',
   lockSecret: '',
   biometricEnabled: true,
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
@@ -236,8 +236,9 @@ const useSettingsStore = create((set, get) => ({
   setSecurity: async ({ securityEnabled, securityMethod, lockSecret, autoLockTimeout, biometricEnabled }) => {
     const nextMethod = securityMethod ?? get().securityMethod
     const nextEnabled = securityEnabled ?? get().securityEnabled
-    const autoBio = (securityMethod === 'pin' || securityMethod === 'pattern') ? true : undefined
-    const nextBiometricEnabled = biometricEnabled !== undefined ? Boolean(biometricEnabled) : (autoBio ?? get().biometricEnabled ?? true)
+    const nextBiometricEnabled = biometricEnabled !== undefined
+      ? Boolean(biometricEnabled)
+      : (get().biometricEnabled ?? true)
 
     let finalSecret = lockSecret !== undefined ? lockSecret : get().lockSecret
     if ((nextMethod === 'pin' || nextMethod === 'pattern') && finalSecret && !isPinHash(finalSecret)) {
@@ -370,7 +371,7 @@ const useSettingsStore = create((set, get) => ({
       hasCompletedOnboarding: onboardingDone,
       hasCompletedSpotlightTour: tourDone,
       securityEnabled,
-      securityMethod: record.securityMethod || 'biometric',
+      securityMethod: record.securityMethod || 'none',
       lockSecret: initialLockSecret,
       biometricEnabled: record.biometricEnabled !== undefined ? Boolean(record.biometricEnabled) : true,
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,

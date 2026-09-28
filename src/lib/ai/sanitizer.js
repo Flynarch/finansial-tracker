@@ -52,10 +52,30 @@ export function sanitizeGeminiContents(contents = []) {
 
   const cleanTurns = contents
     .filter((c) => c && (c.role === 'user' || c.role === 'model' || c.role === 'function') && Array.isArray(c.parts) && c.parts.length > 0)
-    .map((c) => ({
-      role: c.role === 'function' ? 'user' : c.role,
-      parts: c.parts.filter((p) => p && (p.text !== undefined || p.inlineData || p.functionCall || p.functionResponse)),
-    }))
+    .map((c) => {
+      const role = c.role === 'function' ? 'user' : c.role
+      const validParts = c.parts
+        .filter((p) => p && (p.text !== undefined || p.inlineData || p.functionCall || p.functionResponse))
+        .map((p) => {
+          if (role === 'model' && p.functionCall) {
+            const sig =
+              p.thought_signature ||
+              p.thoughtSignature ||
+              p.functionCall.thought_signature ||
+              p.functionCall.thoughtSignature ||
+              'context_engineering_is_the_way_to_go'
+            return {
+              ...p,
+              thought_signature: sig,
+            }
+          }
+          return p
+        })
+      return {
+        role,
+        parts: validParts,
+      }
+    })
     .filter((c) => c.parts.length > 0)
 
   if (cleanTurns.length === 0) return []

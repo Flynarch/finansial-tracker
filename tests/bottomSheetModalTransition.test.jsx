@@ -38,6 +38,9 @@ describe('Motion, Transition & Lifecycle Synchronization Tests', () => {
           <button type="button" onClick={closeSheet} data-testid="close-btn">
             Close
           </button>
+          <button type="button" onClick={() => setIsOpen(false)} data-testid="external-close-btn">
+            External Close
+          </button>
         </div>
       )
     }
@@ -74,6 +77,32 @@ describe('Motion, Transition & Lifecycle Synchronization Tests', () => {
         vi.advanceTimersByTime(100)
       })
       expect(onClose).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('mounted').textContent).toBe('false')
+    })
+
+    it('defers unmount and triggers exit animation when parent sets isOpen=false directly', () => {
+      render(<ControlledTestComponent />)
+
+      expect(screen.getByTestId('mounted').textContent).toBe('true')
+      expect(screen.getByTestId('visible').textContent).toBe('true')
+
+      // Trigger external close (setting isOpen = false directly from parent)
+      fireEvent.click(screen.getByTestId('external-close-btn'))
+
+      // Immediately: isVisible becomes false (ft-sheet-exit triggered), but STILL MOUNTED
+      expect(screen.getByTestId('visible').textContent).toBe('false')
+      expect(screen.getByTestId('mounted').textContent).toBe('true')
+
+      // Mid-flight (100ms): still mounted
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
+      expect(screen.getByTestId('mounted').textContent).toBe('true')
+
+      // Full 200ms: animation complete, unmounted
+      act(() => {
+        vi.advanceTimersByTime(100)
+      })
       expect(screen.getByTestId('mounted').textContent).toBe('false')
     })
   })

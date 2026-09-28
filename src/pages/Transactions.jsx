@@ -2,6 +2,8 @@ import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { syncNotificationQueue } from '../lib/notificationIngestion'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -151,6 +153,25 @@ function Transactions() {
   const [highlightedTransactionId, setHighlightedTransactionId] = useState(null)
   const listScrollRef = useRef(null)
 
+  const [selectedViewTab, setSelectedViewTab] = useState(null)
+  const isUrlStaging = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('tab') === 'staging' || location.state?.tab === 'staging'
+  }, [location.search, location.state])
+  const activeViewTab = selectedViewTab ?? (isUrlStaging ? 'staging' : 'all')
+
+  // Sync native notification queue on mount if on native platform
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const currentSettings = useSettingsStore.getState()
+      syncNotificationQueue({
+        defaultCurrency: currentSettings.defaultCurrency,
+        defaultWalletId: currentSettings.defaultWalletId,
+        notificationAutoApprove: currentSettings.notificationAutoApprove,
+      }).catch((err) => console.warn('[Transactions:syncNotificationQueue]', err))
+    }
+  }, [])
+
   // Bulk Actions
   const [isBulkMode, setIsBulkMode] = useState(false)
   const [selectedTxIds, setSelectedTxIds] = useState(new Set())
@@ -199,8 +220,9 @@ function Transactions() {
     loadRates()
   }, [defaultCurrency, t])
 
-  // Page entrance animation & clear mutation badge
+  // Page entrance animation, scroll reset & clear mutation badge
   useEffect(() => {
+    window.scrollTo(0, 0)
     clearUnviewedMutations?.()
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
     return () => window.cancelAnimationFrame(frameId)
@@ -224,14 +246,23 @@ function Transactions() {
     }, 0)
   }, [location.pathname, location.state, navigate, setFilters])
 
-  // Scroll to focused transaction
+  // Scroll to focused transaction within listScrollRef to avoid outer window scroll displacement
   useEffect(() => {
     if (!pendingFocusTransactionId) return
 
     const frameId = window.requestAnimationFrame(() => {
       const row = document.querySelector(`[data-transaction-id="${pendingFocusTransactionId}"]`)
       if (!row) return
-      row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      const container = listScrollRef.current
+      if (container) {
+        const containerRect = container.getBoundingClientRect()
+        const rowRect = row.getBoundingClientRect()
+        const targetScrollTop =
+          container.scrollTop + (rowRect.top - containerRect.top) - containerRect.height / 2 + rowRect.height / 2
+        container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' })
+      } else {
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      }
       setHighlightedTransactionId(pendingFocusTransactionId)
       setPendingFocusTransactionId(null)
       window.setTimeout(() => {
@@ -550,10 +581,10 @@ function Transactions() {
   }
 
   return (
-    <div>
+    <div className="h-full flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
-        className={`ft-motion-page flex min-h-[calc(100svh_-_64px)] max-h-[calc(100svh_-_64px)] flex-col gap-2 overflow-hidden transform-gpu md:min-h-[calc(100vh_-_65px)] md:max-h-[calc(100vh_-_65px)] ${
-          isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+        className={`ft-motion-page flex h-full flex-1 min-h-0 flex-col gap-2 overflow-hidden transform-gpu ${
+          isEntering ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
@@ -672,50 +703,95 @@ function Transactions() {
           }
         />
 
-        {/* Collapsible Search Input */}
-        {(isSearchOpen || filters.search) && (
-          <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
-            <input
-              type="text"
-              autoFocus
-              placeholder={t('tx.search.placeholder') || 'Cari catatan atau kategori...'}
-              value={filters.search || ''}
-              onChange={(event) => setFilters({ search: event.target.value })}
-              className="ft-field mt-0 h-11 pl-9 pr-9 text-xs sm:text-sm bg-[var(--field-bg)] border-[var(--border)] rounded-2xl focus:border-[var(--accent)]"
-            />
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
-                <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
-              </svg>
-            </span>
-            {filters.search ? (
-              <button
-                type="button"
-                onClick={() => setFilters({ search: '' })}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-2 min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-90 cursor-pointer"
-              >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+        {/* View Switcher: Semua Transaksi vs Tampungan */}
+        <div className="flex items-center gap-1 rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)] shrink-0">
+          <button
+            type="button"
+            onClick={() => setSelectedViewTab('all')}
+            className={"flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition active:scale-[0.98] cursor-pointer " + (activeViewTab === 'all' ? "bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs" : "text-[var(--muted)] hover:text-[var(--fg)]")}
+          >
+            <span>{t('tx.tab.all', 'Semua Transaksi')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedViewTab('staging')}
+            className={"flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition active:scale-[0.98] cursor-pointer " + (activeViewTab === 'staging' ? "bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs" : "text-[var(--muted)] hover:text-[var(--fg)]")}
+          >
+            <span>{t('tx.tab.staging', 'Tampungan')}</span>
+            {pendingReviewTxs.length > 0 ? (
+              <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)] text-white">
+                {pendingReviewTxs.length}
+              </span>
             ) : null}
+          </button>
+        </div>
+
+        {activeViewTab === 'staging' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))]">
+            <StagingReviewInbox
+              pendingTransactions={pendingReviewTxs}
+              wallets={allWallets}
+              formatCurrency={formatCurrency}
+              defaultCurrency={defaultCurrency}
+              locale={locale}
+              onEditTransaction={openEditTransaction}
+              t={t}
+            />
           </div>
-        )}
+        ) : (
+          <>
+            {/* Collapsible Search Input */}
+            {(isSearchOpen || filters.search) && (
+              <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={t('tx.search.placeholder') || 'Cari catatan atau kategori...'}
+                  value={filters.search || ''}
+                  onChange={(event) => setFilters({ search: event.target.value })}
+                  className="ft-field mt-0 h-11 pl-9 pr-9 text-xs sm:text-sm bg-[var(--field-bg)] border-[var(--border)] rounded-2xl focus:border-[var(--accent)]"
+                />
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" />
+                    <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+                  </svg>
+                </span>
+                {filters.search ? (
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ search: '' })}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-2 min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-90 cursor-pointer"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+            )}
 
-        {/* Staging Review Inbox for Pending Bank Mutations */}
-        <StagingReviewInbox
-          pendingTransactions={pendingReviewTxs}
-          wallets={allWallets}
-          formatCurrency={formatCurrency}
-          defaultCurrency={defaultCurrency}
-          locale={locale}
-          onEditTransaction={openEditTransaction}
-          t={t}
-        />
+            {/* Quick banner if pending mutations exist */}
+            {pendingReviewTxs.length > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3.5 py-2.5 text-[var(--fg)] shrink-0 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+                  <p className="text-xs font-semibold truncate">
+                    {t('tx.staging.bannerDesc', 'Ada {{count}} transaksi baru dari notifikasi siap diperiksa.', { count: pendingReviewTxs.length })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedViewTab('staging')}
+                  className="shrink-0 px-2.5 py-1 text-xs font-bold rounded-lg bg-[var(--accent)] text-white transition active:scale-95 cursor-pointer"
+                >
+                  {t('tx.staging.reviewNow', 'Tinjau')}
+                </button>
+              </div>
+            )}
 
-        {/* Transaction List Section Component */}
-        <TransactionListSection
+            {/* Transaction List Section Component */}
+            <TransactionListSection
           isLoading={isInitialLoading}
           filteredTransactions={filteredTransactions}
           groupedEntriesDetailed={groupedEntriesDetailed}
@@ -750,7 +826,9 @@ function Transactions() {
           allWallets={allWallets}
           sessionLastSeenTimestamp={sessionLastSeenTimestamp}
           newestTransactionId={newestTransactionId}
-        />
+            />
+          </>
+        )}
       </div>
 
       {/* Single Delete Confirm Modal */}

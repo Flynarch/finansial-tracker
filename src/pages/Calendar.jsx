@@ -496,9 +496,11 @@ function Calendar() {
                           <div className="text-right shrink-0">
                             <p
                               className="text-sm sm:text-[15px] font-extrabold tabular-nums tracking-tight"
-                              style={{ color: tx.type === 'income' ? 'var(--status-income)' : 'var(--status-expense)' }}
+                              style={{
+                                color: tx.type === 'income' ? 'var(--status-income)' : tx.type === 'transfer' ? 'var(--accent)' : 'var(--status-expense)',
+                              }}
                             >
-                              {tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount, tx.currency)}
+                              {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '-'} {formatCurrency(tx.amount, tx.currency)}
                             </p>
                           </div>
                         </div>

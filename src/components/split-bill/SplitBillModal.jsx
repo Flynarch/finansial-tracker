@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
@@ -15,10 +15,8 @@ import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
-import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { createTransaction } from '../../services/transactionService'
-import { formatCurrency, formatMoneyInput, parseMoneyInput, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
-import { fetchCurrencyRates, getCachedCurrencyRates } from '../../lib/api'
+import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -54,26 +52,17 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     { id: '2', name: 'Teman 2', amount: '', isPayer: false },
   ])
 
-  const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
-
-  useEffect(() => {
-    if (!isOpen) return
-    const timer = setTimeout(() => {
-      fetchCurrencyRates('USD')
-        .then((r) => r && setRates(r))
-        .catch((err) => console.warn('[SplitBillModal]', err))
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [isOpen])
-
   const wallets = useLiveQuery(
     async () => {
       if (!isOpen) return []
       const raw = await db.wallets.filter((w) => !w.isArchived).toArray()
       if (!raw || raw.length === 0) return []
-      return await getAllWalletBalances(raw, rates)
+      return raw.map((w) => ({
+        ...w,
+        currentBalance: w.balance ?? 0,
+      }))
     },
-    [isOpen, rates],
+    [isOpen],
     getCachedDashboardWallets() || []
   )
 

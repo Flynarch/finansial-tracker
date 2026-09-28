@@ -4,6 +4,22 @@
  */
 
 /**
+ * Masks sensitive bank account and credit card numbers for zero-knowledge data privacy.
+ * Example: "Debit Rek. 1234567890 Rp 50.000" -> "Debit Rek. ****7890 Rp 50.000"
+ * @param {string} text
+ * @returns {string}
+ */
+export function maskFinancialAccountNumbers(text = '') {
+  if (!text) return ''
+  return String(text)
+    // 16-digit credit/debit card numbers with optional dashes/spaces
+    .replace(/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?(\d{4})\b/g, '****-****-****-$1')
+    // 10 to 14 digit bank account numbers
+    .replace(/\b(?:\d{2,4})[-]?\d{4,8}[-](\d{4})\b/g, '****$1')
+    .replace(/\b\d{6,14}(\d{4})\b/g, '****$1')
+}
+
+/**
  * Cleans cryptic bank transfer/teller codes and extracts readable merchant name.
  * Example: "TRSF E-BANKING DB 2808/FTSCY/WS95011 KOPI KENANGAN JAKARTA" -> "Kopi Kenangan Jakarta"
  * @param {string} rawText
@@ -15,9 +31,27 @@ export function cleanMutationMerchant(rawText = '') {
   let cleaned = String(rawText)
     // Strip AI predicted category tags
     .replace(/\[kategori diprediksi ai\]/gi, '')
-    // Remove bank notification app headers
-    .replace(/^(?:m-bca|mybca|livin(?:\s*by\s*mandiri)?|wondr(?:\s*by\s*bni)?|brimo|bsi\s*mobile|octo\s*mobile|line\s*bank|seabank|bank\s*jago|blu|jenius|dana|ovo|gopay|shopeepay)\s*[-:]?\s*/i, '')
-    .replace(/^m-bca:\s*\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+/i, '')
+    // Strip trailing balance info e.g. " Saldo Akhir Rp 2.500.000"
+    .replace(/\s+saldo\s+akhir.*$/i, '')
+
+  // Multi-pass loop: strip leading shortcodes, headers, timestamps, and mutation markers
+  for (let pass = 0; pass < 3; pass++) {
+    cleaned = cleaned
+      // Strip leading shortcodes e.g. '69888: ', '83355 ', '+6269888 '
+      .replace(/^(?:\+?62)?(?:69888|83355|3355|3300|3346|1418|3399|3377)\s*[-:]?\s*/i, '')
+      // Strip leading timestamps e.g. '27/09 18:30 ' or '27/09 ' or '27/09/2026 18:30:00 '
+      .replace(/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s+\d{2}:\d{2}(?::\d{2})?)?\s*[-:]?\s*/i, '')
+      // Strip bank notification & SMS headers
+      .replace(/^(?:m-bca|mybca|bank\s*bca|bca|livin(?:\s*by\s*mandiri)?|bank\s*mandiri|mandiri|wondr(?:\s*by\s*bni)?|bank\s*bni|bni|brimo|bank\s*bri|bri(?:-info)?|bsi\s*mobile|bank\s*syariah\s*indonesia|bsi|octo\s*mobile|octo\s*card|cimb\s*niaga|cimb|line\s*bank|seabank|bank\s*jago|blu|jenius|permatabank|permata|danamon|bank\s*mega|mega|citibank|hsbc|dana|ovo|gopay|shopeepay)\s*[-:]?\s*/i, '')
+      .replace(/^d-bca\s+(?:db|cr)\s+/i, '')
+      .replace(/^m-bca:\s*\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+/i, '')
+      .replace(/^(?:sms\s+)?notifikasi\s*(?:debet|kredit|transaksi)?\s*[-:]?\s*/i, '')
+      .replace(/^(?:trx|transaksi)\s+(?:kartu(?:\s+(?:kredit|debit|mandiri|bca|bri|bni|mega))?\s*(?:\d{4})?|rekening\s*(?:\d+)?|rek\s*(?:\d+)?)?\s*(?:berakhir\s+\d+)?\s*[-:]?\s*/i, '')
+      .replace(/^(?:debit|debet|kredit|cr|db)\s+(?:rekening\s*(?:\d+)?\s*|rek\s*(?:\d+)?\s*)?/i, '')
+      .trim()
+  }
+
+  cleaned = cleaned
     // Remove bank & mutation prefix boilerplate
     .replace(/^TRSF\s+E-BANKING\s+(DB|CR)/i, '')
     .replace(/^TRSF\s+KE\s+REK\s*\d*/i, '')
@@ -39,22 +73,35 @@ export function cleanMutationMerchant(rawText = '') {
     .replace(/^KAMU\s+(TELAH\s+BERHASIL|TELAH|BERHASIL)?\s*(TRANSFER|MENGIRIM|BAYAR|MEMBAYAR|KIRIM)\s+(KE|DI)?\s*/i, '')
     .replace(/^KANTONG\s+UTAMA\s+(BERKURANG\s+UNTUK\s+PEMBAYARAN\s+DI|BERTAMBAH\s+DARI)\s*/i, '')
     .replace(/^(UANG\s+MASUK|UANG\s+KELUAR|MONEY\s+OUT)\s*:\s*/i, '')
+    .replace(/\bberakhir\s+\d+\b/gi, '')
+    .replace(/\brek(?:ening)?\s*\d*\b/gi, '')
+    .replace(/\bkartu\s+(?:(?:kredit|debit)\s+)?(?:mega|bca|mandiri|bni|bri)?\s*\d*\b/gi, '')
+    .replace(/\btelah\s+di-(?:debet|kredit|debit|debitkan|kreditkan)\b/gi, '')
+    .replace(/\btelah\s+(?:didebet|dikredit|didebit|didebitkan|dikreditkan)\b/gi, '')
+    .replace(/\buntuk\s+transaksi\s+(?:di|ke)\b/gi, ' ')
+    .replace(/\buntuk\s+transaksi\b/gi, ' ')
+    // Remove dates inside text like "Tgl 27/09/26 14:20" or "pada 27/09"
+    .replace(/\b(?:tgl\.?|pada|tanggal)\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s+\d{2}:\d{2}(?::\d{2})?)?\b/gi, '')
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
+    .replace(/\b\d{2}:\d{2}(?::\d{2})?\b/g, '')
     // Remove embedded currency amounts like "Rp 45.000" or "Rp35.000" or "sebesar Rp 100.000"
     .replace(/(?:sebesar\s+)?(?:rp|idr)\.?\s*[\d.,]+/gi, ' ')
+    // Remove masked account numbers (e.g. ****7890 or ****-****-****-1234)
+    .replace(/\*{2,}[-\s]?\d+/g, '')
+    .replace(/\b\*{4,}\b/g, '')
     // Remove reference numbers like 2808/FTSCY/WS95011 or 00000012345
     .replace(/\b\d{2,4}\/[A-Z0-9_\-/]+\b/gi, '')
     .replace(/\b(WS|FT|TX|REF)\d+\b/gi, '')
-    .replace(/\b\d{10,20}\b/g, '')
+    .replace(/\b\d{8,20}\b/g, '')
     // Remove bank receipt status words
-    .replace(/\b(berhasil|sukses|telah berhasil)\b/gi, '')
-    // Remove dangling prepositions at start or end
+    .replace(/\b(berhasil|sukses|telah berhasil|telah selesai)\b/gi, '')
+    // Remove excess punctuation and spaces BEFORE preposition stripping
+    .replace(/[;:#*~=]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^(ke|di|dari)\s+/i, '')
-    .replace(/\s+(ke|di|dari)$/i, '')
-    // Remove excess punctuation and spaces
-    .replace(/[;:#*~]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    // Remove dangling prepositions at start or end
+    .replace(/^(?:ke|di|dari|pada)\s+/i, '')
+    .replace(/\s+(?:ke|di|dari|pada)$/i, '')
     .trim()
 
   if (!cleaned || cleaned.length < 2) {
@@ -64,7 +111,7 @@ export function cleanMutationMerchant(rawText = '') {
   // Capitalize words nicely
   return cleaned
     .split(' ')
-    .map((w) => (w.length > 2 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .map((w) => (w.length >= 2 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
     .join(' ')
 }
 

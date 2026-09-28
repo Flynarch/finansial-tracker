@@ -1,16 +1,17 @@
 import { useState, useCallback } from 'react'
 import Modal from '../ui/Modal'
-import { Delete, KeyRound, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Delete, KeyRound, CheckCircle2, AlertCircle, Fingerprint } from 'lucide-react'
 import { triggerHaptic } from '../../lib/haptics'
 import useTranslation from '../../hooks/useTranslation'
 
-export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '' }) {
+export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '', initialBiometric = false }) {
   const { t } = useTranslation()
   const [step, setStep] = useState(1) // 1: enter new pin, 2: confirm pin
   const [firstPin, setFirstPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [useBiometrics, setUseBiometrics] = useState(initialBiometric)
 
   const activePin = step === 1 ? firstPin : confirmPin
 
@@ -20,8 +21,9 @@ export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '
     setConfirmPin('')
     setErrorMsg('')
     setIsSuccess(false)
+    setUseBiometrics(initialBiometric)
     onClose()
-  }, [onClose])
+  }, [onClose, initialBiometric])
 
   const handleDigit = useCallback(
     (digit) => {
@@ -46,7 +48,7 @@ export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '
               triggerHaptic('success')
               setIsSuccess(true)
               setTimeout(() => {
-                onSave(next)
+                onSave(next, useBiometrics)
                 handleClose()
               }, 400)
             } else {
@@ -63,7 +65,7 @@ export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '
         }
       }
     },
-    [step, firstPin, confirmPin, onSave, handleClose, t],
+    [step, firstPin, confirmPin, onSave, handleClose, t, useBiometrics],
   )
 
   const handleDelete = useCallback(() => {
@@ -133,6 +135,34 @@ export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '
         ) : (
           <div className="h-4" />
         )}
+
+        {/* Biometric Toggle Option */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light')
+            setUseBiometrics((prev) => !prev)
+          }}
+          className="flex items-center justify-between w-full max-w-[240px] px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs cursor-pointer hover:bg-[var(--panel)] transition active:scale-98"
+        >
+          <div className="flex items-center gap-2">
+            <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
+            <span className="text-[11px] font-bold text-[var(--fg)]">
+              {t('settings.biometricQuickOption', 'Buka juga via Biometrik')}
+            </span>
+          </div>
+          <div
+            className={`w-7 h-4 rounded-full transition-colors relative p-0.5 ${
+              useBiometrics ? 'bg-[var(--lock)]' : 'bg-[var(--border-strong)]'
+            }`}
+          >
+            <div
+              className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                useBiometrics ? 'translate-x-3' : 'translate-x-0'
+              }`}
+            />
+          </div>
+        </button>
 
         {/* Keypad Grid */}
         <div className="grid grid-cols-3 gap-2.5 w-full max-w-[240px] pt-1">

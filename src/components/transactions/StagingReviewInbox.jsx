@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Check, CheckCheck, Trash2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, ArrowRight, Edit2, Sparkles } from 'lucide-react'
+import { Check, CheckCheck, Trash2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, ArrowRight, Edit2, Sparkles, RefreshCw } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
+import { syncNotificationQueue } from '../../lib/notificationIngestion'
+import useSettingsStore from '../../store/useSettingsStore'
 import { db } from '../../lib/db'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
@@ -15,6 +18,7 @@ export default function StagingReviewInbox({
   defaultCurrency = 'IDR',
   locale = 'id',
   onEditTransaction,
+  onSync,
   t,
 }) {
   const [selectedWalletMap, setSelectedWalletMap] = useState({})
@@ -22,9 +26,70 @@ export default function StagingReviewInbox({
   const [isProcessingId, setIsProcessingId] = useState(null)
   const [isProcessingAll, setIsProcessingAll] = useState(false)
   const [isProcessingAiId, setIsProcessingAiId] = useState(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState(null)
+
+  const handleManualScan = async () => {
+    setIsSyncing(true)
+    setSyncFeedback(null)
+    try {
+      if (typeof onSync === 'function') {
+        const result = await onSync()
+        if (result?.syncedCount > 0) {
+          setSyncFeedback(t('tx.staging.syncSuccessCount', 'Ditemukan {{count}} mutasi baru.', { count: result.syncedCount }))
+        } else {
+          setSyncFeedback(t('tx.staging.syncEmptyFeedback', 'Tidak ada mutasi baru dalam antrean notifikasi.'))
+        }
+      } else {
+        const { defaultCurrency: cur, defaultWalletId: wid, notificationAutoApprove } = useSettingsStore.getState()
+        const res = await syncNotificationQueue({
+          defaultCurrency: cur || defaultCurrency,
+          defaultWalletId: wid,
+          notificationAutoApprove,
+          force: true,
+        })
+        if (res?.syncedCount > 0) {
+          setSyncFeedback(t('tx.staging.syncSuccessCount', 'Ditemukan {{count}} mutasi baru.', { count: res.syncedCount }))
+        } else {
+          setSyncFeedback(t('tx.staging.syncEmptyFeedback', 'Tidak ada mutasi baru dalam antrean notifikasi.'))
+        }
+      }
+    } catch (err) {
+      console.error('[StagingReviewInbox:handleManualScan]', err)
+      setSyncFeedback(t('tx.staging.syncError', 'Gagal memindai antrean notifikasi.'))
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   if (!pendingTransactions || pendingTransactions.length === 0) {
-    return null
+    return (
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-6 shadow-xs animate-in fade-in duration-200">
+        <EmptyState
+          variant="generic"
+          title={t('tx.staging.emptyTitle', 'Tampungan Kosong')}
+          description={t('tx.staging.emptyDesc', 'Belum ada mutasi menunggu peninjauan dari notifikasi bank atau SMS')}
+          action={
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                disabled={isSyncing}
+                onClick={handleManualScan}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-xs transition hover:brightness-110 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={"h-4 w-4 " + (isSyncing ? "animate-spin" : "")} />
+                <span>{isSyncing ? t('tx.staging.syncing', 'Memindai Antrean...') : t('tx.staging.scanQueue', 'Pindai Antrean')}</span>
+              </button>
+              {syncFeedback ? (
+                <p className="text-xs font-medium text-[var(--muted)] animate-in fade-in">
+                  {syncFeedback}
+                </p>
+              ) : null}
+            </div>
+          }
+        />
+      </div>
+    )
   }
 
   const handleWalletChange = (txId, walletId) => {

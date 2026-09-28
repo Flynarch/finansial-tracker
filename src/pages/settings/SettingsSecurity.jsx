@@ -105,9 +105,13 @@ export default function SettingsSecurity() {
         await setSecurity({
           securityEnabled: true,
           securityMethod: 'pin',
-          biometricEnabled: true, // auto-enable biometrics
+          biometricEnabled,
         })
-        setStatusMessage(t('settings.pinEnabled', 'Kunci PIN aktif bersama verifikasi biometrik.'))
+        setStatusMessage(
+          biometricEnabled
+            ? t('settings.pinEnabled', 'Kunci PIN aktif bersama verifikasi biometrik.')
+            : t('settings.pinEnabledNoBio', 'Kunci PIN aktif.')
+        )
       } else {
         setIsPinModalOpen(true)
       }
@@ -119,36 +123,48 @@ export default function SettingsSecurity() {
         await setSecurity({
           securityEnabled: true,
           securityMethod: 'pattern',
-          biometricEnabled: true, // auto-enable biometrics
+          biometricEnabled,
         })
-        setStatusMessage(t('settings.patternEnabled', 'Kunci Pola aktif bersama verifikasi biometrik.'))
+        setStatusMessage(
+          biometricEnabled
+            ? t('settings.patternEnabled', 'Kunci Pola aktif bersama verifikasi biometrik.')
+            : t('settings.patternEnabledNoBio', 'Kunci Pola aktif.')
+        )
       } else {
         setIsPatternModalOpen(true)
       }
     }
   }
 
-  const handleSavePin = async (newPin) => {
+  const handleSavePin = async (newPin, enableBio = biometricEnabled) => {
     await setSecurity({
       securityEnabled: true,
       securityMethod: 'pin',
       lockSecret: newPin,
-      biometricEnabled: true, // auto-enable biometrics
+      biometricEnabled: enableBio,
       autoLockTimeout: timeoutSec,
     })
-    setStatusMessage(t('settings.pinSavedSuccess', 'PIN berhasil disimpan dan biometrik otomatis aktif.'))
+    setStatusMessage(
+      enableBio
+        ? t('settings.pinSavedSuccess', 'PIN berhasil disimpan dan biometrik aktif.')
+        : t('settings.pinSavedSuccessNoBio', 'PIN berhasil disimpan.')
+    )
     setTimeout(() => setStatusMessage(''), 4000)
   }
 
-  const handleSavePattern = async (newPatternSeq) => {
+  const handleSavePattern = async (newPatternSeq, enableBio = biometricEnabled) => {
     await setSecurity({
       securityEnabled: true,
       securityMethod: 'pattern',
       lockSecret: newPatternSeq,
-      biometricEnabled: true, // auto-enable biometrics
+      biometricEnabled: enableBio,
       autoLockTimeout: timeoutSec,
     })
-    setStatusMessage(t('settings.patternSavedSuccess', 'Pola berhasil disimpan dan biometrik otomatis aktif.'))
+    setStatusMessage(
+      enableBio
+        ? t('settings.patternSavedSuccess', 'Pola berhasil disimpan dan biometrik aktif.')
+        : t('settings.patternSavedSuccessNoBio', 'Pola berhasil disimpan.')
+    )
     setTimeout(() => setStatusMessage(''), 4000)
   }
 
@@ -215,8 +231,12 @@ export default function SettingsSecurity() {
             </h2>
             <p className="text-xs font-medium text-[var(--muted)] mt-1">
               {securityEnabled
-                ? (securityMethod === 'pattern' ? 'Dilindungi Pola & Biometrik' : 'Dilindungi PIN & Biometrik')
-                : 'Kunci aplikasi saat ini dinonaktifkan'}
+                ? (
+                  securityMethod === 'pattern'
+                    ? (biometricEnabled ? t('settings.securedPatternBio', 'Dilindungi Pola & Biometrik') : t('settings.securedPatternOnly', 'Dilindungi Pola'))
+                    : (biometricEnabled ? t('settings.securedPinBio', 'Dilindungi PIN & Biometrik') : t('settings.securedPinOnly', 'Dilindungi PIN'))
+                )
+                : t('settings.securityDisabledDesc', 'Kunci aplikasi saat ini dinonaktifkan')}
             </p>
           </div>
         </div>
@@ -234,7 +254,7 @@ export default function SettingsSecurity() {
         label={t('settings.appLock', 'Kunci Aplikasi')}
         footnote={t(
           'settings.securityFootnote',
-          'Pilih salah satu metode kunci: PIN angka atau Pola usap (keduanya bersifat eksklusif). Saat PIN atau Pola dinyalakan, autentikasi biometrik bawaan HP akan otomatis aktif untuk akses cepat.',
+          'Pilih salah satu metode kunci: PIN angka atau Pola usap. Opsi verifikasi biometrik bawaan HP dapat diaktifkan atau dinonaktifkan kapan saja.',
         )}
       >
         {/* Method Selector: None vs PIN vs Pattern */}
@@ -470,6 +490,7 @@ export default function SettingsSecurity() {
           onClose={() => setIsPinModalOpen(false)}
           onSave={handleSavePin}
           currentSecret={securityMethod === 'pin' ? lockSecret : ''}
+          initialBiometric={biometricEnabled}
         />
       )}
 
@@ -479,6 +500,7 @@ export default function SettingsSecurity() {
           onClose={() => setIsPatternModalOpen(false)}
           onSave={handleSavePattern}
           currentSecret={securityMethod === 'pattern' ? lockSecret : ''}
+          initialBiometric={biometricEnabled}
         />
       )}
 

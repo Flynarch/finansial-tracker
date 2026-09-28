@@ -36,7 +36,8 @@ export default function ChatInputBar({
         className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-1.5 shadow-xs focus-within:border-[var(--accent)] transition-colors"
         onSubmit={(e) => {
           e.preventDefault()
-          onSend()
+          if (isLoading || (!inputValue.trim() && !selectedImage)) return
+          onSend(inputValue, selectedImage)
         }}
       >
         {/* Unified Camera / Gallery Media Button */}
@@ -89,7 +90,9 @@ export default function ChatInputBar({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              onSend()
+              if (e.nativeEvent?.isComposing || e.keyCode === 229) return
+              if (isLoading || (!inputValue.trim() && !selectedImage)) return
+              onSend(inputValue, selectedImage)
             }
           }}
           placeholder={translate(locale, 'aiChat.placeholder') || (locale === 'en' ? 'Ask anything...' : 'Ketik apapun...')}

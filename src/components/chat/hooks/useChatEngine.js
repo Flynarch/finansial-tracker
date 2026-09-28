@@ -17,15 +17,28 @@ export function useChatEngine({
   setMessages,
   chatScrollContainerRef,
   inputRef,
+  inputValue = '',
+  selectedImage = null,
   setSelectedImage,
   setInputValue,
   setShowScanModePicker,
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const isLoadingRef = useRef(false)
   const isStreamingRef = useRef(false)
   const streamBufferRef = useRef('')
   const streamRafRef = useRef(null)
   const handleSendRef = useRef(null)
+
+  const inputValueRef = useRef(inputValue)
+  useEffect(() => {
+    inputValueRef.current = inputValue
+  }, [inputValue])
+
+  const selectedImageRef = useRef(selectedImage)
+  useEffect(() => {
+    selectedImageRef.current = selectedImage
+  }, [selectedImage])
 
   const addLoan = useLoanStore((s) => s.addLoan)
   const recordPayment = useLoanStore((s) => s.recordPayment)
@@ -42,26 +55,35 @@ export function useChatEngine({
 
   const handleSend = useCallback(
     async (text, image, scanMode = 'all', targetWalletId = null) => {
-      if (!text?.trim() && !image) return
+      if (isLoadingRef.current || isStreamingRef.current) return
+
+      const textToSend = (text !== undefined ? text : inputValueRef.current) || ''
+      const imageToSend = image !== undefined ? image : (text !== undefined ? null : selectedImageRef.current)
+      if (!textToSend?.trim() && !imageToSend) return
       triggerHaptic('light')
 
-      const clampedText = text ? String(text).slice(0, 4000) : ''
+      const now = Date.now()
+      const clampedText = textToSend ? String(textToSend).slice(0, 4000) : ''
       const userMsg = {
-        id: Date.now(),
+        id: now,
+        timestamp: now,
         role: 'user',
         type: 'text',
         content: clampedText,
-        image: image || null,
+        image: imageToSend || null,
       }
 
+      inputValueRef.current = ''
+      selectedImageRef.current = null
       setInputValue?.('')
       setSelectedImage?.(null)
       setShowScanModePicker?.(false)
       if (inputRef?.current) inputRef.current.style.height = 'auto'
 
+      isLoadingRef.current = true
       setIsLoading(true)
 
-      const aiMsgId = Date.now() + 1
+      const aiMsgId = now + 1
       setMessages((prev) => [...prev, userMsg])
 
       isStreamingRef.current = true
@@ -73,7 +95,7 @@ export function useChatEngine({
           locale,
           defaultCurrency,
           previousMessages: messages,
-          imageData: image,
+          imageData: imageToSend,
           wallets,
           rates: activeRates,
           scanMode,
@@ -88,7 +110,7 @@ export function useChatEngine({
                   if (exists) {
                     return prev.map((m) => (m.id === aiMsgId ? { ...m, content: currentBuffered } : m))
                   }
-                  return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: currentBuffered }]
+                  return [...prev, { id: aiMsgId, timestamp: aiMsgId, role: 'ai', type: 'text', content: currentBuffered }]
                 })
                 if (chatScrollContainerRef?.current) {
                   chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
@@ -105,7 +127,7 @@ export function useChatEngine({
               if (exists) {
                 return prev.map((m) => (m.id === aiMsgId ? { ...m, content: result.message, chips: result.chips } : m))
               }
-              return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: result.message, chips: result.chips }]
+              return [...prev, { id: aiMsgId, timestamp: aiMsgId, role: 'ai', type: 'text', content: result.message, chips: result.chips }]
             })
             return
           }
@@ -129,12 +151,13 @@ export function useChatEngine({
         const actionResult = await executeAiChatAction(result, actionContext)
 
         if (actionResult.isFinancialHealth) {
+          const healthMsg = { ...actionResult.healthMsg, id: aiMsgId, timestamp: actionResult.healthMsg?.timestamp || aiMsgId }
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === aiMsgId)
             if (exists) {
-              return prev.map((m) => (m.id === aiMsgId ? actionResult.healthMsg : m))
+              return prev.map((m) => (m.id === aiMsgId ? healthMsg : m))
             }
-            return [...prev, actionResult.healthMsg]
+            return [...prev, healthMsg]
           })
           return
         }
@@ -142,7 +165,8 @@ export function useChatEngine({
         const { newMsgs = [] } = actionResult
 
         if (newMsgs.length > 0) {
-          const unifiedMsg = prepareUnifiedMessage(newMsgs, result)
+          const rawUnified = prepareUnifiedMessage(newMsgs, result)
+          const unifiedMsg = { ...rawUnified, id: aiMsgId, timestamp: rawUnified?.timestamp || aiMsgId }
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === aiMsgId)
             if (exists) {
@@ -156,7 +180,7 @@ export function useChatEngine({
             if (exists) {
               return prev.map((m) => (m.id === aiMsgId ? { ...m, content: result.text, chips: result.chips } : m))
             }
-            return [...prev, { id: aiMsgId, role: 'ai', type: 'text', content: result.text, chips: result.chips }]
+            return [...prev, { id: aiMsgId, timestamp: aiMsgId, role: 'ai', type: 'text', content: result.text, chips: result.chips }]
           })
         } else {
           setMessages((prev) => prev.filter((m) => m.id !== aiMsgId))
@@ -168,12 +192,14 @@ export function useChatEngine({
           : 'Tidak ada koneksi internet. Silakan periksa jaringan Anda dan coba lagi.'
         const displayMsg = err?.message || (isOffline ? offlineMsg : translate(locale, 'aiChat.error'))
 
+        const errTimestamp = Date.now()
         setMessages((prev) => {
           const filtered = prev.filter((m) => m.id !== aiMsgId)
           return [
             ...filtered,
             {
-              id: Date.now() + 1,
+              id: errTimestamp,
+              timestamp: errTimestamp,
               role: 'ai',
               type: 'text',
               content: displayMsg,
@@ -186,6 +212,7 @@ export function useChatEngine({
           streamRafRef.current = null
         }
         isStreamingRef.current = false
+        isLoadingRef.current = false
         setIsLoading(false)
         if (inputRef?.current) inputRef.current.focus()
       }

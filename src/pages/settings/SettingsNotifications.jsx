@@ -13,6 +13,7 @@ import {
   Loader2,
   ShieldCheck,
   Trash2,
+  MessageSquare,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -24,6 +25,7 @@ import {
 import {
   FinTrackNotificationPlugin,
   syncNotificationQueue,
+  syncHistoricalSms,
   scanSuspectPromoTransactions,
   cleanSuspectPromoTransactions,
 } from '../../lib/notificationIngestion'
@@ -36,6 +38,8 @@ import ProminentDisclosureModal from '../../components/notifications/ProminentDi
 export default function SettingsNotifications() {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
+  const defaultWalletId = useSettingsStore((s) => s.defaultWalletId)
+  const setDefaultWalletId = useSettingsStore((s) => s.setDefaultWalletId)
   const dailyReminderEnabled = useSettingsStore((s) => s.dailyReminderEnabled)
   const setDailyReminderEnabled = useSettingsStore((s) => s.setDailyReminderEnabled)
   const dailyReminderTime = useSettingsStore((s) => s.dailyReminderTime || '20:00')
@@ -48,13 +52,25 @@ export default function SettingsNotifications() {
   // Wallet list for auto-assignment
   const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
   const activeWallets = wallets.filter((w) => !w.isArchived)
-  const [autoWalletId, setAutoWalletId] = useState(() => activeWallets[0]?.id || '')
+  const autoWalletId = defaultWalletId ? String(defaultWalletId) : (activeWallets[0]?.id ? String(activeWallets[0].id) : '')
+
+  useEffect(() => {
+    if (!defaultWalletId && activeWallets[0]?.id) {
+      setDefaultWalletId(activeWallets[0].id)
+    }
+  }, [defaultWalletId, activeWallets, setDefaultWalletId])
 
   // Native Notification Listener State
   const [isListenerGranted, setIsListenerGranted] = useState(false)
   const [isDisclosureOpen, setIsDisclosureOpen] = useState(false)
   const [isSyncingQueue, setIsSyncingQueue] = useState(false)
-  const [syncFeedback, setSyncFeedback] = useState('')
+  const [syncFeedback, setSyncFeedback] = useState({ text: '', isError: false })
+
+  // Native SMS Ingestion State
+  const [isSmsGranted, setIsSmsGranted] = useState(false)
+  const [isRequestingSms, setIsRequestingSms] = useState(false)
+  const [isScanningSms, setIsScanningSms] = useState(false)
+  const [smsFeedback, setSmsFeedback] = useState({ text: '', isError: false })
 
   // Suspect Promo Cleaner State
   const [suspectTxs, setSuspectTxs] = useState(null)
@@ -76,11 +92,67 @@ export default function SettingsNotifications() {
     try {
       const res = await FinTrackNotificationPlugin.isPermissionGranted()
       setIsListenerGranted(Boolean(res?.granted))
+      if (FinTrackNotificationPlugin.checkSmsPermission) {
+        const smsRes = await FinTrackNotificationPlugin.checkSmsPermission()
+        setIsSmsGranted(Boolean(smsRes?.granted || (smsRes?.receiveGranted && smsRes?.readGranted)))
+      }
     } catch (err){
       console.warn('[SettingsNotifications]', err)
       setIsListenerGranted(false)
     }
   }, [])
+
+  const handleRequestSmsPermission = async () => {
+    triggerHaptic('medium')
+    setIsRequestingSms(true)
+    try {
+      if (FinTrackNotificationPlugin.requestSmsPermission) {
+        await FinTrackNotificationPlugin.requestSmsPermission()
+        await checkNativePermission()
+      }
+    } catch (err) {
+      console.error('[SettingsNotifications] SMS request error', err)
+    } finally {
+      setIsRequestingSms(false)
+    }
+  }
+
+  const handleScanHistoricalSms = async () => {
+    triggerHaptic('medium')
+    setIsScanningSms(true)
+    setSmsFeedback({ text: '', isError: false })
+    try {
+      const res = await syncHistoricalSms({ days: 30 })
+      if (res?.error) {
+        triggerHaptic('error')
+        setSmsFeedback({
+          text: t('notif.smsScanError', 'Gagal memindai SMS: {{error}}', { error: res.error }),
+          isError: true,
+        })
+      } else if (res?.syncedCount > 0) {
+        triggerHaptic('success')
+        setSmsFeedback({
+          text: t('notif.smsScanSuccess', 'Berhasil memindai {{count}} transaksi SMS ke antrean peninjauan.', {
+            count: res.syncedCount,
+          }),
+          isError: false,
+        })
+      } else {
+        setSmsFeedback({
+          text: t('notif.smsScanEmpty', 'Tidak ditemukan transaksi SMS perbankan baru dalam 30 hari terakhir.'),
+          isError: false,
+        })
+      }
+    } catch (err) {
+      triggerHaptic('error')
+      setSmsFeedback({
+        text: err?.message || t('notif.smsScanError', 'Gagal memindai SMS: {{error}}', { error: 'Error' }),
+        isError: true,
+      })
+    } finally {
+      setIsScanningSms(false)
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -89,6 +161,16 @@ export default function SettingsNotifications() {
         if (isMounted) setIsListenerGranted(Boolean(res?.granted))
       })
       .catch((err) => console.warn('[SettingsNotifications]', err))
+
+    if (FinTrackNotificationPlugin.checkSmsPermission) {
+      FinTrackNotificationPlugin.checkSmsPermission()
+        .then((smsRes) => {
+          if (isMounted) {
+            setIsSmsGranted(Boolean(smsRes?.granted || (smsRes?.receiveGranted && smsRes?.readGranted)))
+          }
+        })
+        .catch((err) => console.warn('[SettingsNotifications] SMS check error', err))
+    }
 
     const handleFocus = () => {
       checkNativePermission()
@@ -174,7 +256,7 @@ export default function SettingsNotifications() {
   const handleManualSyncNotifs = async () => {
     triggerHaptic('selection')
     setIsSyncingQueue(true)
-    setSyncFeedback('')
+    setSyncFeedback({ text: '', isError: false })
 
     try {
       const result = await syncNotificationQueue({
@@ -183,20 +265,34 @@ export default function SettingsNotifications() {
         notificationAutoApprove,
       })
 
-      if (result.syncedCount > 0) {
+      if (result?.error) {
+        triggerHaptic('error')
+        setSyncFeedback({
+          text: t('notif.syncError', 'Gagal sinkronisasi notifikasi: {{error}}', { error: result.error }),
+          isError: true,
+        })
+      } else if (result?.syncedCount > 0) {
         triggerHaptic('success')
-        setSyncFeedback(
-          t('notif.syncSuccess', 'Berhasil mencatat {{count}} mutasi baru.', { count: result.syncedCount })
-        )
+        setSyncFeedback({
+          text: t('notif.syncSuccess', 'Berhasil mencatat {{count}} mutasi baru.', { count: result.syncedCount }),
+          isError: false,
+        })
       } else {
-        setSyncFeedback(t('notif.syncEmpty', 'Antrean notifikasi kosong.'))
+        setSyncFeedback({
+          text: t('notif.syncEmpty', 'Antrean notifikasi kosong.'),
+          isError: false,
+        })
       }
-    } catch (err){
+    } catch (err) {
       console.warn('[SettingsNotifications]', err)
-      setSyncFeedback(t('common.error.generic', 'Terjadi kesalahan saat sinkronisasi.'))
+      triggerHaptic('error')
+      setSyncFeedback({
+        text: err?.message || t('common.error.generic', 'Terjadi kesalahan saat sinkronisasi.'),
+        isError: true,
+      })
     } finally {
       setIsSyncingQueue(false)
-      setTimeout(() => setSyncFeedback(''), 3000)
+      setTimeout(() => setSyncFeedback({ text: '', isError: false }), 4000)
     }
   }
 
@@ -304,7 +400,10 @@ export default function SettingsNotifications() {
                 </label>
                 <select
                   value={autoWalletId}
-                  onChange={(e) => setAutoWalletId(e.target.value)}
+                  onChange={async (e) => {
+                    const val = e.target.value
+                    await setDefaultWalletId(val ? Number(val) : null)
+                  }}
                   className="ft-field text-xs font-bold py-1.5 px-3 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)]"
                 >
                   {activeWallets.map((w) => (
@@ -373,7 +472,94 @@ export default function SettingsNotifications() {
         </div>
       </SettingsSection>
 
-      {/* Group 1B: Pembersih Transaksi Promosi & Spam */}
+      {/* Group 1B: Integrasi SMS Perbankan (Hybrid & Historical Scanner) */}
+      <SettingsSection
+        label={t('notif.smsSection', 'Integrasi SMS Perbankan (Hybrid & Offline)')}
+        footnote={t(
+          'notif.smsFootnote',
+          'Mendeteksi mutasi dari SMS perbankan (BCA, Mandiri, BRI, BNI, CIMB, Permata, Danamon, Mega, dll.). Pesan kode OTP, token rahasia, dan nomor pribadi otomatis difilter dan dibuang (Zero-Knowledge).'
+        )}
+      >
+        <div className="ft-settings-cell space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-500 border border-sky-500/20">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="block text-sm font-extrabold text-[var(--fg)]">
+                  {t('notif.smsTitle', 'Penangkapan SMS Perbankan')}
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isSmsGranted ? 'bg-emerald-500' : 'bg-zinc-500'
+                    }`}
+                  />
+                  <span className="text-xs font-bold text-[var(--muted)]">
+                    {isSmsGranted
+                      ? t('notif.smsActive', 'Izin SMS Aktif (Latar Belakang Penuh)')
+                      : t('notif.smsInactive', 'Mode Notifikasi (Standar)')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRequestSmsPermission}
+              disabled={isRequestingSms}
+              className="px-3 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <span>{isSmsGranted ? t('notif.smsGranted', 'Aktif') : t('notif.smsEnable', 'Aktifkan Izin SMS')}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Historical 30-Day SMS Scan */}
+          <div className="border-t border-[var(--border)] pt-3.5 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="block text-xs font-bold text-[var(--fg)]">
+                  {t('notif.smsHistoricalTitle', 'Pindai Riwayat SMS (30 Hari Terakhir)')}
+                </span>
+                <span className="block text-[11px] font-medium text-[var(--muted)] mt-0.5">
+                  {t(
+                    'notif.smsHistoricalDesc',
+                    'Membaca SMS perbankan yang sudah ada di kotak masuk untuk memasukkan mutasi masa lalu ke antrean peninjauan.'
+                  )}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleScanHistoricalSms}
+                disabled={isScanningSms}
+                className="h-9 px-3.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {isScanningSms ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                <span>{t('notif.smsScanBtn', 'Pindai Kotak Masuk')}</span>
+              </button>
+            </div>
+
+            {smsFeedback?.text && (
+              <p
+                className={`text-xs font-bold animate-fadeIn pt-1 ${
+                  smsFeedback.isError ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-500'
+                }`}
+              >
+                {smsFeedback.text}
+              </p>
+            )}
+          </div>
+        </div>
+      </SettingsSection>
+
+      {/* Group 1C: Pembersih Transaksi Promosi & Spam */}
       <SettingsSection
         label={t('notif.cleanerSection', 'Pembersih Mutasi Promosi & Spam')}
         footnote={t(
