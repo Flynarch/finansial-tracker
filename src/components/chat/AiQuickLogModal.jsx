@@ -704,11 +704,12 @@ function isObviousNonTransaction(text) {
 
     const clampedText = cleanText ? String(cleanText).slice(0, 4000) : ''
 
-    // 2. Zero-Latency Fast Path:
-    // If the input is a clean financial transaction ("makan siang 35rb", "kopi 25rb bca", "gaji 5jt"),
-    // parse it instantly in 0ms locally without waiting or entering the analyzing loading spinner!
+    // 2. Fast Path Routing (Online-First):
+    // When offline, parse casual transactions instantly in 0ms locally without calling remote AI.
+    // When online, skip local fast-path pre-parsing, enter 'analyzing' state, and call Gemini AI!
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
     let preParsedResult = null
-    if (!imageToSubmit && clampedText) {
+    if (isOffline && !imageToSubmit && clampedText) {
       const fastResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
       if (fastResult && (fastResult.type === 'transactions' || (Array.isArray(fastResult.transactions) && fastResult.transactions.length > 0))) {
         preParsedResult = fastResult
@@ -720,14 +721,38 @@ function isObviousNonTransaction(text) {
     }
 
     try {
-      const result = preParsedResult || (await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
-        locale,
-        defaultCurrency,
-        wallets,
-        imageData: imageToSubmit,
-        scanMode: modeToUse,
-        preferFastNlp: true,
-      }))
+      let result = preParsedResult
+      if (!result) {
+        try {
+          result = await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
+            locale,
+            defaultCurrency,
+            wallets,
+            imageData: imageToSubmit,
+            scanMode: modeToUse,
+            preferFastNlp: false,
+          })
+        } catch (apiErr) {
+          console.warn('[AiQuickLogModal] Remote AI call failed, attempting local NLP fallback:', apiErr)
+          if (!imageToSubmit && clampedText) {
+            const fallbackResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
+            if (fallbackResult && (fallbackResult.type === 'transactions' || fallbackResult.transactions?.length > 0)) {
+              result = fallbackResult
+            }
+          }
+          if (!result) throw apiErr
+        }
+      }
+
+      if (result.error) {
+        // If remote AI returned an error (e.g. quota 429), try local NLP fallback before giving up
+        if (!imageToSubmit && clampedText && result.type !== 'omission_clarification') {
+          const fallbackResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
+          if (fallbackResult && (fallbackResult.type === 'transactions' || fallbackResult.transactions?.length > 0)) {
+            result = fallbackResult
+          }
+        }
+      }
 
       if (result.error) {
         if (result.type === 'omission_clarification' || (Array.isArray(result.chips) && result.chips.length > 0)) {

@@ -216,26 +216,32 @@ export async function parseTransactionFromText(userMessage, context = {}) {
     }
   }
 
-  const now = new Date()
-  const today = format(now, 'yyyy-MM-dd')
-  const currentTime = format(now, 'HH:mm')
-  const monthSummary = await getMonthSummaryForPrompt()
+  try {
+    const now = new Date()
+    const today = format(now, 'yyyy-MM-dd')
+    const currentTime = format(now, 'HH:mm')
+    let monthSummary = null
+    let recentTxs = []
+    try {
+      monthSummary = await getMonthSummaryForPrompt()
+      recentTxs = await db.transactions
+        .orderBy('date')
+        .reverse()
+        .limit(15)
+        .toArray()
+    } catch {
+      // Defensive fallback if IndexedDB is unavailable or throws
+    }
 
-  const recentTxs = await db.transactions
-    .orderBy('date')
-    .reverse()
-    .limit(15)
-    .toArray()
-
-  const sysPrompt = buildSystemPrompt({
-    todayStr: today,
-    currentTime,
-    currency: defaultCurrency,
-    locale,
-    wallets,
-    monthSummary,
-    recentTransactions: recentTxs,
-  })
+    const sysPrompt = buildSystemPrompt({
+      todayStr: today,
+      currentTime,
+      currency: defaultCurrency,
+      locale,
+      wallets,
+      monthSummary,
+      recentTransactions: recentTxs,
+    })
 
   let contents = []
   let lastRole = null
@@ -376,9 +382,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   })
 
   contents = sanitizeGeminiContents(contents)
-
-  try {
-    let response = await callApi(contents)
+  let response = await callApi(contents)
 
     if (response.functionCall) {
       const fnCall = response.functionCall

@@ -156,4 +156,53 @@ describe('Quick Log Zero-Latency Fast Path', () => {
     expect(result.error).toBe(true)
     expect(result.message).toContain('Nominal')
   })
+
+  it('routes to parseShortTransactionFast when offline (navigator.onLine is false)', async () => {
+    const originalOnline = globalThis.navigator.onLine
+    try {
+      Object.defineProperty(globalThis.navigator, 'onLine', {
+        value: false,
+        configurable: true,
+      })
+
+      const result = await parseTransactionFromText('makan siang 35rb', {
+        wallets: mockWallets,
+        defaultCurrency: 'IDR',
+        preferFastNlp: false,
+      })
+
+      expect(result).not.toBeNull()
+      expect(result.engine).toBe('offline_nlp')
+      expect(result.transactions[0].amount).toBe(35000)
+    } finally {
+      Object.defineProperty(globalThis.navigator, 'onLine', {
+        value: originalOnline,
+        configurable: true,
+      })
+    }
+  })
+
+  it('returns AI error when online and remote AI fails without preferFastNlp', async () => {
+    const originalOnline = globalThis.navigator.onLine
+    try {
+      Object.defineProperty(globalThis.navigator, 'onLine', {
+        value: true,
+        configurable: true,
+      })
+
+      const result = await parseTransactionFromText('kopi 25rb bca', {
+        wallets: mockWallets,
+        defaultCurrency: 'IDR',
+        preferFastNlp: false,
+      })
+
+      expect(result.error).toBe(true)
+      expect(result.transactions).toBeUndefined()
+    } finally {
+      Object.defineProperty(globalThis.navigator, 'onLine', {
+        value: originalOnline,
+        configurable: true,
+      })
+    }
+  })
 })
