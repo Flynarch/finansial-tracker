@@ -204,7 +204,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         }
 
         // Determine calibrated sparkline canvas height based on widget bounds
-        int targetCanvasHeight = 185;
+        int targetCanvasHeight = 210;
         if (appWidgetManager != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             try {
                 Bundle options = appWidgetManager.getAppWidgetOptions(appWidgetId);
@@ -212,11 +212,11 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                     int minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
                     int minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
                     if (minW > 0 && minH > 0) {
-                        int estChartW = Math.max(160, minW - 26);
-                        int estChartH = Math.max(50, minH - 120);
+                        int estChartW = Math.max(160, minW - 28);
+                        int estChartH = Math.max(60, minH - 92);
                         float ratio = (float) estChartH / (float) estChartW;
                         int calcH = Math.round(800f * ratio);
-                        targetCanvasHeight = Math.max(160, Math.min(270, calcH));
+                        targetCanvasHeight = Math.max(160, Math.min(320, calcH));
                     }
                 }
             } catch (Exception ignored) {}
@@ -272,7 +272,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
      * widget viewport dimensions, ensuring true circular pulse dots and un-squished text.
      */
     public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson) {
-        return createSparklineBitmap(sparklineJson, sparklineDatesJson, 185);
+        return createSparklineBitmap(sparklineJson, sparklineDatesJson, 210);
     }
 
     public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, int targetHeight) {
@@ -300,7 +300,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
             // Calibrated dimensions adaptive to widget viewport
             int width = 800;
-            int height = targetHeight > 0 ? targetHeight : 185;
+            int height = targetHeight > 0 ? targetHeight : 210;
             float leftPadding = 32f;
             float rightPadding = 32f;
             float topPadding = Math.max(16f, height * 0.12f);
@@ -354,11 +354,16 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             fillPath.close();
 
             // 1. Draw subtle area fill with Sage gradient (FinTrack brand accent token) bounded to baseline
-            int fillStart = Color.argb(60, 107, 124, 94); // alpha sage #6B7C5E
-            int fillEnd = Color.argb(0, 107, 124, 94);     // 0% alpha
+            int[] fillColors = new int[] {
+                Color.argb(45, 107, 124, 94),  // sage alpha 18%
+                Color.argb(25, 107, 124, 94),  // sage alpha 10%
+                Color.argb(8, 107, 124, 94),   // sage alpha 3%
+                Color.argb(0, 107, 124, 94)    // transparent
+            };
+            float[] fillPositions = new float[] { 0f, 0.4f, 0.7f, 1f };
             LinearGradient gradient = new LinearGradient(
-                    0f, topPadding, 0f, baselineY,
-                    fillStart, fillEnd, Shader.TileMode.CLAMP
+                0f, topPadding, 0f, baselineY,
+                fillColors, fillPositions, Shader.TileMode.CLAMP
             );
 
             Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
@@ -366,28 +371,72 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             fillPaint.setShader(gradient);
             canvas.drawPath(fillPath, fillPaint);
 
-            // 2. Draw stroke line with smooth sage (#86A879)
+            // Layer 1: Wide ambient glow (outermost bloom)
+            Paint glowPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            glowPaint1.setStyle(Paint.Style.STROKE);
+            glowPaint1.setColor(Color.argb(35, 134, 168, 121)); // sage #86A879 at 14% alpha
+            glowPaint1.setStrokeWidth(14f);
+            glowPaint1.setStrokeCap(Paint.Cap.ROUND);
+            glowPaint1.setStrokeJoin(Paint.Join.ROUND);
+            glowPaint1.setMaskFilter(new android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL));
+            canvas.drawPath(linePath, glowPaint1);
+
+            // Layer 2: Medium bloom
+            Paint glowPaint2 = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            glowPaint2.setStyle(Paint.Style.STROKE);
+            glowPaint2.setColor(Color.argb(55, 134, 168, 121)); // sage at 22% alpha
+            glowPaint2.setStrokeWidth(9f);
+            glowPaint2.setStrokeCap(Paint.Cap.ROUND);
+            glowPaint2.setStrokeJoin(Paint.Join.ROUND);
+            glowPaint2.setMaskFilter(new android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL));
+            canvas.drawPath(linePath, glowPaint2);
+
+            // Layer 3: Core crisp line (existing, keep same)
             Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             linePaint.setStyle(Paint.Style.STROKE);
-            linePaint.setColor(Color.rgb(134, 168, 121));
+            linePaint.setColor(Color.rgb(134, 168, 121)); // sage #86A879
             linePaint.setStrokeWidth(5.5f);
             linePaint.setStrokeCap(Paint.Cap.ROUND);
             linePaint.setStrokeJoin(Paint.Join.ROUND);
             canvas.drawPath(linePath, linePaint);
 
-            // 3. Draw highlighted pulse dot on the latest point (guaranteed circular due to calibrated aspect ratio)
+            // 2b. Draw small indicator dots at each data point (except last)
+            Paint dotIndicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            dotIndicatorPaint.setStyle(Paint.Style.FILL);
+            dotIndicatorPaint.setColor(Color.argb(100, 134, 168, 121)); // sage at ~39% alpha
+            for (int i = 0; i < len - 1; i++) {
+                float dotX = leftPadding + (len > 1 ? i * stepX : usableWidth / 2f);
+                float dotY = pointsY[i];
+                canvas.drawCircle(dotX, dotY, 3.2f, dotIndicatorPaint);
+            }
+
+            // 3. Draw highlighted pulse dot with concentric glow rings on the latest point
             float lastX = leftPadding + (len > 1 ? (len - 1) * stepX : usableWidth);
             float lastY = pointsY[len - 1];
 
-            Paint outerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-            outerDotPaint.setStyle(Paint.Style.FILL);
-            outerDotPaint.setColor(Color.argb(85, 107, 124, 94));
-            canvas.drawCircle(lastX, lastY, 11.5f, outerDotPaint);
+            // Ring 1 (outermost): ambient glow
+            Paint ring1Paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            ring1Paint.setStyle(Paint.Style.FILL);
+            ring1Paint.setColor(Color.argb(25, 107, 124, 94));
+            canvas.drawCircle(lastX, lastY, 18f, ring1Paint);
 
-            Paint innerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-            innerDotPaint.setStyle(Paint.Style.FILL);
-            innerDotPaint.setColor(Color.WHITE);
-            canvas.drawCircle(lastX, lastY, 4.6f, innerDotPaint);
+            // Ring 2: inner glow
+            Paint ring2Paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            ring2Paint.setStyle(Paint.Style.FILL);
+            ring2Paint.setColor(Color.argb(45, 107, 124, 94));
+            canvas.drawCircle(lastX, lastY, 13f, ring2Paint);
+
+            // Ring 3: solid ring
+            Paint ring3Paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            ring3Paint.setStyle(Paint.Style.FILL);
+            ring3Paint.setColor(Color.argb(85, 134, 168, 121));
+            canvas.drawCircle(lastX, lastY, 8f, ring3Paint);
+
+            // Ring 4 (core): bright white center
+            Paint coreDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            coreDotPaint.setStyle(Paint.Style.FILL);
+            coreDotPaint.setColor(Color.WHITE);
+            canvas.drawCircle(lastX, lastY, 4f, coreDotPaint);
 
             // 4. Draw subtle timeline divider and date labels below each point
             String[] dateLabels = new String[len];
@@ -411,6 +460,15 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                 }
             }
 
+            // 4a. Draw subtle vertical tick marks at each date position
+            Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            tickPaint.setColor(Color.argb(20, 255, 255, 255)); // 8% white
+            tickPaint.setStrokeWidth(1f);
+            for (int i = 0; i < len; i++) {
+                float tickX = leftPadding + (len > 1 ? i * stepX : usableWidth / 2f);
+                canvas.drawLine(tickX, baselineY, tickX, baselineY + 4f, tickPaint);
+            }
+
             Paint dividerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             dividerPaint.setColor(Color.argb(22, 255, 255, 255));
             dividerPaint.setStrokeWidth(1.5f);
@@ -418,7 +476,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
             Paint datePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             datePaint.setTextAlign(Paint.Align.CENTER);
-            datePaint.setTextSize(Math.max(18f, height * 0.10f));
+            datePaint.setTextSize(Math.max(20f, height * 0.11f));
             datePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 
             float dateLabelY = height - 9f;
@@ -428,7 +486,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                 if (isToday) {
                     datePaint.setColor(Color.parseColor("#F8FAFC")); // Bright white for today
                 } else {
-                    datePaint.setColor(Color.parseColor("#64748B")); // Slate-500 muted for past days
+                    datePaint.setColor(Color.parseColor("#525C6B")); // Slate-500 muted for past days
                 }
                 String label = dateLabels[i] != null ? dateLabels[i] : "";
                 canvas.drawText(label, x, dateLabelY, datePaint);
