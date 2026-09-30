@@ -3,6 +3,7 @@ import Modal from '../ui/Modal'
 import { Grid3X3, CheckCircle2, AlertCircle, RotateCcw, Fingerprint } from 'lucide-react'
 import { triggerHaptic } from '../../lib/haptics'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 
 const DOTS = [
   { id: 0, x: 45, y: 45 },
@@ -26,6 +27,13 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
   const [errorMsg, setErrorMsg] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
   const [useBiometrics, setUseBiometrics] = useState(initialBiometric)
+
+  useBackButton(() => {
+    setStep(1)
+    setFirstPattern([])
+    setCurrentPath([])
+    setErrorMsg('')
+  }, isOpen && step === 2)
 
   const svgRef = useRef(null)
 

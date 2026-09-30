@@ -23,8 +23,8 @@ export function getParentRoute(pathname) {
     return '/todos'
   }
 
-  // Wallet Detail Page (/wallets/:id) -> /dashboard
-  if (pathname.startsWith('/wallets/')) {
+  // Wallet Detail Page (/wallet/:id) -> /dashboard
+  if (pathname.startsWith('/wallet/') || pathname.startsWith('/wallets/')) {
     return '/dashboard'
   }
 

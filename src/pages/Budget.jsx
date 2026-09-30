@@ -476,7 +476,7 @@ function Budget() {
                               {displayLabel}
                             </h3>
                             <p className="mt-0.5 text-xs font-bold text-[var(--muted)] tabular-nums">
-                              {formatCurrency(spent, defaultCurrency)} <span className="font-normal text-[var(--muted-2)]">/ {formatCurrency(limit, defaultCurrency)}</span>
+                              {formatCurrency(spent, b.currency || defaultCurrency)} <span className="font-normal text-[var(--muted-2)]">/ {formatCurrency(limit, b.currency || defaultCurrency)}</span>
                             </p>
                           </div>
                         </div>
@@ -511,7 +511,7 @@ function Budget() {
                           {isOver ? t('budget.overBudget', 'Kelebihan anggaran') : t('budget.remainingBudget', 'Sisa anggaran')}
                         </span>
                         <span className={isOver ? 'text-[var(--status-expense)] font-extrabold' : 'text-[var(--fg)]'}>
-                          {isOver ? formatCurrency(spent - limit, defaultCurrency) : formatCurrency(remaining, defaultCurrency)}
+                          {isOver ? formatCurrency(spent - limit, b.currency || defaultCurrency) : formatCurrency(remaining, b.currency || defaultCurrency)}
                         </span>
                       </div>
                     </div>

@@ -9,6 +9,7 @@ import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { resolveExpenseParentIconKey } from '../../lib/categoryIcon'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import { formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../../lib/utils'
 import { getMergedExpenseTree, parseExpenseCategoryPath } from '../../lib/expenseCategories'
 
@@ -144,6 +145,10 @@ export default function BudgetSheetModal({
   const [expandedParentId, setExpandedParentId] = useState(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const limitInputRef = useRef(null)
+
+  useBackButton(() => {
+    setIsCategoryOpen(false)
+  }, Boolean(isOpen && isCategoryOpen))
 
   const tree = useMemo(() => getMergedExpenseTree(), [])
   const lang = locale === 'en' ? 'en' : 'id'

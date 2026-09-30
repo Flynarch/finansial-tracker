@@ -16,6 +16,7 @@ import {
   validateMnemonicPhrase,
   setSessionMnemonicPhrase,
 } from '../../lib/mnemonicCrypto'
+import useBackButton from '../../hooks/useBackButton'
 
 export default function MnemonicRecoveryModal({
   isOpen,
@@ -34,6 +35,18 @@ export default function MnemonicRecoveryModal({
   const [phraseError, setPhraseError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [decryptedData, setDecryptedData] = useState(null)
+
+  useBackButton(() => {
+    if (step === 'preview') {
+      setStep('phrase')
+      setDecryptedData(null)
+    } else if (step === 'phrase' && !initialEnvelope) {
+      setStep('upload')
+      setFile(null)
+      setRawEnvelope(null)
+      setPhraseError('')
+    }
+  }, isOpen && (step === 'preview' || (step === 'phrase' && !initialEnvelope)))
 
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
   const [prevInitialEnvelope, setPrevInitialEnvelope] = useState(initialEnvelope)

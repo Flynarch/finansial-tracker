@@ -11,6 +11,7 @@ import HabitColorPicker from './HabitColorPicker'
 import { db } from '../../lib/db'
 import useSwipeAction from '../../hooks/useSwipeAction'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_ACTION_TYPES,
@@ -25,6 +26,8 @@ const HABIT_CATEGORIES = ['Kesehatan', 'Belajar', 'Produktivitas', 'Keuangan', '
 const CustomSelect = ({ value, options, onChange }) => {
   const [isOpen, setIsOpen] = useState(false)
   const selectRef = useRef(null)
+
+  useBackButton(() => setIsOpen(false), isOpen)
 
   useEffect(() => {
     const handleClick = (e) => {

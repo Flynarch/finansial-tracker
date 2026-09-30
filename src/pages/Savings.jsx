@@ -18,6 +18,7 @@ import {
   clampPercent,
   convertCurrency,
   formatCurrency,
+  roundCurrency,
   toSafeNumber,
   FALLBACK_EXCHANGE_RATES,
 } from '../lib/utils'
@@ -600,10 +601,11 @@ function Savings() {
                 const targetWallet = wallets?.find((w) => Number(w.id) === targetWalletIdNum)
                 const walletName = targetWallet?.name || 'Dompet'
                 const targetCurrency = targetWallet?.currency || deletingGoal.currency || defaultCurrency
-                const effectiveAmount =
+                const effectiveAmount = roundCurrency(
                   targetCurrency !== (deletingGoal.currency || defaultCurrency)
                     ? convertCurrency(currentAmt, deletingGoal.currency || defaultCurrency, targetCurrency, rates)
                     : currentAmt
+                )
 
                 await db.transactions.add({
                   date: format(now, 'yyyy-MM-dd'),
@@ -615,6 +617,7 @@ function Savings() {
                   walletId: targetWalletIdNum,
                   goalId: deletingGoal.id,
                   createdAt: Date.now(),
+                  deletedAt: null,
                   isExcludeAnalyticsTx: true,
                   isExcludeFromAnalytics: true,
                   excludeFromAnalytics: true,

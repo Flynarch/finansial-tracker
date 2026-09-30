@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Camera, Mic, Send, Sparkles } from 'lucide-react'
 import { translate } from '../../lib/i18n'
 import { triggerHaptic } from '../../lib/haptics'
@@ -17,6 +18,15 @@ export default function ChatInputBar({
   onOpenMediaPicker,
   locale,
 }) {
+  useEffect(() => {
+    if (inputRef?.current) {
+      inputRef.current.style.height = 'auto'
+      if (inputValue) {
+        inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`
+      }
+    }
+  }, [inputValue, inputRef])
+
   return (
     <footer className="shrink-0 border-t border-[var(--border)] bg-[var(--panel-strong)]/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] pt-2 px-3 shadow-2xl z-20 space-y-2">
       {/* Voice Visualizer Overlay during recording */}
@@ -89,6 +99,16 @@ export default function ChatInputBar({
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
+              const isTouchMobile =
+                typeof window !== 'undefined' &&
+                typeof window.matchMedia === 'function' &&
+                window.matchMedia('(pointer: coarse)').matches
+
+              if (isTouchMobile) {
+                // On mobile touchscreens, Enter inserts a newline instead of submitting
+                return
+              }
+
               e.preventDefault()
               if (e.nativeEvent?.isComposing || e.keyCode === 229) return
               if (isLoading || (!inputValue.trim() && !selectedImage)) return

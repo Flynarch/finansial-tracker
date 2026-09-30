@@ -5,7 +5,7 @@ import BottomSheet from '../ui/BottomSheet'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
-import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret } from '../../lib/utils'
+import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret, roundCurrency } from '../../lib/utils'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -88,7 +88,7 @@ export default function SavingsFundSheetModal({
         if (walletIdNum) {
           createdTxId = await db.transactions.add({
             date: dateInput,
-            amount: val,
+            amount: roundCurrency(val),
             type: isWithdraw ? 'income' : 'expense',
             category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
             notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
@@ -96,6 +96,8 @@ export default function SavingsFundSheetModal({
             walletId: walletIdNum,
             goalId: goal.id,
             createdAt: Date.now(),
+            deletedAt: null,
+            isExcludeAnalyticsTx: true,
             isExcludeFromAnalytics: true,
             excludeFromAnalytics: true,
           })
@@ -201,18 +203,17 @@ export default function SavingsFundSheetModal({
           <input
             ref={inputRef}
             type="text"
-            inputMode="numeric"
+            inputMode="decimal"
             className="w-full bg-transparent text-center text-3xl font-black text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/30 tabular-nums"
             placeholder="0"
             value={amountInput}
             onChange={(e) => {
               const selStart = e.target.selectionStart
-              const oldVal = amountInput
               const newVal = formatMoneyInput(e.target.value, currency)
               setAmountInput(newVal)
               window.requestAnimationFrame(() => {
                 if (inputRef.current) {
-                  const newPos = getMoneyInputCaret(e.target.value, oldVal, newVal, selStart)
+                  const newPos = getMoneyInputCaret(e.target.value, newVal, selStart ?? e.target.value.length, currency)
                   inputRef.current.setSelectionRange(newPos, newPos)
                 }
               })

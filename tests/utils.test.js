@@ -116,13 +116,14 @@ describe('utils - isExcludeAnalyticsTx', () => {
     expect(isExcludeAnalyticsTx({ tags: ['exclude_analytics'] })).toBe(true)
     expect(isExcludeAnalyticsTx({ type: 'balance_adjustment' })).toBe(true)
     expect(isExcludeAnalyticsTx({ loanId: 123 })).toBe(true)
-    expect(isExcludeAnalyticsTx({ splitBillId: 456 })).toBe(true)
+    expect(isExcludeAnalyticsTx({ splitBillId: 456, category: 'Pinjaman Diberikan' })).toBe(true)
     expect(isExcludeAnalyticsTx({ category: 'Bayar Hutang' })).toBe(true)
   })
 
   it('identifies standard transactions that should be included', () => {
     expect(isExcludeAnalyticsTx({ type: 'expense', category: 'makanan' })).toBe(false)
     expect(isExcludeAnalyticsTx({ type: 'income', category: 'gaji' })).toBe(false)
+    expect(isExcludeAnalyticsTx({ splitBillId: 456, category: 'makanan/makan_diluar' })).toBe(false)
     expect(isExcludeAnalyticsTx(null)).toBe(false)
   })
 })

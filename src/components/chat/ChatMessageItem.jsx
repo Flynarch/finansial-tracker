@@ -15,6 +15,7 @@ export default function ChatMessageItem({
   isLoading = false,
   locale = 'id',
   onSend,
+  onStagePrompt,
   onMsgTouchStart,
   onMsgTouchMove,
   onMsgTouchEnd,
@@ -97,7 +98,7 @@ export default function ChatMessageItem({
                         ? Math.min(100, Math.round((msg.metrics.emergencyMonths / 6) * 100))
                         : null
                     }
-                    onAction={onSend}
+                    onAction={onStagePrompt || onSend}
                   />
                 ) : msg.type === 'chart' && msg.data ? (
                   <ChartBubble data={msg.data} chartType={msg.chartType} embedded={true} />
@@ -132,7 +133,7 @@ export default function ChatMessageItem({
           {isLastAi && !isLoading && (
             <QuickChips
               chips={msg.type === 'welcome' ? null : msg.chips}
-              onSelect={onSend}
+              onSelect={onStagePrompt || onSend}
             />
           )}
         </>

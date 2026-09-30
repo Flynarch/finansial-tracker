@@ -20,6 +20,7 @@ import {
   deletePasskey,
 } from '../../lib/passkeys'
 import { format } from 'date-fns'
+import useBackButton from '../../hooks/useBackButton'
 
 export default function PasskeysManagerModal({ isOpen, onClose }) {
   const { t } = useTranslation()
@@ -32,6 +33,12 @@ export default function PasskeysManagerModal({ isOpen, onClose }) {
   const [error, setError] = useState('')
   const [newDeviceName, setNewDeviceName] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+
+  useBackButton(() => {
+    setShowAddForm(false)
+    setNewDeviceName('')
+    setError('')
+  }, isOpen && showAddForm)
 
   const reloadPasskeys = useCallback(() => {
     setPasskeys(getStoredPasskeys())

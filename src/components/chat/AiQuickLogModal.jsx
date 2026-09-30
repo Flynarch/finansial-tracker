@@ -9,7 +9,6 @@ import {
   parseTransactionFromText,
   distributeReceiptTransactions,
   parseShortTransactionFast,
-  rememberTransactionEntity,
 } from '../../lib/gemini'
 import { sanitizeCategoryPath } from '../../lib/categorySanitizer'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -24,6 +23,7 @@ import VoiceVisualizer from './VoiceVisualizer'
 import MediaSourcePickerModal from './MediaSourcePickerModal'
 import { triggerHaptic } from '../../lib/haptics'
 import { compressImage } from '../../lib/imageCompression'
+import { getLocalDateString } from '../../lib/dateUtils'
 
 const CURRENCY_SAMPLE_TEMPLATES = {
   IDR: {
@@ -370,6 +370,8 @@ export default function AiQuickLogModal() {
   const touchStartTime = useRef(0)
 
   const [prevOpen, setPrevOpen] = useState(isOpen)
+  const isOpenRef = useRef(isOpen)
+  useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
   if (prevOpen !== isOpen) {
     setPrevOpen(isOpen)
     if (isOpen) {
@@ -481,6 +483,18 @@ export default function AiQuickLogModal() {
     if (modalMode === 'scan_mode') {
       setModalMode('input')
       setSelectedImage(null)
+      return
+    }
+    if (modalMode === 'intent_switch') {
+      setModalMode('input')
+      setInputValue(lastSubmittedPrompt)
+      setErrorMessage('')
+      setOmissionData(null)
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+        }
+      }, 120)
       return
     }
     closeQuickLog()
@@ -637,6 +651,17 @@ export default function AiQuickLogModal() {
   const handleImageSelect = async (e) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setErrorMessage(
+          locale === 'en'
+            ? 'Receipt scanning requires an internet connection.'
+            : 'Pemindaian struk memerlukan koneksi internet.'
+        )
+        if (e.target) {
+          e.target.value = ''
+        }
+        return
+      }
       try {
         const compressed = await compressImage(file, 1024, 0.75)
         if (compressed) {
@@ -689,8 +714,21 @@ function isObviousNonTransaction(text) {
     modeToUse = scanMode,
     targetWalletId = null
   ) => {
+    handleStopRecording()
     const cleanText = textToSubmit?.trim()
     if (!cleanText && !imageToSubmit) return
+
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+
+    if (imageToSubmit && isOffline) {
+      setErrorMessage(
+        locale === 'en'
+          ? 'Receipt scanning requires an internet connection.'
+          : 'Pemindaian struk memerlukan koneksi internet.'
+      )
+      setModalMode('input')
+      return
+    }
 
     setLastSubmittedPrompt(cleanText || (imageToSubmit ? (modeToUse === 'per_item' ? 'Scan struk per item' : 'Scan struk total') : 'Upload struk/gambar'))
     setErrorMessage('')
@@ -707,7 +745,6 @@ function isObviousNonTransaction(text) {
     // 2. Fast Path Routing (Online-First):
     // When offline, parse casual transactions instantly in 0ms locally without calling remote AI.
     // When online, skip local fast-path pre-parsing, enter 'analyzing' state, and call Gemini AI!
-    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
     let preParsedResult = null
     if (isOffline && !imageToSubmit && clampedText) {
       const fastResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
@@ -731,6 +768,7 @@ function isObviousNonTransaction(text) {
             imageData: imageToSubmit,
             scanMode: modeToUse,
             preferFastNlp: false,
+            isQuickLog: true,
           })
         } catch (apiErr) {
           console.warn('[AiQuickLogModal] Remote AI call failed, attempting local NLP fallback:', apiErr)
@@ -743,6 +781,9 @@ function isObviousNonTransaction(text) {
           if (!result) throw apiErr
         }
       }
+
+      // Race condition guard: bail out if modal was closed during AI processing
+      if (!isOpenRef.current) return
 
       if (result.error) {
         // If remote AI returned an error (e.g. quota 429), try local NLP fallback before giving up
@@ -792,6 +833,17 @@ function isObviousNonTransaction(text) {
             ? sanitizeCategoryPath(tx.category || tx.notes, tx.type || 'expense')
             : sanitizeCategoryPath(tx.category, tx.type)
 
+          const isSplit = Boolean(tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0)
+          const cleanSplitItems = isSplit
+            ? tx.splitItems.map((si) => ({
+                ...si,
+                category: sanitizeCategoryPath(si.category || si.notes, si.type || tx.type || 'expense'),
+                amount: Number(si.amount) || 0,
+                notes: si.notes || '',
+                isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+              }))
+            : undefined
+
           const txEngine = tx.engine || result.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
           const txEngineLabel = tx.engineLabel || result.engineLabel || (txEngine === 'offline_nlp' ? 'NLP Lokal (Offline)' : 'AI Gemini (Online)')
 
@@ -800,9 +852,11 @@ function isObviousNonTransaction(text) {
             engine: txEngine,
             engineLabel: txEngineLabel,
             amount: numericAmount,
-            date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+            date: tx.date || getLocalDateString(),
             time: tx.time || format(new Date(), 'HH:mm'),
             category: itemCategory,
+            isSplit,
+            splitItems: cleanSplitItems,
             walletId: finalWalletId,
             currency: txCurrency,
             merchant: tx.merchant || result.merchant || undefined,
@@ -822,7 +876,6 @@ function isObviousNonTransaction(text) {
 
           const createdId = await addTransaction(txToSave)
           txToSave.id = createdId
-          rememberTransactionEntity(txToSave)
           savedTxs.push(txToSave)
         }
 
@@ -865,6 +918,23 @@ function isObviousNonTransaction(text) {
         } catch (err){
       console.warn('[AiQuickLogModal]', err)
           // ignore
+        }
+      }
+    }, 120)
+  }
+
+  const handleStayAndEdit = () => {
+    setModalMode('input')
+    setInputValue(lastSubmittedPrompt)
+    setErrorMessage('')
+    setOmissionData(null)
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        try {
+          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        } catch (err) {
+          console.warn('[AiQuickLogModal]', err)
         }
       }
     }, 120)
@@ -1052,6 +1122,15 @@ function isObviousNonTransaction(text) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
+                      const isTouchMobile =
+                        typeof window !== 'undefined' &&
+                        typeof window.matchMedia === 'function' &&
+                        window.matchMedia('(pointer: coarse)').matches
+
+                      if (isTouchMobile) {
+                        return
+                      }
+
                       e.preventDefault()
                       if (e.nativeEvent?.isComposing || e.keyCode === 229) return
                       if (!inputValue.trim() && !selectedImage) return
@@ -1276,7 +1355,7 @@ function isObviousNonTransaction(text) {
               <AiIntentSwitchDialog
                 rawPrompt={lastSubmittedPrompt}
                 onSwitchToChat={handleSwitchToChat}
-                onStay={handleResetForAnother}
+                onStay={handleStayAndEdit}
               />
             </div>
           )}

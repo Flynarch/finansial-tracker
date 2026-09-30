@@ -198,6 +198,8 @@ export async function updateTransaction(id, fields) {
     }
   }
 
+  const extraAffectedWallets = []
+
   try {
     await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
     const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
@@ -230,48 +232,107 @@ export async function updateTransaction(id, fields) {
     }
 
     // 2. Synchronize linked loan & loan payment record if applicable
+    let loan = null
     if (existing.loanId) {
-      const loan = await db.loans.get(existing.loanId)
-      if (loan) {
-        const loanCurrency = loan.currency || defaultCurrency
+      loan = await db.loans.get(existing.loanId)
+    }
+    if (!loan) {
+      loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+    }
+    if (loan) {
+      const loanCurrency = loan.currency || defaultCurrency
         const oldAmtNorm = convertCurrency(oldAmt, oldCurrency, loanCurrency, rates)
         const newAmtNorm = convertCurrency(newAmt, newCurrency, loanCurrency, rates)
-        const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
+
+        const isExcessTx = Boolean(existing.isLoanExcess)
+        let payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
+        if (!payment && isExcessTx) {
+          payment = await db.loanPayments
+            .where('loanId')
+            .equals(existing.loanId)
+            .filter((p) => p.excessTransactionId === cleanId)
+            .first()
+        }
+
         if (payment) {
-          const delta = newAmtNorm - oldAmtNorm
-          const newRemaining = Math.max(0, Math.min(loan.totalAmount, (Number(loan.remainingAmount) || 0) - delta))
-          const isNowActive = newRemaining > 0
+          if (isExcessTx) {
+            // Updating excess transaction: sync payment.excessAmount and total amount
+            const newExcessAmt = newAmtNorm
+            const currentPrincipal = Number(payment.principalAmount ?? payment.amount) || 0
+            const updatedPaymentFields = {
+              excessAmount: newExcessAmt,
+              amount: currentPrincipal + newExcessAmt,
+              ...(fields.date ? { date: fields.date } : {}),
+            }
+            await db.loanPayments.update(payment.id, updatedPaymentFields)
 
-          await db.loanPayments.update(payment.id, {
-            amount: newAmtNorm,
-            ...(fields.date ? { date: fields.date } : {}),
-            ...(fields.notes !== undefined ? { notes: fields.notes } : {}),
-          })
+            // Keep linked principal transaction synchronized
+            const principalTxId = existing.principalTransactionId || payment.transactionId
+            if (principalTxId) {
+              const syncFields = {}
+              if (fields.date) syncFields.date = fields.date
+              if (fields.walletId !== undefined) {
+                syncFields.walletId = Number(fields.walletId)
+                extraAffectedWallets.push(Number(fields.walletId))
+              }
+              if (Object.keys(syncFields).length > 0) {
+                await db.transactions.update(Number(principalTxId), syncFields)
+              }
+            }
+          } else {
+            // Updating principal transaction
+            const delta = newAmtNorm - oldAmtNorm
+            const newRemaining = Math.max(0, Math.min(loan.totalAmount, (Number(loan.remainingAmount) || 0) - delta))
+            const isNowActive = newRemaining > 0
 
-          await db.loans.update(loan.id, {
-            remainingAmount: newRemaining,
-            status: isNowActive
-              ? newRemaining >= loan.totalAmount
-                ? 'active'
-                : 'partially_paid'
-              : 'paid',
-            ...(isNowActive
-              ? { paidDate: null, paidAt: null }
-              : { paidDate: fields.date || existing.date, paidAt: Date.now() }),
-          })
-        } else if (loan.initialTransactionId === cleanId && loan.status === 'active') {
+            const currentExcess = Number(payment.excessAmount) || 0
+            await db.loanPayments.update(payment.id, {
+              principalAmount: newAmtNorm,
+              amount: newAmtNorm + currentExcess,
+              ...(fields.date ? { date: fields.date } : {}),
+              ...(fields.notes !== undefined ? { notes: fields.notes } : {}),
+            })
+
+            await db.loans.update(loan.id, {
+              remainingAmount: newRemaining,
+              status: isNowActive
+                ? newRemaining >= loan.totalAmount
+                  ? 'active'
+                  : 'partially_paid'
+                : 'paid',
+              ...(isNowActive
+                ? { paidDate: null, paidAt: null }
+                : { paidDate: fields.date || existing.date, paidAt: Date.now() }),
+            })
+
+            // Keep linked excess transaction synchronized
+            const excessTxId = existing.excessTransactionId || payment.excessTransactionId
+            if (excessTxId) {
+              const syncFields = {}
+              if (fields.date) syncFields.date = fields.date
+              if (fields.walletId !== undefined) {
+                syncFields.walletId = Number(fields.walletId)
+                extraAffectedWallets.push(Number(fields.walletId))
+              }
+              if (Object.keys(syncFields).length > 0) {
+                await db.transactions.update(Number(excessTxId), syncFields)
+              }
+            }
+          }
+        } else if (loan.initialTransactionId === cleanId && (loan.status === 'active' || loan.status === 'partially_paid')) {
           if (newAmtNorm !== oldAmtNorm) {
             const delta = newAmtNorm - oldAmtNorm
             const newTotal = Math.max(0, (Number(loan.totalAmount) || 0) + delta)
             const newRemaining = Math.max(0, (Number(loan.remainingAmount) || 0) + delta)
+            const newStatus = newRemaining <= 0 ? 'paid' : (newRemaining < newTotal ? 'partially_paid' : 'active')
             await db.loans.update(loan.id, {
               totalAmount: newTotal,
               remainingAmount: newRemaining,
+              status: newStatus,
             })
           }
         }
       }
-    }
 
     // 3. Synchronize linked savings goal & goal logs if applicable
     if (existing.goalId) {
@@ -364,6 +425,7 @@ export async function updateTransaction(id, fields) {
     existing?.targetWalletId,
     fields?.walletId,
     fields?.targetWalletId,
+    ...extraAffectedWallets,
   ].filter(Boolean)
   if (affectedWallets.length > 0) {
     await invalidateWalletBalance(affectedWallets)
@@ -398,6 +460,8 @@ export async function deleteTransaction(id) {
   const existing = await db.transactions.get(cleanId)
   if (!existing) return
 
+  const extraAffectedWallets = []
+
   try {
     await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
       const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
@@ -418,47 +482,102 @@ export async function deleteTransaction(id) {
           if (activeParticipantLoans.length > 0) {
             throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
           }
+          if (linkedLoans.length > 0) {
+            throw new Error('Transaksi ini merupakan talangan split bill yang memiliki catatan pinjaman partisipan. Kelola atau hapus pinjaman partisipan melalui menu Pinjaman.')
+          }
         }
       }
 
       // 2. If transaction is linked to a loan, synchronize remaining amount and payment records
+      let loan = null
       if (existing.loanId) {
-        const loan = await db.loans.get(existing.loanId)
-        if (loan) {
-          const payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
+        loan = await db.loans.get(existing.loanId)
+      }
+      if (!loan) {
+        loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+      }
+      if (loan) {
+        const isExcessTx = Boolean(existing.isLoanExcess)
+        let payment = await db.loanPayments.where('transactionId').equals(cleanId).first()
+          if (!payment && isExcessTx) {
+            payment = await db.loanPayments
+              .where('loanId')
+              .equals(existing.loanId)
+              .filter((p) => p.excessTransactionId === cleanId)
+              .first()
+          }
+
           if (payment) {
-            await db.loanPayments.delete(payment.id)
-            const loanCurrency = loan.currency || defaultCurrency
-            const normalizedExistingAmt = convertCurrency(
-              Number(existing.amount || 0),
-              existing.currency || defaultCurrency,
-              loanCurrency,
-              rates,
-            )
-            const restoredRemaining = Math.min(
-              loan.totalAmount,
-              (Number(loan.remainingAmount) || 0) + normalizedExistingAmt,
-            )
-            const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
-              ? loan.paymentTransactionIds
-              : []
-            const nextPaymentIds = existingPaymentIds.filter((txId) => txId !== cleanId)
-            const isNowActive = restoredRemaining > 0
-            await db.loans.update(loan.id, {
-              remainingAmount: restoredRemaining,
-              status: isNowActive
-                ? restoredRemaining >= loan.totalAmount
-                  ? 'active'
-                  : 'partially_paid'
-                : 'paid',
-              paymentTransactionIds: nextPaymentIds,
-              ...(isNowActive ? { paidDate: null, paidAt: null } : {}),
-            })
+            if (isExcessTx) {
+              // Deleting only the excess transaction: unlink from payment and principal tx
+              const remainingPrincipal = Number(payment.principalAmount ?? payment.amount) || 0
+              if (remainingPrincipal <= 0) {
+                await db.loanPayments.delete(payment.id)
+              } else {
+                await db.loanPayments.update(payment.id, {
+                  excessAmount: 0,
+                  excessTransactionId: null,
+                  amount: remainingPrincipal,
+                })
+              }
+              const principalTxId = existing.principalTransactionId || payment.transactionId
+              if (principalTxId) {
+                await db.transactions.update(Number(principalTxId), { excessTransactionId: null })
+              }
+              const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
+                ? loan.paymentTransactionIds
+                : []
+              await db.loans.update(loan.id, {
+                paymentTransactionIds: existingPaymentIds.filter((txId) => txId !== cleanId),
+              })
+            } else {
+              // Deleting the principal payment transaction
+              await db.loanPayments.delete(payment.id)
+              const loanCurrency = loan.currency || defaultCurrency
+              const principalPortion = payment.principalAmount != null
+                ? Number(payment.principalAmount)
+                : convertCurrency(
+                    Number(existing.amount || 0),
+                    existing.currency || defaultCurrency,
+                    loanCurrency,
+                    rates,
+                  )
+              const restoredRemaining = Math.min(
+                loan.totalAmount,
+                (Number(loan.remainingAmount) || 0) + principalPortion,
+              )
+
+              // If there is a linked excess transaction, also delete it
+              const excessTxId = existing.excessTransactionId || payment.excessTransactionId
+              if (excessTxId) {
+                const excessTx = await db.transactions.get(Number(excessTxId))
+                if (excessTx && !excessTx.deletedAt) {
+                  await db.transactions.update(excessTx.id, { deletedAt: Date.now() })
+                  if (excessTx.walletId) extraAffectedWallets.push(excessTx.walletId)
+                }
+              }
+
+              const existingPaymentIds = Array.isArray(loan.paymentTransactionIds)
+                ? loan.paymentTransactionIds
+                : []
+              const txsToRemove = new Set([cleanId, Number(excessTxId)].filter(Boolean))
+              const nextPaymentIds = existingPaymentIds.filter((txId) => !txsToRemove.has(txId))
+              const isNowActive = restoredRemaining > 0
+              await db.loans.update(loan.id, {
+                remainingAmount: restoredRemaining,
+                status: isNowActive
+                  ? restoredRemaining >= loan.totalAmount
+                    ? 'active'
+                    : 'partially_paid'
+                  : 'paid',
+                paymentTransactionIds: nextPaymentIds,
+                ...(isNowActive ? { paidDate: null, paidAt: null } : {}),
+              })
+            }
           } else if (loan.initialTransactionId === cleanId) {
             throw new Error('Transaksi ini merupakan pencairan pokok pinjaman aktif. Silakan kelola atau hapus pinjaman melalui menu Pinjaman.')
           }
         }
-      }
 
       // 3. Savings Goal Ledger Reversal on Transaction Deletion
       if (existing.goalId) {
@@ -510,7 +629,7 @@ export async function deleteTransaction(id) {
     throw transformDbError(err, 'deleteTransaction')
   }
 
-  const affectedWallets = [existing?.walletId, existing?.targetWalletId].filter(Boolean)
+  const affectedWallets = [existing?.walletId, existing?.targetWalletId, ...extraAffectedWallets].filter(Boolean)
   if (affectedWallets.length > 0) {
     await invalidateWalletBalance(affectedWallets)
   }

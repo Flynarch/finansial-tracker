@@ -17,18 +17,51 @@ import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { formatMoneyInput, parseMoneyInput, formatMoneyValueForInput } from '../../lib/utils'
 import { evaluateExpression } from '../../lib/calcParser'
+import { updateTransaction } from '../../services/transactionService'
+import { getLocalDateString } from '../../lib/dateUtils'
 import { LayoutGrid, ChevronDown, Sliders, Pencil, Layers } from 'lucide-react'
 
 export default function TransactionEditSheet({
   isOpen,
   onClose,
-  formData,
-  setFormData,
-  onSubmit,
+  transaction,
+  formData: propFormData,
+  setFormData: propSetFormData,
+  onSubmit: propOnSubmit,
+  onSaved,
   locale,
   wallets = [],
 }) {
   const { t } = useTranslation()
+  const [internalFormData, setInternalFormData] = useState(null)
+  const [prevTxKey, setPrevTxKey] = useState(null)
+
+  const currentTxKey = isOpen && transaction && !propFormData ? `${transaction.id}_${transaction.updatedAt || transaction.amount}` : null
+  if (currentTxKey !== prevTxKey) {
+    setPrevTxKey(currentTxKey)
+    if (currentTxKey) {
+      setInternalFormData({
+        id: transaction.id,
+        amount: formatMoneyValueForInput(transaction.amount || 0, transaction.currency || 'IDR'),
+        type: transaction.type || 'expense',
+        category: transaction.category || '',
+        date: transaction.date || getLocalDateString(),
+        walletId: transaction.walletId ? String(transaction.walletId) : '',
+        targetWalletId: transaction.targetWalletId ? String(transaction.targetWalletId) : '',
+        notes: transaction.notes || '',
+        currency: transaction.currency || 'IDR',
+        isSplit: Boolean(transaction.isSplit),
+        splitItems: Array.isArray(transaction.splitItems) ? [...transaction.splitItems] : [],
+        receiptImage: transaction.receiptImage || null,
+        isExcludeAnalyticsTx: Boolean(transaction.isExcludeAnalyticsTx),
+      })
+    } else {
+      setInternalFormData(null)
+    }
+  }
+
+  const formData = propFormData || internalFormData
+  const setFormData = propSetFormData || setInternalFormData
   const [walletModalMode, setWalletModalMode] = useState(null)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -210,7 +243,7 @@ export default function TransactionEditSheet({
     [setFormData]
   )
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     try {
       setSubmitError('')
@@ -262,10 +295,20 @@ export default function TransactionEditSheet({
       setCategoryError(false)
       setWalletError(false)
       setAmountError(false)
-      onSubmit(event)
+      if (typeof propOnSubmit === 'function') {
+        propOnSubmit(event)
+      } else if (transaction?.id) {
+        await updateTransaction(transaction.id, {
+          ...formData,
+          amount: totalAmount,
+          updatedAt: new Date().toISOString(),
+        })
+        onSaved?.()
+        onClose?.()
+      }
     } catch (err){
       console.warn('[TransactionEditSheet]', err)
-      setSubmitError(t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
+      setSubmitError(err.message || t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
     }
   }
 
@@ -274,6 +317,7 @@ export default function TransactionEditSheet({
   return (
     <BottomSheet
       isOpen={isOpen}
+      enableBackButton={false}
       onClose={() => {
         setSubmitError('')
         setCategoryError(false)

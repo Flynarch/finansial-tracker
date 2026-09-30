@@ -95,7 +95,8 @@ const useLoanStore = create(() => ({
     newRemaining = roundCurrency(newRemaining)
     const isNowPaid = newRemaining <= 0
     const wasPaidReopened = !isNowPaid && existing.status === 'paid'
-    const newStatus = isNowPaid ? 'paid' : (wasPaidReopened ? 'active' : (loanData.status || existing.status))
+    const wasForgivenReopened = !isNowPaid && existing.status === 'forgiven'
+    const newStatus = isNowPaid ? 'paid' : (wasPaidReopened || wasForgivenReopened ? 'active' : (loanData.status || existing.status))
 
     const updated = {
       ...existing,
@@ -106,6 +107,7 @@ const useLoanStore = create(() => ({
       status: newStatus,
       ...(isNowPaid && !existing.paidDate ? { paidDate: loanData.paidDate || getLocalDateString(), paidAt: Date.now() } : {}),
       ...(wasPaidReopened ? { paidDate: null, paidAt: null } : {}),
+      ...(wasForgivenReopened ? { forgivenDate: null, forgivenAt: null, forgivenAmount: null, forgivenNotes: null } : {}),
     }
 
     const affectedWallets = []
@@ -115,6 +117,10 @@ const useLoanStore = create(() => ({
       // Update initial transaction in db.transactions if linked
       if (existing.initialTransactionId) {
         const txUpdates = {}
+        const oldPrincipal = existing.principalAmount !== undefined ? existing.principalAmount : existing.totalAmount
+        const principalChanged = principal !== oldPrincipal
+        const currencyChanged = Boolean(loanData.currency && loanData.currency !== existing.currency)
+
         if (existing.splitBillId) {
           if (diffTotal !== 0) {
             const initTx = await db.transactions.get(existing.initialTransactionId)
@@ -123,8 +129,7 @@ const useLoanStore = create(() => ({
             }
           }
         } else {
-          const oldPrincipal = existing.principalAmount !== undefined ? existing.principalAmount : existing.totalAmount
-          if (principal !== oldPrincipal) {
+          if (principalChanged) {
             txUpdates.amount = principal
           }
         }
@@ -132,7 +137,7 @@ const useLoanStore = create(() => ({
           txUpdates.walletId = Number(loanData.walletId)
           if (existing.walletId) affectedWallets.push(Number(existing.walletId))
           affectedWallets.push(Number(loanData.walletId))
-        } else if (diffTotal !== 0 && existing.walletId) {
+        } else if ((diffTotal !== 0 || principalChanged || currencyChanged) && existing.walletId) {
           affectedWallets.push(Number(existing.walletId))
         }
         if (loanData.startDate && loanData.startDate !== existing.startDate) {
@@ -214,16 +219,31 @@ const useLoanStore = create(() => ({
     }
   },
 
-  recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null, inputCurrency = null) => {
-    const loan = await db.loans.get(loanId)
-    if (!loan) throw new Error('Catatan pinjaman tidak ditemukan.')
-
-    const payAmt = Number(amount) || 0
-    if (payAmt <= 0) throw new Error('Nominal pembayaran harus lebih dari 0.')
-
+  recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null, inputCurrency = null, excessCategory = null) => {
+    let effectiveAmount = amount
     let effectiveDate = date
     let effectiveNotes = notes
     let effectivePaymentWalletId = paymentWalletId
+    let effectiveInputCurrency = inputCurrency
+    let effectiveExcessCategory = excessCategory
+
+    if (typeof amount === 'object' && amount !== null) {
+      effectiveAmount = amount.amount
+      effectiveDate = amount.date
+      effectiveNotes = amount.notes || ''
+      effectivePaymentWalletId = amount.paymentWalletId || amount.walletId || null
+      effectiveInputCurrency = amount.inputCurrency || amount.currency || null
+      effectiveExcessCategory = amount.excessCategory || null
+    }
+
+    const loan = await db.loans.get(loanId)
+    if (!loan) throw new Error('Catatan pinjaman tidak ditemukan.')
+    if (loan.status === 'forgiven') {
+      throw new Error('Pinjaman ini telah diputihkan. Pulihkan status pinjaman sebelum mencatat pembayaran.')
+    }
+
+    const payAmt = Number(effectiveAmount) || 0
+    if (payAmt <= 0) throw new Error('Nominal pembayaran harus lebih dari 0.')
 
     if (typeof effectiveDate === 'number' && effectivePaymentWalletId === null) {
       effectivePaymentWalletId = effectiveDate
@@ -235,38 +255,38 @@ const useLoanStore = create(() => ({
     const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
     const loanCurrency = loan.currency || defaultCurrency
     const walletCurrency = targetWallet?.currency || loanCurrency
-    const paymentCurrency = inputCurrency || loanCurrency
+    const paymentCurrency = effectiveInputCurrency || loanCurrency
     const rates = getCachedCurrencyRates('USD')
 
     const payAmtInLoanCurrency = convertCurrency(payAmt, paymentCurrency, loanCurrency, rates)
-    const payAmtInWalletCurrency = convertCurrency(payAmt, paymentCurrency, walletCurrency, rates)
 
     const roundedLoanRemaining = roundCurrency(Number(loan.remainingAmount) || 0)
-    const roundedPayAmt = roundCurrency(payAmtInLoanCurrency)
-    if (roundedPayAmt > roundedLoanRemaining) {
-      throw new Error(`Nominal pembayaran tidak boleh melebihi sisa tagihan (${loan.remainingAmount}).`)
-    }
 
-    let newRemaining = Math.max(0, loan.remainingAmount - payAmtInLoanCurrency)
+    const principalPortion = Math.min(payAmtInLoanCurrency, roundedLoanRemaining)
+    const excessPortion = Math.max(0, roundCurrency(payAmtInLoanCurrency - roundedLoanRemaining))
+
+    let newRemaining = Math.max(0, loan.remainingAmount - principalPortion)
     newRemaining = roundCurrency(newRemaining)
     const newStatus = newRemaining <= 0 ? 'paid' : 'partially_paid'
     const payDate = (typeof effectiveDate === 'string' && effectiveDate) ? effectiveDate : getLocalDateString()
 
     let generatedTxId = null
+    let generatedExcessTxId = null
 
     await db.transaction('rw', db.transactions, db.loans, db.loanPayments, async () => {
-      // Generate transaction in ledger if loan has connected walletId
-      if (effectiveWalletId) {
-        const isDebt = loan.type === 'debt'
-        const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
-        const txType = isDebt ? 'expense' : 'income' // Debt payment reduces wallet cash; Receivable receipt increases wallet cash
-        const txNotes = effectiveNotes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
+      const isDebt = loan.type === 'debt'
+      const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
+      const txType = isDebt ? 'expense' : 'income'
+      const txNotes = effectiveNotes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
 
+      // 1. Generate Principal Transaction if wallet connected and principalPortion > 0
+      if (effectiveWalletId && principalPortion > 0) {
+        const principalInWallet = roundCurrency(convertCurrency(principalPortion, loanCurrency, walletCurrency, rates))
         generatedTxId = await db.transactions.add({
           date: payDate,
           type: txType,
           category: txCategory,
-          amount: payAmtInWalletCurrency,
+          amount: principalInWallet,
           currency: walletCurrency,
           notes: txNotes,
           walletId: Number(effectiveWalletId),
@@ -279,17 +299,52 @@ const useLoanStore = create(() => ({
         })
       }
 
+      // 2. Generate Excess Transaction if excessPortion > 0
+      if (effectiveWalletId && excessPortion > 0) {
+        const excessInWallet = roundCurrency(convertCurrency(excessPortion, loanCurrency, walletCurrency, rates))
+        const excessCat = effectiveExcessCategory || (isDebt ? 'tagihan/cicilan' : 'investasi/bunga_bank')
+        const excessNotes = isDebt ? `[Kelebihan Bayar] ${loan.title}` : `[Kelebihan Terima] ${loan.title}`
+
+        generatedExcessTxId = await db.transactions.add({
+          date: payDate,
+          type: txType,
+          category: excessCat,
+          amount: excessInWallet,
+          currency: walletCurrency,
+          notes: excessNotes,
+          walletId: Number(effectiveWalletId),
+          loanId,
+          isLoanExcess: true,
+          isExcludeAnalyticsTx: false,
+          isExcludeFromAnalytics: false,
+          excludeFromAnalytics: false,
+          principalTransactionId: generatedTxId || null,
+          createdAt: Date.now(),
+          deletedAt: null,
+        })
+
+        if (generatedTxId) {
+          await db.transactions.update(generatedTxId, {
+            excessTransactionId: generatedExcessTxId,
+          })
+        }
+      }
+
       await db.loanPayments.add({
         loanId,
         amount: payAmtInLoanCurrency,
+        principalAmount: principalPortion,
+        excessAmount: excessPortion,
         date: payDate,
         notes: effectiveNotes,
         transactionId: generatedTxId || null,
+        excessTransactionId: generatedExcessTxId || null,
         createdAt: Date.now(),
       })
 
       const existingPaymentTxIds = Array.isArray(loan.paymentTransactionIds) ? loan.paymentTransactionIds : []
-      const nextPaymentTxIds = generatedTxId ? [...existingPaymentTxIds, generatedTxId] : existingPaymentTxIds
+      const newTxIds = [generatedTxId, generatedExcessTxId].filter(Boolean)
+      const nextPaymentTxIds = [...existingPaymentTxIds, ...newTxIds]
 
       const isNowPaid = newRemaining <= 0
       await db.loans.update(loanId, {

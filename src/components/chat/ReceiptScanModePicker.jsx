@@ -8,10 +8,12 @@ import {
   Wallet as WalletIcon,
   HelpCircle,
   ChevronDown,
+  WifiOff,
 } from 'lucide-react'
 import WalletSelectModal from '../ui/WalletSelectModal'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { triggerHaptic } from '../../lib/haptics'
+import useSettingsStore from '../../store/useSettingsStore'
 
 export default function ReceiptScanModePicker({
   image,
@@ -22,11 +24,14 @@ export default function ReceiptScanModePicker({
   locale = 'id',
 }) {
   const [selectedMode, setSelectedMode] = useState('all') // 'all' | 'per_item'
-  const [selectedWalletId, setSelectedWalletId] = useState(() => (wallets.length > 0 ? wallets[0].id : null))
+  const defaultWalletId = useSettingsStore.getState().defaultWalletId
+  const initialWalletId = wallets.find((w) => w.id === defaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
+  const [selectedWalletId, setSelectedWalletId] = useState(initialWalletId)
   const [showWalletPicker, setShowWalletPicker] = useState(false)
   const isEn = locale === 'en'
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
 
-  const selectedWallet = wallets.find((w) => w.id === selectedWalletId) || (wallets.length > 0 ? wallets[0] : null)
+  const selectedWallet = wallets.find((w) => w.id === selectedWalletId) || wallets.find((w) => w.id === defaultWalletId) || (wallets.length > 0 ? wallets[0] : null)
   const selectedWalletLogo = selectedWallet ? getWalletLogoUrl(selectedWallet) : null
 
   const handleConfirm = () => {
@@ -42,6 +47,18 @@ export default function ReceiptScanModePicker({
           ? 'Determine how AI parses the captured receipt.'
           : 'Tentukan bagaimana AI mencatat transaksi dari struk ini.'}
       </p>
+
+      {/* Offline Alert Indicator */}
+      {isOffline && (
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-500 animate-in fade-in duration-200">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          <span>
+            {isEn
+              ? 'You are currently offline. AI receipt vision scanning requires an active internet connection.'
+              : 'Perangkat sedang offline. Pemindaian struk dengan AI vision memerlukan koneksi internet aktif.'}
+          </span>
+        </div>
+      )}
 
       {/* Image Preview Card */}
       {image && (
@@ -223,7 +240,8 @@ export default function ReceiptScanModePicker({
         <button
           type="button"
           onClick={handleConfirm}
-          className="ft-btn-primary flex-2 py-2.5 px-4 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95 transition"
+          disabled={isOffline}
+          className="ft-btn-primary flex-2 py-2.5 px-4 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95 transition disabled:opacity-50 disabled:pointer-events-none"
         >
           <Sparkles className="h-4 w-4" />
           <span>

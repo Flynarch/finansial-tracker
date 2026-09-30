@@ -22,6 +22,7 @@ import {
   setSessionMnemonicPhrase,
 } from '../../lib/mnemonicCrypto'
 import { copyToClipboard } from '../../lib/clipboard'
+import useBackButton from '../../hooks/useBackButton'
 
 export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
   const { t } = useTranslation()
@@ -39,6 +40,11 @@ export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
   const [challenge, setChallenge] = useState([])
   const [userInputs, setUserInputs] = useState({ 0: '', 1: '', 2: '' })
   const [challengeError, setChallengeError] = useState('')
+
+  useBackButton(() => {
+    setStep('generate')
+    setChallengeError('')
+  }, isOpen && step === 'challenge')
 
   const handleRegenerate = async () => {
     triggerHaptic('light')

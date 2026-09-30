@@ -15,6 +15,7 @@ import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletS
 import { db } from '../lib/db'
 import { createTransaction } from '../services/transactionService'
 import useTranslation from '../hooks/useTranslation'
+import useBackButton from '../hooks/useBackButton'
 import useSettingsStore from '../store/useSettingsStore'
 import { getTransactionCategoryLabels, resolveTransactionIconKey } from '../lib/categoryIcon'
 import { formatExpenseCategory } from '../lib/expenseCategories'
@@ -142,6 +143,11 @@ function Calendar() {
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [dayTab, setDayTab] = useState('items') // items | add
+
+  useBackButton(
+    () => setDayTab('items'),
+    Boolean(isDayModalOpen && dayTab === 'add' && !isCatModalOpen && !isWalletModalOpen),
+  )
   const [txForm, setTxForm] = useState({
     type: 'expense',
     category: '',

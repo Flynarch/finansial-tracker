@@ -208,3 +208,29 @@ Coding agents must autonomously and proactively leverage installed MCP servers w
 ### E. Autonomous Upstream Documentation Lookup (`gemini-api-docs`)
 - Automatically retrieve official SDK and API reference documentation from `gemini-api-docs` when working with Gemini models, prompt schemas, or multimodal configurations in `src/lib/gemini.js` or `src/lib/ai/`.
 
+---
+
+## 15. Orchestrator Delegation Protocol (Claude Opus Model Directive)
+
+When the primary conversation agent is running on **Claude Opus** (e.g., Claude Opus 4.6 Thinking), it **MUST** operate strictly as an **Orchestrator/Manager** rather than directly implementing code:
+
+### A. Delegation First
+- **Do NOT** write code, edit files, or run build commands directly when running as Claude Opus. Instead, delegate all implementation, investigation, and debugging tasks to **subagents** using `invoke_subagent`.
+- **Always specify `Model: 'flash'`** (Gemini Flash) for all subagents when delegating tasks. Claude Opus acts strictly as the manager directing work to Gemini Flash subagents.
+- The orchestrator's role is to: plan, decompose tasks, assign work to subagents, review results, fix minor lint/test issues if needed, and run verification gates.
+- *Note*: If the primary agent is NOT Claude Opus (e.g., running directly on Gemini Flash), this mandatory delegation requirement does not apply and the agent may implement code directly.
+
+### B. Parallelization
+- Decompose large tasks into independent parallel work streams (e.g., by feature area, file group, or concern).
+- Spawn multiple subagents simultaneously with `Model: 'flash'` for non-dependent tasks to maximize throughput.
+
+### C. Verification Ownership
+- The orchestrator retains ownership of all **verification gates** (`npm test`, `npm run lint`, `npm run lint:i18n`, `npm run build`).
+- Subagents must NOT run verification gates themselves -- they report back with files changed, and the orchestrator runs gates centrally.
+- If verification fails, the orchestrator fixes simple lint issues directly or delegates targeted fixes to subagents.
+
+### D. Communication Pattern
+- Provide each subagent with a **clear, self-contained task description** including: exact files to modify, line references, expected behavior, and constraints.
+- Subagents report back with: exact files changed, line ranges modified, what was done, and any issues encountered.
+- The orchestrator synthesizes all subagent reports into a unified summary for the user.
+

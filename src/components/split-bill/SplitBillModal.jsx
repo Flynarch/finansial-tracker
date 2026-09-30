@@ -16,7 +16,7 @@ import CustomDatePicker from '../ui/CustomDatePicker'
 import CategoryIcon from '../ui/CategoryIcon'
 import { db } from '../../lib/db'
 import { createTransaction } from '../../services/transactionService'
-import { formatCurrency, formatMoneyInput, parseMoneyInput } from '../../lib/utils'
+import { formatCurrency, formatMoneyInput, parseMoneyInput, roundCurrency } from '../../lib/utils'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -83,15 +83,18 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   const parsedTotal = parseMoneyInput(totalAmountInput, activeCurrency)
 
   // Equal split calculation per person with exact rounding sum
+  const isIdr = activeCurrency === 'IDR'
   const friendShareEqual = useMemo(() => {
     if (participants.length <= 1 || parsedTotal <= 0) return 0
-    return Math.floor(parsedTotal / participants.length)
-  }, [parsedTotal, participants.length])
+    return isIdr
+      ? Math.floor(parsedTotal / participants.length)
+      : roundCurrency(parsedTotal / participants.length)
+  }, [parsedTotal, participants.length, isIdr])
 
   const payerShareEqual = useMemo(() => {
     if (participants.length <= 1 || parsedTotal <= 0) return 0
     const nonPayerCount = participants.length - 1
-    return parsedTotal - (friendShareEqual * nonPayerCount)
+    return roundCurrency(parsedTotal - (friendShareEqual * nonPayerCount))
   }, [parsedTotal, participants.length, friendShareEqual])
 
   // Custom split sum and remainder
@@ -99,7 +102,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     return participants.reduce((sum, p) => sum + parseMoneyInput(p.amount, activeCurrency), 0)
   }, [participants, activeCurrency])
 
-  const remainingCustom = parsedTotal - customSum
+  const remainingCustom = roundCurrency(parsedTotal - customSum)
 
   const handleAutoFillRemaining = () => {
     if (remainingCustom <= 0) return
@@ -122,8 +125,10 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
       }
 
       const count = targetIndices.length
-      const share = Math.floor(remainingCustom / count)
-      const remainder = remainingCustom - share * count
+      const share = isIdr
+        ? Math.floor(remainingCustom / count)
+        : roundCurrency(remainingCustom / count)
+      const remainder = roundCurrency(remainingCustom - share * count)
 
       const targetSet = new Set(targetIndices)
       let remainderAssigned = false
@@ -134,11 +139,11 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
         const currentVal = parseMoneyInput(p.amount, activeCurrency)
         let addAmount = share
         if (!remainderAssigned && remainder > 0) {
-          addAmount += remainder
+          addAmount = roundCurrency(addAmount + remainder)
           remainderAssigned = true
         }
 
-        const newVal = currentVal + addAmount
+        const newVal = roundCurrency(currentVal + addAmount)
         return {
           ...p,
           amount: formatMoneyInput(String(newVal), activeCurrency),

@@ -8,9 +8,10 @@ import useBackButton from '../hooks/useBackButton'
 import { getCachedCurrencyRates } from '../lib/api'
 import { getLocalDateString } from '../lib/dateUtils'
 import { triggerHaptic } from '../lib/haptics'
-import { FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency, formatCurrency } from '../lib/utils'
+import { FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency, formatCurrency, formatMoneyInput, parseMoneyInput } from '../lib/utils'
 
 // UI & Subcomponents
+import Modal from '../components/ui/Modal'
 import ChatHeaderToolbar from '../components/chat/ChatHeaderToolbar'
 import ChatMessageList from '../components/chat/ChatMessageList'
 import ChatInputBar from '../components/chat/ChatInputBar'
@@ -20,6 +21,8 @@ import ReceiptScanModePicker from '../components/chat/ReceiptScanModePicker'
 import MediaSourcePickerModal from '../components/chat/MediaSourcePickerModal'
 import MessageContextMenu from '../components/chat/MessageContextMenu'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
+import { updateTransaction } from '../services/transactionService'
+import { getTransactionCategoryLabels } from '../lib/categoryIcon'
 import { copyToClipboard } from '../lib/clipboard'
 
 // Hooks
@@ -50,6 +53,7 @@ export default function AiFinanceChat() {
       const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
       let total = 0
       txs.forEach((tx) => {
+        if (tx.deletedAt) return
         if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
           tx.splitItems.forEach((si) => {
             const itemTx = {
@@ -86,6 +90,7 @@ export default function AiFinanceChat() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [contextMenuMsg, setContextMenuMsg] = useState(null)
   const [editingTransaction, setEditingTransaction] = useState(null)
+  const [editFormData, setEditFormData] = useState(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   const textureDropdownRef = useRef(null)
@@ -165,7 +170,6 @@ export default function AiFinanceChat() {
   const {
     isLoading,
     handleSend,
-    handleSendRef,
   } = useChatEngine({
     locale,
     defaultCurrency,
@@ -194,14 +198,23 @@ export default function AiFinanceChat() {
     chatScrollContainerRef,
   })
 
-  const handleInitialPrompt = useCallback(
+  const handleStagePrompt = useCallback(
     (prompt) => {
       setInputValue(prompt)
-      setTimeout(() => {
-        handleSendRef.current?.(prompt)
-      }, 350)
+      if (inputRef.current) {
+        inputRef.current.focus()
+        const len = prompt.length
+        inputRef.current.setSelectionRange?.(len, len)
+      }
     },
-    [setInputValue, handleSendRef],
+    [setInputValue, inputRef],
+  )
+
+  const handleInitialPrompt = useCallback(
+    (prompt) => {
+      handleStagePrompt(prompt)
+    },
+    [handleStagePrompt],
   )
 
   const {
@@ -223,33 +236,76 @@ export default function AiFinanceChat() {
     locale,
   })
 
-  // Android Hardware Back Button - Strict 7-Tier Dismissal Queue
-  useBackButton(() => {
-    if (editingTransaction) {
+  const handleStartEdit = useCallback((tx) => {
+    if (!tx) return
+    setEditingTransaction(tx)
+    setEditFormData({
+      id: tx.id,
+      amount: formatMoneyInput(String(tx.amount || 0), tx.currency || defaultCurrency),
+      type: tx.type || 'expense',
+      category: tx.category || '',
+      date: tx.date || getLocalDateString(),
+      walletId: tx.walletId ? String(tx.walletId) : '',
+      targetWalletId: tx.targetWalletId ? String(tx.targetWalletId) : '',
+      notes: tx.notes || '',
+      currency: tx.currency || defaultCurrency,
+      isSplit: Boolean(tx.isSplit),
+      splitItems: Array.isArray(tx.splitItems) ? [...tx.splitItems] : [],
+      receiptImage: tx.receiptImage || null,
+      isExcludeAnalyticsTx: Boolean(tx.isExcludeAnalyticsTx),
+    })
+  }, [defaultCurrency])
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editFormData || !editingTransaction) return
+    const rawAmt = parseMoneyInput(editFormData.amount, editFormData.currency)
+    if (rawAmt <= 0) return
+
+    const updatedTx = {
+      ...editingTransaction,
+      ...editFormData,
+      amount: rawAmt,
+      updatedAt: new Date().toISOString(),
+    }
+
+    try {
+      await updateTransaction(updatedTx.id, updatedTx)
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.type === 'success' && msg.data) {
+            if (Array.isArray(msg.data)) {
+              return {
+                ...msg,
+                data: msg.data.map((t) => (t.id === updatedTx.id ? updatedTx : t)),
+              }
+            } else if (msg.data.id === updatedTx.id) {
+              return { ...msg, data: updatedTx }
+            }
+          }
+          return msg
+        })
+      )
       setEditingTransaction(null)
-      return
+      setEditFormData(null)
+    } catch (err) {
+      console.warn('[AiFinanceChat] handleSaveEdit error:', err)
     }
-    if (contextMenuMsg) {
-      setContextMenuMsg(null)
-      return
-    }
-    if (showMediaSourcePicker) {
-      setShowMediaSourcePicker(false)
-      return
-    }
-    if (showTexturePicker) {
-      setShowTexturePicker(false)
-      return
-    }
-    if (showClearConfirm) {
-      setShowClearConfirm(false)
-      return
-    }
-    if (showScanModePicker) {
-      setShowScanModePicker(false)
-      setSelectedImage(null)
-      return
-    }
+  }, [editFormData, editingTransaction, setMessages])
+
+  // Android Hardware Back Button Handlers
+  useBackButton(() => {
+    setEditingTransaction(null)
+    setEditFormData(null)
+  }, Boolean(editingTransaction))
+  useBackButton(() => setContextMenuMsg(null), Boolean(contextMenuMsg))
+  useBackButton(() => setShowTexturePicker(false), Boolean(showTexturePicker))
+  useBackButton(() => setShowClearConfirm(false), Boolean(showClearConfirm))
+  useBackButton(() => setShowMediaSourcePicker(false), Boolean(showMediaSourcePicker))
+  useBackButton(() => {
+    setShowScanModePicker(false)
+    setSelectedImage(null)
+  }, Boolean(showScanModePicker))
+  useBackButton(() => {
     if (window.history.length > 1) {
       navigate(-1)
     } else {
@@ -328,7 +384,14 @@ export default function AiFinanceChat() {
         cancelText={locale === 'en' ? 'Cancel' : 'Batal'}
       />
 
-      {showScanModePicker && selectedImage && (
+      <Modal
+        isOpen={Boolean(showScanModePicker && selectedImage)}
+        onClose={() => {
+          setShowScanModePicker(false)
+          setSelectedImage(null)
+        }}
+        title={locale === 'en' ? 'Receipt Scan Mode' : 'Mode Scan Struk'}
+      >
         <ReceiptScanModePicker
           image={selectedImage}
           wallets={wallets}
@@ -346,7 +409,7 @@ export default function AiFinanceChat() {
             setShowMediaSourcePicker(true)
           }}
         />
-      )}
+      </Modal>
 
       <MediaSourcePickerModal
         isOpen={showMediaSourcePicker}
@@ -382,6 +445,7 @@ export default function AiFinanceChat() {
         messagesEndRef={messagesEndRef}
         onScroll={handleScroll}
         onSend={handleSend}
+        onStagePrompt={handleStagePrompt}
         onMsgTouchStart={handleMsgTouchStart}
         onMsgTouchMove={handleMsgTouchMove}
         onMsgTouchEnd={handleMsgTouchEnd}
@@ -422,7 +486,8 @@ export default function AiFinanceChat() {
           let textToCopy = text || contextMenuMsg?.content || ''
           if (!textToCopy && contextMenuMsg?.type === 'success' && contextMenuMsg?.data) {
             const tx = Array.isArray(contextMenuMsg.data) ? contextMenuMsg.data[0] : contextMenuMsg.data
-            textToCopy = `${tx.notes || tx.category || 'Transaksi'}: ${formatCurrency(tx.amount, tx.currency || defaultCurrency)}`
+            const catLabel = getTransactionCategoryLabels(tx.category, tx.type, locale)?.main || tx.category
+            textToCopy = `${tx.notes || catLabel || (locale === 'en' ? 'Transaction' : 'Transaksi')}: ${formatCurrency(tx.amount, tx.currency || defaultCurrency)}`
           }
           const success = await copyToClipboard(textToCopy)
           if (success) {
@@ -459,7 +524,7 @@ export default function AiFinanceChat() {
         onEditTransaction={(data) => {
           const tx = Array.isArray(data) ? data[0] : (data || contextMenuMsg?.data)
           if (tx) {
-            setEditingTransaction(tx)
+            handleStartEdit(tx)
           }
         }}
         onDeleteMessage={() => {
@@ -469,12 +534,18 @@ export default function AiFinanceChat() {
         }}
       />
 
-      {Boolean(editingTransaction) && (
+      {Boolean(editingTransaction && editFormData) && (
         <TransactionEditSheet
           isOpen={Boolean(editingTransaction)}
-          transaction={editingTransaction}
-          onClose={() => setEditingTransaction(null)}
-          onSaved={() => setEditingTransaction(null)}
+          formData={editFormData}
+          setFormData={setEditFormData}
+          onSubmit={handleSaveEdit}
+          onClose={() => {
+            setEditingTransaction(null)
+            setEditFormData(null)
+          }}
+          locale={locale}
+          wallets={wallets}
         />
       )}
     </div>

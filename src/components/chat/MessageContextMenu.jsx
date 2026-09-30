@@ -57,49 +57,53 @@ const MessageContextMenu = memo(function MessageContextMenu({
         <div className="w-10 h-1 rounded-full bg-[var(--muted)]/30 mx-auto mt-3 mb-2" />
         
         <div className="flex flex-col">
-          <div 
-            className="flex items-center gap-3 px-4 py-3 active:bg-[var(--field-bg)] transition cursor-pointer"
+          <button 
+            type="button"
+            className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
             onClick={() => handleAction(onCopyText, messageContent)}
           >
             <Copy size={18} className="text-[var(--muted)]" />
             <span className="text-sm font-bold text-[var(--fg)]">
               {locale === 'en' ? 'Copy Text' : 'Salin Teks'}
             </span>
-          </div>
+          </button>
 
           {hasAmount && (
-            <div 
-              className="flex items-center gap-3 px-4 py-3 active:bg-[var(--field-bg)] transition cursor-pointer"
+            <button 
+              type="button"
+              className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
               onClick={() => handleAction(onCopyAmount, extractedAmount)}
             >
               <DollarSign size={18} className="text-[var(--muted)]" />
               <span className="text-sm font-bold text-[var(--fg)]">
                 {locale === 'en' ? 'Copy Amount' : 'Salin Nominal'}
               </span>
-            </div>
+            </button>
           )}
 
           {messageType === 'transaction' && (
-            <div 
-              className="flex items-center gap-3 px-4 py-3 active:bg-[var(--field-bg)] transition cursor-pointer"
+            <button 
+              type="button"
+              className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
               onClick={() => handleAction(onEditTransaction, messageData)}
             >
               <Pencil size={18} className="text-[var(--muted)]" />
               <span className="text-sm font-bold text-[var(--fg)]">
                 {locale === 'en' ? 'Edit Transaction' : 'Edit Transaksi'}
               </span>
-            </div>
+            </button>
           )}
 
-          <div 
-            className="flex items-center gap-3 px-4 py-3 active:bg-[var(--field-bg)] transition cursor-pointer"
+          <button 
+            type="button"
+            className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
             onClick={() => handleAction(onDeleteMessage)}
           >
             <Trash2 size={18} className="text-rose-500" />
             <span className="text-sm font-bold text-rose-500">
               {locale === 'en' ? 'Delete Message' : 'Hapus Pesan'}
             </span>
-          </div>
+          </button>
         </div>
       </div>
     </>

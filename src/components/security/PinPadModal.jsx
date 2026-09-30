@@ -3,6 +3,7 @@ import Modal from '../ui/Modal'
 import { Delete, KeyRound, CheckCircle2, AlertCircle, Fingerprint } from 'lucide-react'
 import { triggerHaptic } from '../../lib/haptics'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 
 export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '', initialBiometric = false }) {
   const { t } = useTranslation()
@@ -12,6 +13,12 @@ export default function PinPadModal({ isOpen, onClose, onSave, currentSecret = '
   const [errorMsg, setErrorMsg] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
   const [useBiometrics, setUseBiometrics] = useState(initialBiometric)
+
+  useBackButton(() => {
+    setStep(1)
+    setConfirmPin('')
+    setErrorMsg('')
+  }, isOpen && step === 2)
 
   const activePin = step === 1 ? firstPin : confirmPin
 

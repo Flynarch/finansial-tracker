@@ -1,4 +1,4 @@
-import { format, subDays, differenceInDays, startOfWeek, isSameWeek, isBefore } from 'date-fns'
+import { format, subDays, differenceInCalendarDays, startOfWeek, isSameWeek, isBefore } from 'date-fns'
 
 export function calculateHabitStats(habit, allLogs) {
   const logs = allLogs.filter(log => log.habitId === habit.id)
@@ -6,7 +6,7 @@ export function calculateHabitStats(habit, allLogs) {
   
   const todayDate = new Date()
   const createdAt = habit.createdAt ? new Date(habit.createdAt) : todayDate
-  const daysSinceCreation = Math.max(1, differenceInDays(todayDate, createdAt) + 1)
+  const daysSinceCreation = Math.max(1, differenceInCalendarDays(todayDate, createdAt) + 1)
   
   let currentStreak
   let bestStreak = 0
@@ -57,7 +57,7 @@ export function calculateHabitStats(habit, allLogs) {
     // Completion Rate (Fair calculation)
     // How many FULL weeks have passed since createdAt?
     const createdWeekStart = startOfWeek(createdAt, { weekStartsOn: 1 })
-    let pastWeeks = differenceInDays(weekStart, createdWeekStart) / 7
+    let pastWeeks = differenceInCalendarDays(weekStart, createdWeekStart) / 7
     if (pastWeeks < 0) pastWeeks = 0
     
     // Denominator = (Target * Full Past Weeks) + (Completions this week)

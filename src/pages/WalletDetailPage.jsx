@@ -27,6 +27,7 @@ import { createTransaction as addTransaction, updateTransaction, deleteTransacti
 import { deleteWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
 import useSwipeAction from '../hooks/useSwipeAction'
+import useBackButton from '../hooks/useBackButton'
 import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
@@ -163,6 +164,15 @@ export default function WalletDetailPage() {
     notes: '',
     currency: 'IDR',
   })
+
+  useBackButton(() => setDetailTransaction(null), Boolean(detailTransaction))
+  useBackButton(() => setReceiptPreviewTx(null), Boolean(receiptPreviewTx))
+  useBackButton(() => setSingleDeleteTx(null), Boolean(singleDeleteTx))
+  useBackButton(() => setEditingTransaction(null), Boolean(editingTransaction))
+  useBackButton(() => setIsDeleteModalOpen(false), Boolean(isDeleteModalOpen))
+  useBackButton(() => setIsEditBalanceModalOpen(false), Boolean(isEditBalanceModalOpen))
+  useBackButton(() => setIsEditWalletModalOpen(false), Boolean(isEditWalletModalOpen))
+  useBackButton(() => setIsActionMenuOpen(false), Boolean(isActionMenuOpen))
 
   const {
     swipedId: swipedTransactionId,

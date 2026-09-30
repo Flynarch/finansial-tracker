@@ -18,6 +18,7 @@ import {
   formatMoneyInput,
   getMoneyInputCaret,
   parseMoneyInput,
+  roundCurrency,
   toSafeNumber,
   safeFormatDate,
 } from '../lib/utils'
@@ -159,7 +160,7 @@ export default function SavingsDetail() {
       if (walletIdNum) {
         createdTxId = await db.transactions.add({
           date: dateInput,
-          amount: val,
+          amount: roundCurrency(val),
           type: isWithdraw ? 'income' : 'expense',
           category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
           notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
@@ -167,6 +168,8 @@ export default function SavingsDetail() {
           walletId: walletIdNum,
           goalId: goal.id,
           createdAt: Date.now(),
+          deletedAt: null,
+          isExcludeAnalyticsTx: true,
           isExcludeFromAnalytics: true,
           excludeFromAnalytics: true,
         })
@@ -224,7 +227,7 @@ export default function SavingsDetail() {
       // 2. Add Income Transaction to Wallet
       const cashoutTxId = await db.transactions.add({
         date: format(now, 'yyyy-MM-dd'),
-        amount: cashoutAmount,
+        amount: roundCurrency(cashoutAmount),
         type: 'income',
         category: 'cairkan_tabungan',
         notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
@@ -232,6 +235,8 @@ export default function SavingsDetail() {
         walletId: walletIdNum,
         goalId: Number(goalId),
         createdAt: Date.now(),
+        deletedAt: null,
+        isExcludeAnalyticsTx: true,
         isExcludeFromAnalytics: true,
         excludeFromAnalytics: true,
       })
@@ -690,18 +695,17 @@ export default function SavingsDetail() {
             <input
               ref={inputRef}
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
               className="w-full bg-transparent text-center text-3xl font-black text-[var(--fg)] outline-none placeholder:text-[var(--muted)]/30 tabular-nums"
               placeholder="0"
               value={amountInput}
               onChange={(e) => {
                 const selStart = e.target.selectionStart
-                const oldVal = amountInput
                 const newVal = formatMoneyInput(e.target.value, currency)
                 setAmountInput(newVal)
                 window.requestAnimationFrame(() => {
                   if (inputRef.current) {
-                    const newPos = getMoneyInputCaret(e.target.value, oldVal, newVal, selStart)
+                    const newPos = getMoneyInputCaret(e.target.value, newVal, selStart ?? e.target.value.length, currency)
                     inputRef.current.setSelectionRange(newPos, newPos)
                   }
                 })

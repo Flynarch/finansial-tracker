@@ -4,7 +4,13 @@ import useSettingsStore from '../../store/useSettingsStore';
 import { formatCurrency } from '../../lib/utils';
 import { triggerHaptic } from '../../lib/haptics';
 
-const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0, todayCurrency = 'IDR' }) {
+const WelcomeHero = memo(function WelcomeHero({
+  onSelectPrompt,
+  onStagePrompt,
+  onSend,
+  todayExpense = 0,
+  todayCurrency = 'IDR',
+}) {
   const locale = useSettingsStore(state => state.locale) || 'id';
   const isEn = locale === 'en';
 
@@ -15,7 +21,10 @@ const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0
 
   const handleSelect = (promptText) => {
     triggerHaptic('light');
-    onSelectPrompt(promptText);
+    const stageHandler = onStagePrompt || onSelectPrompt || onSend;
+    if (stageHandler) {
+      stageHandler(promptText);
+    }
   };
 
   const intents = [
@@ -73,10 +82,11 @@ const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0
         {intents.map((intent) => {
           const Icon = intent.icon;
           return (
-            <div
+            <button
+              type="button"
               key={intent.id}
               onClick={() => handleSelect(intent.prompt)}
-              className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 cursor-pointer active:scale-[0.97] transition-transform"
+              className="flex flex-col text-left gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 cursor-pointer active:scale-[0.97] hover:bg-[var(--panel-strong)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${intent.colors}`}>
                 <Icon size={16} strokeWidth={2.5} />
@@ -87,7 +97,7 @@ const WelcomeHero = memo(function WelcomeHero({ onSelectPrompt, todayExpense = 0
                   &quot;{intent.prompt}&quot;
                 </span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

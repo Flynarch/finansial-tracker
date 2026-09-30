@@ -10,6 +10,7 @@ import {
 import { maskFinancialAccountNumbers, cleanMutationMerchant } from '../src/lib/merchantUtils'
 import { db } from '../src/lib/db'
 import useSettingsStore from '../src/store/useSettingsStore'
+import { format } from 'date-fns'
 
 describe('smsIngestionParser - Android SMS Financial Ingestion Engine Suite', () => {
   describe('Deterministic Multi-layer Anti-OTP & Anti-Spam Guard', () => {
@@ -458,7 +459,7 @@ describe('smsIngestionParser - Android SMS Financial Ingestion Engine Suite', ()
     })
 
     it('correctly deduplicates against existing transactions with mixed ISO/Date formats', async () => {
-      const todayStr = new Date().toISOString().slice(0, 10)
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
       // Existing transaction with ISO date string format
       await db.transactions.add({
         date: `${todayStr}T14:30:00.000Z`,

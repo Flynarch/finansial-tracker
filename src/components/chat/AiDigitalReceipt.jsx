@@ -21,6 +21,7 @@ import CategoryIcon from '../ui/CategoryIcon'
 import TransactionEditSheet from '../transactions/TransactionEditSheet'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
+import { evaluateExpression } from '../../lib/calcParser'
 import { getCachedCurrencyRates } from '../../lib/api'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -200,12 +201,18 @@ export default function AiDigitalReceipt({
       walletId: tx.walletId,
       targetWalletId: tx.targetWalletId || '',
       receiptImage: tx.receiptImage || null,
+      isSplit: tx.isSplit || false,
+      splitItems: tx.splitItems || [],
     })
   }
 
   const handleSaveEdit = async () => {
     if (!editingTx?.id) return
-    const numericAmt = parseMoneyInput(editFormData.amount, editFormData.currency)
+    const evalResult = evaluateExpression(editFormData.amount, editFormData.currency)
+    const numericAmt =
+      evalResult?.isValid && evalResult?.result !== null
+        ? evalResult.result
+        : parseMoneyInput(editFormData.amount, editFormData.currency)
 
     const updated = {
       date: editFormData.date,
@@ -217,6 +224,8 @@ export default function AiDigitalReceipt({
       walletId: editFormData.walletId,
       targetWalletId: editFormData.targetWalletId || '',
       receiptImage: editFormData.receiptImage || null,
+      isSplit: editFormData.isSplit || false,
+      splitItems: editFormData.splitItems || [],
     }
 
     try {
@@ -305,12 +314,12 @@ export default function AiDigitalReceipt({
                 {isOnlineAi ? (
                   <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-500 shrink-0">
                     <Sparkles className="h-2.5 w-2.5" />
-                    <span>AI Gemini (Online)</span>
+                    <span>{t('ai.engine.online', 'AI Gemini (Online)')}</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-amber-500 shrink-0">
                     <WifiOff className="h-2.5 w-2.5" />
-                    <span>NLP Lokal (Offline)</span>
+                    <span>{t('ai.engine.offline', 'NLP Lokal (Offline)')}</span>
                   </span>
                 )}
                 <span className="block text-[9px] font-semibold text-[var(--muted)] truncate">
@@ -580,7 +589,7 @@ export default function AiDigitalReceipt({
               </span>
               <span className={`text-xs font-black tabular-nums ${netTotal >= 0 ? 'ft-income-text' : 'ft-expense-text'}`}>
                 {netTotal >= 0 ? '+' : '-'}
-                {formatCurrency(Math.abs(netTotal || totalExpense || totalIncome), displayCurrency)}
+                {formatCurrency(Math.abs(Number.isFinite(netTotal) ? netTotal : (totalExpense || totalIncome)), displayCurrency)}
               </span>
             </div>
           </div>

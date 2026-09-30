@@ -356,7 +356,7 @@ export function generateBalanceSheet(
       (p) => String(p.loanId) === String(l.id) && p.date && String(p.date).slice(0, 10) > asOfDate
     )
     for (const p of postPayments) {
-      const pAmt = convertCurrency(toSafeNumber(p.amount), p.currency || l.currency || defaultCurrency, l.currency || defaultCurrency, rates)
+      const pAmt = convertCurrency(toSafeNumber(p.principalAmount ?? p.amount), p.currency || l.currency || defaultCurrency, l.currency || defaultCurrency, rates)
       remaining += pAmt
     }
 
@@ -364,6 +364,7 @@ export function generateBalanceSheet(
       const postTxPayments = (transactions || []).filter(
         (tx) =>
           String(tx.loanId) === String(l.id) &&
+          !tx.isLoanExcess &&
           tx.date &&
           String(tx.date).slice(0, 10) > asOfDate &&
           (tx.category === 'Bayar Hutang' || tx.category === 'Terima Piutang' || tx.type === 'expense' || tx.type === 'income') &&
@@ -520,6 +521,7 @@ export function generateCashFlowStatement(
             currency: si.currency || tx.currency || defaultCurrency,
             notes: si.notes || tx.notes,
             loanId: si.loanId || tx.loanId,
+            isLoanExcess: si.isLoanExcess || tx.isLoanExcess,
             isExcluded: isExcludeAnalyticsTx(itemTx) || si.isExcluded || false,
           }
         })
@@ -531,6 +533,7 @@ export function generateCashFlowStatement(
             currency: tx.currency || defaultCurrency,
             notes: tx.notes,
             loanId: tx.loanId,
+            isLoanExcess: tx.isLoanExcess,
             isExcluded: isExcludeAnalyticsTx(tx) || tx.isExcluded || false,
           },
         ]
@@ -541,7 +544,7 @@ export function generateCashFlowStatement(
 
       const normAmt = convertCurrency(rawAmt, item.currency || defaultCurrency, defaultCurrency, rates)
       const cat = String(item.category || '').toLowerCase()
-      const isLoanTx = cat.includes('pinjaman') || cat.includes('utang') || cat.includes('cicilan') || item.loanId != null
+      const isLoanTx = !item.isLoanExcess && (cat.includes('pinjaman') || cat.includes('utang') || cat.includes('cicilan') || item.loanId != null)
 
       if (cat.includes('investasi') || cat.includes('tabungan') || cat.includes('reksadana') || cat.includes('saham') || cat.includes('emas')) {
         if (item.type === 'income') {

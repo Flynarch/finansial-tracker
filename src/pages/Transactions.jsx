@@ -185,7 +185,6 @@ function Transactions() {
   useBackButton(() => setDetailTransaction(null), Boolean(detailTransaction))
   useBackButton(() => setReceiptPreviewTx(null), Boolean(receiptPreviewTx))
   useBackButton(() => setSingleDeleteTx(null), Boolean(singleDeleteTx))
-  useBackButton(() => setEditingTransaction(null), Boolean(editingTransaction))
   useBackButton(() => setIsMenuOpen(false), isMenuOpen)
   useBackButton(() => {
     setSelectedTxIds(new Set())

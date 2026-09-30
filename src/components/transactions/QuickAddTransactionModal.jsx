@@ -748,6 +748,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       onClose={onClose}
       maxHeight="max-h-[95dvh]"
       scrollable={true}
+      enableBackButton={false}
       footer={
         <div className="flex items-center gap-2">
           <button

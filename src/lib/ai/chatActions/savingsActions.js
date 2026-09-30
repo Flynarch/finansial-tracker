@@ -4,7 +4,7 @@ import { invalidateWalletBalance } from '../../balanceEngine'
 import { getCachedCurrencyRates } from '../../api'
 import { getLocalDateString } from '../../dateUtils'
 import { triggerHaptic } from '../../haptics'
-import { formatCurrency, convertCurrency } from '../../utils'
+import { formatCurrency, convertCurrency, roundCurrency } from '../../utils'
 
 export async function handleSavingsAction(result, {
   locale,
@@ -85,8 +85,8 @@ export async function handleSavingsAction(result, {
           const goalCurrency = matched.currency || defaultCurrency
           const walletCurrency = chosenWallet?.currency || defaultCurrency
           const rates = getCachedCurrencyRates('USD')
-          const depositAmtInGoalCurrency = convertCurrency(depositAmt, inputCurrency, goalCurrency, rates)
-          const depositAmtInWalletCurrency = convertCurrency(depositAmt, inputCurrency, walletCurrency, rates)
+          const depositAmtInGoalCurrency = roundCurrency(convertCurrency(depositAmt, inputCurrency, goalCurrency, rates))
+          const depositAmtInWalletCurrency = roundCurrency(convertCurrency(depositAmt, inputCurrency, walletCurrency, rates))
           const newCurrent = (matched.currentAmount || 0) + depositAmtInGoalCurrency
           const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
 
@@ -101,6 +101,8 @@ export async function handleSavingsAction(result, {
               walletId: walletIdNum,
               goalId: matched.id,
               createdAt: Date.now(),
+              deletedAt: null,
+              isExcludeAnalyticsTx: true,
               isExcludeFromAnalytics: true,
               excludeFromAnalytics: true,
             })
@@ -203,8 +205,8 @@ export async function handleSavingsAction(result, {
           const goalCurrency = matched.currency || defaultCurrency
           const walletCurrency = chosenWallet?.currency || defaultCurrency
           const rates = getCachedCurrencyRates('USD')
-          const withdrawAmtInGoalCurrency = convertCurrency(withdrawAmt, inputCurrency, goalCurrency, rates)
-          const withdrawAmtInWalletCurrency = convertCurrency(withdrawAmt, inputCurrency, walletCurrency, rates)
+          const withdrawAmtInGoalCurrency = roundCurrency(convertCurrency(withdrawAmt, inputCurrency, goalCurrency, rates))
+          const withdrawAmtInWalletCurrency = roundCurrency(convertCurrency(withdrawAmt, inputCurrency, walletCurrency, rates))
           const newCurrent = Math.max(0, currentSavings - withdrawAmtInGoalCurrency)
           const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
 
@@ -219,6 +221,8 @@ export async function handleSavingsAction(result, {
               walletId: walletIdNum,
               goalId: matched.id,
               createdAt: Date.now(),
+              deletedAt: null,
+              isExcludeAnalyticsTx: true,
               isExcludeFromAnalytics: true,
               excludeFromAnalytics: true,
             })

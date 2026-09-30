@@ -16,9 +16,14 @@ export default function BottomSheet({
   closeAriaLabel,
   scrollable = true,
   footer,
+  enableBackButton = true,
 }) {
   const { t } = useTranslation()
-  const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
+  const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({
+    isOpen,
+    onClose,
+    useBackButton: enableBackButton,
+  })
   const defaultCloseLabel = closeAriaLabel || t('common.close', 'Tutup')
 
   const [dragOffset, setDragOffset] = useState(0)

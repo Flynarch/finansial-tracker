@@ -22,6 +22,7 @@ import ReportDonutSection from '../components/reports/ReportDonutSection'
 import ReportNetWorthChart from '../components/reports/ReportNetWorthChart'
 import ReportStatementModal from '../components/reports/ReportStatementModal'
 import useTransactionStore from '../store/useTransactionStore'
+import useBackButton from '../hooks/useBackButton'
 
 export default function Reports() {
   const { t, locale } = useTranslation()
@@ -35,6 +36,8 @@ export default function Reports() {
   const openQuickAdd = useTransactionStore((s) => s.openQuickAdd)
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false)
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
+
+  useBackButton(() => setSelectedDrilldownParent(null), Boolean(selectedDrilldownParent))
 
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
 
@@ -72,7 +75,7 @@ export default function Reports() {
 
   const cutoffDate = useMemo(() => {
     const months = typeof rangeMonths === 'number' ? rangeMonths : 12
-    return format(startOfMonth(subMonths(new Date(), Math.max(months, 12))), 'yyyy-MM-dd')
+    return format(startOfMonth(subMonths(new Date(), Math.max(1, months))), 'yyyy-MM-dd')
   }, [rangeMonths])
 
   const transactions = useLiveQuery(

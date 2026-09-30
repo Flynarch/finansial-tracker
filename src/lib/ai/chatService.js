@@ -10,7 +10,6 @@ import { getCachedCurrencyRates } from '../api'
 import useSettingsStore from '../../store/useSettingsStore'
 import { extractMerchantAndCategory } from './indonesianFinanceNlp'
 import { extractTimeSlot, extractCleanSubjectEntity, extractVenueSlot } from './semanticSlotFiller'
-import { rememberTransactionEntity } from './entityMemory'
 import { getPrunedTools } from './toolSchemas'
 import { buildSystemPrompt } from './promptBuilder'
 import { wrapUserTurn, sanitizeGeminiContents } from './sanitizer'
@@ -465,14 +464,6 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
             const timeSlot = extractTimeSlot(userMessage) || (t.notes ? extractTimeSlot(t.notes) : null)
             txTime = timeSlot?.timeStr || currentTime || format(new Date(), 'HH:mm')
           }
-
-          rememberTransactionEntity({
-            notes: cleanNotes,
-            category: cleanCat,
-            amount: t.amount,
-            walletId: resolvedWalletId,
-            merchant: itemMerchant,
-          })
 
           return {
             ...t,

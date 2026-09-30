@@ -12,6 +12,8 @@ export default function ChatMessageList({
   messagesEndRef,
   onScroll,
   onSend,
+  onStagePrompt,
+  onSelectPrompt,
   onMsgTouchStart,
   onMsgTouchMove,
   onMsgTouchEnd,
@@ -22,6 +24,7 @@ export default function ChatMessageList({
 }) {
   const visibleMessages = messages.filter((m) => m.type !== 'hidden')
   const isOnlyWelcome = visibleMessages.length <= 1 && (visibleMessages.length === 0 || visibleMessages[0]?.type === 'welcome')
+  const handleStage = onStagePrompt || onSelectPrompt
 
   const getMessagePosition = (all, i) => {
     const curr = all[i]
@@ -44,7 +47,8 @@ export default function ChatMessageList({
     >
       {isOnlyWelcome && !isLoading ? (
         <WelcomeHero
-          onSelectPrompt={onSend}
+          onSelectPrompt={handleStage || onSend}
+          onStagePrompt={handleStage}
           todayExpense={todayExpense}
           todayCurrency={defaultCurrency}
         />
@@ -64,6 +68,7 @@ export default function ChatMessageList({
               isLoading={isLoading}
               locale={locale}
               onSend={onSend}
+              onStagePrompt={handleStage}
               onMsgTouchStart={onMsgTouchStart}
               onMsgTouchMove={onMsgTouchMove}
               onMsgTouchEnd={onMsgTouchEnd}

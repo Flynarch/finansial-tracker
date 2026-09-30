@@ -17,13 +17,17 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../../lib/utils'
-import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History, HeartHandshake } from 'lucide-react'
+import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History, HeartHandshake, ChevronRight } from 'lucide-react'
 import LoanForgiveModal from './LoanForgiveModal'
+import CategoryPickerModal from '../transactions/CategoryPickerModal'
+import CategoryIcon from '../ui/CategoryIcon'
+import { formatExpenseCategory } from '../../lib/expenseCategories'
+import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import { getLocalDateString } from '../../lib/dateUtils'
 
 export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan = null, initialAmount = null, onSaved, onOpenForgive }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const recordPayment = useLoanStore((state) => state.recordPayment)
@@ -41,9 +45,15 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(getLocalDateString())
   const [notes, setNotes] = useState('')
-  const [paymentWalletId, setPaymentWalletId] = useState('')
+  const [paymentWalletId, setPaymentWalletId] = useState(
+    incomingLoan?.walletId ? String(incomingLoan.walletId) : (defaultWalletId ? String(defaultWalletId) : '')
+  )
+  const [excessCategory, setExcessCategory] = useState(
+    incomingLoan?.type === 'debt' ? 'tagihan/cicilan' : 'investasi/bunga_bank'
+  )
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [isForgiveOpen, setIsForgiveOpen] = useState(false)
+  const [isExcessCategoryModalOpen, setIsExcessCategoryModalOpen] = useState(false)
 
   const allWallets = useLiveQuery(
     () => {
@@ -77,7 +87,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       setAmount(initAmtVal)
       setDate(getLocalDateString())
       setNotes('')
-      setPaymentWalletId(loan?.walletId ? String(loan.walletId) : '')
+      setPaymentWalletId(loan?.walletId ? String(loan.walletId) : (defaultWalletId ? String(defaultWalletId) : ''))
+      setExcessCategory(loan?.type === 'debt' ? 'tagihan/cicilan' : 'investasi/bunga_bank')
+      setIsExcessCategoryModalOpen(false)
     }
   }
 
@@ -90,6 +102,9 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const isDebt = loan.type === 'debt'
 
   const currentPayValue = parseMoneyInput(amount, currency) || 0
+  const isOverpayment = currentPayValue > remaining
+  const principalPortion = Math.min(currentPayValue, remaining)
+  const excessPortion = Math.max(0, currentPayValue - remaining)
   const nextRemaining = Math.max(0, remaining - currentPayValue)
   const isWillBePaidFull = currentPayValue >= remaining && remaining > 0
 
@@ -111,7 +126,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   }
 
   const addAmountIncrement = (val) => {
-    const nextVal = Math.min(remaining, currentPayValue + val)
+    const nextVal = currentPayValue + val
     setAmount(formatMoneyValueForInput(nextVal, currency))
   }
 
@@ -123,20 +138,17 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       return
     }
 
-    if (payAmt > remaining) {
-      hapticWarning()
-      setSheetError(
-        t(
-          'loans.payment.exceedsRemaining',
-          { payAmt: formatCurrency(payAmt, currency), remaining: formatCurrency(remaining, currency) },
-          `Nominal pembayaran (${formatCurrency(payAmt, currency)}) tidak boleh melebihi sisa tagihan (${formatCurrency(remaining, currency)}).`
-        )
-      )
-      return
-    }
-
     try {
-      await recordPayment(loan.id, payAmt, date, notes.trim(), paymentWalletId || loan?.walletId, currency)
+      const targetWalletId = paymentWalletId || loan?.walletId || (defaultWalletId ? String(defaultWalletId) : null)
+      await recordPayment(
+        loan.id,
+        payAmt,
+        date,
+        notes.trim(),
+        targetWalletId,
+        currency,
+        isOverpayment ? excessCategory : null
+      )
       hapticSuccess()
       onSaved?.()
       onClose?.()
@@ -256,7 +268,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
                   <button
                     type="button"
                     onClick={() => {
-                      const installmentVal = Math.min(remaining, toSafeNumber(loan.monthlyPayment))
+                      const installmentVal = remaining > 0 ? Math.min(remaining, toSafeNumber(loan.monthlyPayment)) : toSafeNumber(loan.monthlyPayment)
                       setAmount(formatMoneyValueForInput(installmentVal, currency))
                     }}
                     className="col-span-3 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[11px] font-extrabold hover:bg-[var(--accent)]/20 transition-colors cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
@@ -296,14 +308,16 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
                 {t('loans.payment.addNominal', 'Tambah Nominal:')}
               </span>
               <div className="grid grid-cols-3 gap-1.5">
-                {[50000, 100000, 500000].map((amt) => (
+                {((currency || 'IDR') === 'IDR' ? [50000, 100000, 500000] : [5, 10, 50]).map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => addAmountIncrement(amt)}
                     className="py-1 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-[10px] font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer text-center active:scale-95"
                   >
-                    +{amt >= 1000000 ? `${amt / 1000000}Jt` : `${amt / 1000}Rb`}
+                    {(currency || 'IDR') === 'IDR'
+                      ? `+${amt >= 1000000 ? `${amt / 1000000}Jt` : `${amt / 1000}Rb`}`
+                      : `+${amt}`}
                   </button>
                 ))}
               </div>
@@ -312,7 +326,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
         </div>
 
         {/* Dynamic Balance Impact Card */}
-        {currentPayValue > 0 && (
+        {currentPayValue > 0 && !isOverpayment && (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 flex items-center justify-between text-xs">
             <div className="space-y-0.5">
               <span className="text-[9px] font-extrabold text-[var(--muted)] uppercase tracking-wider block">
@@ -349,6 +363,71 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
           </div>
         )}
 
+        {/* Overpayment Breakdown Card */}
+        {isOverpayment && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-extrabold uppercase tracking-wider text-amber-500 text-[10px]">
+                {t('loans.payment.overpaymentBreakdown', 'Rincian Kelebihan Bayar')}
+              </span>
+              <span className="font-bold text-[10px] text-[var(--muted)]">
+                {isDebt
+                  ? t('loans.payment.excessExpense', 'Dicatat sebagai Pengeluaran')
+                  : t('loans.payment.excessIncome', 'Dicatat sebagai Pemasukan')}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-2 space-y-0.5">
+                <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                  {t('loans.payment.principalLabel', 'Pokok')}
+                </span>
+                <p className="font-extrabold text-[var(--fg)] tabular-nums">
+                  {formatCurrency(principalPortion, currency)}{' '}
+                  <span className="text-[10px] font-bold text-emerald-500">
+                    ({t('loans.badge.paid', 'Lunas')})
+                  </span>
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 space-y-0.5">
+                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">
+                  {t('loans.payment.excessLabel', 'Kelebihan')}
+                </span>
+                <p className="font-extrabold text-amber-500 tabular-nums">
+                  +{formatCurrency(excessPortion, currency)}
+                </p>
+              </div>
+            </div>
+
+            {/* Category Selector for Excess */}
+            <div className="space-y-1 pt-0.5">
+              <label className="text-[11px] font-bold text-[var(--fg)] flex items-center justify-between">
+                <span>{t('loans.payment.excessCategoryLabel', 'Kategori Kelebihan')}</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsExcessCategoryModalOpen(true)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] hover:bg-[var(--field-bg)] transition-colors text-left cursor-pointer active:scale-98"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <CategoryIcon
+                    category={excessCategory}
+                    txType={isDebt ? 'expense' : 'income'}
+                    className="h-4 w-4 shrink-0 text-[var(--accent)]"
+                  />
+                  <span className="text-xs font-bold text-[var(--fg)] truncate">
+                    {isDebt
+                      ? formatExpenseCategory(excessCategory, locale)
+                      : formatIncomeCategory(excessCategory, locale)}
+                  </span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Input Details Card */}
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-2.5 space-y-2">
           {/* Wallet Selector */}
@@ -367,7 +446,6 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
             <WalletSelectModal
               isOpen={isWalletModalOpen}
               onClose={() => setIsWalletModalOpen(false)}
-              wallets={allWallets || []}
               selectedWalletId={paymentWalletId || loan?.walletId || defaultWalletId}
               onSelectWallet={(wId) => {
                 setPaymentWalletId(wId)
@@ -467,10 +545,25 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
             onClick={handleSave}
             className={isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'}
           >
-            {isDebt ? t('loans.payment.save', 'Konfirmasi Pembayaran') : t('loans.payment.saveReceivable', 'Konfirmasi Penerimaan')}
+            {isOverpayment
+              ? `${isDebt ? t('loans.action.pay', 'Bayar') : t('loans.action.receive', 'Terima')} ${formatCurrency(currentPayValue, currency)} (${t('loans.badge.paid', 'Lunas')} + ${t('loans.payment.excessShort', 'Kelebihan')} ${formatCurrency(excessPortion, currency)})`
+              : isDebt
+              ? t('loans.payment.save', 'Konfirmasi Pembayaran')
+              : t('loans.payment.saveReceivable', 'Konfirmasi Penerimaan')}
           </Button>
         </div>
       </div>
+
+      <CategoryPickerModal
+        isOpen={isExcessCategoryModalOpen}
+        onClose={() => setIsExcessCategoryModalOpen(false)}
+        txType={isDebt ? 'expense' : 'income'}
+        selectedCategory={excessCategory}
+        onSelectCategory={(cat) => {
+          setExcessCategory(cat)
+          setIsExcessCategoryModalOpen(false)
+        }}
+      />
 
       {!onOpenForgive && (
         <LoanForgiveModal

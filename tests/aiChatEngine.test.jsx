@@ -100,6 +100,47 @@ describe('AI Chat Engine & Input Bar Message Sending Invariants', () => {
       expect(onSend).not.toHaveBeenCalled()
     })
 
+    it('does not trigger onSend when Enter key is pressed on mobile touchscreen (pointer: coarse)', () => {
+      const originalMatchMedia = window.matchMedia
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: query === '(pointer: coarse)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+
+      try {
+        const onSend = vi.fn()
+
+        render(
+          <ChatInputBar
+            inputValue="Pesan baru mobile"
+            setInputValue={vi.fn()}
+            selectedImage={null}
+            isLoading={false}
+            isRecording={false}
+            onSend={onSend}
+            onToggleRecording={vi.fn()}
+            onStopRecording={vi.fn()}
+            onCancelRecording={vi.fn()}
+            onOpenMediaPicker={vi.fn()}
+            locale="id"
+          />
+        )
+
+        const textarea = screen.getByPlaceholderText(/ketik apapun/i)
+        fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+
+        expect(onSend).not.toHaveBeenCalled()
+      } finally {
+        window.matchMedia = originalMatchMedia
+      }
+    })
+
     it('disables submit button when inputValue is empty and no image is attached', () => {
       render(
         <ChatInputBar

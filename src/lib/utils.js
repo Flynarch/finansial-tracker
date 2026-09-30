@@ -288,11 +288,12 @@ export const LOAN_CATEGORIES = Object.freeze([
 
 export function isExcludeAnalyticsTx(tx) {
   if (!tx) return false
+  if (tx.deletedAt) return true
   if (tx.isExcludeAnalyticsTx || tx.isExcludeFromAnalytics || tx.excludeFromAnalytics) return true
   if (tx.isPendingReview === true || tx.isPendingReview === 1) return true
   if (Array.isArray(tx.tags) && (tx.tags.includes('exclude_analytics') || tx.tags.includes('excludeFromAnalytics'))) return true
   if (tx.type === 'balance_adjustment') return true
-  if (tx.loanId != null || tx.splitBillId != null) return true
+  if ((tx.loanId != null && !tx.isLoanExcess) || (tx.splitBillId != null && (LOAN_CATEGORIES.includes(tx.category) || tx.isExcludeAnalyticsTx))) return true
   if (LOAN_CATEGORIES.includes(tx.category)) return true
   if (['tabungan', 'cairkan_tabungan'].includes(tx.category)) return true
   if (typeof tx.category === 'string') {
