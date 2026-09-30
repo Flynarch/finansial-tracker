@@ -181,8 +181,23 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         }
         views.setTextViewText(R.id.widget_date_text, dateText);
 
-        // Render trend sparkline with timeline and today net badge
-        Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson, sparklineDatesJson, todayNet, todayNetVal);
+        // Bind elegant inline Net today text next to total balance
+        if (todayNet != null && !todayNet.trim().isEmpty() && !"Rp 0".equals(todayNet.trim()) && !"+Rp 0".equals(todayNet.trim())) {
+            views.setTextViewText(R.id.widget_today_net, todayNet);
+            if (todayNetVal > 0 || todayNet.startsWith("+")) {
+                views.setTextColor(R.id.widget_today_net, Color.parseColor("#86EFAC")); // Soft emerald
+            } else if (todayNetVal < 0 || todayNet.startsWith("-")) {
+                views.setTextColor(R.id.widget_today_net, Color.parseColor("#FDA4AF")); // Soft rose
+            } else {
+                views.setTextColor(R.id.widget_today_net, Color.parseColor("#94A3B8")); // Muted slate
+            }
+            views.setViewVisibility(R.id.widget_today_net, View.VISIBLE);
+        } else {
+            views.setViewVisibility(R.id.widget_today_net, View.GONE);
+        }
+
+        // Render trend sparkline with timeline (calibrated aspect ratio to prevent squishing)
+        Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson, sparklineDatesJson);
         if (sparklineBitmap != null) {
             views.setImageViewBitmap(R.id.widget_sparkline, sparklineBitmap);
             views.setViewVisibility(R.id.widget_sparkline, View.VISIBLE);
@@ -218,15 +233,19 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
     }
 
     public static Bitmap createSparklineBitmap(String sparklineJson) {
-        return createSparklineBitmap(sparklineJson, null, null, 0f);
+        return createSparklineBitmap(sparklineJson, null);
+    }
+
+    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, String todayNet, float todayNetVal) {
+        return createSparklineBitmap(sparklineJson, sparklineDatesJson);
     }
 
     /**
-     * Generate an offscreen Bitmap containing a smooth sparkline trend chart,
-     * daily date timeline labels, and an optional Today Net badge in the top-right corner.
-     * Features high-DPI ARGB_8888 rendering, anti-aliasing/dithering, and non-clipped pulse dots.
+     * Generate an offscreen Bitmap containing an un-distorted smooth sparkline trend chart
+     * with daily date timeline labels. Aspect ratio is calibrated (800x135 ~ 5.9:1) to match
+     * real-world home screen widget dimensions, ensuring true circular pulse dots and un-squished text.
      */
-    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, String todayNet, float todayNetVal) {
+    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson) {
         if (sparklineJson == null || sparklineJson.trim().isEmpty()) {
             return null;
         }
@@ -249,12 +268,13 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                 if (values[i] > maxVal) maxVal = values[i];
             }
 
+            // Calibrated dimensions: 800 x 135 (~5.93:1 aspect ratio matching real widget view)
             int width = 800;
-            int height = 240;
-            float leftPadding = 36f;
-            float rightPadding = 36f;
-            float topPadding = 56f;
-            float bottomPadding = 50f;
+            int height = 135;
+            float leftPadding = 32f;
+            float rightPadding = 32f;
+            float topPadding = 14f;
+            float bottomPadding = 36f;
             float usableWidth = width - leftPadding - rightPadding;
             float usableHeight = height - topPadding - bottomPadding;
             float baselineY = height - bottomPadding;
@@ -320,26 +340,26 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             linePaint.setStyle(Paint.Style.STROKE);
             linePaint.setColor(Color.rgb(134, 168, 121));
-            linePaint.setStrokeWidth(6f);
+            linePaint.setStrokeWidth(5.5f);
             linePaint.setStrokeCap(Paint.Cap.ROUND);
             linePaint.setStrokeJoin(Paint.Join.ROUND);
             canvas.drawPath(linePath, linePaint);
 
-            // 3. Draw highlighted pulse dot on the latest point with guaranteed non-clipped boundary
+            // 3. Draw highlighted pulse dot on the latest point (guaranteed circular due to calibrated aspect ratio)
             float lastX = leftPadding + (len > 1 ? (len - 1) * stepX : usableWidth);
             float lastY = pointsY[len - 1];
 
             Paint outerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             outerDotPaint.setStyle(Paint.Style.FILL);
             outerDotPaint.setColor(Color.argb(90, 107, 124, 94));
-            canvas.drawCircle(lastX, lastY, 14f, outerDotPaint);
+            canvas.drawCircle(lastX, lastY, 11f, outerDotPaint);
 
             Paint innerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             innerDotPaint.setStyle(Paint.Style.FILL);
             innerDotPaint.setColor(Color.WHITE);
-            canvas.drawCircle(lastX, lastY, 6f, innerDotPaint);
+            canvas.drawCircle(lastX, lastY, 4.5f, innerDotPaint);
 
-            // 4. Draw timeline divider and date labels below each point
+            // 4. Draw subtle timeline divider and date labels below each point
             String[] dateLabels = new String[len];
             JSONArray datesArr = null;
             if (sparklineDatesJson != null && !sparklineDatesJson.trim().isEmpty()) {
@@ -362,83 +382,26 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             }
 
             Paint dividerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dividerPaint.setColor(Color.argb(20, 255, 255, 255));
+            dividerPaint.setColor(Color.argb(22, 255, 255, 255));
             dividerPaint.setStrokeWidth(1.5f);
-            canvas.drawLine(leftPadding, baselineY + 6f, width - rightPadding, baselineY + 6f, dividerPaint);
+            canvas.drawLine(leftPadding, baselineY + 4f, width - rightPadding, baselineY + 4f, dividerPaint);
 
             Paint datePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             datePaint.setTextAlign(Paint.Align.CENTER);
-            datePaint.setTextSize(21f);
+            datePaint.setTextSize(18f);
             datePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 
-            float dateLabelY = height - 12f;
+            float dateLabelY = height - 9f;
             for (int i = 0; i < len; i++) {
                 float x = leftPadding + (len > 1 ? i * stepX : usableWidth / 2f);
                 boolean isToday = (i == len - 1);
                 if (isToday) {
                     datePaint.setColor(Color.parseColor("#F8FAFC")); // Bright white for today
                 } else {
-                    datePaint.setColor(Color.parseColor("#94A3B8")); // Muted slate-400 for past days
+                    datePaint.setColor(Color.parseColor("#64748B")); // Slate-500 muted for past days
                 }
                 String label = dateLabels[i] != null ? dateLabels[i] : "";
                 canvas.drawText(label, x, dateLabelY, datePaint);
-            }
-
-            // 5. Draw Today Net Badge at top-right corner if available
-            if (todayNet != null && !todayNet.trim().isEmpty()) {
-                Paint badgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-                badgeTextPaint.setTextSize(22f);
-                badgeTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-                badgeTextPaint.setTextAlign(Paint.Align.CENTER);
-
-                float textWidth = badgeTextPaint.measureText(todayNet);
-                float padH = 16f;
-                float pillW = textWidth + padH * 2;
-                float pillH = 32f;
-                float pillRight = width - rightPadding;
-                float pillLeft = pillRight - pillW;
-                float pillTop = 10f;
-                float pillBottom = pillTop + pillH;
-                float cornerRadius = pillH / 2f;
-
-                RectF pillRect = new RectF(pillLeft, pillTop, pillRight, pillBottom);
-
-                int bgColor;
-                int borderColor;
-                int textColor;
-
-                boolean isPositive = todayNetVal > 0 || todayNet.startsWith("+");
-                boolean isNegative = todayNetVal < 0 || todayNet.startsWith("-");
-
-                if (isPositive) {
-                    bgColor = Color.argb(45, 134, 239, 172); // soft emerald #86EFAC
-                    borderColor = Color.argb(110, 134, 239, 172);
-                    textColor = Color.rgb(134, 239, 172);
-                } else if (isNegative) {
-                    bgColor = Color.argb(45, 253, 164, 175); // soft rose #FDA4AF
-                    borderColor = Color.argb(110, 253, 164, 175);
-                    textColor = Color.rgb(253, 164, 175);
-                } else {
-                    bgColor = Color.argb(35, 148, 163, 184); // subtle slate #CBD5E1
-                    borderColor = Color.argb(80, 148, 163, 184);
-                    textColor = Color.rgb(203, 213, 225);
-                }
-
-                Paint pillBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                pillBgPaint.setStyle(Paint.Style.FILL);
-                pillBgPaint.setColor(bgColor);
-                canvas.drawRoundRect(pillRect, cornerRadius, cornerRadius, pillBgPaint);
-
-                Paint pillBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                pillBorderPaint.setStyle(Paint.Style.STROKE);
-                pillBorderPaint.setColor(borderColor);
-                pillBorderPaint.setStrokeWidth(2f);
-                canvas.drawRoundRect(pillRect, cornerRadius, cornerRadius, pillBorderPaint);
-
-                badgeTextPaint.setColor(textColor);
-                Paint.FontMetrics fm = badgeTextPaint.getFontMetrics();
-                float textY = pillRect.centerY() - (fm.ascent + fm.descent) / 2f;
-                canvas.drawText(todayNet, pillRect.centerX(), textY, badgeTextPaint);
             }
 
             return bitmap;

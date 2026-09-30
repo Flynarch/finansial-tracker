@@ -45,7 +45,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Balance Hero Section -->
+    <!-- Balance Hero Section with Inline Elegant Delta -->
     <TextView
         android:id="@+id/widget_balance_label"
         android:layout_width="wrap_content"
@@ -56,23 +56,43 @@
         android:textSize="9.5sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/widget_total_balance"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:text="Rp 0"
-        android:textColor="#F8FAFC"
-        android:textSize="20sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginTop="1dp">
 
-    <!-- Sparkline Trend Chart with Timeline & Badge -->
+        <TextView
+            android:id="@+id/widget_total_balance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Rp 0"
+            android:textColor="#F8FAFC"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_today_net"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="+Rp 0"
+            android:textColor="#86EFAC"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Sparkline Trend Chart with Daily Timeline -->
     <ImageView
         android:id="@+id/widget_sparkline"
         android:layout_width="match_parent"
-        android:layout_height="54dp"
+        android:layout_height="48dp"
         android:layout_marginTop="3dp"
         android:layout_marginBottom="3dp"
         android:scaleType="fitXY"
