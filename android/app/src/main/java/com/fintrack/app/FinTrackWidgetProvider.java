@@ -17,6 +17,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Bundle;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
@@ -31,6 +32,12 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         for (int appWidgetId : appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId);
         }
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager appWidgetManager, int appWidgetId, Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions);
+        updateAppWidget(context, appWidgetManager, appWidgetId);
     }
 
     @Override
@@ -196,8 +203,27 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.widget_today_net, View.GONE);
         }
 
+        // Determine calibrated sparkline canvas height based on widget bounds
+        int targetCanvasHeight = 185;
+        if (appWidgetManager != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            try {
+                Bundle options = appWidgetManager.getAppWidgetOptions(appWidgetId);
+                if (options != null) {
+                    int minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+                    int minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+                    if (minW > 0 && minH > 0) {
+                        int estChartW = Math.max(160, minW - 26);
+                        int estChartH = Math.max(50, minH - 120);
+                        float ratio = (float) estChartH / (float) estChartW;
+                        int calcH = Math.round(800f * ratio);
+                        targetCanvasHeight = Math.max(160, Math.min(270, calcH));
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
         // Render trend sparkline with timeline (calibrated aspect ratio to prevent squishing)
-        Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson, sparklineDatesJson);
+        Bitmap sparklineBitmap = createSparklineBitmap(sparklineJson, sparklineDatesJson, targetCanvasHeight);
         if (sparklineBitmap != null) {
             views.setImageViewBitmap(R.id.widget_sparkline, sparklineBitmap);
             views.setViewVisibility(R.id.widget_sparkline, View.VISIBLE);
@@ -242,11 +268,15 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
     /**
      * Generate an offscreen Bitmap containing an un-distorted smooth sparkline trend chart
-     * with daily date timeline labels. Aspect ratio is calibrated (800x135 ~ 5.9:1) to match
-     * real-world home screen widget dimensions, ensuring true circular pulse dots and un-squished text.
+     * with daily date timeline labels. Aspect ratio is calibrated to match real-world
+     * widget viewport dimensions, ensuring true circular pulse dots and un-squished text.
      */
     public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson) {
-        if (sparklineJson == null || sparklineJson.trim().isEmpty()) {
+        return createSparklineBitmap(sparklineJson, sparklineDatesJson, 185);
+    }
+
+    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, int targetHeight) {
+        if (sparklineJson == null || sparklineJson.trim().isEmpty() || "[]".equals(sparklineJson.trim())) {
             return null;
         }
 
@@ -268,13 +298,13 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
                 if (values[i] > maxVal) maxVal = values[i];
             }
 
-            // Calibrated dimensions: 800 x 135 (~5.93:1 aspect ratio matching real widget view)
+            // Calibrated dimensions adaptive to widget viewport
             int width = 800;
-            int height = 135;
+            int height = targetHeight > 0 ? targetHeight : 185;
             float leftPadding = 32f;
             float rightPadding = 32f;
-            float topPadding = 14f;
-            float bottomPadding = 36f;
+            float topPadding = Math.max(16f, height * 0.12f);
+            float bottomPadding = Math.max(40f, height * 0.23f);
             float usableWidth = width - leftPadding - rightPadding;
             float usableHeight = height - topPadding - bottomPadding;
             float baselineY = height - bottomPadding;
@@ -324,7 +354,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             fillPath.close();
 
             // 1. Draw subtle area fill with Sage gradient (FinTrack brand accent token) bounded to baseline
-            int fillStart = Color.argb(65, 107, 124, 94); // 25% alpha sage #6B7C5E
+            int fillStart = Color.argb(60, 107, 124, 94); // alpha sage #6B7C5E
             int fillEnd = Color.argb(0, 107, 124, 94);     // 0% alpha
             LinearGradient gradient = new LinearGradient(
                     0f, topPadding, 0f, baselineY,
@@ -351,13 +381,13 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
             Paint outerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             outerDotPaint.setStyle(Paint.Style.FILL);
-            outerDotPaint.setColor(Color.argb(90, 107, 124, 94));
-            canvas.drawCircle(lastX, lastY, 11f, outerDotPaint);
+            outerDotPaint.setColor(Color.argb(85, 107, 124, 94));
+            canvas.drawCircle(lastX, lastY, 11.5f, outerDotPaint);
 
             Paint innerDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             innerDotPaint.setStyle(Paint.Style.FILL);
             innerDotPaint.setColor(Color.WHITE);
-            canvas.drawCircle(lastX, lastY, 4.5f, innerDotPaint);
+            canvas.drawCircle(lastX, lastY, 4.6f, innerDotPaint);
 
             // 4. Draw subtle timeline divider and date labels below each point
             String[] dateLabels = new String[len];
@@ -388,7 +418,7 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
 
             Paint datePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
             datePaint.setTextAlign(Paint.Align.CENTER);
-            datePaint.setTextSize(18f);
+            datePaint.setTextSize(Math.max(18f, height * 0.10f));
             datePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 
             float dateLabelY = height - 9f;

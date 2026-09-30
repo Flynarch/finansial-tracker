@@ -88,13 +88,14 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Sparkline Trend Chart with Daily Timeline -->
+    <!-- Sparkline Trend Chart with Daily Timeline (flexes to fill vertical space) -->
     <ImageView
         android:id="@+id/widget_sparkline"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="3dp"
-        android:layout_marginBottom="3dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
         android:scaleType="fitXY"
         android:visibility="gone"
         android:contentDescription="Tren Kekayaan Bersih" />
@@ -103,8 +104,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:gravity="bottom|center_vertical"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <!-- Left Context: Today Date & Active Timeframe -->
@@ -122,19 +123,19 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:text="Hari Ini"
-                android:textColor="#E2E8F0"
-                android:textSize="11sp"
+                android:textColor="#F1F5F9"
+                android:textSize="11.5sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_period_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="1.5dp"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:text="7 Hari Terakhir"
-                android:textColor="#64748B"
+                android:textColor="#94A3B8"
                 android:textSize="9.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
