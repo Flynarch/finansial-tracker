@@ -510,6 +510,13 @@ public class FinTrackNotificationPlugin extends Plugin {
                 dateText = sdf.format(new java.util.Date());
             }
 
+            String sparklineIncome = call.getString("sparklineIncome", "[]");
+            String sparklineExpense = call.getString("sparklineExpense", "[]");
+            String topCategories = call.getString("topCategories", "[]");
+            if (topCategories == null || topCategories.trim().isEmpty() || "[]".equals(topCategories.trim())) {
+                topCategories = call.getString("topCategoriesJson", "[]");
+            }
+
             SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
             prefs.edit()
                 .putString("fintrack_widget_balance", balance)
@@ -527,6 +534,9 @@ public class FinTrackNotificationPlugin extends Plugin {
                 .putString("fintrack_widget_sparkline", sparklineData)
                 .putString("sparklineData", sparklineData)
                 .putString("fintrack_widget_sparkline_dates", sparklineDates)
+                .putString("fintrack_widget_sparkline_income", sparklineIncome)
+                .putString("fintrack_widget_sparkline_expense", sparklineExpense)
+                .putString("fintrack_widget_top_categories", topCategories)
                 .putString("fintrack_widget_today_net", todayNet)
                 .putFloat("fintrack_widget_today_net_val", todayNetVal != null ? todayNetVal : 0f)
                 .putString("fintrack_widget_btn_text", btnText)

@@ -33,6 +33,9 @@ export async function syncNativeWidgetData({
   dateText: customDateText = null,
   sparklinePoints = [],
   sparklineDates = [],
+  incomeSparklinePoints = [],
+  expenseSparklinePoints = [],
+  topCategories = [],
   todayNet = null,
   todayNetFormatted = null,
 } = {}) {
@@ -56,12 +59,18 @@ export async function syncNativeWidgetData({
     const expenseValue = cleanExpNum > 0 ? `-${formatCurrency(cleanExpNum, defaultCurrency, locale)}` : formatCurrency(cleanExpNum, defaultCurrency, locale)
     const formattedIncome = `${incomePrefix}${incomeValue}`
     const formattedExpense = `${expensePrefix}${expenseValue}`
-    const effectivePeriod = period || (isEn ? 'Last 7 Days' : '7 Hari Terakhir')
+    const effectivePeriod = period || (isEn ? 'This Month' : 'Bulan Ini')
     const dateText = customDateText || format(new Date(), 'EEEE, d MMM', { locale: dateLocale })
     const btnText = isEn ? '+ Add' : '+ Catat'
     const balanceLabel = isEn ? 'Net Worth' : 'Kekayaan Bersih'
     const safePoints = Array.isArray(sparklinePoints) ? sparklinePoints.map((p) => Number(p) || 0) : []
     const sparklineJson = JSON.stringify(safePoints)
+    const safeIncomePoints = Array.isArray(incomeSparklinePoints) ? incomeSparklinePoints.map((p) => Number(p) || 0) : []
+    const safeExpensePoints = Array.isArray(expenseSparklinePoints) ? expenseSparklinePoints.map((p) => Number(p) || 0) : []
+    const sparklineIncomeJson = JSON.stringify(safeIncomePoints)
+    const sparklineExpenseJson = JSON.stringify(safeExpensePoints)
+    const safeCategories = Array.isArray(topCategories) ? topCategories : []
+    const topCategoriesJson = JSON.stringify(safeCategories)
 
     let safeDates = Array.isArray(sparklineDates) ? sparklineDates.map((d) => String(d)) : []
     if (safeDates.length === 0 && safePoints.length > 0) {
@@ -109,6 +118,9 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_date', dateText)
         localStorage.setItem('fintrack_widget_period', effectivePeriod)
         localStorage.setItem('fintrack_widget_sparkline', sparklineJson)
+        localStorage.setItem('fintrack_widget_sparkline_income', sparklineIncomeJson)
+        localStorage.setItem('fintrack_widget_sparkline_expense', sparklineExpenseJson)
+        localStorage.setItem('fintrack_widget_top_categories', topCategoriesJson)
         localStorage.setItem('fintrack_widget_sparkline_dates', sparklineDatesJson)
         localStorage.setItem('fintrack_widget_today_net', formattedTodayNet)
         localStorage.setItem('fintrack_widget_today_net_val', String(cleanTodayNetVal))
@@ -136,6 +148,10 @@ export async function syncNativeWidgetData({
       period: effectivePeriod,
       sparklineData: sparklineJson,
       sparklinePoints: safePoints,
+      sparklineIncome: sparklineIncomeJson,
+      sparklineExpense: sparklineExpenseJson,
+      topCategories: topCategoriesJson,
+      topCategoriesJson,
       sparklineDates: safeDates,
       sparklineDatesJson,
       todayNet: formattedTodayNet,
@@ -180,6 +196,7 @@ export async function syncNativeWidgetFromDb() {
     const periodLabel = isEn ? 'This Month' : 'Bulan Ini'
     let monthIncome = 0
     let monthExpense = 0
+    const categoryExpenseMap = {}
 
     for (const tx of allTxs) {
       if (!tx?.date || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
@@ -201,77 +218,131 @@ export async function syncNativeWidgetFromDb() {
           if (isExcludeAnalyticsTx(itemTx)) continue
           const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
           const itemType = item.type || tx.type
-          if (itemType === 'income') monthIncome += amt
-          else if (itemType === 'expense') monthExpense += amt
+          if (itemType === 'income') {
+            monthIncome += amt
+          } else if (itemType === 'expense') {
+            monthExpense += amt
+            const catName = itemTx.category || (isEn ? 'Other' : 'Lainnya')
+            categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
+          }
         }
       } else {
         if (isExcludeAnalyticsTx(tx)) continue
         const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-        if (tx.type === 'income') monthIncome += amt
-        else if (tx.type === 'expense') monthExpense += amt
+        if (tx.type === 'income') {
+          monthIncome += amt
+        } else if (tx.type === 'expense') {
+          monthExpense += amt
+          const catName = tx.category || (isEn ? 'Other' : 'Lainnya')
+          categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
+        }
       }
     }
 
-    // Generate 7-day sparkline trend data & 7-day cash flow metrics
+    // Generate 30-day sparkline trend data & cash flow metrics
     const now = new Date()
     const sparklinePoints = []
+    const incomeSparklinePoints = []
+    const expenseSparklinePoints = []
     const sparklineDates = []
     let sevenDaysIncome = 0
     let sevenDaysExpense = 0
     let todayNet = 0
-    for (let i = 6; i >= 0; i--) {
-      const d = subDays(now, i)
-      const dStr = format(d, 'yyyy-MM-dd')
-      sparklineDates.push(format(d, 'd'))
-      let dayNet = 0
-      for (const tx of allTxs) {
-        if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || (tx.date || '').slice(0, 10) !== dStr) continue
 
-        const txCurrency = tx.currency || defaultCurrency
-        if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-          for (const item of tx.splitItems) {
-            const itemTx = {
-              ...tx,
-              ...item,
-              category: item.category || tx.category,
-              amount: item.amount,
-              type: item.type || tx.type,
-              currency: item.currency || txCurrency,
-              isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
-              isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
-              excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
-            }
-            if (isExcludeAnalyticsTx(itemTx)) continue
-            const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
-            const itemType = item.type || tx.type
-            if (itemType === 'income') {
-              dayNet += amt
-              sevenDaysIncome += amt
-            } else if (itemType === 'expense') {
-              dayNet -= amt
-              sevenDaysExpense += amt
-            }
+    // Pre-index transactions by day for maximum efficiency
+    const dayMetricsMap = new Map()
+    for (const tx of allTxs) {
+      if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || !tx.date) continue
+      const dateKey = tx.date.slice(0, 10)
+      const txCurrency = tx.currency || defaultCurrency
+
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        for (const item of tx.splitItems) {
+          const itemTx = {
+            ...tx,
+            ...item,
+            category: item.category || tx.category,
+            amount: item.amount,
+            type: item.type || tx.type,
+            currency: item.currency || txCurrency,
+            isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+            isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
           }
-        } else {
-          if (isExcludeAnalyticsTx(tx)) continue
-          const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-          if (tx.type === 'income') {
-            dayNet += amt
-            sevenDaysIncome += amt
-          } else if (tx.type === 'expense') {
-            dayNet -= amt
-            sevenDaysExpense += amt
+          if (isExcludeAnalyticsTx(itemTx)) continue
+          const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
+          const itemType = item.type || tx.type
+          const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
+          if (itemType === 'income') {
+            current.income += amt
+            current.net += amt
+          } else if (itemType === 'expense') {
+            current.expense += amt
+            current.net -= amt
           }
+          dayMetricsMap.set(dateKey, current)
         }
-      }
-      sparklinePoints.push(dayNet)
-      if (i === 0) {
-        todayNet = dayNet
+      } else {
+        if (isExcludeAnalyticsTx(tx)) continue
+        const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
+        const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
+        if (tx.type === 'income') {
+          current.income += amt
+          current.net += amt
+        } else if (tx.type === 'expense') {
+          current.expense += amt
+          current.net -= amt
+        }
+        dayMetricsMap.set(dateKey, current)
       }
     }
 
     const widgetRange = settings.widgetRange || '7d'
     const isSevenDays = widgetRange === '7d'
+    const daysCount = isSevenDays ? 7 : 30
+
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = subDays(now, i)
+      const dStr = format(d, 'yyyy-MM-dd')
+      sparklineDates.push(format(d, 'd'))
+      const metric = dayMetricsMap.get(dStr) || { income: 0, expense: 0, net: 0 }
+
+      sparklinePoints.push(metric.net)
+      incomeSparklinePoints.push(metric.income)
+      expenseSparklinePoints.push(metric.expense)
+
+      if (i < 7) {
+        sevenDaysIncome += metric.income
+        sevenDaysExpense += metric.expense
+      }
+      if (i === 0) {
+        todayNet = metric.net
+      }
+    }
+
+    // Top 3 categories
+    const sortedCats = Object.entries(categoryExpenseMap)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+
+    const defaultPalette = ['#10B981', '#06B6D4', '#F59E0B']
+    const totalExp = monthExpense > 0 ? monthExpense : 1
+    const topCategories = sortedCats.slice(0, 3).map((cat, idx) => ({
+      name: cat.name,
+      amount: cat.amount,
+      percentage: Math.max(5, Math.round((cat.amount / totalExp) * 100)),
+      color: defaultPalette[idx] || '#64748B',
+      amountFormatted: formatCompactCurrency(cat.amount, defaultCurrency, locale, true),
+    }))
+
+    if (topCategories.length === 0) {
+      topCategories.push(
+        { name: isEn ? 'Food' : 'Makan', percentage: 45, color: '#10B981', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
+        { name: isEn ? 'Transport' : 'Transportasi', percentage: 30, color: '#06B6D4', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
+        { name: isEn ? 'Shopping' : 'Belanja', percentage: 25, color: '#F59E0B', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) }
+      )
+    }
+
     const effectiveIncome = isSevenDays ? sevenDaysIncome : monthIncome
     const effectiveExpense = isSevenDays ? sevenDaysExpense : monthExpense
     const effectivePeriod = isSevenDays
@@ -285,6 +356,9 @@ export async function syncNativeWidgetFromDb() {
       defaultCurrency,
       period: effectivePeriod,
       sparklinePoints,
+      incomeSparklinePoints,
+      expenseSparklinePoints,
+      topCategories,
       sparklineDates,
       todayNet,
     })
