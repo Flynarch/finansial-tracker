@@ -27,19 +27,30 @@ public class FinTrackNotificationService extends NotificationListenerService {
     private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(
         "com.bca",
         "com.bca.mybca",
+        "id.co.bcadigital.blu",
         "com.bca.blu",
+        "id.bmri.livin",
         "id.co.bankmandiri.livin",
         "id.co.bri.brimo",
+        "id.bni.wondr",
         "id.co.bni.wondr",
         "src.bni",
+        "com.btpn.dc",
         "com.btpn.jenius",
         "id.co.bankbsi.mobile",
         "com.bsi.mobile",
+        "com.cimbniaga.octomobile",
         "id.co.cimbniaga.octomobile",
         "com.linecorp.linebank.id",
         "com.seabank.id",
+        "com.jago.digitalBanking",
         "com.jago.bank",
+        "id.co.banksaqu.mobile",
+        "id.co.superbank.app",
+        "com.allobank.allobank",
+        "com.bnc.finance",
         "com.gojek.app",
+        "com.gojek.gopay",
         "com.gopay.wallet",
         "ovo.id",
         "id.dana",
@@ -86,9 +97,15 @@ public class FinTrackNotificationService extends NotificationListenerService {
             title = bigTitleChar.toString();
         }
 
-        String text = textChar != null ? textChar.toString() : "";
-        if (bigTextChar != null && bigTextChar.length() > text.length()) {
+        String text = "";
+        if (bigTextChar != null && bigTextChar.length() > 0) {
             text = bigTextChar.toString();
+        } else if (textChar != null && textChar.length() > 0) {
+            text = textChar.toString();
+        }
+
+        if (textChar != null && textChar.length() > text.length()) {
+            text = textChar.toString();
         }
 
         if (text.isEmpty()) {
@@ -199,7 +216,23 @@ public class FinTrackNotificationService extends NotificationListenerService {
     }
 
     private boolean isFinancialPackage(String pkg) {
-        return WHITELISTED_PACKAGES.contains(pkg.toLowerCase());
+        if (pkg == null) return false;
+        String lower = pkg.toLowerCase();
+        if (WHITELISTED_PACKAGES.contains(lower)) {
+            return true;
+        }
+        try {
+            SharedPreferences prefs = getEncryptedPreferences(this);
+            String customJson = prefs.getString("custom_whitelisted_packages", "[]");
+            JSONArray arr = new JSONArray(customJson);
+            for (int i = 0; i < arr.length(); i++) {
+                String customPkg = arr.optString(i, "").toLowerCase();
+                if (!customPkg.isEmpty() && customPkg.equals(lower)) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
     private boolean isSmsPackage(String pkg) {
@@ -270,15 +303,15 @@ public class FinTrackNotificationService extends NotificationListenerService {
                     }
 
                     // 2. Cross-channel content match (SMS broadcast vs Notification listener)
-                    // If text content matches or one contains the other, suppress duplicate
+                    // Suppress duplicate only when one source is SMS and the other is financial notification
                     if (!normText.isEmpty() && !exText.isEmpty()) {
                         String lowPkg = packageName.toLowerCase(Locale.ROOT);
                         String lowExPkg = exPkg.toLowerCase(Locale.ROOT);
-                        boolean isSmsCrossChannel = lowPkg.contains("sms") || lowExPkg.contains("sms") ||
-                            lowPkg.contains("messaging") || lowExPkg.contains("messaging") ||
-                            lowPkg.contains("mms") || lowExPkg.contains("mms");
+                        boolean isSmsOne = lowPkg.contains("sms") || lowPkg.contains("messaging") || lowPkg.contains("mms");
+                        boolean isSmsTwo = lowExPkg.contains("sms") || lowExPkg.contains("messaging") || lowExPkg.contains("mms");
+                        boolean isCrossChannel = isSmsOne ^ isSmsTwo;
 
-                        if (normText.equals(exText) || (isSmsCrossChannel && (normText.contains(exText) || exText.contains(normText)))) {
+                        if (isCrossChannel && (normText.equals(exText) || normText.contains(exText) || exText.contains(normText))) {
                             Log.d(TAG, "Suppressed cross-channel duplicate between " + packageName + " and " + exPkg);
                             return;
                         }

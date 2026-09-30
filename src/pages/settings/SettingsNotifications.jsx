@@ -14,6 +14,9 @@ import {
   ShieldCheck,
   Trash2,
   MessageSquare,
+  Plus,
+  X,
+  Landmark,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -28,6 +31,8 @@ import {
   syncHistoricalSms,
   scanSuspectPromoTransactions,
   cleanSuspectPromoTransactions,
+  getWhitelistedPackages,
+  updateCustomPackages,
 } from '../../lib/notificationIngestion'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -72,6 +77,10 @@ export default function SettingsNotifications() {
   const [isScanningSms, setIsScanningSms] = useState(false)
   const [smsFeedback, setSmsFeedback] = useState({ text: '', isError: false })
 
+  // Custom Whitelisted Packages State
+  const [customPackages, setCustomPackages] = useState([])
+  const [newPackageInput, setNewPackageInput] = useState('')
+
   // Suspect Promo Cleaner State
   const [suspectTxs, setSuspectTxs] = useState(null)
   const [isScanning, setIsScanning] = useState(false)
@@ -96,11 +105,33 @@ export default function SettingsNotifications() {
         const smsRes = await FinTrackNotificationPlugin.checkSmsPermission()
         setIsSmsGranted(Boolean(smsRes?.granted || (smsRes?.receiveGranted && smsRes?.readGranted)))
       }
+      const customPkgRes = await getWhitelistedPackages()
+      if (Array.isArray(customPkgRes?.packages)) {
+        setCustomPackages(customPkgRes.packages)
+      }
     } catch (err){
       console.warn('[SettingsNotifications]', err)
       setIsListenerGranted(false)
     }
   }, [])
+
+  const handleAddCustomPackage = async (e) => {
+    e?.preventDefault()
+    const trimmed = newPackageInput.trim().toLowerCase()
+    if (!trimmed || customPackages.includes(trimmed)) return
+    const updated = [...customPackages, trimmed]
+    setCustomPackages(updated)
+    setNewPackageInput('')
+    await updateCustomPackages(updated)
+    triggerHaptic('impactLight')
+  }
+
+  const handleRemoveCustomPackage = async (pkgToRemove) => {
+    const updated = customPackages.filter((p) => p !== pkgToRemove)
+    setCustomPackages(updated)
+    await updateCustomPackages(updated)
+    triggerHaptic('impactLight')
+  }
 
   const handleRequestSmsPermission = async () => {
     triggerHaptic('medium')
@@ -466,6 +497,74 @@ export default function SettingsNotifications() {
                     {syncFeedback}
                   </span>
                 )}
+              </div>
+
+              {/* Monitored Financial Apps & Custom Whitelist Section */}
+              <div className="border-t border-[var(--border)] pt-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-[var(--accent)]" />
+                    <span className="text-xs font-bold text-[var(--fg)]">
+                      {t('notif.monitoredAppsTitle', 'Aplikasi Bank & E-Wallet Terpantau')}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--field-bg)] text-[var(--muted)]">
+                    {t('notif.builtInCount', '20+ Bank & Dompet')}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                  {t(
+                    'notif.monitoredAppsDesc',
+                    'Mendukung otomatisasi BCA, Mandiri Livin, BRImo, BNI wondr, Jago, blu, Jenius, CIMB OCTO, Seabank, Bank Saqu, Superbank, Allo Bank, GoPay, OVO, DANA, ShopeePay, dll.'
+                  )}
+                </p>
+
+                {/* Custom Packages Tag List */}
+                {customPackages.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-[var(--fg)]">
+                      {t('notif.customPackagesTitle', 'Package ID Kustom Tambahan:')}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {customPackages.map((pkg) => (
+                        <span
+                          key={pkg}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[11px] font-mono font-medium text-[var(--fg)]"
+                        >
+                          <span>{pkg}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomPackage(pkg)}
+                            aria-label={`Hapus ${pkg}`}
+                            className="text-[var(--muted)] hover:text-rose-500 transition cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Custom Package Input */}
+                <form onSubmit={handleAddCustomPackage} className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={newPackageInput}
+                    onChange={(e) => setNewPackageInput(e.target.value)}
+                    placeholder={t('notif.customPackagePlaceholder', 'Tambah package ID (contoh: com.bank.app)')}
+                    className="flex-1 h-9 px-3 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] font-mono"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newPackageInput.trim()}
+                    className="h-9 px-3.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{t('common.add', 'Tambah')}</span>
+                  </button>
+                </form>
               </div>
             </div>
           )}

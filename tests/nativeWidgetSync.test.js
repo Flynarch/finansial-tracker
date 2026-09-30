@@ -69,6 +69,10 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(payload.incomeValue).toContain('+Rp')
     expect(payload.expenseValue).toContain('-Rp')
     expect(payload.sparklinePoints).toEqual([100000, 200000])
+    expect(payload.sparklineDates).toBeDefined()
+    expect(payload.sparklineDates.length).toBe(2)
+    expect(payload.todayNet).toBeDefined()
+    expect(payload.todayNetVal).toBeDefined()
   })
 
   it('formats English widget metrics with proper prefixes and labels', async () => {
@@ -81,6 +85,7 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
       defaultCurrency: 'USD',
       period: 'This Month',
       sparklinePoints: [500],
+      todayNet: -150,
     })
 
     expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
@@ -96,6 +101,8 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(payload.incomeValue).toContain('+$')
     expect(payload.expenseValue).toContain('-$')
     expect(payload.sparklinePoints).toEqual([500])
+    expect(payload.todayNet).toContain('-$')
+    expect(payload.todayNetVal).toBe(-150)
   })
 
   it('ensures widget text strings contain zero system emojis', async () => {
@@ -105,6 +112,7 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
       totalBalance: 1000000,
       monthIncome: 500000,
       monthExpense: 200000,
+      todayNet: 50000,
     })
 
     const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
@@ -117,6 +125,7 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(emojiRegex.test(payload.btnText)).toBe(false)
     expect(emojiRegex.test(payload.balanceLabel)).toBe(false)
     expect(emojiRegex.test(payload.dateText)).toBe(false)
+    expect(emojiRegex.test(payload.todayNet)).toBe(false)
   })
 
   it('aggregates balances and split transactions correctly in syncNativeWidgetFromDb with 7-day adaptive default', async () => {

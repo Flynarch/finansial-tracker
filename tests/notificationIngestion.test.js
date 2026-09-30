@@ -8,9 +8,11 @@ import {
   findBestMatchingWallet,
   correlateInternalTransfers,
   FinTrackNotificationPlugin,
+  FinTrackNotificationWeb,
   scanSuspectPromoTransactions,
   cleanSuspectPromoTransactions,
   parseAmountFromRegexMatch,
+  extractTransactionRef,
 } from '../src/lib/notificationIngestion'
 import { db } from '../src/lib/db'
 
@@ -679,3 +681,176 @@ describe('notificationIngestion - DANA Mutation Ingestion & Classification', () 
     expect(parsed.type).toBe('income')
   })
 })
+
+describe('notificationIngestion - Ref Numbers & Official Package Enhancements', () => {
+  it('correctly extracts reference numbers and transaction IDs from text', () => {
+    expect(
+      extractTransactionRef('m-Transfer Berhasil Rp 50.000 ke 1234567890 No. Ref: 2024093012345')
+    ).toBe('2024093012345')
+
+    expect(
+      extractTransactionRef('Pembayaran Berhasil Rp 25.000 Order ID: ORD-998877')
+    ).toBe('ORD-998877')
+
+    expect(
+      extractTransactionRef('Transfer Masuk Rp 100.000 Ref: BNI9988-ABC')
+    ).toBe('BNI9988-ABC')
+
+    expect(
+      extractTransactionRef('Kirim uang berhasil Rp 35.000 ID Transaksi: TRX_776655')
+    ).toBe('TRX_776655')
+
+    expect(extractTransactionRef('Transfer Masuk Rp 50.000 tanpa nomor referensi')).toBeNull()
+  })
+
+  it('correctly parses notifications using official Google Play Store package names', () => {
+    // 1. Mandiri Livin (id.bmri.livin)
+    const livin = parseFinancialNotification({
+      title: "Livin' by Mandiri",
+      text: 'Pembayaran Berhasil Rp 75.000 di Kopi Kenangan No. Ref: LIV9988',
+      packageName: 'id.bmri.livin',
+    })
+    expect(livin).not.toBeNull()
+    expect(livin.institution).toBe('Mandiri Livin')
+    expect(livin.amount).toBe(75000)
+    expect(livin.refNumber).toBe('LIV9988')
+
+    // 2. BNI wondr (id.bni.wondr)
+    const wondr = parseFinancialNotification({
+      title: 'wondr by BNI',
+      text: 'Transfer Masuk Rp 500.000 dari BUDI SANTOSO Ref: WNDR123',
+      packageName: 'id.bni.wondr',
+    })
+    expect(wondr).not.toBeNull()
+    expect(wondr.institution).toBe('BNI')
+    expect(wondr.amount).toBe(500000)
+    expect(wondr.type).toBe('income')
+    expect(wondr.refNumber).toBe('WNDR123')
+
+    // 3. blu by BCA Digital (id.co.bcadigital.blu)
+    const blu = parseFinancialNotification({
+      title: 'blu by BCA Digital',
+      text: 'Transfer Rp 150.000 ke rekening BCA berhasil',
+      packageName: 'id.co.bcadigital.blu',
+    })
+    expect(blu).not.toBeNull()
+    expect(blu.institution).toBe('Blu')
+    expect(blu.amount).toBe(150000)
+
+    // 4. Bank Jago (com.jago.digitalBanking)
+    const jago = parseFinancialNotification({
+      title: 'Bank Jago',
+      text: 'Uang masuk Rp 200.000 ke Kantong Utama',
+      packageName: 'com.jago.digitalBanking',
+    })
+    expect(jago).not.toBeNull()
+    expect(jago.institution).toBe('Bank Jago')
+    expect(jago.type).toBe('income')
+    expect(jago.amount).toBe(200000)
+
+    // 5. Jenius (com.btpn.dc)
+    const jenius = parseFinancialNotification({
+      title: 'Jenius',
+      text: 'Uang masuk Rp 350.000 dari Tabungan',
+      packageName: 'com.btpn.dc',
+    })
+    expect(jenius).not.toBeNull()
+    expect(jenius.institution).toBe('Jenius')
+    expect(jenius.type).toBe('income')
+
+    // 6. CIMB OCTO Mobile (com.cimbniaga.octomobile)
+    const octo = parseFinancialNotification({
+      title: 'OCTO Mobile',
+      text: 'Pembayaran QRIS Rp 45.000 berhasil',
+      packageName: 'com.cimbniaga.octomobile',
+    })
+    expect(octo).not.toBeNull()
+    expect(octo.institution).toBe('CIMB Niaga')
+    expect(octo.amount).toBe(45000)
+
+    // 7. GoPay standalone (com.gojek.gopay)
+    const gopay = parseFinancialNotification({
+      title: 'GoPay',
+      text: 'Pembayaran Rp 22.000 ke Indomaret berhasil Order ID: GP-112233',
+      packageName: 'com.gojek.gopay',
+    })
+    expect(gopay).not.toBeNull()
+    expect(gopay.institution).toBe('GoPay')
+    expect(gopay.refNumber).toBe('GP-112233')
+
+    // 8. Bank Saqu (id.co.banksaqu.mobile)
+    const saqu = parseFinancialNotification({
+      title: 'Bank Saqu',
+      text: 'Isi saldo Rp 100.000 berhasil',
+      packageName: 'id.co.banksaqu.mobile',
+    })
+    expect(saqu).not.toBeNull()
+    expect(saqu.institution).toBe('Bank Saqu')
+    expect(saqu.type).toBe('income')
+
+    // 9. Superbank (id.co.superbank.app)
+    const superbank = parseFinancialNotification({
+      title: 'Superbank',
+      text: 'Pembayaran QRIS Rp 55.000 berhasil',
+      packageName: 'id.co.superbank.app',
+    })
+    expect(superbank).not.toBeNull()
+    expect(superbank.institution).toBe('Superbank')
+
+    // 10. Allo Bank (com.allobank.allobank)
+    const allo = parseFinancialNotification({
+      title: 'Allo Bank',
+      text: 'Top up Rp 80.000 berhasil',
+      packageName: 'com.allobank.allobank',
+    })
+    expect(allo).not.toBeNull()
+    expect(allo.institution).toBe('Allo Bank')
+    expect(allo.type).toBe('income')
+  })
+
+  it('keeps distinct transactions with same amount and timestamp if refNumbers differ', () => {
+    const notif1 = parseFinancialNotification({
+      title: 'BCA',
+      text: 'm-Transfer Berhasil. Transfer Rp 15.000 ke Toko A No. Ref: 20240930001',
+      packageName: 'com.bca',
+      timestamp: 1727670000000,
+    })
+    const notif2 = parseFinancialNotification({
+      title: 'BCA',
+      text: 'm-Transfer Berhasil. Transfer Rp 15.000 ke Toko B No. Ref: 20240930002',
+      packageName: 'com.bca',
+      timestamp: 1727670010000,
+    })
+
+    expect(notif1.refNumber).toBe('20240930001')
+    expect(notif2.refNumber).toBe('20240930002')
+    expect(notif1.refNumber).not.toBe(notif2.refNumber)
+  })
+
+  it('acknowledges processed mutations in two-phase commit pattern', async () => {
+    const webPlugin = new FinTrackNotificationWeb()
+    const res = await webPlugin.acknowledgeQueuedMutations({
+      ids: ['notif_1', 'notif_2'],
+    })
+    expect(res).toBeDefined()
+    expect(res.acknowledgedCount).toBe(2)
+    expect(res.remainingCount).toBe(0)
+
+    const pluginRes = await FinTrackNotificationPlugin.acknowledgeQueuedMutations({
+      ids: ['notif_1', 'notif_2', 'notif_3'],
+    })
+    expect(pluginRes).toBeDefined()
+    expect(pluginRes.acknowledgedCount).toBe(3)
+  })
+
+  it('manages dynamic custom package whitelisting', async () => {
+    const webPlugin = new FinTrackNotificationWeb()
+    const getRes = await webPlugin.getCustomPackages()
+    expect(Array.isArray(getRes.packages)).toBe(true)
+
+    const updateRes = await webPlugin.updateCustomPackages({ packages: ['com.test.bank'] })
+    expect(updateRes.success).toBe(true)
+    expect(updateRes.count).toBe(1)
+  })
+})
+

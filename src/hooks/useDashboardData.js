@@ -833,7 +833,10 @@ export function useDashboardData() {
       (acc, r) => {
         acc.income += r.income || 0
         acc.expense += r.expense || 0
-        acc.net += r.net || 0
+        // Use income - expense (analytic net) for the Selisih card display,
+        // NOT r.net (cashNet). cashNet deducts external transfers which causes
+        // a confusing negative Selisih even when income > expense.
+        acc.net += (r.income || 0) - (r.expense || 0)
         return acc
       },
       { income: 0, expense: 0, net: 0 },
@@ -1239,5 +1242,6 @@ export function useDashboardData() {
     setZoomTooltipDismissed,
     isCoarsePointer,
     computeRevenueValue,
+    todayStats,
   }
 }

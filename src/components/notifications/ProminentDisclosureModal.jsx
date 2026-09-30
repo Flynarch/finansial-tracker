@@ -1,4 +1,4 @@
-import { ShieldCheck, Lock, BellRing, Smartphone, ArrowRight } from 'lucide-react'
+import { ShieldCheck, Lock, BellRing, Smartphone, ArrowRight, AlertCircle } from 'lucide-react'
 import Modal from '../ui/Modal'
 import useTranslation from '../../hooks/useTranslation'
 import { triggerHaptic } from '../../lib/haptics'
@@ -96,10 +96,30 @@ export default function ProminentDisclosureModal({ isOpen, onClose, onPermission
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2 border-t border-[var(--border)]/60">
+        {/* Android 13/14+ Restricted Settings Help Banner */}
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2">
+          <div className="flex items-center gap-2 text-amber-500 font-bold text-xs">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{t('notif.disclosure.restrictedSettingsTitle', 'Muncul "Setelan Dibatasi" di Android 13/14+?')}</span>
+          </div>
+          <p className="text-[11px] text-[var(--fg)] leading-relaxed">
+            {t(
+              'notif.disclosure.restrictedSettingsDesc',
+              'Jika tombol izin tidak bisa dinyalakan karena pembatasan Android APK, lakukan langkah berikut:'
+            )}
+          </p>
+          <ol className="text-[11px] text-[var(--muted)] space-y-1 pl-4 list-decimal leading-relaxed">
+            <li>{t('notif.disclosure.step1', 'Buka Info Aplikasi FinTrack di Pengaturan Android.')}</li>
+            <li>{t('notif.disclosure.step2', 'Tekan ikon titik tiga di pojok kanan atas layar.')}</li>
+            <li>{t('notif.disclosure.step3', 'Pilih "Izinkan setelan yang dibatasi" (Allow restricted settings).')}</li>
+            <li>{t('notif.disclosure.step4', 'Buka kembali menu ini dan aktifkan izin Akses Notifikasi.')}</li>
+          </ol>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 pt-2 border-t border-[var(--border)]/60">
           <button
             type="button"
             onClick={onClose}

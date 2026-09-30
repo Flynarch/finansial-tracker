@@ -6,7 +6,7 @@ import { matchCategoryFromDescription, cleanMutationMerchant, maskFinancialAccou
 import { invalidateWalletBalance } from './balanceEngine'
 import { getRememberedCategory, enrichPendingMutationsWithAi } from './ai/merchantCategorizer'
 
-class FinTrackNotificationWeb extends WebPlugin {
+export class FinTrackNotificationWeb extends WebPlugin {
   async isPermissionGranted() {
     return { granted: false }
   }
@@ -30,6 +30,15 @@ class FinTrackNotificationWeb extends WebPlugin {
   }
   async clearQueuedMutations() {
     return { success: true }
+  }
+  async acknowledgeQueuedMutations(options = {}) {
+    return { acknowledgedCount: options?.ids?.length || 0, remainingCount: 0 }
+  }
+  async getCustomPackages() {
+    return { packages: [] }
+  }
+  async updateCustomPackages(options = {}) {
+    return { success: true, count: options?.packages?.length || 0 }
   }
   async getSupportedInstitutions() {
     return { institutions: [] }
@@ -86,7 +95,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 2. Mandiri / Livin / SMS Mandiri
-  if (lowerPkg.includes('mandiri') || /\b(?:62)?83355\b|livin|bank\s*mandiri/i.test(combined) || /^(?:bank\s*)?mandiri\b/i.test(title.trim()) || /^mandiri[:\s]/i.test(text.trim())) {
+  if (lowerPkg.includes('mandiri') || lowerPkg.includes('bmri') || lowerPkg.includes('livin') || /\b(?:62)?83355\b|livin|bank\s*mandiri/i.test(combined) || /^(?:bank\s*)?mandiri\b/i.test(title.trim()) || /^mandiri[:\s]/i.test(text.trim())) {
     // "Pembayaran Berhasil Rp 45.000 di Kopi Kenangan", "Trx Kartu Mandiri berakhir 1234 sebesar IDR 75.000"
     // "Transfer Masuk Rp 500.000", "Kredit Rek. 123456 sebesar IDR 1.000.000"
     const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|diterima)/i.test(combined) && !/(?:trx\s+kartu|debet\s+rek|db\b|keluar|transfer\s+ke|pembayaran)/i.test(combined)
@@ -122,7 +131,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 4. BNI / Wondr / BNI SMS
-  if (((lowerPkg.includes('bni') && !lowerPkg.includes('cimb')) || /\b(?:62)?3300\b|wondr|bank\s*bni/i.test(combined) || /^(?:bank\s*)?bni\b/i.test(title.trim()) || /^bni[:\s]/i.test(text.trim())) && !/cimb/i.test(combined)) {
+  if ((((lowerPkg.includes('bni') || lowerPkg.includes('wondr')) && !lowerPkg.includes('cimb')) || /\b(?:62)?3300\b|wondr|bank\s*bni/i.test(combined) || /^(?:bank\s*)?bni\b/i.test(title.trim()) || /^bni[:\s]/i.test(text.trim())) && !/cimb/i.test(combined)) {
     const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|dikredit)/i.test(combined) && !/(?:debet|db\b|keluar|didebet|kartu\s+kredit|transfer\s+ke|pembayaran)/i.test(combined)
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
@@ -249,7 +258,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 11. Blu by BCA Digital
-  if (lowerPkg.includes('blu') || /blu by bca digital|\bblu\b/i.test(combined)) {
+  if (lowerPkg.includes('blu') || lowerPkg.includes('bcadigital') || /blu by bca digital|\bblu\b/i.test(combined)) {
     const isIncome = /(?:masuk|cr|terima|kredit)/i.test(combined) &&
       !/(?:pembayaran|transfer\s+ke|qris|keluar)/i.test(combined)
     const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
@@ -267,7 +276,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 12. Jenius (BTPN)
-  if (lowerPkg.includes('jenius') || /jenius|btpn/i.test(combined)) {
+  if (lowerPkg.includes('jenius') || lowerPkg.includes('btpn') || /jenius|btpn/i.test(combined)) {
     const isIncome = /(?:uang masuk|masuk|inflow|terima)/i.test(combined) &&
       !/(?:money out|uang keluar|keluar|bayar|transfer\s+ke)/i.test(combined)
     const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
@@ -303,7 +312,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 14. CIMB Niaga (OCTO Mobile / SMS CIMB)
-  if (lowerPkg.includes('cimb') || lowerPkg.includes('octo') || /\b(?:62)?3346\b|octo\s*mobile|cimb\s*niaga|\bcimb\b/i.test(combined)) {
+  if (lowerPkg.includes('cimb') || lowerPkg.includes('octo') || lowerPkg.includes('cimbniaga') || /\b(?:62)?3346\b|octo\s*mobile|cimb\s*niaga|\bcimb\b/i.test(combined)) {
     const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|diterima|dikredit)/i.test(combined) &&
       !/(?:keluar|pembayaran|transfer\s+ke|qris|debit|debet|didebit|kartu\s+kredit)/i.test(combined)
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
@@ -428,6 +437,60 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
     }
   }
 
+  // 21. Bank Saqu
+  if (lowerPkg.includes('banksaqu') || /bank\s*saqu/i.test(combined)) {
+    const isIncome = /(?:masuk|cr\b|terima|kredit|isi saldo)/i.test(combined) &&
+      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
+    if (amtMatch) {
+      const amount = parseAmountFromRegexMatch(amtMatch[1])
+      return {
+        institution: 'Bank Saqu',
+        amount,
+        type: isIncome ? 'income' : 'expense',
+        rawDescription: maskFinancialAccountNumbers(combined),
+        confidence: 0.98,
+        tier: 1,
+      }
+    }
+  }
+
+  // 22. Superbank
+  if (lowerPkg.includes('superbank') || /superbank/i.test(combined)) {
+    const isIncome = /(?:masuk|cr\b|terima|kredit|isi saldo)/i.test(combined) &&
+      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
+    if (amtMatch) {
+      const amount = parseAmountFromRegexMatch(amtMatch[1])
+      return {
+        institution: 'Superbank',
+        amount,
+        type: isIncome ? 'income' : 'expense',
+        rawDescription: maskFinancialAccountNumbers(combined),
+        confidence: 0.98,
+        tier: 1,
+      }
+    }
+  }
+
+  // 23. Allo Bank
+  if (lowerPkg.includes('allobank') || /allo\s*bank/i.test(combined)) {
+    const isIncome = /(?:masuk|cr\b|terima|kredit|top\s*up)/i.test(combined) &&
+      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
+    if (amtMatch) {
+      const amount = parseAmountFromRegexMatch(amtMatch[1])
+      return {
+        institution: 'Allo Bank',
+        amount,
+        type: isIncome ? 'income' : 'expense',
+        rawDescription: maskFinancialAccountNumbers(combined),
+        confidence: 0.98,
+        tier: 1,
+      }
+    }
+  }
+
   return null
 }
 
@@ -436,6 +499,9 @@ export const INSTITUTION_ALIASES = {
   'Mandiri Livin': ['mandiri', 'livin', 'bank mandiri', 'livin by mandiri', '83355', '6283355'],
   BRImo: ['bri', 'brimo', 'bank bri', 'bank rakyat indonesia', 'bri-info', '3355', '623355'],
   BNI: ['bni', 'wondr', 'bank bni', 'bank negara indonesia', '3300', '623300'],
+  'Bank Saqu': ['saqu', 'bank saqu', 'banksaqu'],
+  Superbank: ['superbank', 'super bank'],
+  'Allo Bank': ['allo', 'allobank', 'allo bank'],
   GoPay: ['gopay', 'gojek', 'go-pay', 'pt dompet anak bangsa'],
   OVO: ['ovo', 'ovo cash', 'pt visionet'],
   DANA: ['dana', 'dompet dana', 'pt espay debit indonesia'],
@@ -817,6 +883,8 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
         category: 'transfer',
         notes: `[Pindah Dana] ${fromMutation.institution} -> ${toMutation.institution}`,
         cleanMerchant: `Pindah Dana: ${fromMutation.institution} -> ${toMutation.institution}`,
+        refNumber: fromMutation.refNumber || toMutation.refNumber || undefined,
+        sourceNotifIds: [fromMutation.sourceNotifId, toMutation.sourceNotifId].filter(Boolean),
         isPendingReview:
           !notificationAutoApprove ||
           fromMatch.isAmbiguous ||
@@ -861,42 +929,63 @@ export function parseWithTokenBoundary(title = '', text = '') {
 /**
  * 3-TIER INGESTION PARSER PIPELINE
  */
+/**
+ * Extracts reference number, Order ID, or Transaction ID from banking notification text.
+ */
+export function extractTransactionRef(rawText = '') {
+  if (!rawText) return null
+  const match =
+    rawText.match(
+      /\b(?:(?:no\.?|nomor)\s*ref(?:erensi)?|ref(?:\s*no\.?)?|id\s*transaksi|transaksi\s*id|order\s*id)\s*[:#]\s*([a-zA-Z0-9_.-]+)/i
+    ) ||
+    rawText.match(
+      /\b(?:(?:no\.?|nomor)\s*ref(?:erensi)?|ref(?:\s*no\.?)?|id\s*transaksi|transaksi\s*id|order\s*id)\s+([a-zA-Z0-9_.-]{4,})/i
+    )
+  return match ? match[1].trim() : null
+}
+
 export function parseFinancialNotification(notif = {}) {
-  const { title = '', text = '', packageName = '', timestamp = Date.now() } = notif
+  const { title = '', text = '', packageName = '', timestamp = Date.now(), id = null } = notif
 
   if (!isFinancialMutation(title, text, packageName)) {
     return null
   }
 
+  const rawCombined = `${title} ${text}`.trim()
+  const refNumber = extractTransactionRef(rawCombined)
+
   // Tier 1: Deterministic Bank Regex
   const tier1 = parseWithBankRegex(title, text, packageName)
   if (tier1) {
-    return formatParsedNotification(tier1, timestamp)
+    return formatParsedNotification(tier1, timestamp, id, refNumber)
   }
 
   // Tier 2: Token Boundary Extractor
   const tier2 = parseWithTokenBoundary(title, text)
   if (tier2) {
-    return formatParsedNotification(tier2, timestamp)
+    return formatParsedNotification(tier2, timestamp, id, refNumber)
   }
 
   return null
 }
 
-function formatParsedNotification(parsed, timestamp) {
+function formatParsedNotification(parsed, timestamp, notifId = null, fallbackRef = null) {
   const cleanMerchant = cleanMutationMerchant(parsed.rawDescription)
   const rememberedCategory = getRememberedCategory(cleanMerchant, parsed.type)
   const matchedCategory = rememberedCategory || matchCategoryFromDescription(cleanMerchant, parsed.type)
   const defaultCategory = parsed.type === 'income' ? 'lainnya/umum' : 'lainnya_kategori/umum'
   const category = matchedCategory || defaultCategory
+  const refNumber = parsed.refNumber || fallbackRef || extractTransactionRef(parsed.rawDescription)
 
   return {
     ...parsed,
+    refNumber: refNumber || undefined,
     cleanMerchant,
     category,
     date: format(new Date(timestamp), 'yyyy-MM-dd'),
     createdAt: Number(timestamp) || Date.now(),
     notes: cleanMerchant,
+    sourceNotifId: notifId || parsed.sourceNotifId || undefined,
   }
 }
 
@@ -911,9 +1000,9 @@ export async function syncNotificationQueue(options = {}) {
   }
 
   try {
-    const res = await (FinTrackNotificationPlugin.drainQueuedMutations
-      ? FinTrackNotificationPlugin.drainQueuedMutations()
-      : FinTrackNotificationPlugin.getQueuedMutations())
+    const res = await (FinTrackNotificationPlugin.getQueuedMutations
+      ? FinTrackNotificationPlugin.getQueuedMutations()
+      : FinTrackNotificationPlugin.drainQueuedMutations())
     const queuedItems = res?.mutations || []
 
     if (queuedItems.length === 0) {
@@ -922,6 +1011,7 @@ export async function syncNotificationQueue(options = {}) {
 
     let syncedCount = 0
     let skippedDuplicates = 0
+    const processedIds = new Set()
 
     // Fetch existing transactions from recent 7 days to deduplicate
     const recentDate = format(new Date(Date.now() - 7 * 86400000), 'yyyy-MM-dd')
@@ -938,13 +1028,18 @@ export async function syncNotificationQueue(options = {}) {
 
     for (const notif of queuedItems) {
       const parsed = parseFinancialNotification(notif)
-      if (!parsed || parsed.amount <= 0) continue
+      if (!parsed || parsed.amount <= 0) {
+        if (notif.id) processedIds.add(notif.id)
+        continue
+      }
 
       const merchantKey = (parsed.cleanMerchant || parsed.notes || '').toLowerCase().trim()
       const timeBucket = Math.floor((parsed.createdAt || Date.now()) / (60 * 1000))
-      const batchKey = `${parsed.date}_${parsed.type}_${parsed.amount}_${parsed.institution}_${merchantKey}_${timeBucket}`
+      const refKey = parsed.refNumber ? `_${parsed.refNumber}` : ''
+      const batchKey = `${parsed.date}_${parsed.type}_${parsed.amount}_${parsed.institution}_${merchantKey}_${timeBucket}${refKey}`
       if (seenInBatch.has(batchKey)) {
         skippedDuplicates++
+        if (notif.id) processedIds.add(notif.id)
         continue
       }
 
@@ -956,6 +1051,14 @@ export async function syncNotificationQueue(options = {}) {
           Math.abs(toSafeNumber(existing.amount) - toSafeNumber(parsed.amount)) >= 0.01
         ) {
           return false
+        }
+
+        // If both have explicit reference numbers, use them as definitive discriminator
+        if (parsed.refNumber && existing.refNumber) {
+          if (parsed.refNumber !== existing.refNumber) {
+            return false
+          }
+          return true
         }
 
         const parsedTime = getNotificationTimestamp(parsed.createdAt)
@@ -987,6 +1090,7 @@ export async function syncNotificationQueue(options = {}) {
 
       if (isDuplicate) {
         skippedDuplicates++
+        if (notif.id) processedIds.add(notif.id)
         continue
       }
 
@@ -1002,6 +1106,11 @@ export async function syncNotificationQueue(options = {}) {
     const walletBalanceDeltas = new Map()
 
     for (const item of correlated) {
+      if (item.sourceNotifId) processedIds.add(item.sourceNotifId)
+      if (Array.isArray(item.sourceNotifIds)) {
+        item.sourceNotifIds.forEach((id) => processedIds.add(id))
+      }
+
       if (item.type === 'transfer') {
         toInsert.push(item)
         syncedCount++
@@ -1047,6 +1156,7 @@ export async function syncNotificationQueue(options = {}) {
         isPendingReview: isPendingReview,
         suggestedInstitution: item.institution,
         cleanMerchant: item.cleanMerchant || item.notes || '',
+        refNumber: item.refNumber || undefined,
       })
 
       if (resolvedWalletId && !isPendingReview) {
@@ -1091,9 +1201,17 @@ export async function syncNotificationQueue(options = {}) {
       }
     }
 
-    // Safely fallback to clearing native queue if drainQueuedMutations was not available
-    if (!FinTrackNotificationPlugin.drainQueuedMutations) {
-      await FinTrackNotificationPlugin.clearQueuedMutations?.()
+    // Two-Phase Handshake: Acknowledge processed IDs so native queue removes only successfully processed/filtered items
+    if (processedIds.size > 0 && FinTrackNotificationPlugin.acknowledgeQueuedMutations) {
+      try {
+        await FinTrackNotificationPlugin.acknowledgeQueuedMutations({
+          ids: Array.from(processedIds),
+        })
+      } catch (ackErr) {
+        console.warn('[syncNotificationQueue:acknowledgeQueuedMutations]', ackErr)
+      }
+    } else if (FinTrackNotificationPlugin.clearQueuedMutations) {
+      await FinTrackNotificationPlugin.clearQueuedMutations()
     }
 
     return { syncedCount, skippedDuplicates }
@@ -1266,4 +1384,35 @@ export async function syncHistoricalSms(options = {}) {
     return { syncedCount: 0, skippedDuplicates: 0, error: err.message }
   }
 }
+
+/**
+ * Retrieves custom packages configured in Native SharedPreferences.
+ */
+export async function getWhitelistedPackages() {
+  if (!Capacitor.isNativePlatform() || !FinTrackNotificationPlugin.getCustomPackages) {
+    return { packages: [] }
+  }
+  try {
+    return await FinTrackNotificationPlugin.getCustomPackages()
+  } catch (err) {
+    console.warn('[getWhitelistedPackages]', err)
+    return { packages: [] }
+  }
+}
+
+/**
+ * Updates custom whitelisted packages in Native SharedPreferences.
+ */
+export async function updateCustomPackages(packages = []) {
+  if (!Capacitor.isNativePlatform() || !FinTrackNotificationPlugin.updateCustomPackages) {
+    return { success: true, count: packages.length }
+  }
+  try {
+    return await FinTrackNotificationPlugin.updateCustomPackages({ packages })
+  } catch (err) {
+    console.error('[updateCustomPackages]', err)
+    return { success: false, error: err.message }
+  }
+}
+
 

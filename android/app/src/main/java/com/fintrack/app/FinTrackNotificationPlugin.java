@@ -24,6 +24,7 @@ import android.util.Log;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -44,15 +45,30 @@ public class FinTrackNotificationPlugin extends Plugin {
     private static final String[] KNOWN_FINANCIAL_PACKAGES = {
         "com.bca",
         "com.bca.mybca",
+        "id.co.bcadigital.blu",
+        "com.bca.blu",
+        "id.bmri.livin",
         "id.co.bankmandiri.livin",
         "id.co.bri.brimo",
+        "id.bni.wondr",
         "id.co.bni.wondr",
         "src.bni",
+        "com.btpn.dc",
         "com.btpn.jenius",
+        "id.co.bankbsi.mobile",
+        "com.bsi.mobile",
+        "com.cimbniaga.octomobile",
         "id.co.cimbniaga.octomobile",
+        "com.linecorp.linebank.id",
         "com.seabank.id",
+        "com.jago.digitalBanking",
         "com.jago.bank",
+        "id.co.banksaqu.mobile",
+        "id.co.superbank.app",
+        "com.allobank.allobank",
+        "com.bnc.finance",
         "com.gojek.app",
+        "com.gojek.gopay",
         "com.gopay.wallet",
         "ovo.id",
         "id.dana",
@@ -311,6 +327,103 @@ public class FinTrackNotificationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void acknowledgeQueuedMutations(PluginCall call) {
+        Context context = getContext();
+        JSArray idsArray = call.getArray("ids");
+        if (idsArray == null || idsArray.length() == 0) {
+            JSObject ret = new JSObject();
+            ret.put("acknowledgedCount", 0);
+            call.resolve(ret);
+            return;
+        }
+
+        Set<String> ackIds = new HashSet<>();
+        try {
+            for (int i = 0; i < idsArray.length(); i++) {
+                String id = idsArray.getString(i);
+                if (id != null && !id.isEmpty()) {
+                    ackIds.add(id);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        synchronized (FinTrackNotificationService.QUEUE_LOCK) {
+            try {
+                SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
+                String queueJson = prefs.getString(FinTrackNotificationService.KEY_QUEUE, "[]");
+                JSONArray jsonArray = new JSONArray(queueJson);
+
+                JSONArray remainingArray = new JSONArray();
+                int ackCount = 0;
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject item = jsonArray.getJSONObject(i);
+                    String itemId = item.optString("id");
+                    if (ackIds.contains(itemId)) {
+                        ackCount++;
+                    } else {
+                        remainingArray.put(item);
+                    }
+                }
+
+                prefs.edit().putString(FinTrackNotificationService.KEY_QUEUE, remainingArray.toString()).commit();
+
+                JSObject ret = new JSObject();
+                ret.put("acknowledgedCount", ackCount);
+                ret.put("remainingCount", remainingArray.length());
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Failed to acknowledge queued mutations: " + e.getMessage());
+            }
+        }
+    }
+
+    @PluginMethod
+    public void getCustomPackages(PluginCall call) {
+        Context context = getContext();
+        try {
+            SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
+            String customJson = prefs.getString("custom_whitelisted_packages", "[]");
+            JSONArray arr = new JSONArray(customJson);
+            JSArray res = new JSArray();
+            for (int i = 0; i < arr.length(); i++) {
+                res.put(arr.optString(i));
+            }
+            JSObject ret = new JSObject();
+            ret.put("packages", res);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to get custom packages: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void updateCustomPackages(PluginCall call) {
+        Context context = getContext();
+        JSArray packagesArray = call.getArray("packages");
+        JSONArray toSave = new JSONArray();
+        if (packagesArray != null) {
+            try {
+                for (int i = 0; i < packagesArray.length(); i++) {
+                    String pkg = packagesArray.getString(i);
+                    if (pkg != null && !pkg.trim().isEmpty()) {
+                        toSave.put(pkg.trim().toLowerCase(Locale.ROOT));
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        try {
+            SharedPreferences prefs = FinTrackNotificationService.getEncryptedPreferences(context);
+            prefs.edit().putString("custom_whitelisted_packages", toSave.toString()).commit();
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            ret.put("count", toSave.length());
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to update custom packages: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void getSupportedInstitutions(PluginCall call) {
         Context context = getContext();
         PackageManager pm = context.getPackageManager();
@@ -370,6 +483,25 @@ public class FinTrackNotificationPlugin extends Plugin {
                 }
             }
 
+            String sparklineDates = call.getString("sparklineDatesJson");
+            if (sparklineDates == null || sparklineDates.trim().isEmpty()) {
+                sparklineDates = call.getString("sparklineDates");
+            }
+            if (sparklineDates == null || sparklineDates.trim().isEmpty()) {
+                JSArray datesArr = call.getArray("sparklineDates");
+                sparklineDates = datesArr != null ? datesArr.toString() : "[]";
+            }
+
+            String todayNet = call.getString("todayNet");
+            if (todayNet == null || todayNet.trim().isEmpty()) {
+                todayNet = call.getString("todayNetFormatted", "");
+            }
+            Float todayNetVal = call.getFloat("todayNetVal");
+            if (todayNetVal == null) {
+                Double d = call.getDouble("todayNetVal");
+                todayNetVal = d != null ? d.floatValue() : 0f;
+            }
+
             String btnText = call.getString("btnText", "+ Catat");
             String balanceLabel = call.getString("balanceLabel", "Kekayaan Bersih");
             String dateText = call.getString("dateText");
@@ -394,6 +526,9 @@ public class FinTrackNotificationPlugin extends Plugin {
                 .putString("fintrack_widget_date", dateText)
                 .putString("fintrack_widget_sparkline", sparklineData)
                 .putString("sparklineData", sparklineData)
+                .putString("fintrack_widget_sparkline_dates", sparklineDates)
+                .putString("fintrack_widget_today_net", todayNet)
+                .putFloat("fintrack_widget_today_net_val", todayNetVal != null ? todayNetVal : 0f)
                 .putString("fintrack_widget_btn_text", btnText)
                 .putString("fintrack_widget_balance_label", balanceLabel)
                 .commit();
@@ -404,7 +539,7 @@ public class FinTrackNotificationPlugin extends Plugin {
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
             if (appWidgetIds != null && appWidgetIds.length > 0) {
                 for (int appWidgetId : appWidgetIds) {
-                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, btnText, balanceLabel, dateText);
+                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, sparklineDates, todayNet, todayNetVal != null ? todayNetVal : 0f, btnText, balanceLabel, dateText);
                 }
             }
 

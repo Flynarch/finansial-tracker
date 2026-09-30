@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { format, subDays } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
-import { formatCurrency, isExcludeAnalyticsTx, convertCurrency, FALLBACK_EXCHANGE_RATES } from './utils'
+import { formatCurrency, formatCompactCurrency, isExcludeAnalyticsTx, convertCurrency, FALLBACK_EXCHANGE_RATES } from './utils'
 import { getCachedCurrencyRates } from './api'
 import { FinTrackNotificationPlugin } from './notificationIngestion'
 import { db, computeAllWalletBalances } from './db'
@@ -20,6 +20,9 @@ let syncDebounceTimer = null
  * @param {string} [params.period]
  * @param {string} [params.dateText]
  * @param {number[]} [params.sparklinePoints]
+ * @param {string[]} [params.sparklineDates]
+ * @param {number|null} [params.todayNet]
+ * @param {string|null} [params.todayNetFormatted]
  */
 export async function syncNativeWidgetData({
   totalBalance = 0,
@@ -29,6 +32,9 @@ export async function syncNativeWidgetData({
   period = 'Bulan Ini',
   dateText: customDateText = null,
   sparklinePoints = [],
+  sparklineDates = [],
+  todayNet = null,
+  todayNetFormatted = null,
 } = {}) {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
     return
@@ -57,6 +63,41 @@ export async function syncNativeWidgetData({
     const safePoints = Array.isArray(sparklinePoints) ? sparklinePoints.map((p) => Number(p) || 0) : []
     const sparklineJson = JSON.stringify(safePoints)
 
+    let safeDates = Array.isArray(sparklineDates) ? sparklineDates.map((d) => String(d)) : []
+    if (safeDates.length === 0 && safePoints.length > 0) {
+      const len = safePoints.length
+      safeDates = Array.from({ length: len }, (_, idx) => {
+        const d = subDays(new Date(), len - 1 - idx)
+        return format(d, 'd')
+      })
+    }
+    const sparklineDatesJson = JSON.stringify(safeDates)
+
+    let cleanTodayNetVal = 0
+    let formattedTodayNet = ''
+    if (todayNet != null && !isNaN(Number(todayNet))) {
+      cleanTodayNetVal = Number(todayNet)
+      const absVal = Math.abs(cleanTodayNetVal)
+      const compact = formatCompactCurrency(absVal, defaultCurrency, locale, true)
+      if (cleanTodayNetVal > 0) {
+        formattedTodayNet = `+${compact}`
+      } else if (cleanTodayNetVal < 0) {
+        formattedTodayNet = `-${compact}`
+      } else {
+        formattedTodayNet = formatCurrency(0, defaultCurrency, locale)
+      }
+    } else if (todayNetFormatted) {
+      formattedTodayNet = todayNetFormatted
+      cleanTodayNetVal = safePoints.length > 0 ? safePoints[safePoints.length - 1] : 0
+    } else if (safePoints.length > 0) {
+      cleanTodayNetVal = safePoints[safePoints.length - 1]
+      const absVal = Math.abs(cleanTodayNetVal)
+      const compact = formatCompactCurrency(absVal, defaultCurrency, locale, true)
+      formattedTodayNet = cleanTodayNetVal > 0 ? `+${compact}` : cleanTodayNetVal < 0 ? `-${compact}` : formatCurrency(0, defaultCurrency, locale)
+    } else {
+      formattedTodayNet = formatCurrency(0, defaultCurrency, locale)
+    }
+
     // Fallback in web storage for debugging
     try {
       if (typeof localStorage !== 'undefined') {
@@ -68,6 +109,9 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_date', dateText)
         localStorage.setItem('fintrack_widget_period', effectivePeriod)
         localStorage.setItem('fintrack_widget_sparkline', sparklineJson)
+        localStorage.setItem('fintrack_widget_sparkline_dates', sparklineDatesJson)
+        localStorage.setItem('fintrack_widget_today_net', formattedTodayNet)
+        localStorage.setItem('fintrack_widget_today_net_val', String(cleanTodayNetVal))
         localStorage.setItem('fintrack_widget_btn_text', btnText)
         localStorage.setItem('fintrack_widget_balance_label', balanceLabel)
       }
@@ -92,6 +136,11 @@ export async function syncNativeWidgetData({
       period: effectivePeriod,
       sparklineData: sparklineJson,
       sparklinePoints: safePoints,
+      sparklineDates: safeDates,
+      sparklineDatesJson,
+      todayNet: formattedTodayNet,
+      todayNetFormatted: formattedTodayNet,
+      todayNetVal: cleanTodayNetVal,
       btnText,
       balanceLabel,
     })
@@ -166,11 +215,14 @@ export async function syncNativeWidgetFromDb() {
     // Generate 7-day sparkline trend data & 7-day cash flow metrics
     const now = new Date()
     const sparklinePoints = []
+    const sparklineDates = []
     let sevenDaysIncome = 0
     let sevenDaysExpense = 0
+    let todayNet = 0
     for (let i = 6; i >= 0; i--) {
       const d = subDays(now, i)
       const dStr = format(d, 'yyyy-MM-dd')
+      sparklineDates.push(format(d, 'd'))
       let dayNet = 0
       for (const tx of allTxs) {
         if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || (tx.date || '').slice(0, 10) !== dStr) continue
@@ -213,6 +265,9 @@ export async function syncNativeWidgetFromDb() {
         }
       }
       sparklinePoints.push(dayNet)
+      if (i === 0) {
+        todayNet = dayNet
+      }
     }
 
     const widgetRange = settings.widgetRange || '7d'
@@ -230,6 +285,8 @@ export async function syncNativeWidgetFromDb() {
       defaultCurrency,
       period: effectivePeriod,
       sparklinePoints,
+      sparklineDates,
+      todayNet,
     })
   } catch (err) {
     console.error('[nativeWidgetSync] Failed to sync widget from DB:', err)

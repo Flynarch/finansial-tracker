@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Inbox, ArrowRight } from 'lucide-react'
 import { db } from '../lib/db'
@@ -91,6 +92,7 @@ export default function Dashboard() {
     zoomTooltipDismissed,
     setZoomTooltipDismissed,
     computeRevenueValue,
+    todayStats,
   } = dashboardData
 
   const widgetRange = useSettingsStore((s) => s.widgetRange) || '7d'
@@ -110,6 +112,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     const points = Array.isArray(miniRevenueSeries) ? miniRevenueSeries.map((p) => Number(p.value) || 0) : []
+    const sparklineDates = Array.isArray(miniRevenueSeries)
+      ? miniRevenueSeries.map((p) => {
+          if (p?.time) {
+            const d = new Date(p.time)
+            if (!isNaN(d.getTime())) return format(d, 'd')
+          }
+          return ''
+        })
+      : []
     const isEn = locale === 'en'
     const use7d = miniRevenueRange === '1w' || (widgetRange === '7d' && miniRevenueRange !== '1m')
     const activeIncome = use7d ? (sevenDaysStats?.income ?? 0) : Number(monthIncome) || 0
@@ -125,8 +136,10 @@ export default function Dashboard() {
       defaultCurrency: defaultCurrency || 'IDR',
       period: activePeriod,
       sparklinePoints: points,
+      sparklineDates,
+      todayNet: todayStats?.todayNet ?? 0,
     })
-  }, [netWorth, totalWalletBalance, monthIncome, monthExpense, sevenDaysStats, defaultCurrency, currentMonthLabel, miniRevenueSeries, miniRevenueRange, widgetRange, locale])
+  }, [netWorth, totalWalletBalance, monthIncome, monthExpense, sevenDaysStats, defaultCurrency, currentMonthLabel, miniRevenueSeries, miniRevenueRange, widgetRange, locale, todayStats])
 
   const closeZoom = useCallback(() => {
     if (zoomedChart === 'revenue') {
