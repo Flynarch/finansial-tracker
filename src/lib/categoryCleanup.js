@@ -142,7 +142,8 @@ export async function cascadeDeleteParentCategory(parentId, type = 'expense') {
         await db.transactions.update(tx.id, updateData)
       }
 
-      const budgetsToDelete = await db.budgets
+      // 3. Remap or merge budgets to fallback category to preserve ledger immutability
+      const budgetsToRemap = await db.budgets
         .filter(
           (b) =>
             b.category === parentId ||
@@ -150,8 +151,21 @@ export async function cascadeDeleteParentCategory(parentId, type = 'expense') {
         )
         .toArray()
 
-      if (budgetsToDelete.length > 0) {
-        await db.budgets.bulkDelete(budgetsToDelete.map((b) => b.id))
+      for (const b of budgetsToRemap) {
+        const existingFallback = await db.budgets
+          .where('category')
+          .equals(fallbackPath)
+          .filter((eb) => eb.month === b.month && eb.id !== b.id)
+          .first()
+        if (existingFallback) {
+          await db.budgets.update(existingFallback.id, {
+            limit: (existingFallback.limit || 0) + (b.limit || 0),
+            spent: (existingFallback.spent || 0) + (b.spent || 0),
+          })
+          await db.budgets.delete(b.id)
+        } else {
+          await db.budgets.update(b.id, { category: fallbackPath })
+        }
       }
 
       // Remap matching recurring transactions

@@ -5,6 +5,7 @@ import { getCachedCurrencyRates } from '../../api'
 import { getLocalDateString } from '../../dateUtils'
 import { triggerHaptic } from '../../haptics'
 import { formatCurrency, convertCurrency, roundCurrency } from '../../utils'
+import { createTransaction } from '../../../services/transactionService'
 
 export async function handleSavingsAction(result, {
   locale,
@@ -90,8 +91,9 @@ export async function handleSavingsAction(result, {
           const newCurrent = (matched.currentAmount || 0) + depositAmtInGoalCurrency
           const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
 
-          await db.transaction('rw', [db.transactions, db.goals, db.goalLogs], async () => {
-            const createdTxId = await db.transactions.add({
+          let createdTxId = null
+          await db.transaction('rw', [db.transactions, db.goals, db.goalLogs, db.wallets, db.walletBalanceCache, db.budgets, db.notifications], async () => {
+            createdTxId = await createTransaction({
               date: getLocalDateString(),
               amount: depositAmtInWalletCurrency,
               type: 'expense',
@@ -100,8 +102,6 @@ export async function handleSavingsAction(result, {
               currency: walletCurrency,
               walletId: walletIdNum,
               goalId: matched.id,
-              createdAt: Date.now(),
-              deletedAt: null,
               isExcludeAnalyticsTx: true,
               isExcludeFromAnalytics: true,
               excludeFromAnalytics: true,
@@ -210,8 +210,9 @@ export async function handleSavingsAction(result, {
           const newCurrent = Math.max(0, currentSavings - withdrawAmtInGoalCurrency)
           const logDate = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
 
-          await db.transaction('rw', [db.transactions, db.goals, db.goalLogs], async () => {
-            const createdTxId = await db.transactions.add({
+          let createdTxId = null
+          await db.transaction('rw', [db.transactions, db.goals, db.goalLogs, db.wallets, db.walletBalanceCache, db.budgets, db.notifications], async () => {
+            createdTxId = await createTransaction({
               date: getLocalDateString(),
               amount: withdrawAmtInWalletCurrency,
               type: 'income',
@@ -220,8 +221,6 @@ export async function handleSavingsAction(result, {
               currency: walletCurrency,
               walletId: walletIdNum,
               goalId: matched.id,
-              createdAt: Date.now(),
-              deletedAt: null,
               isExcludeAnalyticsTx: true,
               isExcludeFromAnalytics: true,
               excludeFromAnalytics: true,

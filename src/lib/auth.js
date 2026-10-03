@@ -756,10 +756,24 @@ export async function deleteCurrentAccount() {
 
   if (currentUser) {
     const uid = currentUser.uid
-    // 1. Purge cloud backup data with timeout protection
+
+    if (currentUser?.metadata?.lastSignInTime) {
+      const lastSignIn = new Date(currentUser.metadata.lastSignInTime).getTime()
+      const isRecentLogin = !isNaN(lastSignIn) && Date.now() - lastSignIn < 5 * 60 * 1000
+
+      if (!isRecentLogin) {
+        return {
+          success: false,
+          requiresRecentLogin: true,
+          code: 'auth/requires-recent-login',
+          message: 'Demi keamanan akun, silakan keluar dan masuk kembali sebelum menghapus akun.',
+        }
+      }
+    }
+
+    // Purge cloud backup while currentUser credentials are still valid
     await withTimeout(deleteCloudBackup(uid).catch((err) => console.warn('[auth]', err)), 3500)
 
-    // 2. Delete user from Firebase Auth with timeout protection
     try {
       if (Capacitor.isNativePlatform()) {
         await withTimeout(FirebaseAuthentication.deleteUser().catch((err) => console.warn('[auth]', err)), 3000)
@@ -774,7 +788,6 @@ export async function deleteCurrentAccount() {
           message: formatAuthError(error, 'Demi keamanan akun, silakan keluar dan masuk kembali sebelum menghapus akun.'),
         }
       }
-      // If error is other than requires-recent-login (e.g. user already deleted), proceed with local cleanup
       console.warn('Firebase deleteUser warning:', error)
     }
   }

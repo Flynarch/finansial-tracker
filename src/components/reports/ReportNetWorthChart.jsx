@@ -91,6 +91,8 @@ export default function ReportNetWorthChart({
               <Tooltip
                 content={<ChartTooltip currency={defaultCurrency} />}
                 cursor={CHART_TOOLTIP_CURSOR}
+                allowEscapeViewBox={{ x: false, y: false }}
+                wrapperStyle={{ pointerEvents: 'none', zIndex: 50 }}
               />
               <Area
                 type="monotone"
@@ -99,6 +101,7 @@ export default function ReportNetWorthChart({
                 stroke="var(--accent)"
                 fill="url(#netWorthFillGrad)"
                 strokeWidth={3}
+                dot={netWorthTrend?.length === 1 ? { r: 5, fill: 'var(--accent)', stroke: 'var(--panel-strong)', strokeWidth: 2 } : false}
                 activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--panel-strong)', strokeWidth: 2 }}
               />
             </AreaChart>

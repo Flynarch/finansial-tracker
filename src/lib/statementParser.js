@@ -1,5 +1,5 @@
 import { format, isValid } from 'date-fns'
-import { toSafeNumber } from './utils'
+import { toSafeNumber, parseMoneyInput } from './utils'
 import { cleanMutationMerchant, matchCategoryFromDescription } from './merchantUtils'
 import { getRememberedCategory } from './ai/merchantCategorizer'
 
@@ -138,8 +138,8 @@ export function parseBcaStatementLines(lines = [], defaultYear = new Date().getF
   const transactions = []
   let currentTx = null
 
-  // Pattern: DD/MM (e.g. "05/08" or "28/08")
-  const dateRowRegex = /^(\d{2}\/\d{2})\s+(.+)$/
+  // Pattern: DD/MM, DD-MM, DD/MM/YYYY, DD/MM/YY, DD-MM-YYYY, DD-MM-YY
+  const dateRowRegex = /^(\d{2}[/-]\d{2}(?:[/-]\d{2,4})?)\s+(.+)$/
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
@@ -159,20 +159,47 @@ export function parseBcaStatementLines(lines = [], defaultYear = new Date().getF
 
     const match = line.match(dateRowRegex)
     if (match) {
+      const rawDateStr = match[1]
+      const restOfLine = match[2]
+
+      // Format ISO Date: YYYY-MM-DD
+      const parts = rawDateStr.split(/[/-]/)
+      const d = parts[0]
+      const m = parts[1]
+
+      const dayNum = Number(d)
+      const monthNum = Number(m)
+
+      // Guard: day must be 1..31, month must be 1..12
+      // If numbers are out of range (e.g. description starts with code like 45/12),
+      // treat as continuation line instead of a new date row.
+      if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+        if (currentTx && !line.startsWith('BERSAMBUNG')) {
+          currentTx.rawDescription += ' ' + line
+        }
+        continue
+      }
+
       // If there was a pending transaction, flush it
       if (currentTx) {
         transactions.push(finalizeParsedTx(currentTx))
       }
 
-      const rawDateStr = match[1] // "05/08"
-      const restOfLine = match[2]
+      let txYear
+      if (parts[2]) {
+        const rawY = Number(parts[2])
+        txYear = rawY < 100 ? 2000 + rawY : rawY
+      } else {
+        const txMonth = Number(m)
+        const currentMonth = new Date().getMonth() + 1
+        txYear = txMonth > currentMonth ? defaultYear - 1 : defaultYear
+      }
 
-      // Format ISO Date: YYYY-MM-DD
-      const [d, m] = rawDateStr.split('/')
-      const isoDate = `${defaultYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      const isoDate = `${txYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 
       // Check DB / CR indicator and Amount in restOfLine
       // Example restOfLine: "TRSF E-BANKING DB 2808/FTSCY 50,000.00 1,250,000.00"
+      // or Indonesian format: "TRSF E-BANKING DB 2808/FTSCY 50.000,00 1.250.000,00"
       let type = 'expense'
       if (/\bCR\b/i.test(restOfLine) || /\b(bunga|setoran|transfer masuk)\b/i.test(restOfLine)) {
         type = 'income'
@@ -180,20 +207,20 @@ export function parseBcaStatementLines(lines = [], defaultYear = new Date().getF
 
       // First clean reference numbers from line before extracting numbers
       const sanitizedLine = restOfLine.replace(/\b\d{2,4}\/[A-Z0-9_\-/]+\b/gi, '')
-      const numMatches = Array.from(sanitizedLine.matchAll(/([\d,]+\.\d{2})/g)).map((m) => m[0])
+      const moneyPattern = /\b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?\b|\b\d+(?:[.,]\d{2})\b/g
+      const numMatches = Array.from(sanitizedLine.matchAll(moneyPattern)).map((m) => m[0])
       let amount = 0
       if (numMatches.length >= 1) {
-        const rawAmtStr = numMatches[0].replace(/,/g, '')
-        amount = toSafeNumber(rawAmtStr)
+        amount = parseMoneyInput(numMatches[0], 'IDR')
       } else {
-        const generalNums = Array.from(sanitizedLine.matchAll(/([\d,]+)/g)).map((m) => m[0])
+        const generalNums = Array.from(sanitizedLine.matchAll(/([\d,.]+)/g)).map((m) => m[0])
         if (generalNums.length >= 1) {
-          amount = toSafeNumber(generalNums[0].replace(/,/g, ''))
+          amount = parseMoneyInput(generalNums[0], 'IDR')
         }
       }
 
       // Extract raw description by removing numbers
-      let desc = sanitizedLine.replace(/([\d,]+\.\d{2})/g, '').replace(/\b(DB|CR)\b/g, '').trim()
+      let desc = sanitizedLine.replace(moneyPattern, '').replace(/\b(DB|CR)\b/g, '').trim()
 
       currentTx = {
         date: isoDate,
@@ -221,40 +248,76 @@ export function parseBcaStatementLines(lines = [], defaultYear = new Date().getF
  * Parses generic CSV rows using interactive column mappings.
  */
 export function parseGenericCsvRows(rows = [], mapping = {}) {
-  const { dateCol, descCol, amountCol, typeCol, incomeIndicator = 'CR' } = mapping
+  const { dateCol, descCol, amountCol, debitCol, creditCol, typeCol, incomeIndicator = 'CR' } = mapping
   const transactions = []
 
   rows.forEach((row) => {
     const rawDate = row[dateCol]
     const rawDesc = row[descCol]
-    const rawAmt = row[amountCol]
     const rawType = row[typeCol]
 
-    if (!rawDate && !rawAmt) return
-
-    let amount = toSafeNumber(String(rawAmt || '').replace(/[^0-9.-]+/g, ''))
-    if (amount <= 0) return
-
+    let amount = 0
     let type = 'expense'
-    if (rawType) {
-      const typeStr = String(rawType).trim().toUpperCase()
-      if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR') {
+
+    if (debitCol || creditCol) {
+      const debitAmt = debitCol && row[debitCol] ? Math.abs(parseMoneyInput(row[debitCol], 'IDR')) : 0
+      const creditAmt = creditCol && row[creditCol] ? Math.abs(parseMoneyInput(row[creditCol], 'IDR')) : 0
+      if (creditAmt > 0) {
+        amount = creditAmt
         type = 'income'
+      } else if (debitAmt > 0) {
+        amount = debitAmt
+        type = 'expense'
+      } else if (amountCol && row[amountCol]) {
+        const parsedAmt = parseMoneyInput(row[amountCol], 'IDR')
+        if (parsedAmt < 0) {
+          amount = Math.abs(parsedAmt)
+          type = 'expense'
+        } else {
+          amount = parsedAmt
+          if (rawType) {
+            const typeStr = String(rawType).trim().toUpperCase()
+            if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR') {
+              type = 'income'
+            }
+          }
+        }
+      }
+    } else if (amountCol && row[amountCol]) {
+      const parsedAmt = parseMoneyInput(row[amountCol], 'IDR')
+      if (parsedAmt < 0) {
+        amount = Math.abs(parsedAmt)
+        type = 'expense'
+      } else {
+        amount = parsedAmt
+        if (rawType) {
+          const typeStr = String(rawType).trim().toUpperCase()
+          if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR') {
+            type = 'income'
+          }
+        }
       }
     }
 
-    // Date normalization
+    if (amount <= 0) return
+    if (!rawDate && !rawDesc) return
+    if (rawDesc && /^(total|saldo awal|saldo akhir|grand total|subtotal)\b/i.test(String(rawDesc).trim())) return
+
+    // Date normalization (timezone-safe without UTC midnight shift)
     let isoDate = format(new Date(), 'yyyy-MM-dd')
     try {
       const trimmedDate = String(rawDate || '').trim()
-      const ddmmyyyyMatch = trimmedDate.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
-      if (ddmmyyyyMatch) {
-        const [, d, m, y] = ddmmyyyyMatch
-        const constructedDate = new Date(Number(y), Number(m) - 1, Number(d))
-        if (isValid(constructedDate)) {
-          isoDate = format(constructedDate, 'yyyy-MM-dd')
-        }
-      } else {
+      const ymdMatch = trimmedDate.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/)
+      const dmyMatch = trimmedDate.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+
+      if (ymdMatch) {
+        const [, y, m, d] = ymdMatch
+        isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      } else if (dmyMatch) {
+        const [, d, m, y] = dmyMatch
+        const fullY = y.length === 2 ? 2000 + Number(y) : Number(y)
+        isoDate = `${fullY}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      } else if (trimmedDate) {
         const parsed = new Date(trimmedDate)
         if (isValid(parsed)) {
           isoDate = format(parsed, 'yyyy-MM-dd')
@@ -295,9 +358,19 @@ function finalizeParsedTx(tx) {
  * Deduplication Matcher: Compares parsed mutations against existing transactions.
  * Calculates similarity based on (Date + Amount + Type + Description Similarity >= 85%).
  */
-export function detectDuplicateTransactions(parsedTransactions = [], existingTransactions = []) {
+export function detectDuplicateTransactions(parsedTransactions = [], existingTransactions = [], selectedWalletId = null) {
   return parsedTransactions.map((parsed) => {
     const matchingCandidate = existingTransactions.find((existing) => {
+      // Ignore soft-deleted transactions
+      if (existing.deletedAt) {
+        return false
+      }
+
+      // Filter by wallet if selectedWalletId is provided
+      if (selectedWalletId && Number(existing.walletId) !== Number(selectedWalletId)) {
+        return false
+      }
+
       // 1. Exact Date & Type Match
       if (existing.date !== parsed.date || existing.type !== parsed.type) {
         return false
@@ -311,14 +384,11 @@ export function detectDuplicateTransactions(parsedTransactions = [], existingTra
       }
 
       // 3. Text Similarity Check
-      const textA = (existing.notes || existing.category || '').toLowerCase().trim()
-      const textB = (parsed.cleanMerchant || parsed.rawDescription || '').toLowerCase().trim()
+      const descA = (existing.cleanMerchant || existing.notes || existing.category || '').toLowerCase().trim()
+      const descB = (parsed.cleanMerchant || parsed.rawDescription || parsed.notes || '').toLowerCase().trim()
 
-      if (textA === textB || textA.includes(textB) || textB.includes(textA)) {
-        return true
-      }
-
-      return false
+      const hasTextMatch = Boolean(descA && descB && (descA === descB || descA.includes(descB) || descB.includes(descA)))
+      return hasTextMatch
     })
 
     if (matchingCandidate) {
@@ -333,7 +403,8 @@ export function detectDuplicateTransactions(parsedTransactions = [], existingTra
     return {
       ...parsed,
       isDuplicate: false,
-      selected: true,
+      selected: parsed.isDuplicate ? true : (parsed.selected !== undefined ? parsed.selected : true),
+      duplicateMatch: null,
     }
   })
 }

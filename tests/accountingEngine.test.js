@@ -109,6 +109,39 @@ describe('accountingEngine', () => {
     expect(cf.netChangeInCash).toBe(-1000000)
   })
 
+  it('excludes pending review transactions in filterTransactionsByDateRange', () => {
+    const txs = [
+      { id: 1, date: '2026-08-01', amount: 100000, isPendingReview: true },
+      { id: 2, date: '2026-08-02', amount: 200000, isPendingReview: 1 },
+      { id: 3, date: '2026-08-03', amount: 300000, isPendingReview: false },
+      { id: 4, date: '2026-08-04', amount: 400000 },
+    ]
+    const withoutRange = filterTransactionsByDateRange(txs)
+    expect(withoutRange.length).toBe(2)
+    expect(withoutRange.map((t) => t.id)).toEqual([3, 4])
+
+    const withIsoRange = filterTransactionsByDateRange(txs, '2026-08-01', '2026-08-31')
+    expect(withIsoRange.length).toBe(2)
+    expect(withIsoRange.map((t) => t.id)).toEqual([3, 4])
+
+    const withCustomRange = filterTransactionsByDateRange(txs, '2026-08-01 00:00', '2026-08-31 23:59')
+    expect(withCustomRange.length).toBe(2)
+    expect(withCustomRange.map((t) => t.id)).toEqual([3, 4])
+  })
+
+  it('excludes excluded and non-analytic transactions from investing and financing activities in Cash Flow Statement', () => {
+    const txs = [
+      { id: 1, type: 'expense', category: 'investasi/saham', amount: 5000000, date: '2026-08-10', isExcluded: true },
+      { id: 2, type: 'expense', category: 'pinjaman/cicilan', amount: 2000000, date: '2026-08-11', isExcludeAnalyticsTx: true },
+      { id: 3, type: 'expense', category: 'makanMinum/restoran', amount: 100000, date: '2026-08-12' },
+    ]
+    const cf = generateCashFlowStatement(txs, { defaultCurrency: 'IDR' })
+    expect(cf.investingActivities.outflow).toBe(0)
+    expect(cf.financingActivities.outflow).toBe(0)
+    expect(cf.operatingActivities.outflow).toBe(100000)
+    expect(cf.netChangeInCash).toBe(-100000)
+  })
+
   it('computes SHA-256 digital checksum deterministically', async () => {
     const checksum1 = await calculateSha256Checksum('FINTRACK-VERIFY-123')
     const checksum2 = await calculateSha256Checksum('FINTRACK-VERIFY-123')

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Edit2, Check, ChevronRight } from 'lucide-react'
+import { ChevronLeft, Edit2, Check, ChevronRight, AlertCircle } from 'lucide-react'
 import { createWallet } from '../../services/walletService'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -32,6 +32,7 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
   const [isEditingName, setIsEditingName] = useState(!institution)
   const [currency, setCurrency] = useState(initialCurrency)
   const [isSelectingCurrency, setIsSelectingCurrency] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const balanceInputRef = useRef(null)
 
   const [displayBalance, setDisplayBalance] = useState('')
@@ -60,8 +61,17 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
     e.preventDefault()
     if (!isFormValid) return
 
+    const cleanName = String(name || '').trim()
+    const duplicate = await db.wallets
+      .filter((w) => !w.isArchived && w.name.trim().toLowerCase() === cleanName.toLowerCase())
+      .first()
+    if (duplicate) {
+      setErrorMsg(t('wallets.duplicateName', 'Nama dompet sudah digunakan.'))
+      return
+    }
+
     const newId = await createWallet({
-      name,
+      name: cleanName,
       institutionType: institution ? institution.type : 'lainnya',
       logoUrl: isCashInstitution ? null : institution ? institution.logoUrl : null,
       customIcon: isCashInstitution ? 'dollar' : institution ? institution.customIcon : null,
@@ -167,7 +177,10 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value)
+                        if (errorMsg) setErrorMsg('')
+                      }}
                       className="bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] rounded-xl px-3 py-1.5 text-base font-black text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--ring)] w-full transition"
                       autoFocus
                       onBlur={() => setIsEditingName(false)}
@@ -294,7 +307,13 @@ export default function AddAccountForm({ institution, onBack, onSuccess }) {
 
       {/* ── Bottom Fixed Action Button ─────────────────────────────────── */}
       <div className="p-4 bg-[var(--panel-strong)] border-t border-[var(--border)] mt-auto sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg">
-        <div className="max-w-xl mx-auto w-full">
+        <div className="max-w-xl mx-auto w-full space-y-3">
+          {errorMsg && (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
           <button
             type="submit"
             onClick={handleSubmit}

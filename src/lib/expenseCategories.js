@@ -316,6 +316,14 @@ export function addExpenseParentCategory(nameId, nameEn, colorKey, iconKey) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
+  const tree = getMergedExpenseTree()
+  const exists = tree.some((p) => {
+    const pIdName = (p.names?.id || p.id || '').trim().toLowerCase()
+    const pEnName = (p.names?.en || p.id || '').trim().toLowerCase()
+    return pIdName === trimmed.toLowerCase() || pEnName === en.toLowerCase()
+  })
+  if (exists) return null
+
   const custom = loadCustom()
   const id = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   custom.parents.push({ id, names: { id: trimmed, en }, children: [] })
@@ -328,6 +336,16 @@ export function addExpenseParentCategory(nameId, nameEn, colorKey, iconKey) {
 export function removeExpenseParentCategory(parentId) {
   const custom = loadCustom()
   custom.parents = custom.parents.filter((p) => p.id !== parentId)
+  delete custom.colors[parentId]
+  delete custom.icons[parentId]
+  delete custom.extras[parentId]
+  delete custom.hidden[parentId]
+  delete custom.names[parentId]
+  if (custom.names) {
+    Object.keys(custom.names).forEach((k) => {
+      if (k.startsWith(`${parentId}/`)) delete custom.names[k]
+    })
+  }
   saveCustom(custom)
 }
 
@@ -340,6 +358,17 @@ export function addExpenseSubcategory(parentId, nameId, nameEn) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
+  const tree = getMergedExpenseTree()
+  const parent = tree.find((p) => p.id === parentId)
+  if (parent?.children) {
+    const exists = parent.children.some((c) => {
+      const cIdName = (c.names?.id || c.id || '').trim().toLowerCase()
+      const cEnName = (c.names?.en || c.id || '').trim().toLowerCase()
+      return cIdName === trimmed.toLowerCase() || cEnName === en.toLowerCase()
+    })
+    if (exists) return null
+  }
+
   const custom = loadCustom()
   if (!custom.extras[parentId]) custom.extras[parentId] = []
   const id = `x_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`

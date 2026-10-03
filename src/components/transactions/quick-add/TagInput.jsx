@@ -37,7 +37,7 @@ export default function TagInput({
               <button
                 type="button"
                 onClick={() => onRemoveTag(tag)}
-                className="text-[var(--muted)] hover:text-rose-500 transition-colors cursor-pointer"
+                className="text-[var(--muted)] hover:text-rose-500 transition-colors cursor-pointer min-h-[44px] min-w-[44px] -my-3 -mr-1.5 flex items-center justify-center"
                 aria-label={t('common.delete', 'Hapus')}
               >
                 <X className="w-3 h-3" />
@@ -54,13 +54,13 @@ export default function TagInput({
           onChange={(e) => onChangeTagInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('tx.tagsPlaceholder', 'Tambah label (contoh: liburan, kantor)...')}
-          className="flex-1 bg-[var(--field-bg)] rounded-xl py-2 px-3 text-xs font-semibold text-[var(--fg)] outline-none border border-[var(--field-border,var(--border))] hover:border-[var(--field-border-hover,var(--border-strong))] focus:border-[var(--accent)] transition-colors"
+          className="flex-1 min-h-[44px] bg-[var(--field-bg)] rounded-xl py-2 px-3 text-xs font-semibold text-[var(--fg)] outline-none border border-[var(--field-border,var(--border))] hover:border-[var(--field-border-hover,var(--border-strong))] focus:border-[var(--accent)] transition-colors"
         />
         <button
           type="button"
           onClick={onAddTag}
           disabled={!tagInput.trim()}
-          className="px-3 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-xs font-bold text-[var(--fg)] hover:border-[var(--field-border-hover,var(--border-strong))] hover:bg-[var(--panel)] disabled:opacity-40 cursor-pointer transition-all active:scale-95"
+          className="px-3.5 min-h-[44px] rounded-xl bg-[var(--field-bg)] border border-[var(--field-border,var(--border))] text-xs font-bold text-[var(--fg)] hover:border-[var(--field-border-hover,var(--border-strong))] hover:bg-[var(--panel)] disabled:opacity-40 cursor-pointer transition-all active:scale-95 flex items-center justify-center"
         >
           + Tag
         </button>

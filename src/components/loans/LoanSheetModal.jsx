@@ -168,7 +168,10 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
     const annualRateNum = form.interestRate ? parseFloat(form.interestRate) : 0
     const tenorNum = form.tenorMonths ? parseInt(form.tenorMonths, 10) : 0
     const isAmortized = annualRateNum > 0 && tenorNum > 0 && previewMonthlyPayment > 0
-    const totalRepayment = isAmortized ? previewMonthlyPayment * tenorNum : total
+    let totalRepayment = isAmortized ? previewMonthlyPayment * tenorNum : total
+    if (editingLoan && !isAmortized && editingLoan.totalAmount > total && !form.interestRate && !form.tenorMonths) {
+      totalRepayment = editingLoan.totalAmount
+    }
     const effectivePrincipal = total
 
     if (editingLoan) {

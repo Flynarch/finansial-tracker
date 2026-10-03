@@ -42,7 +42,9 @@ export function cleanMutationMerchant(rawText = '') {
       // Strip leading timestamps e.g. '27/09 18:30 ' or '27/09 ' or '27/09/2026 18:30:00 '
       .replace(/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s+\d{2}:\d{2}(?::\d{2})?)?\s*[-:]?\s*/i, '')
       // Strip bank notification & SMS headers
-      .replace(/^(?:m-bca|mybca|bank\s*bca|bca|livin(?:\s*by\s*mandiri)?|bank\s*mandiri|mandiri|wondr(?:\s*by\s*bni)?|bank\s*bni|bni|brimo|bank\s*bri|bri(?:-info)?|bsi\s*mobile|bank\s*syariah\s*indonesia|bsi|octo\s*mobile|octo\s*card|cimb\s*niaga|cimb|line\s*bank|seabank|bank\s*jago|blu|jenius|permatabank|permata|danamon|bank\s*mega|mega|citibank|hsbc|dana|ovo|gopay|shopeepay)\s*[-:]?\s*/i, '')
+      .replace(/^(?:m-bca|mybca|bank\s*bca|bca|livin(?:\s*by\s*mandiri)?|bank\s*mandiri|mandiri|wondr(?:\s*by\s*bni)?|bank\s*bni|bni|brimo|bank\s*bri|bri(?:-info)?\b|bsi\s*mobile|bank\s*syariah\s*indonesia|bsi|octo\s*mobile|octo\s*card|cimb\s*niaga|cimb|line\s*bank|seabank|bank\s*jago|blu|jenius|permatabank|permata|danamon|bank\s*mega|mega|citibank|hsbc|dana|ovo|gopay|shopeepay)\s*[-:]?\s*/i, '')
+      .replace(/^(?:briva|bca\s*va|bni\s*va|mandiri\s*va|permata\s*va|va|virtual\s*account)\s*[-:]?\s*(?:\d+)?\s*[-:]?\s*/i, '')
+      .replace(/^(?:trsf|transfer|trf)\s+(?:e-banking\s+)?(?:db|cr|ke\s+rek\s*\d*|dari\s+rek\s*\d*|masuk|keluar)?\s*[-:]?\s*/i, '')
       .replace(/^d-bca\s+(?:db|cr)\s+/i, '')
       .replace(/^m-bca:\s*\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+/i, '')
       .replace(/^(?:sms\s+)?notifikasi\s*(?:debet|kredit|transaksi)?\s*[-:]?\s*/i, '')
@@ -61,8 +63,8 @@ export function cleanMutationMerchant(rawText = '') {
     .replace(/^BIAYA\s+ADM(IN)?\s*/i, 'Biaya Admin ')
     .replace(/^SWITCHING\s+(DB|CR)/i, '')
     .replace(/^BI-FAST\s+(DB|CR)/i, '')
-    .replace(/^QRIS\s+(PEMBAYARAN|PURCHASE)/i, '')
-    .replace(/^PEMBAYARAN\s+(QRIS|TAGIHAN)?\s*/i, '')
+    .replace(/^QRIS\s+(?:MPM|CPM|PEMBAYARAN|PURCHASE)?\s*/i, '')
+    .replace(/^PEMBAYARAN\s+(?:QRIS|TAGIHAN|VA)?\s*(?:\d+)?\s*/i, '')
     .replace(/^TOP\s*UP\s+(SALDO\s+)?/i, 'Top Up ')
     .replace(/^ISI\s+SALDO\s+/i, 'Isi Saldo ')
     .replace(/^M-BCA\s+/i, '')
@@ -86,6 +88,8 @@ export function cleanMutationMerchant(rawText = '') {
     .replace(/\b\d{2}:\d{2}(?::\d{2})?\b/g, '')
     // Remove embedded currency amounts like "Rp 45.000" or "Rp35.000" or "sebesar Rp 100.000"
     .replace(/(?:sebesar\s+)?(?:rp|idr)\.?\s*[\d.,]+/gi, ' ')
+    // Remove standalone Indonesian thousands amounts without prefix e.g. " 100.000 "
+    .replace(/\b\d{1,3}(?:\.\d{3})+(?:,\d{2})?\b/g, ' ')
     // Remove masked account numbers (e.g. ****7890 or ****-****-****-1234)
     .replace(/\*{2,}[-\s]?\d+/g, '')
     .replace(/\b\*{4,}\b/g, '')

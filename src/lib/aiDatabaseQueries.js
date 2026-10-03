@@ -21,17 +21,17 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
 
   let collection
   if (startDate && endDate) {
-    collection = db.transactions.where('date').between(startDate, endDate, true, true)
+    collection = db.transactions.where('date').between(startDate, `${endDate}\uffff`, true, true)
   } else if (startDate) {
     collection = db.transactions.where('date').aboveOrEqual(startDate)
   } else if (endDate) {
-    collection = db.transactions.where('date').belowOrEqual(endDate)
+    collection = db.transactions.where('date').belowOrEqual(`${endDate}\uffff`)
   } else {
     collection = db.transactions.orderBy('date')
   }
 
   let allRawTxs = await collection.toArray()
-  let rawTxs = allRawTxs.filter((tx) => !tx.deletedAt)
+  let rawTxs = allRawTxs.filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
 
   // Sort chronologically ascending
   rawTxs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
@@ -135,9 +135,9 @@ export async function getMonthSummaryForPrompt() {
 
     const rawAllTxs = await db.transactions
       .where('date')
-      .between(prevPeriod.startDate, currentPeriod.endDate, true, true)
+      .between(prevPeriod.startDate, `${currentPeriod.endDate}\uffff`, true, true)
       .toArray()
-    const allTxs = (rawAllTxs || []).filter((tx) => !tx.deletedAt)
+    const allTxs = (rawAllTxs || []).filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
 
     const currentMonthTxs = []
     const prevMonthTxs = []
@@ -217,9 +217,12 @@ export async function getMonthSummaryForPrompt() {
     // Comparisons
     const expenseDiff = currentExpense - prevExpense
     const expensePct = prevExpense > 0 ? Math.round((expenseDiff / prevExpense) * 100) : null
-    const expenseDiffStr = expensePct !== null
-      ? `${expenseDiff >= 0 ? '+' : ''}${formatCurrency(expenseDiff, defaultCurrency)} (${expenseDiff >= 0 ? '+' : ''}${expensePct}%)`
-      : 'Bulan lalu belum ada data'
+    const isEarlyMonth = now.getDate() <= 3
+    const expenseDiffStr = isEarlyMonth
+      ? `Awal bulan berjalan (hari ke-${now.getDate()}), perbandingan tren belanja belum stabil: ${expenseDiff >= 0 ? '+' : ''}${formatCurrency(expenseDiff, defaultCurrency)} vs bulan lalu`
+      : expensePct !== null
+        ? `${expenseDiff >= 0 ? '+' : ''}${formatCurrency(expenseDiff, defaultCurrency)} (${expenseDiff >= 0 ? '+' : ''}${expensePct}%)`
+        : 'Bulan lalu belum ada data'
 
     // Loans / Debts
     const loans = await db.loans.toArray().catch(() => [])

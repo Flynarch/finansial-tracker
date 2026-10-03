@@ -54,6 +54,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [isForgiveOpen, setIsForgiveOpen] = useState(false)
   const [isExcessCategoryModalOpen, setIsExcessCategoryModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const allWallets = useLiveQuery(
     () => {
@@ -131,6 +132,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   }
 
   const handleSave = async () => {
+    if (isSubmitting) return
     const payAmt = parseMoneyInput(amount, currency)
     if (payAmt <= 0) {
       hapticWarning()
@@ -138,6 +140,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       return
     }
 
+    setIsSubmitting(true)
     try {
       const targetWalletId = paymentWalletId || loan?.walletId || (defaultWalletId ? String(defaultWalletId) : null)
       await recordPayment(
@@ -156,6 +159,8 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       console.warn('[LoanPaymentModal]', err)
       hapticWarning()
       setSheetError(err.message || t('loans.payment.saveFailed', 'Gagal mencatat pembayaran. Silakan coba lagi.'))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -506,6 +511,10 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
                     <span className="font-black tabular-nums text-purple-500 shrink-0 text-[11px] bg-purple-500/10 px-1.5 py-0.5 rounded-lg border border-purple-500/20">
                       {formatCurrency(log.amount, currency)}
                     </span>
+                  ) : loan?.type === 'debt' ? (
+                    <span className="font-extrabold tabular-nums text-rose-500 shrink-0">
+                      -{formatCurrency(log.amount, currency)}
+                    </span>
                   ) : (
                     <span className="font-extrabold tabular-nums text-emerald-500 shrink-0">
                       +{formatCurrency(log.amount, currency)}
@@ -543,6 +552,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
           <Button
             type="button"
             onClick={handleSave}
+            disabled={isSubmitting}
             className={isDebt ? '!bg-rose-500 hover:!bg-rose-600 !text-white' : '!bg-emerald-500 hover:!bg-emerald-600 !text-white'}
           >
             {isOverpayment

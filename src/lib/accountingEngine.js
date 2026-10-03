@@ -34,13 +34,20 @@ export async function calculateSha256Checksum(input) {
  */
 export function filterTransactionsByDateRange(transactions = [], startDate, endDate) {
   if (!Array.isArray(transactions)) return []
-  if (!startDate && !endDate) return transactions.filter((tx) => tx && !tx.deletedAt)
+  if (!startDate && !endDate) {
+    return transactions.filter((tx) => {
+      if (!tx || tx.deletedAt) return false
+      if (tx.isPendingReview === true || tx.isPendingReview === 1) return false
+      return true
+    })
+  }
 
   const hasIsoRange = (!startDate || startDate.length === 10) && (!endDate || endDate.length === 10)
 
   if (hasIsoRange) {
     return transactions.filter((tx) => {
       if (!tx || !tx.date || tx.deletedAt) return false
+      if (tx.isPendingReview === true || tx.isPendingReview === 1) return false
       const dateKey = String(tx.date).slice(0, 10)
       if (startDate && dateKey < startDate) return false
       if (endDate && dateKey > endDate) return false
@@ -48,11 +55,25 @@ export function filterTransactionsByDateRange(transactions = [], startDate, endD
     })
   }
 
-  const start = startDate ? new Date(startDate + 'T00:00:00') : new Date('1970-01-01')
-  const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2099-12-31')
+  const parseRangeBoundary = (val, isEnd = false) => {
+    if (!val) return isEnd ? new Date('2099-12-31T23:59:59') : new Date('1970-01-01T00:00:00')
+    if (val instanceof Date) return val
+    const str = String(val).trim()
+    if (str.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return new Date(str + (isEnd ? 'T23:59:59' : 'T00:00:00'))
+    }
+    const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str
+    const parsed = new Date(normalized)
+    if (!isNaN(parsed.getTime())) return parsed
+    return new Date(str)
+  }
+
+  const start = parseRangeBoundary(startDate, false)
+  const end = parseRangeBoundary(endDate, true)
 
   return transactions.filter((tx) => {
     if (!tx || !tx.date || tx.deletedAt) return false
+    if (tx.isPendingReview === true || tx.isPendingReview === 1) return false
     try {
       const txDate = new Date(tx.date.length === 10 ? tx.date + 'T12:00:00' : tx.date)
       return txDate >= start && txDate <= end
@@ -288,7 +309,7 @@ export function generateBalanceSheet(
   const savingsItems = []
   let totalSavings = 0
 
-  savingsGoals.forEach((goal) => {
+  savingsGoals.filter((g) => !g.isArchived).forEach((goal) => {
     if (goal.createdAt) {
       const createdDate = format(new Date(goal.createdAt), 'yyyy-MM-dd')
       if (createdDate > asOfDate) return
@@ -514,6 +535,14 @@ export function generateCashFlowStatement(
             isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
             excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
           }
+          const isExplicitExcluded = Boolean(
+            si.isExcluded ||
+            si.isExcludeAnalyticsTx ||
+            si.isExcludeFromAnalytics ||
+            si.excludeFromAnalytics ||
+            si.isPendingReview ||
+            tx.isPendingReview
+          )
           return {
             amount: toSafeNumber(si.amount),
             category: si.category || tx.category,
@@ -522,7 +551,8 @@ export function generateCashFlowStatement(
             notes: si.notes || tx.notes,
             loanId: si.loanId || tx.loanId,
             isLoanExcess: si.isLoanExcess || tx.isLoanExcess,
-            isExcluded: isExcludeAnalyticsTx(itemTx) || si.isExcluded || false,
+            isExplicitExcluded,
+            isOperatingExcluded: isExcludeAnalyticsTx(itemTx) || isExplicitExcluded,
           }
         })
       : [
@@ -534,11 +564,19 @@ export function generateCashFlowStatement(
             notes: tx.notes,
             loanId: tx.loanId,
             isLoanExcess: tx.isLoanExcess,
-            isExcluded: isExcludeAnalyticsTx(tx) || tx.isExcluded || false,
+            isExplicitExcluded: Boolean(
+              tx.isExcluded ||
+              tx.isExcludeAnalyticsTx ||
+              tx.isExcludeFromAnalytics ||
+              tx.excludeFromAnalytics ||
+              tx.isPendingReview
+            ),
+            isOperatingExcluded: isExcludeAnalyticsTx(tx) || Boolean(tx.isExcluded),
           },
         ]
 
     items.forEach((item) => {
+      if (item.isExplicitExcluded) return
       const rawAmt = item.amount
       if (rawAmt <= 0) return
 
@@ -563,8 +601,8 @@ export function generateCashFlowStatement(
           financingDetails.push({ name: item.notes || 'Pembayaran Pokok Utang / Pinjaman', amount: normAmt, type: 'outflow' })
         }
       } else {
-        // Standard Operating (skip if marked exclude from analytics)
-        if (item.isExcluded) return
+        // Standard Operating
+        if (item.isOperatingExcluded) return
         if (item.type === 'income') {
           operatingInflow += normAmt
           operatingDetails.push({ name: item.notes || item.category || 'Penerimaan Operasional', amount: normAmt, type: 'inflow' })

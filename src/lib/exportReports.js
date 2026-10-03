@@ -1,4 +1,4 @@
-import { formatCurrency, toSafeNumber } from './utils'
+import { formatCurrency, toSafeNumber, isExcludeAnalyticsTx } from './utils'
 import { getLocalDateString } from './dateUtils'
 
 export const PRINT_THEME_COLORS = {
@@ -117,6 +117,14 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
       })
     } else {
       const typeLabel = getTypeLabel(tx.type)
+      let noteText = tx.notes || ''
+      if (tx.type === 'transfer' && tx.targetWalletId) {
+        const targetWalletName = walletMap.get(String(tx.targetWalletId))
+        if (targetWalletName) {
+          const transferInfo = isEn ? `[To: ${targetWalletName}]` : `[Ke: ${targetWalletName}]`
+          noteText = noteText ? `${noteText} ${transferInfo}` : transferInfo
+        }
+      }
 
       rows.push(
         [
@@ -126,14 +134,14 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
           escapeCsv(walletName),
           escapeCsv(toSafeNumber(tx.amount)),
           escapeCsv(tx.currency || defaultCurrency),
-          escapeCsv(tx.notes || ''),
+          escapeCsv(noteText),
         ].join(',')
       )
     }
   })
 
-  // Prepend UTF-8 BOM (\uFEFF)
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
+  // Prepend UTF-8 BOM (\uFEFF) and Excel CSV separator directive (sep=,\r\n)
+  const csvContent = '\uFEFFsep=,\r\n' + [headers.join(','), ...rows].join('\r\n')
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const dateStr = getLocalDateString()
   const filename = isEn ? `fintrack-transaction-report-${dateStr}.csv` : `fintrack-laporan-transaksi-${dateStr}.csv`
@@ -251,16 +259,72 @@ export function generateMonthlyPdfStatement({
   )
 
   const transactionRowsHtml = sortedTxs
-    .map((tx) => {
+    .flatMap((tx) => {
+      const walletName = escapeHtml(walletMap.get(String(tx.walletId)) || 'Dompet Utama')
+
+      const isEn = String(locale || '').toLowerCase().startsWith('en')
+
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        return tx.splitItems.map((item, idx) => {
+          const itemType = item.type || tx.type
+          const isInc = itemType === 'income'
+          const isExp = itemType === 'expense'
+          const isTrf = itemType === 'transfer'
+          const itemCat = item.category || tx.category || '-'
+          const isExcluded = isExcludeAnalyticsTx({
+            ...tx,
+            ...item,
+            category: itemCat,
+            isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+            isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+            excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
+          })
+          const typeLabel = isInc ? 'Pemasukan' : isExp ? 'Pengeluaran' : isTrf ? 'Transfer' : 'Penyesuaian'
+          const typeBg = isInc ? PRINT_THEME_COLORS.bgIncome : isExp ? PRINT_THEME_COLORS.bgExpense : PRINT_THEME_COLORS.bgTransfer
+          const typeColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textTransfer
+          const sign = isInc ? '+' : isExp ? '-' : ''
+          const amountColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textDark
+          const itemNote = item.notes || tx.notes || ''
+          const excludeTag = isExcluded ? (isEn ? ' [Excluded]' : ' [Dikecualikan]') : ''
+          const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}${excludeTag}` : `[Split ${idx + 1}]${excludeTag}`
+
+          return `
+            <tr>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textSecondary}; white-space: nowrap;">${escapeHtml(tx.date || '-')}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight};">
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; background: ${typeBg}; color: ${typeColor};">${typeLabel}</span>
+              </td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; font-weight: 600; color: ${PRINT_THEME_COLORS.textMain};">${escapeHtml(itemCat)}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted};">${walletName}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted}; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${escapeHtml(splitNote)}"</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; text-align: right; font-size: 12px; font-weight: 800; color: ${amountColor}; white-space: nowrap;">${sign}${formatCurrency(toSafeNumber(item.amount), item.currency || tx.currency || defaultCurrency, locale)}</td>
+            </tr>
+          `
+        })
+      }
+
       const isInc = tx.type === 'income'
       const isExp = tx.type === 'expense'
       const isTrf = tx.type === 'transfer'
+      const isExcluded = isExcludeAnalyticsTx(tx)
+      const excludeTag = isExcluded ? (isEn ? ' [Excluded]' : ' [Dikecualikan]') : ''
       const typeLabel = isInc ? 'Pemasukan' : isExp ? 'Pengeluaran' : isTrf ? 'Transfer' : 'Penyesuaian'
-      const typeBg = isInc ? '${PRINT_THEME_COLORS.bgIncome}' : isExp ? '${PRINT_THEME_COLORS.bgExpense}' : '${PRINT_THEME_COLORS.bgTransfer}'
-      const typeColor = isInc ? '${PRINT_THEME_COLORS.textIncome}' : isExp ? '${PRINT_THEME_COLORS.textExpense}' : '${PRINT_THEME_COLORS.textTransfer}'
+      const typeBg = isInc ? PRINT_THEME_COLORS.bgIncome : isExp ? PRINT_THEME_COLORS.bgExpense : PRINT_THEME_COLORS.bgTransfer
+      const typeColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textTransfer
       const sign = isInc ? '+' : isExp ? '-' : ''
-      const amountColor = isInc ? '${PRINT_THEME_COLORS.textIncome}' : isExp ? '${PRINT_THEME_COLORS.textExpense}' : '${PRINT_THEME_COLORS.textDark}'
-      const walletName = escapeHtml(walletMap.get(String(tx.walletId)) || 'Dompet Utama')
+      const amountColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textDark
+
+      let noteText = tx.notes || ''
+      if (tx.type === 'transfer' && tx.targetWalletId) {
+        const targetWalletName = walletMap.get(String(tx.targetWalletId))
+        if (targetWalletName) {
+          const transferInfo = isEn ? `[To: ${targetWalletName}]` : `[Ke: ${targetWalletName}]`
+          noteText = noteText ? `${noteText} ${transferInfo}` : transferInfo
+        }
+      }
+      if (excludeTag && !noteText.includes(excludeTag.trim())) {
+        noteText = noteText ? `${noteText}${excludeTag}` : excludeTag.trim()
+      }
 
       return `
         <tr>
@@ -270,7 +334,7 @@ export function generateMonthlyPdfStatement({
           </td>
           <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; font-weight: 600; color: ${PRINT_THEME_COLORS.textMain};">${escapeHtml(tx.category || '-')}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted};">${walletName}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted}; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.notes ? `"${escapeHtml(tx.notes)}"` : '-'}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; font-size: 12px; color: ${PRINT_THEME_COLORS.textMuted}; font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${noteText ? `"${escapeHtml(noteText)}"` : '-'}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid ${PRINT_THEME_COLORS.bgLight}; text-align: right; font-size: 12px; font-weight: 800; color: ${amountColor}; white-space: nowrap;">${sign}${formatCurrency(toSafeNumber(tx.amount), tx.currency || defaultCurrency, locale)}</td>
         </tr>
       `
@@ -468,7 +532,7 @@ export function generateMonthlyPdfStatement({
           </tr>
         </thead>
         <tbody>
-          ${transactionRowsHtml || '<tr><td colspan="6" style="padding: 24px; text-align: center; color: ${PRINT_THEME_COLORS.textLightMuted};">Belum ada riwayat transaksi pada periode ini.</td></tr>'}
+          ${transactionRowsHtml || `<tr><td colspan="6" style="padding: 24px; text-align: center; color: ${PRINT_THEME_COLORS.textLightMuted};">Belum ada riwayat transaksi pada periode ini.</td></tr>`}
         </tbody>
       </table>
 

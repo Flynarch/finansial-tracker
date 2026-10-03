@@ -67,9 +67,9 @@ const COLOR_TONES = [
   { id: 'rose', bg: 'bg-rose-500/15', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-500/30', ring: 'ring-rose-500', name: 'Mawar' },
   { id: 'amber', bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/30', ring: 'ring-amber-500', name: 'Emas' },
   { id: 'orange', bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/30', ring: 'ring-orange-500', name: 'Oranye' },
-  { id: 'yellow', bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-500/30', ring: 'ring-yellow-500', name: 'Kuning' },
-  { id: 'lime', bg: 'bg-lime-500/15', text: 'text-lime-600 dark:text-lime-400', border: 'border-lime-500/30', ring: 'ring-lime-500', name: 'Limau' },
-  { id: 'slate', bg: 'bg-slate-500/15', text: 'text-slate-600 dark:text-slate-400', border: 'border-slate-500/30', ring: 'ring-slate-500', name: 'Netral' },
+  { id: 'yellow', bg: 'bg-yellow-500/15', text: 'text-amber-700 dark:text-amber-300', border: 'border-yellow-500/30', ring: 'ring-yellow-500', name: 'Kuning' },
+  { id: 'lime', bg: 'bg-lime-500/15', text: 'text-lime-700 dark:text-lime-300', border: 'border-lime-500/30', ring: 'ring-lime-500', name: 'Limau' },
+  { id: 'slate', bg: 'bg-slate-500/15', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-500/30', ring: 'ring-slate-500', name: 'Netral' },
 ]
 
 export default function SettingsCategories() {
@@ -201,10 +201,25 @@ export default function SettingsCategories() {
     const trimmedId = parentNameId.trim()
     const trimmedEn = parentNameEn.trim() || trimmedId
 
-    if (activeTab === 'expense') {
-      addExpenseParentCategory(trimmedId, trimmedEn, parentTone, parentIcon)
-    } else {
-      addIncomeParentCategory(trimmedId, trimmedEn, parentTone, parentIcon)
+    const duplicate = currentTree.some((cat) => {
+      const cId = (cat.names?.id || cat.id || '').trim().toLowerCase()
+      const cEn = (cat.names?.en || cat.id || '').trim().toLowerCase()
+      return cId === trimmedId.toLowerCase() || cEn === trimmedEn.toLowerCase()
+    })
+    if (duplicate) {
+      setStatusMessage(t('settings.catDuplicateError', 'Kategori dengan nama tersebut sudah ada.'))
+      setTimeout(() => setStatusMessage(''), 4000)
+      return
+    }
+
+    const createdId = activeTab === 'expense'
+      ? addExpenseParentCategory(trimmedId, trimmedEn, parentTone, parentIcon)
+      : addIncomeParentCategory(trimmedId, trimmedEn, parentTone, parentIcon)
+
+    if (!createdId) {
+      setStatusMessage(t('settings.catDuplicateError', 'Kategori dengan nama tersebut sudah ada.'))
+      setTimeout(() => setStatusMessage(''), 4000)
+      return
     }
 
     bumpVersion()
@@ -265,10 +280,29 @@ export default function SettingsCategories() {
     e.preventDefault()
     if (!subNameId.trim() || !addSubModal.parentId) return
 
-    if (activeTab === 'expense') {
-      addExpenseSubcategory(addSubModal.parentId, subNameId.trim(), subNameEn.trim() || subNameId.trim())
-    } else {
-      addIncomeSubcategory(addSubModal.parentId, subNameId.trim(), subNameEn.trim() || subNameId.trim())
+    const trimmedSubId = subNameId.trim()
+    const trimmedSubEn = subNameEn.trim() || trimmedSubId
+
+    const targetParent = currentTree.find((c) => c.id === addSubModal.parentId)
+    const duplicateSub = targetParent?.children?.some((sub) => {
+      const sId = (sub.names?.id || sub.id || '').trim().toLowerCase()
+      const sEn = (sub.names?.en || sub.id || '').trim().toLowerCase()
+      return sId === trimmedSubId.toLowerCase() || sEn === trimmedSubEn.toLowerCase()
+    })
+    if (duplicateSub) {
+      setStatusMessage(t('settings.subDuplicateError', 'Subkategori dengan nama tersebut sudah ada.'))
+      setTimeout(() => setStatusMessage(''), 4000)
+      return
+    }
+
+    const createdId = activeTab === 'expense'
+      ? addExpenseSubcategory(addSubModal.parentId, trimmedSubId, trimmedSubEn)
+      : addIncomeSubcategory(addSubModal.parentId, trimmedSubId, trimmedSubEn)
+
+    if (!createdId) {
+      setStatusMessage(t('settings.subDuplicateError', 'Subkategori dengan nama tersebut sudah ada.'))
+      setTimeout(() => setStatusMessage(''), 4000)
+      return
     }
 
     bumpVersion()
@@ -625,7 +659,7 @@ export default function SettingsCategories() {
                   className={`h-10 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
                     parentTone === tone.id ? 'ring-2 ' + tone.ring + ' scale-105 shadow-sm' : 'opacity-70 hover:opacity-100'
                   }`}
-                  title={tone.name}
+                  title={t('colors.' + tone.id, tone.name)}
                 >
                   <div className={`h-4 w-4 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
                   {parentTone === tone.id && (
@@ -726,7 +760,7 @@ export default function SettingsCategories() {
                   className={`h-10 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
                     editParentTone === tone.id ? 'ring-2 ' + tone.ring + ' scale-105 shadow-sm' : 'opacity-70 hover:opacity-100'
                   }`}
-                  title={tone.name}
+                  title={t('colors.' + tone.id, tone.name)}
                 >
                   <div className={`h-4 w-4 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
                   {editParentTone === tone.id && (

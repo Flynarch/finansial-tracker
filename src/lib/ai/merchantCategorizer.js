@@ -76,13 +76,19 @@ function loadMemoryCache() {
   return memoryCache
 }
 
+export const MAX_MERCHANT_CACHE_SIZE = 250
+
 /**
- * Saves the in-memory cache to localStorage.
+ * Saves the in-memory cache to localStorage with size limit.
  */
 function saveMemoryCache() {
   if (!memoryCache || typeof localStorage === 'undefined') return
 
   try {
+    if (memoryCache.size > MAX_MERCHANT_CACHE_SIZE) {
+      const entries = [...memoryCache.entries()]
+      memoryCache = new Map(entries.slice(-MAX_MERCHANT_CACHE_SIZE))
+    }
     const obj = Object.fromEntries(memoryCache.entries())
     localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(obj))
   } catch (err) {

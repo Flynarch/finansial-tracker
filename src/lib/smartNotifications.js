@@ -31,6 +31,7 @@ export const NOTIFICATION_ACTION_TYPES = {
 }
 
 export const NOTIFICATION_IDS = {
+  SYSTEM_TEST: 10100,
   DAILY_REMINDER: 99901,
   DAILY_REMINDER_SNOOZE: 99902,
   BUDGET_ALERT_BASE: 99800,
@@ -208,7 +209,7 @@ export async function sendTestNotification() {
       await LocalNotifications.schedule({
         notifications: [
           {
-            id: Math.floor(Math.random() * 90000) + 10000,
+            id: NOTIFICATION_IDS.SYSTEM_TEST,
             title,
             body,
             largeBody,
@@ -232,6 +233,21 @@ export async function sendTestNotification() {
     console.warn('sendTestNotification error:', err)
   }
   return false
+}
+
+/**
+ * Cancels all pending notifications scheduled by the application on native platforms.
+ */
+export async function cancelAllAppNotifications() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const pending = await LocalNotifications.getPending()
+    if (pending?.notifications?.length > 0) {
+      await LocalNotifications.cancel({ notifications: pending.notifications })
+    }
+  } catch (err) {
+    console.warn('[smartNotifications:cancelAllAppNotifications]', err)
+  }
 }
 
 /**
@@ -538,7 +554,7 @@ async function sendInstantBudgetNotification({ id, title, body, largeBody, summa
       await LocalNotifications.schedule({
         notifications: [
           {
-            id: id || Date.now() % 100000,
+            id: id || (800000 + (Date.now() % 100000)),
             title,
             body,
             largeBody: largeBody || body,
@@ -613,10 +629,16 @@ export function registerNotificationTapListener(callback) {
         // Handle marking commitment or todo paid/completed
         try {
           if (extra.type === 'todo' && extra.todoId) {
-            await db.todos.update(Number(extra.todoId), {
+            const tid = Number(extra.todoId)
+            await db.todos.update(tid, {
               completed: 1,
               completedAt: new Date().toISOString(),
             })
+            if (Capacitor.isNativePlatform()) {
+              await LocalNotifications.cancel({
+                notifications: [{ id: 100000 + tid * 10 + 1 }, { id: 100000 + tid * 10 + 2 }],
+              }).catch(() => {})
+            }
           }
           if (typeof window !== 'undefined') {
             const locale = useSettingsStore.getState?.()?.locale || 'id'

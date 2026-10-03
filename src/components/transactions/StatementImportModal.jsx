@@ -11,12 +11,14 @@ import {
 } from 'lucide-react'
 import Modal from '../ui/Modal'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import useSettingsStore from '../../store/useSettingsStore'
 import { db } from '../../lib/db'
 import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import { triggerHaptic } from '../../lib/haptics'
 import { detectDuplicateTransactions, detectBankPreset, extractTextFromPdf, parseBcaStatementLines, parseCsvStatement, parseGenericCsvRows } from '../../lib/statementParser'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
+import { clearCachedDashboardState } from '../../hooks/dashboard/dashboardCache'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 import { format } from 'date-fns'
 
@@ -47,6 +49,8 @@ export default function StatementImportModal({
     dateCol: '',
     descCol: '',
     amountCol: '',
+    debitCol: '',
+    creditCol: '',
     typeCol: '',
     incomeIndicator: 'CR',
     expenseIndicator: 'DB',
@@ -58,6 +62,22 @@ export default function StatementImportModal({
 
   const activeWallets = useMemo(() => wallets.filter((w) => !w.isArchived), [wallets])
 
+  useBackButton(() => {
+    if (step !== 'upload') {
+      if (step === 'preview') {
+        if (rawPdfBuffer) {
+          setStep('upload')
+        } else {
+          setStep('mapper')
+        }
+      } else {
+        setStep('upload')
+      }
+    } else {
+      onClose?.()
+    }
+  }, Boolean(isOpen))
+
   const handleReset = () => {
     setStep('upload')
     setFile(null)
@@ -67,6 +87,16 @@ export default function StatementImportModal({
     setParsedItems([])
     setCsvHeaders([])
     setCsvRows([])
+    setColumnMapping({
+      dateCol: '',
+      descCol: '',
+      amountCol: '',
+      debitCol: '',
+      creditCol: '',
+      typeCol: '',
+      incomeIndicator: 'CR',
+      expenseIndicator: 'DB',
+    })
   }
 
   const handleFileChange = async (e) => {
@@ -92,11 +122,18 @@ export default function StatementImportModal({
         const preset = detectBankPreset(text)
         setDetectedPreset(preset)
 
+        const foundDebit = parsed.headers.find((h) => /debit|debet|keluar|db/i.test(h)) || ''
+        const foundCredit = parsed.headers.find((h) => /credit|kredit|masuk|cr/i.test(h)) || ''
+        const foundAmount = parsed.headers.find((h) => /amount|nominal|jumlah|mutasi/i.test(h) && !/debet|credit|kredit/i.test(h)) || ''
+        const fallbackAmount = (!foundDebit && !foundCredit) ? (parsed.headers[2] || '') : ''
+
         // Try auto mapping columns from header names
         const autoMap = {
           dateCol: parsed.headers.find((h) => /date|tgl|tanggal/i.test(h)) || parsed.headers[0] || '',
           descCol: parsed.headers.find((h) => /desc|keterangan|uraian|transaksi|merchant/i.test(h)) || parsed.headers[1] || '',
-          amountCol: parsed.headers.find((h) => /amount|nominal|jumlah|debet|kredit|mutasi/i.test(h)) || parsed.headers[2] || '',
+          amountCol: foundAmount || fallbackAmount,
+          debitCol: foundDebit,
+          creditCol: foundCredit,
           typeCol: parsed.headers.find((h) => /type|tipe|d\/c|cr\/db|jenis/i.test(h)) || '',
           incomeIndicator: 'CR',
           expenseIndicator: 'DB',
@@ -135,7 +172,7 @@ export default function StatementImportModal({
       }
 
       // Check duplicates against existing database transactions
-      const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions)
+      const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions, selectedWalletId)
       setParsedItems(deduplicated)
       setStep('preview')
     } catch (err) {
@@ -149,7 +186,7 @@ export default function StatementImportModal({
   const handleApplyCsvMapping = () => {
     triggerHaptic('light')
     const rawTxs = parseGenericCsvRows(csvRows, columnMapping)
-    const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions)
+    const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions, selectedWalletId)
     setParsedItems(deduplicated)
     setStep('preview')
   }
@@ -193,13 +230,15 @@ export default function StatementImportModal({
         notes: tx.notes || tx.cleanMerchant || 'Impor Rekening Koran',
         cleanMerchant: tx.cleanMerchant || tx.merchant || '',
         source: 'e_statement_import',
+        deletedAt: null,
         createdAt: Date.now(),
       }))
 
       // Batch insert into Dexie
       await db.transactions.bulkAdd(formattedForDb)
 
-      // Invalidate balance cache so computeWalletBalance reflects new transactions
+      // Invalidate balance cache and clear cached dashboard state so views immediately reflect new transactions
+      clearCachedDashboardState()
       await invalidateWalletBalance([Number(selectedWalletId)])
       scheduleNativeWidgetSync()
 
@@ -217,6 +256,7 @@ export default function StatementImportModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      enableBackButton={false}
       title={t('statement.modalTitle', 'Impor Mutasi Rekening & e-Statement')}
       maxWidth="max-w-2xl"
       showCloseButton={true}
@@ -376,6 +416,7 @@ export default function StatementImportModal({
                   onChange={(e) => setColumnMapping({ ...columnMapping, amountCol: e.target.value })}
                   className="ft-field w-full py-2 px-2.5 rounded-xl bg-[var(--field-bg)]"
                 >
+                  <option value="">{t('statement.optionalCol', '(Opsional / Tidak Ada)')}</option>
                   {csvHeaders.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}
@@ -392,6 +433,38 @@ export default function StatementImportModal({
                   className="ft-field w-full py-2 px-2.5 rounded-xl bg-[var(--field-bg)]"
                 >
                   <option value="">{t('statement.allExpenses', '(Semua Pengeluaran)')}</option>
+                  {csvHeaders.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[var(--muted)] mb-1">
+                  {t('statement.debitCol', 'Kolom Debit / Keluar (Opsional)')}
+                </label>
+                <select
+                  value={columnMapping.debitCol}
+                  onChange={(e) => setColumnMapping({ ...columnMapping, debitCol: e.target.value })}
+                  className="ft-field w-full py-2 px-2.5 rounded-xl bg-[var(--field-bg)]"
+                >
+                  <option value="">{t('statement.optionalCol', '(Opsional / Tidak Ada)')}</option>
+                  {csvHeaders.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[var(--muted)] mb-1">
+                  {t('statement.creditCol', 'Kolom Kredit / Masuk (Opsional)')}
+                </label>
+                <select
+                  value={columnMapping.creditCol}
+                  onChange={(e) => setColumnMapping({ ...columnMapping, creditCol: e.target.value })}
+                  className="ft-field w-full py-2 px-2.5 rounded-xl bg-[var(--field-bg)]"
+                >
+                  <option value="">{t('statement.optionalCol', '(Opsional / Tidak Ada)')}</option>
                   {csvHeaders.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}
@@ -433,7 +506,11 @@ export default function StatementImportModal({
                     <Wallet className="h-4 w-4 text-[var(--accent)]" />
                     <select
                       value={selectedWalletId}
-                      onChange={(e) => setSelectedWalletId(e.target.value)}
+                      onChange={(e) => {
+                        const newWalletId = e.target.value
+                        setSelectedWalletId(newWalletId)
+                        setParsedItems((prev) => detectDuplicateTransactions(prev, existingTransactions, newWalletId))
+                      }}
                       className="ft-field text-xs font-bold py-1.5 px-3 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)]"
                     >
                       {activeWallets.map((w) => (

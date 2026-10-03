@@ -76,8 +76,12 @@ export async function scanReceiptImage(base64Data, mimeType = 'image/jpeg', { de
     try {
       parsed = JSON.parse(cleanJson)
     } catch {
-      const jsonMatch = cleanJson.match(/\{[\s\S]*\}/)
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+      try {
+        const jsonMatch = cleanJson.match(/\{[\s\S]*\}/)
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+      } catch {
+        parsed = {}
+      }
     }
 
     // Sanitize category

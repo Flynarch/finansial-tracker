@@ -174,6 +174,50 @@ describe('Audit Phase 4 Remediation - Data Integrity & Feature Tests', () => {
       expect(tx).toBeDefined()
       expect(tx.amount).toBe(150000)
     })
+
+    it('does not mutate walletId, date, or currency on shared initialTransactionId when updating a sibling split loan', async () => {
+      const walletId1 = await db.wallets.add({ name: 'Kas Utama', balance: 500000, currency: 'IDR' })
+      const walletId2 = await db.wallets.add({ name: 'Bank BCA', balance: 1000000, currency: 'IDR' })
+      const splitBillId = 'sb-sibling-update-test'
+
+      const friendsTxId = await db.transactions.add({
+        amount: 200000,
+        type: 'expense',
+        category: 'Pinjaman Diberikan',
+        walletId: walletId1,
+        splitBillId,
+        date: '2026-03-10',
+        currency: 'IDR',
+        notes: 'Split Bill Talangan',
+      })
+
+      const loanId = await db.loans.add({
+        splitBillId,
+        title: 'Makan Bareng Budi',
+        personName: 'Budi',
+        type: 'receivable',
+        totalAmount: 100000,
+        remainingAmount: 100000,
+        status: 'active',
+        walletId: walletId1,
+        startDate: '2026-03-10',
+        currency: 'IDR',
+        initialTransactionId: friendsTxId,
+      })
+
+      // Update loan with different wallet, date, and currency
+      await useLoanStore.getState().updateLoan(loanId, {
+        walletId: walletId2,
+        startDate: '2026-03-15',
+        currency: 'USD',
+      })
+
+      // Shared friendsTxId must NOT have its walletId, date, or currency overwritten
+      const tx = await db.transactions.get(friendsTxId)
+      expect(tx.walletId).toBe(walletId1)
+      expect(tx.date).toBe('2026-03-10')
+      expect(tx.currency).toBe('IDR')
+    })
   })
 
   describe('Split Transactions Filter & Search Support', () => {

@@ -32,7 +32,7 @@ export async function calculateDirectFinancialHealth({
   const activeRates = rates || getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
   const allWallets = await db.wallets.toArray()
   const rawTxs = await db.transactions.toArray()
-  const txs = rawTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
+  const txs = rawTxs.filter((t) => t && !t.deletedAt && t.isPendingReview !== true && t.isPendingReview !== 1)
   const loans = await db.loans.toArray()
 
   const computedWallets = computeAllWalletBalances(allWallets, txs, activeRates)
@@ -96,18 +96,29 @@ export async function calculateDirectFinancialHealth({
       return acc + convertCurrency(raw, l.currency || defaultCurrency, defaultCurrency, activeRates)
     }, 0)
 
-  const rawSavingsRatio = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100 : (monthlyExpense > 0 ? -100 : 0)
+  const isEarlyMonthGrace = now.getDate() <= 3 && monthlyIncome === 0
+  const rawSavingsRatio = monthlyIncome > 0
+    ? ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100
+    : isEarlyMonthGrace
+      ? 0
+      : (monthlyExpense > 0 ? -100 : 0)
   const savingsRatio = Math.max(0, rawSavingsRatio)
-  const dti = monthlyIncome > 0 ? (totalDebt / monthlyIncome) * 100 : (totalDebt > 0 ? 100 : 0)
+  const dti = monthlyIncome > 0
+    ? (totalDebt / monthlyIncome) * 100
+    : isEarlyMonthGrace
+      ? 0
+      : (totalDebt > 0 ? 100 : 0)
   const emergencyMonths = monthlyExpense > 0 ? (totalCash / monthlyExpense) : (totalCash > 0 ? 12 : 0)
 
   let score = 50
-  if (rawSavingsRatio >= 20) score += 20
-  else if (rawSavingsRatio >= 10) score += 10
-  else if (rawSavingsRatio < 0) score -= 20
+  if (!isEarlyMonthGrace) {
+    if (rawSavingsRatio >= 20) score += 20
+    else if (rawSavingsRatio >= 10) score += 10
+    else if (rawSavingsRatio < 0) score -= 20
 
-  if (dti <= 30) score += 15
-  else if (dti > 50) score -= 15
+    if (dti <= 30) score += 15
+    else if (dti > 50) score -= 15
+  }
 
   if (emergencyMonths >= 6) score += 15
   else if (emergencyMonths >= 3) score += 10

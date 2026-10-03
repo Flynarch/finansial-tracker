@@ -14,11 +14,13 @@ import {
 } from 'lucide-react'
 import CustomDatePicker from '../../components/ui/CustomDatePicker'
 import Modal from '../../components/ui/Modal'
+import ConfirmDeleteModal from '../../components/ui/ConfirmDeleteModal'
 import WalletSelectModal, { WalletSelectTrigger } from '../../components/ui/WalletSelectModal'
 import CategoryPickerModal from '../../components/transactions/CategoryPickerModal'
 import { db } from '../../lib/db'
 import {
   formatCurrency,
+  formatCompactCurrency,
   toSafeNumber,
   formatMoneyInput,
   parseMoneyInput,
@@ -52,6 +54,7 @@ export default function SettingsRecurring() {
 
   // Edit modal state
   const [editingItem, setEditingItem] = useState(null)
+  const [deletingItem, setDeletingItem] = useState(null)
   const [editForm, setEditForm] = useState({
     title: '',
     type: 'expense',
@@ -96,6 +99,7 @@ export default function SettingsRecurring() {
       { value: 'monthly', label: t('settings.recurring.frequency.monthly', 'Bulanan') },
       { value: 'weekly', label: t('settings.recurring.frequency.weekly', 'Mingguan') },
       { value: 'daily', label: t('settings.recurring.frequency.daily', 'Harian') },
+      { value: 'yearly', label: t('settings.recurring.frequency.yearly', 'Tahunan') },
     ],
     [t],
   )
@@ -103,6 +107,7 @@ export default function SettingsRecurring() {
   const recurringFrequencyLabel = (value) => {
     if (value === 'daily') return t('settings.recurring.frequency.daily', 'Harian')
     if (value === 'weekly') return t('settings.recurring.frequency.weekly', 'Mingguan')
+    if (value === 'yearly') return t('settings.recurring.frequency.yearly', 'Tahunan')
     return t('settings.recurring.frequency.monthly', 'Bulanan')
   }
 
@@ -161,12 +166,15 @@ export default function SettingsRecurring() {
     const numericAmount = parseMoneyInput(editForm.amount, editForm.currency)
     if (!editForm.title || numericAmount <= 0) return
 
-    const parsedAnchor = parseInt(String(editForm.nextDate || '').split('-')[2], 10) || 1
+    const prevDay = parseInt(String(editingItem.nextDate || '').split('-')[2], 10)
+    const newDay = parseInt(String(editForm.nextDate || '').split('-')[2], 10) || 1
+    const dayChanged = Boolean(editingItem.nextDate && prevDay !== newDay)
+    const finalAnchorDay = (editingItem.anchorDay && !dayChanged) ? editingItem.anchorDay : newDay
 
     await db.recurringTransactions.update(editingItem.id, {
       ...editForm,
       amount: numericAmount,
-      anchorDay: parsedAnchor,
+      anchorDay: finalAnchorDay,
       autoExecute: editForm.autoExecute !== false,
     })
 
@@ -213,32 +221,34 @@ export default function SettingsRecurring() {
               {t('settings.recurringTitle', 'Transaksi Berulang & Otomasi')}
             </h3>
             <p className="text-xs font-medium text-[var(--muted)] mt-1">
-              Catat tagihan rutin, cicilan, dan gaji secara otomatis tepat waktu
+              {t('settings.recurringSubtitle', 'Catat tagihan rutin, cicilan, dan gaji secara otomatis tepat waktu')}
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)]/60 text-center">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Jadwal Aktif</span>
-            <span className="block text-xs font-black text-[var(--fg)] mt-0.5">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] truncate">
+              {t('settings.recurring.activeSchedules', 'Jadwal Aktif')}
+            </span>
+            <span className="block text-xs font-black text-[var(--fg)] mt-0.5 truncate">
               {activeItems.length} / {(recurringTransactions || []).length}
             </span>
           </div>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] truncate">
               {t('settings.recurring.expenseMonthly', 'Beban/Bulan')}
             </span>
-            <span className="block text-[11px] sm:text-xs font-black text-[var(--status-expense)] mt-0.5 tracking-tight leading-tight">
-              {formatCurrency(totalMonthlyRecurringExpense, defaultCurrency, locale)}
+            <span className="block text-[11px] sm:text-xs font-black text-[var(--status-expense)] mt-0.5 tracking-tight leading-tight truncate">
+              {formatCompactCurrency(totalMonthlyRecurringExpense, defaultCurrency, locale)}
             </span>
           </div>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] truncate">
               {t('settings.recurring.incomeMonthly', 'Masuk/Bulan')}
             </span>
-            <span className="block text-[11px] sm:text-xs font-black text-[var(--status-income)] mt-0.5 tracking-tight leading-tight">
-              {formatCurrency(totalMonthlyRecurringIncome, defaultCurrency, locale)}
+            <span className="block text-[11px] sm:text-xs font-black text-[var(--status-income)] mt-0.5 tracking-tight leading-tight truncate">
+              {formatCompactCurrency(totalMonthlyRecurringIncome, defaultCurrency, locale)}
             </span>
           </div>
         </div>
@@ -516,10 +526,10 @@ export default function SettingsRecurring() {
                             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                             : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
                         }`}
-                        title={isEnabled ? 'Nonaktifkan' : 'Aktifkan'}
+                        title={isEnabled ? t('common.inactive', 'Nonaktifkan') : t('common.active', 'Aktifkan')}
                       >
                         <Power className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-bold">{isEnabled ? 'Aktif' : 'Mati'}</span>
+                        <span className="text-[10px] font-bold">{isEnabled ? t('common.active', 'Aktif') : t('common.inactive', 'Mati')}</span>
                       </button>
 
                       <button
@@ -533,7 +543,7 @@ export default function SettingsRecurring() {
 
                       <button
                         type="button"
-                        onClick={() => db.recurringTransactions.delete(item.id)}
+                        onClick={() => setDeletingItem(item)}
                         className="h-8 w-8 grid place-items-center rounded-xl text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer"
                         title={t('settings.delete', 'Hapus')}
                       >
@@ -730,6 +740,19 @@ export default function SettingsRecurring() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingItem)}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={async () => {
+          if (deletingItem?.id) {
+            await db.recurringTransactions.delete(deletingItem.id)
+            setDeletingItem(null)
+          }
+        }}
+        title={t('settings.deleteRecurringTitle', 'Hapus Transaksi Berulang?')}
+        message={t('settings.deleteRecurringDesc', 'Jadwal otomatis untuk transaksi ini akan dihapus permanen.')}
+      />
     </>
   )
 }

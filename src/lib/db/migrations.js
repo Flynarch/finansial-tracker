@@ -464,7 +464,7 @@ export function applyMigrations(db) {
     }
   })
 
-  // Auto-migrate legacy wallet names and auto-purge old soft-deleted transactions (> 90 days)
+  // Auto-purge old soft-deleted transactions (> 90 days)
   db.on('ready', async () => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -472,14 +472,6 @@ export function applyMigrations(db) {
       }
     } catch {
       /* ignore */
-    }
-    try {
-      const legacyCashWallets = await db.wallets.filter((w) => w.name === 'Uang Tunai (Cash)').toArray()
-      for (const w of legacyCashWallets) {
-        await db.wallets.update(w.id, { name: 'Cash' })
-      }
-    } catch (err) {
-      console.error('[db.ready] Could not auto-migrate legacy wallet names:', err)
     }
 
     try {

@@ -267,8 +267,8 @@ export function maskDateExpressions(text) {
   let t = text
   // 1. Day + Month Name: "9 september", "12 sep 2026", "tgl 25 agustus", "10 okt"
   t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}\s+(?:januari|jan|februari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|ags|agst|aug|september|sep|sept|oktober|okt|oct|november|nov|desember|des|dec)(?:\s+\d{4})?\b/gi, ' ')
-  // 2. Numeric date: "12/09/2026", "9/9", "25-08-2026" (guarding against decimal amounts like "1.2 miliar" or "1.5 jt")
-  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?(?!\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b|billion|million|perak))\b/gi, ' ')
+  // 2. Numeric date: "12/09/2026", "9/9", "25-08-2026" (guarding against decimal amounts like "1.2 miliar" and quantities like "2.5 kg")
+  t = t.replace(/(?:(?:tgl|tanggal)\s+)?\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?(?!\s*(?:k|rb|ribu|jt|juta|m|miliar|milyar|b|billion|million|perak|kg|gram|g|l|liter|ml|pcs|buah|meter|m|km|ons|butir|pax|box|dus))\b/gi, ' ')
   // 3. Relative time expressions: "2 hari lalu", "3 jam lalu", "5 menit lalu"
   t = t.replace(/\b\d{1,2}\s+(?:hari|jam|menit|bulan|tahun)(?:\s+lalu)?\b/gi, ' ')
   // 4. Standalone tanggal/tgl + number: "tanggal 9", "tgl 12"
@@ -315,25 +315,34 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
   }
 
   // 2. Numeric Slash/Dash Date: "9/9", "12/09", "12/9/2026", "25-08-2026"
+  // (guarding against decimal quantities like "2.5 kg" or "10.5 liter")
   const numericDateMatch = lower.match(
-    /(?:(?:tgl|tanggal)\s+)?\b(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/i
+    /(?:(tgl|tanggal)\s+)?\b(\d{1,2})([/.-])(\d{1,2})(?:([/.-])(\d{2,4}))?(?!\s*(?:kg|gram|g|l|liter|ml|pcs|buah|meter|m|km|ons|butir|pax|box|dus|k|rb|ribu|jt|juta|miliar|milyar|b|billion|million|perak))\b/i
   )
   if (numericDateMatch) {
-    const day = parseInt(numericDateMatch[1], 10)
-    const month = parseInt(numericDateMatch[2], 10)
-    let year = refYear
-    if (numericDateMatch[3]) {
-      const rawYear = parseInt(numericDateMatch[3], 10)
-      year = rawYear < 100 ? 2000 + rawYear : rawYear
-    }
-    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
-      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      return {
-        dateStr,
-        matchedText: numericDateMatch[0].trim(),
-        day,
-        month,
-        year,
+    const hasPrefix = Boolean(numericDateMatch[1])
+    const sep = numericDateMatch[3]
+    const hasYear = Boolean(numericDateMatch[5])
+
+    // If dot separator without prefix and without explicit year, treat as decimal number, not a date
+    const isDecimalNumber = sep === '.' && !hasPrefix && !hasYear
+    if (!isDecimalNumber) {
+      const day = parseInt(numericDateMatch[2], 10)
+      const month = parseInt(numericDateMatch[4], 10)
+      let year = refYear
+      if (numericDateMatch[6]) {
+        const rawYear = parseInt(numericDateMatch[6], 10)
+        year = rawYear < 100 ? 2000 + rawYear : rawYear
+      }
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        return {
+          dateStr,
+          matchedText: numericDateMatch[0].trim(),
+          day,
+          month,
+          year,
+        }
       }
     }
   }
@@ -457,6 +466,17 @@ export function parseIndonesianAmount(raw) {
   }
 
   // Preceding Rp or bare digits
+  const trimmed = clean.replace(/[^\d]+$/, '')
+  // Support trailing sen: e.g. ,00, ,000, ,50, or .00, .50 (1-2 digits decimal, or 3 zero decimals after comma)
+  const decimalMatch = trimmed.match(/^(.*?)(?:,(000)|[,.]([\d]{1,2}))$/)
+  if (decimalMatch) {
+    const intDigits = decimalMatch[1].replace(/[^\d]/g, '')
+    const decDigits = decimalMatch[2] ? '0' : decimalMatch[3]
+    const intNum = parseInt(intDigits, 10) || 0
+    const decNum = Number(`0.${decDigits}`)
+    return Math.round(intNum + (Number.isFinite(decNum) ? decNum : 0))
+  }
+
   const digitsOnly = clean.replace(/[^0-9]/g, '')
   return parseInt(digitsOnly, 10) || 0
 }

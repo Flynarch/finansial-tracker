@@ -5,7 +5,8 @@ import BottomSheet from '../ui/BottomSheet'
 import WalletSelectModal, { WalletSelectTrigger } from '../ui/WalletSelectModal'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import { db } from '../../lib/db'
-import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret, roundCurrency } from '../../lib/utils'
+import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret, roundCurrency, convertCurrency } from '../../lib/utils'
+import { getCachedCurrencyRates } from '../../lib/api'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -62,10 +63,24 @@ export default function SavingsFundSheetModal({
     setIsSubmitting(true)
     try {
       const isWithdraw = fundActionType === 'withdraw'
-      const currentGoalAmt = Number(goal.currentAmount || 0)
-      const newGoalAmount = isWithdraw
-        ? Math.max(0, currentGoalAmt - val)
-        : currentGoalAmt + val
+      const currentGoalAmt = Number(goal?.currentAmount || 0)
+      if (isWithdraw && currentGoalAmt <= 0) return
+      const effectiveVal = isWithdraw ? Math.min(val, currentGoalAmt) : val
+      if (effectiveVal <= 0) return
+
+      const newGoalAmount = Math.max(0, currentGoalAmt + (isWithdraw ? -effectiveVal : effectiveVal))
+      const target = Number(goal.targetAmount) || 0
+      const isNowCompleted = target > 0 && newGoalAmount >= target
+      const goalUpdates = {
+        currentAmount: newGoalAmount,
+      }
+      if (!isWithdraw && isNowCompleted) {
+        goalUpdates.isCompleted = true
+        goalUpdates.status = 'completed'
+      } else if (isWithdraw && newGoalAmount < target) {
+        goalUpdates.isCompleted = false
+        goalUpdates.status = 'active'
+      }
 
       const now = new Date()
       const selectedDateObj = new Date(`${dateInput}T00:00:00`)
@@ -74,8 +89,8 @@ export default function SavingsFundSheetModal({
       const walletIdNum = Number(selectedWalletId)
 
       await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
-        // 1. Update goal balance
-        await db.goals.update(goal.id, { currentAmount: newGoalAmount })
+        // 1. Update goal balance and status
+        await db.goals.update(goal.id, goalUpdates)
 
         // 2. Fetch wallet name if selected
         let walletObj = null
@@ -86,13 +101,18 @@ export default function SavingsFundSheetModal({
         // 3. Add transaction record if wallet was selected
         let createdTxId = null
         if (walletIdNum) {
+          const walletCurrency = walletObj?.currency || defaultCurrency
+          const goalCurrency = goal.currency || defaultCurrency
+          const rates = getCachedCurrencyRates('USD')
+          const walletTxAmount = convertCurrency(effectiveVal, goalCurrency, walletCurrency, rates)
+
           createdTxId = await db.transactions.add({
             date: dateInput,
-            amount: roundCurrency(val),
+            amount: roundCurrency(walletTxAmount, walletCurrency),
             type: isWithdraw ? 'income' : 'expense',
             category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
             notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
-            currency: goal.currency || defaultCurrency,
+            currency: walletCurrency,
             walletId: walletIdNum,
             goalId: goal.id,
             createdAt: Date.now(),
@@ -106,7 +126,7 @@ export default function SavingsFundSheetModal({
         // 4. Add to goal logs
         const logPayload = {
           goalId: goal.id,
-          amount: isWithdraw ? -val : val,
+          amount: isWithdraw ? -effectiveVal : effectiveVal,
           notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
           date: formattedLogDate,
           transactionId: createdTxId || null,
@@ -128,7 +148,7 @@ export default function SavingsFundSheetModal({
 
       if (isTargetAchieved) {
         window.setTimeout(() => {
-          onGoalCompleted?.({ ...goal, currentAmount: newGoalAmount })
+          onGoalCompleted?.({ ...goal, ...goalUpdates })
         }, 150)
       }
     } catch (err) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { format, startOfMonth, subMonths, subDays, differenceInDays } from 'date-fns'
+import { format, startOfMonth, subMonths, subDays, differenceInDays, startOfYear } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -67,7 +67,7 @@ export function useDashboardData() {
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
 
   const isAllRange = zoomRevenueRange === 'all' || miniRevenueRange === 'all'
-  const txCutoffDate = format(startOfMonth(subMonths(new Date(), 12)), 'yyyy-MM-dd')
+  const txCutoffDate = format(subMonths(startOfMonth(new Date()), 12), 'yyyy-MM-dd')
   const transactions = useLiveQuery(
     async () => {
       const list = isAllRange
@@ -211,17 +211,19 @@ export function useDashboardData() {
 
   const normalizedTransactions = useMemo(() => {
     if (!transactions) return []
-    return transactions.map((tx) => {
-      const walletCurrency = (tx.walletId != null ? walletCurrencyMap.get(String(tx.walletId)) : null) || defaultCurrency
-      const txCurrency = tx.currency || walletCurrency
-      const amount = convertCurrency(toSafeNumber(tx.amount), txCurrency, defaultCurrency, rates)
-      return {
-        ...tx,
-        currency: txCurrency,
-        walletCurrency,
-        convertedAmount: amount,
-      }
-    })
+    return transactions
+      .filter((tx) => tx && tx.isPendingReview !== true && tx.isPendingReview !== 1)
+      .map((tx) => {
+        const walletCurrency = (tx.walletId != null ? walletCurrencyMap.get(String(tx.walletId)) : null) || defaultCurrency
+        const txCurrency = tx.currency || walletCurrency
+        const amount = convertCurrency(toSafeNumber(tx.amount), txCurrency, defaultCurrency, rates)
+        return {
+          ...tx,
+          currency: txCurrency,
+          walletCurrency,
+          convertedAmount: amount,
+        }
+      })
   }, [transactions, walletCurrencyMap, defaultCurrency, rates])
 
   const monthStats = useMemo(() => {
@@ -248,18 +250,30 @@ export function useDashboardData() {
 
     const rawMonthDelta = thisMonth.income - thisMonth.expense
     const monthDelta = roundCurrency(rawMonthDelta)
+    const currentDay = Math.max(1, new Date().getDate())
+    const daysInCurrentMonth = new Date(cYear, cMonth, 0).getDate()
+    const isEarlyMonth = currentDay <= 3
+
     return {
       monthIncome: thisMonth.income,
       monthExpense: thisMonth.expense,
       monthDelta,
       monthDeltaTone: monthDelta >= 0 ? 'success' : 'danger',
       monthDeltaPct: thisMonth.income > 0 ? roundCurrency((monthDelta / thisMonth.income) * 100) : 0,
-      incomeDeltaPct: lastMonth.income > 0
-        ? roundCurrency(((thisMonth.income - lastMonth.income) / lastMonth.income) * 100)
-        : thisMonth.income > 0 ? 100 : 0,
-      expenseDeltaPct: lastMonth.expense > 0
-        ? roundCurrency(((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100)
-        : thisMonth.expense > 0 ? 100 : 0,
+      incomeDeltaPct: isEarlyMonth
+        ? (thisMonth.income > 0 && lastMonth.income > 0
+            ? roundCurrency((((thisMonth.income / currentDay) * daysInCurrentMonth - lastMonth.income) / lastMonth.income) * 100)
+            : 0)
+        : (lastMonth.income > 0
+            ? roundCurrency(((thisMonth.income - lastMonth.income) / lastMonth.income) * 100)
+            : thisMonth.income > 0 ? 100 : 0),
+      expenseDeltaPct: isEarlyMonth
+        ? (thisMonth.expense > 0 && lastMonth.expense > 0
+            ? roundCurrency((((thisMonth.expense / currentDay) * daysInCurrentMonth - lastMonth.expense) / lastMonth.expense) * 100)
+            : 0)
+        : (lastMonth.expense > 0
+            ? roundCurrency(((thisMonth.expense - lastMonth.expense) / lastMonth.expense) * 100)
+            : thisMonth.expense > 0 ? 100 : 0),
     }
   }, [transactions, investments, currentMonthKey, budgetCycleStartDay, locale, currentPeriod, normalizedTransactions, defaultCurrency, rates])
 
@@ -277,13 +291,15 @@ export function useDashboardData() {
     if (transactions === null || transactions === undefined) {
       return null
     }
-    return [...(transactions ?? [])].sort((a, b) => {
-      const byDate = String(b.date || '').localeCompare(String(a.date || ''))
-      if (byDate !== 0) return byDate
-      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
-      if (byCreatedAt !== 0) return byCreatedAt
-      return String(b.id || '').localeCompare(String(a.id || ''))
-    })
+    return [...(transactions ?? [])]
+      .filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
+      .sort((a, b) => {
+        const byDate = String(b.date || '').localeCompare(String(a.date || ''))
+        if (byDate !== 0) return byDate
+        const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
+        if (byCreatedAt !== 0) return byCreatedAt
+        return String(b.id || '').localeCompare(String(a.id || ''))
+      })
   }, [transactions])
 
   const todayStats = useMemo(() => {
@@ -362,7 +378,7 @@ export function useDashboardData() {
     const { arr: data1y, map: map1y } = generateMonthly(12)
 
     const currentMonth = new Date().getMonth() + 1
-    const { arr: dataYtd, map: mapYtd } = generateMonthly(Math.max(2, currentMonth))
+    const { arr: dataYtd, map: mapYtd } = generateMonthly(currentMonth)
 
     let oldestDate = new Date()
     if (safeTx.length > 0) {
@@ -586,7 +602,7 @@ export function useDashboardData() {
     if (!recentTransactions) return []
     const groups = {}
     recentTransactions.slice(0, 10).forEach((tx) => {
-      const dateKey = tx.date || 'Unknown'
+      const dateKey = tx.date ? String(tx.date).slice(0, 10) : 'Unknown'
       if (!groups[dateKey]) groups[dateKey] = []
       groups[dateKey].push(tx)
     })
@@ -598,13 +614,15 @@ export function useDashboardData() {
     const safeGoals = goals ?? []
 
     const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay, locale)
-    const periodExpenseTxs = (normalizedTransactions || []).filter(
-      (tx) =>
-        tx?.date &&
-        tx.date >= budgetPeriod.startDate &&
-        tx.date <= budgetPeriod.endDate &&
+    const periodExpenseTxs = (normalizedTransactions || []).filter((tx) => {
+      if (!tx?.date) return false
+      const txDateStr = String(tx.date || '').slice(0, 10)
+      return (
+        txDateStr >= budgetPeriod.startDate &&
+        txDateStr <= budgetPeriod.endDate &&
         (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
-    )
+      )
+    })
 
     const budgetRows = safeBudgets
       .filter((b) => b.month === currentMonthKey)
@@ -729,13 +747,16 @@ export function useDashboardData() {
       if (!sourceData || sourceData.length === 0) return []
 
       const firstItem = sourceData[0]
-      const startDate = isMonthly ? `${firstItem.key}-01` : firstItem.date
+      const startDate = rangeId === 'ytd'
+        ? format(startOfYear(new Date()), 'yyyy-MM-01')
+        : (isMonthly ? `${firstItem.key}-01` : firstItem.date)
       const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue + netLoanPosition + totalSavings
 
       let running = startBalance
       return sourceData.map((row) => {
         running += toSafeNumber(row.net)
-        const timeMs = isMonthly ? new Date(`${row.key}-01`).getTime() : new Date(row.date).getTime()
+        const dateStr = isMonthly ? `${row.key}-01T12:00:00` : (typeof row.date === 'string' && row.date.length === 10 ? `${row.date}T12:00:00` : row.date)
+        const timeMs = new Date(dateStr).getTime()
         return { time: timeMs, value: running }
       })
     },
@@ -928,7 +949,8 @@ export function useDashboardData() {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
           let prevLabel = ''
           if (prevData?.date) {
-            const dateObj = new Date(prevData.date)
+            const rawPrevDate = typeof prevData.date === 'string' && prevData.date.length === 10 ? `${prevData.date}T12:00:00` : prevData.date
+            const dateObj = new Date(rawPrevDate)
             if (!isNaN(dateObj.getTime())) {
               prevLabel = format(dateObj, 'dd MMM yyyy')
             }
@@ -944,7 +966,7 @@ export function useDashboardData() {
       if (rangeId === 'ytd') {
         const currentYear = new Date().getFullYear()
         const prevYear = currentYear - 1
-        const monthsCount = Math.max(2, new Date().getMonth() + 1)
+        const monthsCount = new Date().getMonth() + 1
         const prevMonths = Array.from({ length: monthsCount }, (_, idx) => {
           const m = String(idx + 1).padStart(2, '0')
           return `${prevYear}-${m}`
@@ -971,7 +993,7 @@ export function useDashboardData() {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
           let prevLabel = ''
           if (prevData?.month) {
-            const dateObj = new Date(`${prevData.month}-01`)
+            const dateObj = new Date(`${prevData.month}-01T12:00:00`)
             if (!isNaN(dateObj.getTime())) {
               prevLabel = format(dateObj, 'MMM yyyy')
             }
@@ -1014,7 +1036,7 @@ export function useDashboardData() {
           const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
           let prevLabel = ''
           if (prevData?.month) {
-            const dateObj = new Date(`${prevData.month}-01`)
+            const dateObj = new Date(`${prevData.month}-01T12:00:00`)
             if (!isNaN(dateObj.getTime())) {
               prevLabel = format(dateObj, 'MMM yyyy')
             }

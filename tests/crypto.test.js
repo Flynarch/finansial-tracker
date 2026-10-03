@@ -39,9 +39,9 @@ describe('Crypto & PIN Hashing Utilities', () => {
     expect(await verifyPin('0000', '1234')).toBe(false)
   })
 
-  it('returns true if no stored secret exists', async () => {
-    expect(await verifyPin('1234', '')).toBe(true)
-    expect(await verifyPin('1234', null)).toBe(true)
+  it('returns false if no stored secret exists', async () => {
+    expect(await verifyPin('1234', '')).toBe(false)
+    expect(await verifyPin('1234', null)).toBe(false)
   })
 
   it('derives and verifies PBKDF2 PIN hashes with unique salts', async () => {

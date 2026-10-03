@@ -62,13 +62,21 @@ export function loadEntityCache() {
   return entityCache
 }
 
+export const MAX_ENTITY_CACHE_SIZE = 250
+
 /**
- * Persists the in-memory cache to localStorage.
+ * Persists the in-memory cache to localStorage with LRU eviction.
  */
 export function saveEntityCache() {
   if (!entityCache || typeof localStorage === 'undefined') return
 
   try {
+    if (entityCache.size > MAX_ENTITY_CACHE_SIZE) {
+      const sorted = [...entityCache.entries()].sort(
+        (a, b) => (b[1]?.lastUsedAt || 0) - (a[1]?.lastUsedAt || 0)
+      )
+      entityCache = new Map(sorted.slice(0, MAX_ENTITY_CACHE_SIZE))
+    }
     const obj = Object.fromEntries(entityCache.entries())
     localStorage.setItem(ENTITY_MEMORY_KEY, JSON.stringify(obj))
   } catch (err) {
@@ -100,11 +108,16 @@ export function preseedEntityMemoryFromDb(db = defaultDb) {
   return db.transactions
     .filter((tx) => !tx.isArchived && tx.type !== 'transfer' && Boolean(tx.notes || tx.merchant))
     .toArray()
-    .then((txs) => {
-      if (!txs || txs.length === 0) {
+    .then((allTxs) => {
+      if (!allTxs || allTxs.length === 0) {
         isPreseeded = true
         return 0
       }
+
+      // Cap to latest 300 transactions to prevent memory spikes
+      const txs = allTxs
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .slice(0, 300)
 
       // Group by normalized entity key
       const groupings = new Map()
@@ -397,4 +410,3 @@ export function updateEntityMemory(oldTx, newTx) {
     rememberTransactionEntity(newTx)
   }
 }
-

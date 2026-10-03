@@ -151,7 +151,11 @@ export default function ReportDonutSection({
           <div className="relative flex h-64 sm:h-72 w-full items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Tooltip content={<ChartTooltip currency={defaultCurrency} />} />
+                <Tooltip
+                  content={<ChartTooltip currency={defaultCurrency} />}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                  wrapperStyle={{ pointerEvents: 'none', zIndex: 50 }}
+                />
                 <Pie
                   data={donutData}
                   dataKey="value"

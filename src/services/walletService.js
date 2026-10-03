@@ -54,6 +54,18 @@ export async function archiveWallet(id) {
   const walletId = Number(id)
   const res = await db.wallets.update(walletId, { isArchived: 1 })
   await invalidateWalletBalance([walletId])
+
+  try {
+    const useSettingsStore = (await import('../store/useSettingsStore')).default
+    const { defaultWalletId, setDefaultWalletId } = useSettingsStore.getState()
+    if (Number(defaultWalletId) === walletId) {
+      const remainingActive = await db.wallets.filter((w) => !w.isArchived && w.id !== walletId).first()
+      await setDefaultWalletId(remainingActive ? remainingActive.id : null)
+    }
+  } catch (err) {
+    console.warn('[walletService:archiveWallet]', err)
+  }
+
   return res
 }
 

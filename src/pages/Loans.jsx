@@ -661,20 +661,20 @@ export default function Loans() {
                           />
                         </div>
 
-                        <div className="shrink-0 text-[11px] font-extrabold tabular-nums">
+                        <div className="shrink-0 max-w-[60%] truncate text-[11px] font-extrabold tabular-nums">
                           {isForgiven ? (
-                            <span className="text-[var(--forgiven)] flex items-center gap-1 font-black">
-                              <HeartHandshake className="h-3 w-3" /> {formatCurrency(item.total, item.currency || defaultCurrency)}
+                            <span className="text-[var(--forgiven)] flex items-center gap-1 font-black truncate min-w-0">
+                              <HeartHandshake className="h-3 w-3 shrink-0" /> <span className="truncate min-w-0">{formatCurrency(item.total, item.currency || defaultCurrency)}</span>
                             </span>
                           ) : isPaid ? (
-                            <span className="text-emerald-500 flex items-center gap-1 font-black">
-                              <CheckCircle2 className="h-3 w-3" /> {formatCurrency(item.total, item.currency || defaultCurrency)}
+                            <span className="text-emerald-500 flex items-center gap-1 font-black truncate min-w-0">
+                              <CheckCircle2 className="h-3 w-3 shrink-0" /> <span className="truncate min-w-0">{formatCurrency(item.total, item.currency || defaultCurrency)}</span>
                             </span>
                           ) : (
-                            <span className="text-[var(--fg)] font-black">
+                            <span className="text-[var(--fg)] font-black inline-block max-w-full truncate">
                               {formatCurrency(item.remaining, item.currency || defaultCurrency)}
                               <span className="text-[var(--muted)] font-normal text-[10px]">
-                                / {formatCurrency(item.total, item.currency || defaultCurrency)}
+                                {' '}/ {formatCurrency(item.total, item.currency || defaultCurrency)}
                               </span>
                             </span>
                           )}

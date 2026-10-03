@@ -1,4 +1,6 @@
 import { format } from 'date-fns'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { db } from '../../db'
 
 export async function handleTodoAction(result) {
@@ -50,7 +52,12 @@ export async function handleTodoAction(result) {
   } else if (result.action === 'complete') {
     const matched = todos.find((t) => !t.completed && fuzzyMatch(t.title, result.title))
     if (matched) {
-      await db.todos.update(matched.id, { completed: true })
+      await db.todos.update(matched.id, { completed: true, completedAt: new Date().toISOString() })
+      if (Capacitor.isNativePlatform()) {
+        await LocalNotifications.cancel({
+          notifications: [{ id: 100000 + matched.id * 10 + 1 }, { id: 100000 + matched.id * 10 + 2 }],
+        }).catch(() => {})
+      }
       newMsgs.push({
         id: Date.now() + 3,
         role: 'ai',

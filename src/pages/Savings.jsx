@@ -126,11 +126,12 @@ function Savings() {
 
   const processedGoals = useMemo(() => {
     return (goals ?? []).map((g) => {
-      const isArch = g.isCompleted || g.isArchived
+      const isCompleted = Boolean(g.isCompleted)
+      const isArch = isCompleted || Boolean(g.isArchived)
       const target = toSafeNumber(g.targetAmount)
-      const current = isArch ? target : toSafeNumber(g.currentAmount)
-      const pct = isArch ? 100 : target > 0 ? clampPercent((current / target) * 100) : 0
-      const remaining = isArch ? 0 : Math.max(0, target - current)
+      const current = toSafeNumber(g.currentAmount)
+      const pct = isCompleted ? 100 : target > 0 ? clampPercent((current / target) * 100) : 0
+      const remaining = isCompleted ? 0 : Math.max(0, target - current)
 
       let deadlineText = null
       let isOverdue = false

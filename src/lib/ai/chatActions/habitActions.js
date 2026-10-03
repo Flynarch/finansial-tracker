@@ -38,7 +38,7 @@ export async function handleHabitAction(result) {
     const matched = habits.find((h) => fuzzyMatch(h.title, result.title))
     if (matched) {
       const todayStr = format(new Date(), 'yyyy-MM-dd')
-      const existingLog = await db.habitLogs.where({ habitId: matched.id, date: todayStr }).first()
+      const existingLog = await db.habitLogs.where('habitId').equals(matched.id).filter(l => l.date === todayStr).first()
       if (!existingLog) {
         await db.habitLogs.add({ habitId: matched.id, date: todayStr })
       }
@@ -70,7 +70,7 @@ export async function handleHabitAction(result) {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     let count = 0
     for (const h of habits) {
-      const existingLog = await db.habitLogs.where({ habitId: h.id, date: todayStr }).first()
+      const existingLog = await db.habitLogs.where('habitId').equals(h.id).filter(l => l.date === todayStr).first()
       if (!existingLog) {
         await db.habitLogs.add({ habitId: h.id, date: todayStr })
         count++

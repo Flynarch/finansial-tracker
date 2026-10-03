@@ -9,6 +9,7 @@ import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { resolveExpenseParentIconKey } from '../../lib/categoryIcon'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
+import useSettingsStore from '../../store/useSettingsStore'
 import useBackButton from '../../hooks/useBackButton'
 import { formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../../lib/utils'
 import { getMergedExpenseTree, parseExpenseCategoryPath } from '../../lib/expenseCategories'
@@ -141,6 +142,7 @@ export default function BudgetSheetModal({
   onDelete,
 }) {
   const { locale, t } = useTranslation()
+  const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [sheetError, setSheetError] = useState('')
   const [expandedParentId, setExpandedParentId] = useState(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
@@ -238,6 +240,7 @@ export default function BudgetSheetModal({
       month: form.month,
       category: String(form.categoryPath || '').trim(),
       limit: toSafeNumber(form.limit),
+      currency: editingBudget?.currency || defaultCurrency,
     }
     if (!payload.category) {
       setSheetError(t('budget.validation.category'))
@@ -250,6 +253,15 @@ export default function BudgetSheetModal({
     try {
       setSheetError('')
       if (editingBudget?.id) {
+        const existing = await db.budgets
+          .where('month')
+          .equals(payload.month)
+          .and((b) => b.category === payload.category && b.id !== editingBudget.id)
+          .first()
+        if (existing) {
+          setSheetError(t('budget.error.alreadyExists', 'Anggaran untuk kategori ini di bulan ini sudah ada.'))
+          return
+        }
         await db.budgets.update(editingBudget.id, payload)
       } else {
         // Upsert if budget for this month and category already exists
@@ -259,7 +271,7 @@ export default function BudgetSheetModal({
           .and((b) => b.category === payload.category)
           .first()
         if (existing) {
-          await db.budgets.update(existing.id, { limit: payload.limit })
+          await db.budgets.update(existing.id, { limit: payload.limit, currency: payload.currency })
         } else {
           await db.budgets.add(payload)
         }

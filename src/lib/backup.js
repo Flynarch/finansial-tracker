@@ -23,6 +23,7 @@ export async function exportAllDataAsJson() {
     loanPayments,
     ideas,
     boardLinks,
+    chatMessages,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.investments.toArray(),
@@ -43,6 +44,7 @@ export async function exportAllDataAsJson() {
     db.loanPayments.toArray(),
     db.ideas.toArray(),
     db.board_links.toArray(),
+    db.chatMessages ? db.chatMessages.toArray().catch(() => []) : Promise.resolve([]),
   ])
 
   let expenseCustom = null
@@ -98,16 +100,107 @@ export async function exportAllDataAsJson() {
       wallets,
       loans,
       loanPayments,
+      chatMessages: chatMessages || [],
     },
   }
 }
 
 export async function importAllDataFromJsonPayload(payload) {
-  if (!payload || typeof payload !== 'object' || !payload.data || typeof payload.data !== 'object') {
+  const data = (payload && typeof payload === 'object' && payload.data && typeof payload.data === 'object')
+    ? payload.data
+    : (payload && typeof payload === 'object' ? payload : null)
+  if (!data || typeof data !== 'object') {
     throw new Error('Format berkas cadangan tidak valid atau data kosong.')
   }
-  const data = payload.data || {}
 
+  // 1. Capture current device authentication & security state to prevent session loss or lockout
+  const existingSettings = await db.settings.get('preferences').catch(() => null)
+
+  // 2. Clear tables excluding db.settings to preserve active session while updating
+  const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
+
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(tablesToClear.map((table) => table.clear()))
+
+    if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+      const normalizedTxs = data.transactions.map((tx) => ({
+        ...tx,
+        deletedAt: tx.deletedAt !== undefined ? tx.deletedAt : null,
+      }))
+      await db.transactions.bulkPut(normalizedTxs)
+    }
+    if (Array.isArray(data.investments) && data.investments.length > 0) await db.investments.bulkPut(data.investments)
+    if (Array.isArray(data.investmentOrders) && data.investmentOrders.length > 0) await db.investmentOrders.bulkPut(data.investmentOrders)
+    if (Array.isArray(data.budgets) && data.budgets.length > 0) await db.budgets.bulkPut(data.budgets)
+    if (Array.isArray(data.goals) && data.goals.length > 0) await db.goals.bulkPut(data.goals)
+    if (Array.isArray(data.goalLogs) && data.goalLogs.length > 0) await db.goalLogs.bulkPut(data.goalLogs)
+    if (Array.isArray(data.calendarEvents) && data.calendarEvents.length > 0) await db.calendarEvents.bulkPut(data.calendarEvents)
+    if (Array.isArray(data.recurringTransactions) && data.recurringTransactions.length > 0)
+      await db.recurringTransactions.bulkPut(data.recurringTransactions)
+    if (Array.isArray(data.todos) && data.todos.length > 0) await db.todos.bulkPut(data.todos)
+    if (Array.isArray(data.sub_tasks) && data.sub_tasks.length > 0) await db.sub_tasks.bulkPut(data.sub_tasks)
+    if (Array.isArray(data.habits) && data.habits.length > 0) {
+      const normalizedHabits = data.habits.map((h) => ({
+        ...h,
+        frequencyType: h.frequencyType || 'daily',
+      }))
+      await db.habits.bulkPut(normalizedHabits)
+    }
+    if (Array.isArray(data.habitLogs) && data.habitLogs.length > 0) await db.habitLogs.bulkPut(data.habitLogs)
+    if (Array.isArray(data.ideas) && data.ideas.length > 0) await db.ideas.bulkPut(data.ideas)
+    if (Array.isArray(data.board_links) && data.board_links.length > 0) await db.board_links.bulkPut(data.board_links)
+    if (Array.isArray(data.notifications) && data.notifications.length > 0) await db.notifications.bulkPut(data.notifications)
+    if (Array.isArray(data.wallets) && data.wallets.length > 0) {
+      const normalizedWallets = data.wallets.map((w) => ({
+        ...w,
+        isArchived: w.isArchived ? 1 : 0,
+      }))
+      await db.wallets.bulkPut(normalizedWallets)
+    }
+    if (Array.isArray(data.loans) && data.loans.length > 0) {
+      const normalizedLoans = data.loans.map((l) => ({
+        ...l,
+        remainingAmount: l.remainingAmount ?? l.totalAmount,
+      }))
+      await db.loans.bulkPut(normalizedLoans)
+    }
+    if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkPut(data.loanPayments)
+    if (Array.isArray(data.chatMessages) && data.chatMessages.length > 0 && db.chatMessages) await db.chatMessages.bulkPut(data.chatMessages)
+
+    // Merge settings: preserve active logged-in Google / Email user credentials and device lock
+    if (Array.isArray(data.settings) && data.settings.length > 0) {
+      const backupSetting = data.settings.find((s) => s.key === 'preferences') || data.settings.find((s) => s.key === 'fintrack_settings_v1') || data.settings[0]
+      const merged = {
+        ...backupSetting,
+        key: 'preferences',
+        // Preserve active session if currently signed in, or preserve guest session if currently guest
+        authProvider: existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
+          ? existingSettings.authProvider
+          : 'guest',
+        authUserEmail: existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
+          ? existingSettings.authUserEmail
+          : '',
+        authUserId: existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
+          ? existingSettings.authUserId
+          : '',
+        emailVerified: existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
+          ? Boolean(existingSettings.emailVerified)
+          : false,
+        // Preserve device security configuration if currently enabled
+        ...(existingSettings?.securityEnabled && existingSettings?.lockSecret
+          ? {
+              securityEnabled: existingSettings.securityEnabled,
+              securityMethod: existingSettings.securityMethod,
+              lockSecret: existingSettings.lockSecret,
+              autoLockTimeout: existingSettings.autoLockTimeout,
+            }
+          : {}),
+      }
+      await db.settings.put(merged)
+    }
+  })
+
+  // Apply custom category customizations to localStorage ONLY after Dexie transaction succeeds
   if (payload.categoryCustomizations?.expense) {
     try {
       if (typeof localStorage !== 'undefined') {
@@ -136,64 +229,6 @@ export async function importAllDataFromJsonPayload(payload) {
       /* ignore */
     }
   }
-
-  // 1. Capture current device authentication & security state to prevent session loss or lockout
-  const existingSettings = await db.settings.get('preferences').catch(() => null)
-
-  // 2. Clear tables excluding db.settings to preserve active session while updating
-  const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
-
-  await db.transaction('rw', db.tables, async () => {
-    await Promise.all(tablesToClear.map((table) => table.clear()))
-
-    if (Array.isArray(data.transactions) && data.transactions.length > 0) await db.transactions.bulkAdd(data.transactions)
-    if (Array.isArray(data.investments) && data.investments.length > 0) await db.investments.bulkAdd(data.investments)
-    if (Array.isArray(data.investmentOrders) && data.investmentOrders.length > 0) await db.investmentOrders.bulkAdd(data.investmentOrders)
-    if (Array.isArray(data.budgets) && data.budgets.length > 0) await db.budgets.bulkAdd(data.budgets)
-    if (Array.isArray(data.goals) && data.goals.length > 0) await db.goals.bulkAdd(data.goals)
-    if (Array.isArray(data.goalLogs) && data.goalLogs.length > 0) await db.goalLogs.bulkAdd(data.goalLogs)
-    if (Array.isArray(data.calendarEvents) && data.calendarEvents.length > 0) await db.calendarEvents.bulkAdd(data.calendarEvents)
-    if (Array.isArray(data.recurringTransactions) && data.recurringTransactions.length > 0)
-      await db.recurringTransactions.bulkAdd(data.recurringTransactions)
-    if (Array.isArray(data.todos) && data.todos.length > 0) await db.todos.bulkAdd(data.todos)
-    if (Array.isArray(data.sub_tasks) && data.sub_tasks.length > 0) await db.sub_tasks.bulkAdd(data.sub_tasks)
-    if (Array.isArray(data.habits) && data.habits.length > 0) await db.habits.bulkAdd(data.habits)
-    if (Array.isArray(data.habitLogs) && data.habitLogs.length > 0) await db.habitLogs.bulkAdd(data.habitLogs)
-    if (Array.isArray(data.ideas) && data.ideas.length > 0) await db.ideas.bulkAdd(data.ideas)
-    if (Array.isArray(data.board_links) && data.board_links.length > 0) await db.board_links.bulkAdd(data.board_links)
-    if (Array.isArray(data.notifications) && data.notifications.length > 0) await db.notifications.bulkAdd(data.notifications)
-    if (Array.isArray(data.wallets) && data.wallets.length > 0) await db.wallets.bulkAdd(data.wallets)
-    if (Array.isArray(data.loans) && data.loans.length > 0) await db.loans.bulkAdd(data.loans)
-    if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkAdd(data.loanPayments)
-
-    // Merge settings: preserve active logged-in Google / Email user credentials and device lock
-    if (Array.isArray(data.settings) && data.settings.length > 0) {
-      const backupSetting = data.settings.find((s) => s.key === 'preferences') || data.settings.find((s) => s.key === 'fintrack_settings_v1') || data.settings[0]
-      const merged = {
-        ...backupSetting,
-        key: 'preferences',
-        // Preserve active session if currently signed in
-        ...(existingSettings?.authUserId && existingSettings?.authProvider !== 'guest'
-          ? {
-              authProvider: existingSettings.authProvider,
-              authUserEmail: existingSettings.authUserEmail,
-              authUserId: existingSettings.authUserId,
-              emailVerified: existingSettings.emailVerified,
-            }
-          : {}),
-        // Preserve device security configuration if currently enabled
-        ...(existingSettings?.securityEnabled && existingSettings?.lockSecret
-          ? {
-              securityEnabled: existingSettings.securityEnabled,
-              securityMethod: existingSettings.securityMethod,
-              lockSecret: existingSettings.lockSecret,
-              autoLockTimeout: existingSettings.autoLockTimeout,
-            }
-          : {}),
-      }
-      await db.settings.put(merged)
-    }
-  })
 
   // Ensure at least one wallet exists if none were in the backup
   const walletCount = await db.wallets.count()

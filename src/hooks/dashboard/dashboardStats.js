@@ -50,7 +50,10 @@ export function calculateRangeNetWorthGrowth(range, currentNetWorth, chartData, 
     if (range === '1w') sourceData = chartData?.data1w
     else if (range === '1m') sourceData = chartData?.data1m
     else if (range === '3m') sourceData = chartData?.data3m
-    else if (range === 'ytd') sourceData = chartData?.dataYtd
+    else if (range === 'ytd') {
+      const currentYearStr = String(new Date().getFullYear())
+      sourceData = (chartData?.dataYtd || []).filter((r) => r?.key && r.key.startsWith(currentYearStr))
+    }
     else if (range === '1y') sourceData = chartData?.data1y
     else if (range === 'all') sourceData = chartData?.dataAll
 
@@ -93,6 +96,7 @@ export function calculatePeriodStats(safeTx, period, defaultCurrency = 'IDR', ra
 
   const raw = safeTx.reduce(
     (acc, tx) => {
+      if (tx?.isPendingReview === true || tx?.isPendingReview === 1) return acc
       const txDate = (tx?.date || '').slice(0, 10)
       if (!txDate || txDate < period.startDate || txDate > period.endDate) return acc
 

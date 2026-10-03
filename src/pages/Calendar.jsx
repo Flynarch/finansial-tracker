@@ -12,7 +12,10 @@ import PageHeader from '../components/ui/PageHeader'
 import CategoryIcon from '../components/ui/CategoryIcon'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
+import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import { db } from '../lib/db'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { createTransaction } from '../services/transactionService'
 import useTranslation from '../hooks/useTranslation'
 import useBackButton from '../hooks/useBackButton'
@@ -39,7 +42,9 @@ function toDateOnlyString(date) {
 }
 
 function toLocalDate(dateString) {
-  return new Date(`${dateString}T12:00:00`)
+  if (!dateString) return new Date()
+  const cleanDate = String(dateString).split('T')[0]
+  return new Date(`${cleanDate}T12:00:00`)
 }
 
 function sameDate(a, b) {
@@ -143,6 +148,7 @@ function Calendar() {
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [dayTab, setDayTab] = useState('items') // items | add
+  const [editingTx, setEditingTx] = useState(null)
 
   useBackButton(
     () => setDayTab('items'),
@@ -163,13 +169,13 @@ function Calendar() {
     color: 'var(--accent)',
   })
 
-  const calStart = useMemo(() => format(startOfMonth(subMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
-  const calEnd = useMemo(() => format(endOfMonth(addMonths(selectedDate, 2)), 'yyyy-MM-dd'), [selectedDate])
+  const calStart = useMemo(() => format(subMonths(startOfMonth(selectedDate), 2), 'yyyy-MM-dd'), [selectedDate])
+  const calEnd = useMemo(() => format(endOfMonth(addMonths(startOfMonth(selectedDate), 2)), 'yyyy-MM-dd'), [selectedDate])
 
   const transactions = useLiveQuery(
     async () => {
-      const list = await db.transactions.where('date').between(calStart, calEnd, true, true).toArray()
-      return (list || []).filter((tx) => !tx.deletedAt)
+      const list = await db.transactions.where('date').between(calStart, `${calEnd}\uffff`, true, true).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
     },
     [calStart, calEnd],
     []
@@ -197,7 +203,9 @@ function Calendar() {
   )
 
   const calendarEvents = useMemo(() => {
-    const txEvents = (transactions || []).map((tx) => ({
+    const txEvents = (transactions || [])
+      .filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
+      .map((tx) => ({
       id: `tx-${tx.id}`,
       source: 'transaction',
       sourceId: tx.id,
@@ -262,12 +270,23 @@ function Calendar() {
       map.set(dateKey, { ...prev, ...patch })
     }
     ;(transactions || []).forEach((tx) => {
-      if (!tx?.date) return
+      if (!tx?.date || tx.isPendingReview === true || tx.isPendingReview === 1) return
       const prev = map.get(tx.date) || { income: 0, expense: 0, reminder: 0 }
+      let inc = 0
+      let exp = 0
+      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+        tx.splitItems.forEach((si) => {
+          if (si.type === 'income') inc++
+          else if (si.type === 'expense' || !si.type) exp++
+        })
+      } else {
+        if (tx.type === 'income') inc++
+        else if (tx.type === 'expense') exp++
+      }
       map.set(tx.date, {
         ...prev,
-        income: prev.income + (tx.type === 'income' ? 1 : 0),
-        expense: prev.expense + (tx.type === 'expense' ? 1 : 0),
+        income: prev.income + inc,
+        expense: prev.expense + exp,
       })
     })
     ;(importantEvents || []).forEach((ev) => {
@@ -292,10 +311,10 @@ function Calendar() {
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)
     return {
-      transactions: (transactions || []).filter((tx) => tx.date === target),
-      events: (importantEvents || []).filter((event) => event.date === target),
-      loans: (loans || []).filter((loan) => loan.dueDate === target),
-      todos: (todos || []).filter((todo) => todo.dueDate === target),
+      transactions: (transactions || []).filter((tx) => (tx.date ? String(tx.date).slice(0, 10) === target : false)),
+      events: (importantEvents || []).filter((event) => (event.date ? String(event.date).slice(0, 10) === target : false)),
+      loans: (loans || []).filter((loan) => (loan.dueDate ? String(loan.dueDate).slice(0, 10) === target : false)),
+      todos: (todos || []).filter((todo) => (todo.dueDate ? String(todo.dueDate).slice(0, 10) === target : false)),
     }
   }, [importantEvents, loans, todos, selectedDate, transactions])
 
@@ -449,7 +468,16 @@ function Calendar() {
                     dayItems.transactions.map((tx) => (
                       <div
                         key={tx.id}
-                        className="group relative overflow-hidden rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_60%,transparent)] p-3 transition hover:bg-[var(--field-bg)]"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setEditingTx(tx)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setEditingTx(tx)
+                          }
+                        }}
+                        className="group relative overflow-hidden rounded-[1rem] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] bg-[color-mix(in_srgb,var(--panel-strong)_60%,transparent)] p-3 transition hover:bg-[var(--field-bg)] cursor-pointer active:scale-[0.99]"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
@@ -506,7 +534,7 @@ function Calendar() {
                                 color: tx.type === 'income' ? 'var(--status-income)' : tx.type === 'transfer' ? 'var(--accent)' : 'var(--status-expense)',
                               }}
                             >
-                              {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '-'} {formatCurrency(tx.amount, tx.currency)}
+                              {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''} {formatCurrency(tx.amount, tx.currency)}
                             </p>
                           </div>
                         </div>
@@ -613,7 +641,16 @@ function Calendar() {
                           <button
                             type="button"
                             onClick={async () => {
-                              await db.todos.update(todo.id, { completed: !todo.completed })
+                              const next = !todo.completed
+                              await db.todos.update(todo.id, {
+                                completed: next,
+                                ...(next ? { completedAt: new Date().toISOString() } : { completedAt: null }),
+                              })
+                              if (next && Capacitor.isNativePlatform()) {
+                                await LocalNotifications.cancel({
+                                  notifications: [{ id: 100000 + todo.id * 10 + 1 }, { id: 100000 + todo.id * 10 + 2 }],
+                                }).catch(() => {})
+                              }
                             }}
                             className="text-[var(--accent)] hover:scale-110 active:scale-95 transition shrink-0 cursor-pointer"
                             aria-label={todo.title}
@@ -866,6 +903,17 @@ function Calendar() {
           )}
         </div>
       </Modal>
+
+      {editingTx && (
+        <TransactionEditSheet
+          isOpen={Boolean(editingTx)}
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+          onSaved={() => setEditingTx(null)}
+          wallets={wallets}
+          locale={locale}
+        />
+      )}
     </div>
   </div>
   )

@@ -47,17 +47,22 @@ export async function createTransaction(payload) {
     }
   }
 
+  let srcWallet = null
+  if (resolvedWalletId) {
+    srcWallet = await db.wallets.get(Number(resolvedWalletId))
+    if (srcWallet?.isArchived) {
+      throw new Error('Dompet asal tidak valid atau sudah diarsipkan.')
+    }
+  }
+
   if (payload?.type === 'transfer') {
     if (!payload?.targetWalletId || String(payload.targetWalletId) === String(resolvedWalletId)) {
       throw new Error('Dompet tujuan transfer wajib dipilih dan harus berbeda dengan dompet asal.')
     }
-    const [srcWallet, tgtWallet] = await Promise.all([
-      db.wallets.get(Number(resolvedWalletId)),
-      db.wallets.get(Number(payload.targetWalletId)),
-    ])
     if (!srcWallet || srcWallet.isArchived) {
       throw new Error('Dompet asal tidak valid atau sudah diarsipkan.')
     }
+    const tgtWallet = await db.wallets.get(Number(payload.targetWalletId))
     if (!tgtWallet || tgtWallet.isArchived) {
       throw new Error('Dompet tujuan transfer tidak valid atau sudah diarsipkan.')
     }
@@ -71,13 +76,17 @@ export async function createTransaction(payload) {
 
   let cleanCurrency = payload?.currency
   if (!cleanCurrency && resolvedWalletId) {
-    try {
-      const srcWallet = await db.wallets.get(Number(resolvedWalletId))
-      if (srcWallet?.currency) {
-        cleanCurrency = srcWallet.currency
+    if (srcWallet?.currency) {
+      cleanCurrency = srcWallet.currency
+    } else {
+      try {
+        const fetchedWallet = await db.wallets.get(Number(resolvedWalletId))
+        if (fetchedWallet?.currency) {
+          cleanCurrency = fetchedWallet.currency
+        }
+      } catch (err) {
+        console.error('[createTransaction:getWalletCurrency]', err)
       }
-    } catch (err) {
-      console.error('[createTransaction:getWalletCurrency]', err)
     }
   }
 
@@ -86,7 +95,7 @@ export async function createTransaction(payload) {
 
   let createdId
   try {
-    await db.transaction('rw', [db.transactions, db.budgets, db.goals, db.goalLogs, db.loans, db.loanPayments], async () => {
+    await db.transaction('rw', [db.transactions], async () => {
       createdId = await db.transactions.add({
         ...dataWithoutId,
         walletId: cleanWalletId,
@@ -201,7 +210,7 @@ export async function updateTransaction(id, fields) {
   const extraAffectedWallets = []
 
   try {
-    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
+    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs, db.investments, db.investmentOrders], async () => {
     const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
     const rates = getCachedCurrencyRates('USD')
     const oldAmt = Number(existing.amount) || 0
@@ -213,7 +222,7 @@ export async function updateTransaction(id, fields) {
     if (existing.splitBillId) {
       const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
       const isTalanganTx =
-        linkedLoans.some((l) => l.initialTransactionId === existing.id) ||
+        linkedLoans.some((l) => Number(l.initialTransactionId) === cleanId || l.initialTransactionId === cleanId || Number(l.initialTransactionId) === Number(existing.id)) ||
         Boolean(existing.isExcludeAnalyticsTx) ||
         existing.category === 'Pinjaman Diberikan'
 
@@ -221,11 +230,13 @@ export async function updateTransaction(id, fields) {
         const activeParticipantLoans = linkedLoans.filter(
           (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
         )
+        const loanCurrency = activeParticipantLoans[0]?.currency || existing.currency || defaultCurrency
         const activeLoansSum = activeParticipantLoans.reduce(
-          (sum, l) => sum + (Number(l.remainingAmount) || 0),
+          (sum, l) => sum + convertCurrency(Number(l.remainingAmount) || 0, l.currency || loanCurrency, loanCurrency, rates),
           0,
         )
-        if (newAmt < activeLoansSum) {
+        const newAmtInLoanCurrency = convertCurrency(newAmt, newCurrency, loanCurrency, rates)
+        if (newAmtInLoanCurrency < activeLoansSum) {
           throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari sisa pinjaman aktif partisipan.')
         }
       }
@@ -238,6 +249,12 @@ export async function updateTransaction(id, fields) {
     }
     if (!loan) {
       loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+      if (!loan && typeof cleanId === 'number') {
+        loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+      }
+    }
+    if (!loan && existing.splitBillId) {
+      loan = await db.loans.where('splitBillId').equals(existing.splitBillId).first()
     }
     if (loan) {
       const loanCurrency = loan.currency || defaultCurrency
@@ -319,20 +336,80 @@ export async function updateTransaction(id, fields) {
               }
             }
           }
-        } else if (loan.initialTransactionId === cleanId && (loan.status === 'active' || loan.status === 'partially_paid')) {
-          if (newAmtNorm !== oldAmtNorm) {
-            const delta = newAmtNorm - oldAmtNorm
-            const newTotal = Math.max(0, (Number(loan.totalAmount) || 0) + delta)
-            const newRemaining = Math.max(0, (Number(loan.remainingAmount) || 0) + delta)
-            const newStatus = newRemaining <= 0 ? 'paid' : (newRemaining < newTotal ? 'partially_paid' : 'active')
-            await db.loans.update(loan.id, {
-              totalAmount: newTotal,
-              remainingAmount: newRemaining,
-              status: newStatus,
-            })
+        } else if (
+          Number(loan.initialTransactionId) === cleanId ||
+          loan.initialTransactionId === cleanId ||
+          Boolean(existing.splitBillId)
+        ) {
+          let linkedLoans = await db.loans.where('initialTransactionId').equals(cleanId).toArray()
+          if (linkedLoans.length === 0 && typeof cleanId === 'number') {
+            linkedLoans = await db.loans.where('initialTransactionId').equals(String(cleanId)).toArray()
+          }
+          if (linkedLoans.length === 0 && existing.splitBillId) {
+            linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
+          }
+          const eligibleLoans = linkedLoans.filter((l) => l.status === 'active' || l.status === 'partially_paid')
+          const sumTotalLoans = eligibleLoans.reduce(
+            (sum, l) => sum + convertCurrency(Number(l.totalAmount) || 0, l.currency || loanCurrency, loanCurrency, rates),
+            0,
+          )
+          if (eligibleLoans.length > 0 && newAmtNorm !== oldAmtNorm) {
+            const deltaTotal = newAmtNorm - oldAmtNorm
+            let distributedDelta = 0
+            for (let i = 0; i < eligibleLoans.length; i++) {
+              const l = eligibleLoans[i]
+              const lTotalInLoanCur = convertCurrency(Number(l.totalAmount) || 0, l.currency || loanCurrency, loanCurrency, rates)
+              const ratio = sumTotalLoans > 0 ? lTotalInLoanCur / sumTotalLoans : 1 / eligibleLoans.length
+
+              let deltaPartInLoanCur
+              if (i === eligibleLoans.length - 1) {
+                deltaPartInLoanCur = deltaTotal - distributedDelta
+              } else {
+                deltaPartInLoanCur = Math.round(deltaTotal * ratio)
+                distributedDelta += deltaPartInLoanCur
+              }
+
+              const deltaPart = roundCurrency(
+                convertCurrency(deltaPartInLoanCur, loanCurrency, l.currency || loanCurrency, rates),
+                l.currency || loanCurrency,
+              )
+              const newTotal = Math.max(0, (Number(l.totalAmount) || 0) + deltaPart)
+              const newRemaining = Math.max(0, (Number(l.remainingAmount) || 0) + deltaPart)
+              const newStatus = newRemaining <= 0 ? 'paid' : (newRemaining < newTotal ? 'partially_paid' : 'active')
+              await db.loans.update(l.id, {
+                totalAmount: newTotal,
+                remainingAmount: newRemaining,
+                status: newStatus,
+                ...(newStatus === 'paid'
+                  ? { paidDate: fields.date || existing.date || format(new Date(), 'yyyy-MM-dd'), paidAt: Date.now() }
+                  : { paidDate: null, paidAt: null }),
+              })
+            }
           }
         }
       }
+
+    // Synchronize linked investment & investment orders if applicable
+    if (existing.investmentId) {
+      const investment = await db.investments.get(Number(existing.investmentId))
+      if (investment) {
+        const orderCandidates = await db.investmentOrders
+          .filter((o) => Number(o.transactionId) === cleanId || o.transactionId === cleanId || (existing.investmentOrderId && Number(o.id) === Number(existing.investmentOrderId)))
+          .toArray()
+        for (const order of orderCandidates) {
+          const orderUpdates = {}
+          if (fields.amount !== undefined && Number(fields.amount) !== Number(existing.amount)) {
+            orderUpdates.totalAmount = Number(fields.amount)
+          }
+          if (fields.date && fields.date !== existing.date) {
+            orderUpdates.date = fields.date
+          }
+          if (Object.keys(orderUpdates).length > 0) {
+            await db.investmentOrders.update(order.id, orderUpdates)
+          }
+        }
+      }
+    }
 
     // 3. Synchronize linked savings goal & goal logs if applicable
     if (existing.goalId) {
@@ -409,8 +486,15 @@ export async function updateTransaction(id, fields) {
       if (sanitizedFields.targetWalletId !== undefined) {
         sanitizedFields.targetWalletId = sanitizedFields.targetWalletId ? Number(sanitizedFields.targetWalletId) : null
       }
-      if (sanitizedFields.type !== undefined && sanitizedFields.type !== 'transfer') {
+      if (sanitizedFields.targetAmount !== undefined && sanitizedFields.targetAmount !== null) {
+        const num = Number(sanitizedFields.targetAmount)
+        sanitizedFields.targetAmount = Number.isFinite(num) && num > 0 ? roundCurrency(num) : null
+      }
+      if (effectiveType !== 'transfer') {
         sanitizedFields.targetWalletId = null
+        sanitizedFields.targetAmount = null
+      } else if (sanitizedFields.targetAmount !== undefined && !sanitizedFields.targetAmount) {
+        sanitizedFields.targetAmount = null
       }
 
       await db.transactions.update(cleanId, sanitizedFields)
@@ -463,7 +547,7 @@ export async function deleteTransaction(id) {
   const extraAffectedWallets = []
 
   try {
-    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs], async () => {
+    await db.transaction('rw', [db.transactions, db.loans, db.loanPayments, db.goals, db.goalLogs, db.investments, db.investmentOrders], async () => {
       const defaultCurrency = useSettingsStore.getState?.()?.defaultCurrency || 'IDR'
       const rates = getCachedCurrencyRates('USD')
 
@@ -471,7 +555,7 @@ export async function deleteTransaction(id) {
       if (existing.splitBillId) {
         const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
         const isTalanganTx =
-          linkedLoans.some((l) => l.initialTransactionId === existing.id) ||
+          linkedLoans.some((l) => Number(l.initialTransactionId) === cleanId || l.initialTransactionId === cleanId || Number(l.initialTransactionId) === Number(existing.id)) ||
           Boolean(existing.isExcludeAnalyticsTx) ||
           existing.category === 'Pinjaman Diberikan'
 
@@ -495,6 +579,9 @@ export async function deleteTransaction(id) {
       }
       if (!loan) {
         loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+        if (!loan && typeof cleanId === 'number') {
+          loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+        }
       }
       if (loan) {
         const isExcessTx = Boolean(existing.isLoanExcess)
@@ -574,8 +661,20 @@ export async function deleteTransaction(id) {
                 ...(isNowActive ? { paidDate: null, paidAt: null } : {}),
               })
             }
-          } else if (loan.initialTransactionId === cleanId) {
-            throw new Error('Transaksi ini merupakan pencairan pokok pinjaman aktif. Silakan kelola atau hapus pinjaman melalui menu Pinjaman.')
+          } else if (Number(loan.initialTransactionId) === cleanId || loan.initialTransactionId === cleanId) {
+            let linkedLoansForInit = await db.loans.where('initialTransactionId').equals(cleanId).toArray()
+            if (linkedLoansForInit.length === 0 && typeof cleanId === 'number') {
+              linkedLoansForInit = await db.loans.where('initialTransactionId').equals(String(cleanId)).toArray()
+            }
+            const hasActiveLoan = linkedLoansForInit.some(
+              (l) => (l.status === 'active' || l.status === 'partially_paid') && (Number(l.remainingAmount) || 0) > 0,
+            )
+            if (hasActiveLoan) {
+              throw new Error('Transaksi ini merupakan pencairan pokok pinjaman aktif. Silakan kelola atau hapus pinjaman melalui menu Pinjaman.')
+            }
+            for (const l of linkedLoansForInit) {
+              await db.loans.update(l.id, { initialTransactionId: null })
+            }
           }
         }
 
@@ -621,8 +720,97 @@ export async function deleteTransaction(id) {
         }
       }
 
-      // 4. Soft-delete transaction from ledger
-      await db.transactions.update(cleanId, { deletedAt: Date.now() })
+      // 4. Investment Holding Reversal on Transaction Deletion
+      if (
+        existing.investmentId ||
+        existing.investmentOrderId ||
+        (typeof existing.notes === 'string' &&
+          /^(?:Buy|Sell)\s+/i.test(existing.notes.trim()) &&
+          (existing.category?.startsWith('investasi') || existing.category?.startsWith('investasi_pengeluaran')))
+      ) {
+        let order = null
+        if (existing.investmentOrderId) {
+          order = await db.investmentOrders.get(Number(existing.investmentOrderId))
+        }
+        if (!order && existing.createdAt) {
+          order = await db.investmentOrders.where('createdAt').equals(Number(existing.createdAt)).first()
+        }
+        if (!order && existing.date) {
+          const candidates = await db.investmentOrders.where('date').equals(existing.date).toArray()
+          order = candidates.find(
+            (o) =>
+              Math.abs(Number(o.totalAmount) - Number(existing.amount)) < 0.01 &&
+              (!existing.notes || (o.name && existing.notes.includes(o.name))),
+          )
+        }
+
+        let holding = null
+        if (existing.investmentId) {
+          holding = await db.investments.get(Number(existing.investmentId))
+        }
+        if (!holding && order) {
+          holding = await db.investments
+            .filter(
+              (inv) =>
+                inv.name?.toLowerCase() === order.name?.toLowerCase() &&
+                (!order.type || inv.type?.toLowerCase() === order.type?.toLowerCase()),
+            )
+            .first()
+        }
+        if (!holding && existing.notes) {
+          const match = existing.notes.trim().match(/^(?:Buy|Sell)\s+(.+)$/i)
+          if (match && match[1]) {
+            const assetName = match[1].trim().toLowerCase()
+            holding = await db.investments.filter((inv) => inv.name?.toLowerCase() === assetName).first()
+          }
+        }
+
+        const isBuy = order
+          ? order.side === 'buy'
+          : existing.type === 'expense' || existing.notes?.toLowerCase().startsWith('buy')
+        const qtyToAdjust = order
+          ? Number(order.quantity) || 0
+          : holding && Number(holding.purchasePrice) > 0
+          ? Number(existing.amount) / Number(holding.purchasePrice)
+          : 0
+
+        if (isBuy) {
+          if (holding && qtyToAdjust > 0) {
+            const currentQty = Number(holding.quantity) || 0
+            const newQty = Math.max(0, currentQty - qtyToAdjust)
+            if (newQty <= 0.000001) {
+              await db.investments.delete(holding.id)
+            } else {
+              await db.investments.update(holding.id, { quantity: newQty })
+            }
+          }
+        } else {
+          // Deleting a sell transaction restores the sold holding
+          if (holding && qtyToAdjust > 0) {
+            const newQty = (Number(holding.quantity) || 0) + qtyToAdjust
+            await db.investments.update(holding.id, { quantity: newQty })
+          } else if (order && qtyToAdjust > 0) {
+            // Holding was deleted when sold out; restore it with original costBasis
+            await db.investments.add({
+              name: order.name,
+              type: order.type || 'Investasi',
+              quantity: qtyToAdjust,
+              purchasePrice: Number(order.costBasis || order.purchasePrice || order.unitPrice) || 0,
+              purchaseCurrency: order.currency || existing.currency || defaultCurrency,
+            })
+          }
+        }
+
+        if (order) {
+          await db.investmentOrders.delete(order.id)
+        }
+      }
+
+      // 5. Soft-delete transaction from ledger and immediately release Base64 receipt memory
+      await db.transactions.update(cleanId, {
+        deletedAt: Date.now(),
+        receiptImage: null,
+      })
     })
   } catch (err) {
     console.error('[transactionService:deleteTransaction]', err)

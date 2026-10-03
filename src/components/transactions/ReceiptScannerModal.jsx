@@ -17,7 +17,7 @@ import { compressImage } from '../../lib/imageCompression'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 
-export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, enableBackButton = false }) {
+export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, enableBackButton = true }) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
   const geminiApiKey = useSettingsStore((s) => s.geminiApiKey)
@@ -30,20 +30,42 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
 
-  const handleFileChange = (e) => {
+  const handleTriggerPicker = (inputRef) => {
+    if (typeof window !== 'undefined') {
+      window.__ft_isMediaPickerActive = true
+      window.dispatchEvent(new CustomEvent('ft-media-picker-active', { detail: true }))
+    }
+    inputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setErrorMsg('')
     setScanResult(null)
 
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      const base64Data = event.target?.result
+    try {
+      // Fix 1.1: Pre-compress image before previewing and streaming to Gemini
+      const compressedData = await compressImage(file, 1024, 0.75)
+      const base64Data = compressedData || (await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (ev) => resolve(ev.target?.result)
+        reader.readAsDataURL(file)
+      }))
+      const mimeType = base64Data.startsWith('data:image/webp') ? 'image/webp' : (file.type || 'image/jpeg')
       setImagePreview(base64Data)
-      await performScan(base64Data, file.type)
+      await performScan(base64Data, mimeType)
+    } catch (err) {
+      console.warn('Pre-compression failed, falling back to raw:', err)
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        const base64Data = event.target?.result
+        setImagePreview(base64Data)
+        await performScan(base64Data, file.type)
+      }
+      reader.readAsDataURL(file)
     }
-    reader.readAsDataURL(file)
   }
 
   const performScan = async (base64Data, mimeType) => {
@@ -71,7 +93,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
 
   const handleApply = async () => {
     if (!scanResult) return
-    let compressedProof = null
+    let compressedProof = imagePreview
     if (imagePreview) {
       try {
         compressedProof = await compressImage(imagePreview, 800, 0.7)
@@ -92,6 +114,25 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
       merchantName: scanResult.merchantName,
       receiptImage: compressedProof,
     }, compressedProof)
+    handleClose()
+  }
+
+  const handleUsePhotoOnly = async () => {
+    if (!imagePreview) return
+    let compressedProof = imagePreview
+    try {
+      compressedProof = await compressImage(imagePreview, 800, 0.7)
+    } catch (err) {
+      console.warn('Failed to compress receipt image:', err)
+    }
+
+    onApplyReceipt(
+      {
+        receiptImage: compressedProof,
+        rawData: null,
+      },
+      compressedProof
+    )
     handleClose()
   }
 
@@ -141,7 +182,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={() => handleTriggerPicker(cameraInputRef)}
                 className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-5 text-center transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer shadow-2xs"
               >
                 <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
@@ -159,7 +200,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
 
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => handleTriggerPicker(fileInputRef)}
                 className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-5 text-center transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer shadow-2xs"
               >
                 <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-2xs">
@@ -307,6 +348,17 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
                   <ArrowRight className="h-4.5 w-4.5" />
                 </button>
               ) : null}
+
+              {errorMsg && !isScanning && imagePreview && (
+                <button
+                  type="button"
+                  onClick={handleUsePhotoOnly}
+                  className="flex-1 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  <span>{t('transactions.ocr.usePhotoOnly', 'Gunakan Foto Saja')}</span>
+                </button>
+              )}
 
               <button
                 type="button"

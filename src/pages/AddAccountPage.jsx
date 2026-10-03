@@ -91,6 +91,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
 
   const isInstitutionAdded = (inst) => {
     return wallets.some((w) => {
+      if (w.isArchived) return false
       if (inst.logoUrl && w.logoUrl === inst.logoUrl) return true
       if (inst.customIcon && w.customIcon === inst.customIcon) return true
       if (w.name.toLowerCase() === inst.name.toLowerCase()) return true

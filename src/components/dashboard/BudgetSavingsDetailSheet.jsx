@@ -2,7 +2,6 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { PieChart, Target, Plus, AlertTriangle, CheckCircle2, ArrowRight, X, ArrowLeft, Check } from 'lucide-react'
-import { format } from 'date-fns'
 import {
   formatCurrency,
   formatMoneyInput,
@@ -22,6 +21,9 @@ import Button from '../ui/Button'
 import { db } from '../../lib/db'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
+import useSettingsStore from '../../store/useSettingsStore'
+import { getCurrentBudgetMonthKey } from '../../lib/budgetUtils'
 
 const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
   child,
@@ -121,17 +123,26 @@ export default function BudgetSavingsDetailSheet({
   defaultCurrency = 'IDR',
   rates = null,
   locale = 'id',
+  budgetCycleStartDay: propBudgetCycleStartDay,
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { isMounted, isVisible: sheetVisible, closeSheet } = useBottomSheet({ isOpen, onClose })
   const [sheetView, setSheetView] = useState('detail') // 'detail' | 'create-budget' | 'create-goal'
 
+  const budgetCycleStartDay = propBudgetCycleStartDay ?? (useSettingsStore.getState?.()?.budgetCycleStartDay || 1)
+
   // Reset view when opening
   const [prevOpen, setPrevOpen] = useState(isOpen)
   if (prevOpen !== isOpen) {
     setPrevOpen(isOpen)
-    if (isOpen) setSheetView('detail')
+    if (isOpen) {
+      setSheetView('detail')
+      setBudgetForm((p) => ({
+        ...p,
+        month: getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay),
+      }))
+    }
   }
 
   // --- Quick Goal Form State ---
@@ -148,7 +159,7 @@ export default function BudgetSavingsDetailSheet({
 
   // --- Quick Budget Form State ---
   const [budgetForm, setBudgetForm] = useState({
-    month: format(new Date(), 'yyyy-MM'),
+    month: getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay),
     categoryPath: '',
     limit: '',
   })
@@ -157,6 +168,9 @@ export default function BudgetSavingsDetailSheet({
   const [expandedParentId, setExpandedParentId] = useState(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const budgetLimitRef = useRef(null)
+
+  useBackButton(() => setSheetView('detail'), Boolean(sheetVisible && sheetView !== 'detail' && !isCategoryOpen))
+  useBackButton(() => setIsCategoryOpen(false), Boolean(sheetVisible && isCategoryOpen))
 
   const tree = useMemo(() => getMergedExpenseTree(), [])
   const lang = locale === 'en' ? 'en' : 'id'
@@ -245,7 +259,7 @@ export default function BudgetSavingsDetailSheet({
         await db.budgets.add(payload)
       }
       setBudgetForm({
-        month: format(new Date(), 'yyyy-MM'),
+        month: getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay),
         categoryPath: '',
         limit: '',
       })
@@ -298,14 +312,25 @@ export default function BudgetSavingsDetailSheet({
   const budgetCalc = useMemo(() => {
     const rows = budgetGoalSummary?.budgetRows || []
     if (!rows.length) return null
-    const totalSpent = rows.reduce(
-      (sum, r) => sum + convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates),
-      0
-    )
-    const totalLimit = rows.reduce(
-      (sum, r) => sum + convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates),
-      0
-    )
+    const overallBudget = rows.find((r) => r.category === 'all' || r.category === 'semua')
+    const categoryRows = rows.filter((r) => r.category !== 'all' && r.category !== 'semua')
+
+    let totalSpent = 0
+    let totalLimit = 0
+
+    if (overallBudget) {
+      totalSpent = convertCurrency(overallBudget.spent || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
+      totalLimit = convertCurrency(overallBudget.limit || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
+    } else {
+      const topLevelRows = categoryRows.filter((r) => {
+        return !categoryRows.some((other) => other.id !== r.id && r.category?.startsWith(`${other.category}/`))
+      })
+
+      topLevelRows.forEach((r) => {
+        totalSpent += convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates)
+        totalLimit += convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates)
+      })
+    }
     const totalRemaining = Math.max(0, totalLimit - totalSpent)
     const overallPct = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0
     const warningItems = rows.filter((r) => r.pct >= 80).sort((a, b) => b.pct - a.pct)

@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FinTrack</string>
+    <string name="title_activity_main">FinTrack</string>
+    <string name="package_name">com.fintrack.app</string>
+    <string name="custom_url_scheme">com.fintrack.app</string>
+    <string name="widget_description">Net worth summary, cash flow, and financial trend chart</string>
+
+    <string name="widget_label_net_worth">Net worth</string>
+    <string name="widget_label_balance_short">Balance</string>
+    <string name="widget_period_month">This month</string>
+    <string name="widget_period_7d">7 days</string>
+    <string name="widget_period_30d">30 days</string>
+    <string name="widget_income">In</string>
+    <string name="widget_expense">Out</string>
+    <string name="widget_add_cd">Add transaction</string>
+    <string name="widget_chart_cd">Cash flow trend</string>
+    <string name="widget_hidden_mask">••••••</string>
+
+    <!-- Widget Configuration Screen Strings -->
+    <string name="widget_config_title">FinTrack Widget</string>
+    <string name="widget_config_period">Period</string>
+    <string name="widget_config_period_7d">7 days</string>
+    <string name="widget_config_period_30d">30 days</string>
+    <string name="widget_config_period_month">This month</string>
+    <string name="widget_config_hide_balance_title">Hide balance</string>
+    <string name="widget_config_hide_balance_subtitle">For home screen privacy</string>
+    <string name="widget_config_wallet">Wallet</string>
+    <string name="widget_config_wallet_all">All wallets</string>
+    <string name="widget_config_save">Save</string>
+</resources>

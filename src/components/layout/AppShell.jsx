@@ -18,6 +18,7 @@ import { preseedMerchantMemoryFromDb } from '../../lib/ai/merchantCategorizer'
 import { preseedEntityMemoryFromDb } from '../../lib/ai/entityMemory'
 import { prefetchCriticalRoutes } from '../../lib/routePrefetcher'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
+import { purgeOldSoftDeletedTransactions } from '../../services/transactionService'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -83,6 +84,8 @@ function AppShell() {
 
   const historyStack = useRef([])
   const backgroundTimeRef = useRef(null)
+  const isMediaPickerActiveRef = useRef(false)
+  const mediaPickerActivatedAtRef = useRef(0)
   const lastBackPressRef = useRef(0)
 
   // Hide global navigation & AI trigger bar on dedicated sub-detail pages
@@ -119,8 +122,12 @@ function AppShell() {
   // Preload QuickAdd and AiQuickLog chunks on idle so initial user tap has 0ms loading lag
   useEffect(() => {
     const preload = () => {
-      import('../transactions/QuickAddTransactionModal')
-      import('../chat/AiQuickLogModal')
+      import('../transactions/QuickAddTransactionModal').then(() => {
+        setHasOpenedQuickAdd(true)
+      })
+      import('../chat/AiQuickLogModal').then(() => {
+        setHasOpenedQuickLog(true)
+      })
     }
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       const handle = window.requestIdleCallback(preload)
@@ -304,6 +311,9 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
+    // Purge transactions soft-deleted older than 90 days in non-blocking background task
+    void purgeOldSoftDeletedTransactions(90).catch((err) => console.warn('[AppShell:purgeDeleted]', err))
+
     const runAutomation = async () => {
       try {
         await processRecurringTransactions()
@@ -423,7 +433,49 @@ function AppShell() {
   useEffect(() => {
     if (!securityEnabled) return undefined
 
+    const onFileInputClick = (e) => {
+      const target = e.target
+      if (target && target.tagName === 'INPUT' && target.type === 'file') {
+        isMediaPickerActiveRef.current = true
+        mediaPickerActivatedAtRef.current = Date.now()
+      }
+    }
+
+    const onMediaActiveEvent = (e) => {
+      isMediaPickerActiveRef.current = Boolean(e.detail)
+      if (e.detail) {
+        mediaPickerActivatedAtRef.current = Date.now()
+      }
+    }
+
+    const onWindowFocus = () => {
+      if (isMediaPickerActiveRef.current) {
+        window.setTimeout(() => {
+          isMediaPickerActiveRef.current = false
+          mediaPickerActivatedAtRef.current = 0
+          if (typeof window !== 'undefined') window.__ft_isMediaPickerActive = false
+        }, 5000)
+      }
+    }
+
+    window.addEventListener('click', onFileInputClick, true)
+    window.addEventListener('ft-media-picker-active', onMediaActiveEvent)
+    window.addEventListener('focus', onWindowFocus)
+
     const checkAndLock = () => {
+      const isMediaActive = isMediaPickerActiveRef.current || (typeof window !== 'undefined' && window.__ft_isMediaPickerActive)
+      const mediaAgeSec = mediaPickerActivatedAtRef.current ? (Date.now() - mediaPickerActivatedAtRef.current) / 1000 : Infinity
+      if (isMediaActive && mediaAgeSec <= 90) {
+        isMediaPickerActiveRef.current = false
+        mediaPickerActivatedAtRef.current = 0
+        if (typeof window !== 'undefined') window.__ft_isMediaPickerActive = false
+        backgroundTimeRef.current = null
+        return
+      }
+      isMediaPickerActiveRef.current = false
+      mediaPickerActivatedAtRef.current = 0
+      if (typeof window !== 'undefined') window.__ft_isMediaPickerActive = false
+
       if (backgroundTimeRef.current) {
         const elapsedSec = (Date.now() - backgroundTimeRef.current) / 1000
         if (elapsedSec >= (autoLockTimeout || 0)) {
@@ -453,6 +505,9 @@ function AppShell() {
     const appListenerPromise = App.addListener('appStateChange', handleAppStateChange)
 
     return () => {
+      window.removeEventListener('click', onFileInputClick, true)
+      window.removeEventListener('ft-media-picker-active', onMediaActiveEvent)
+      window.removeEventListener('focus', onWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       appListenerPromise.then((l) => l.remove?.())
     }
@@ -618,11 +673,11 @@ function AppShell() {
                     location.pathname.startsWith('/todos/') ||
                     location.pathname.startsWith('/savings/') ||
                     location.pathname === '/add-account'
-                      ? 'px-0 pt-0 pb-12'
+                      ? 'px-0 pt-0 pb-[calc(3rem+env(safe-area-inset-bottom,0px))]'
                       : location.pathname === '/dashboard' || location.pathname === '/'
                       ? 'px-4 pt-1 pb-[calc(10rem+env(safe-area-inset-bottom))]'
                       : isDetailPage
-                      ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-12'
+                      ? 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(3rem+env(safe-area-inset-bottom,0px))]'
                       : 'px-4 pt-[max(env(safe-area-inset-top,0px),1rem)] pb-[calc(10rem+env(safe-area-inset-bottom))]'
                   }`
             }`}

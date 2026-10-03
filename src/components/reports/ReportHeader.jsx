@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Printer, Sparkles, FileSpreadsheet, Check } from 'lucide-react'
+import { format, startOfMonth, subMonths, addMonths, isSameMonth } from 'date-fns'
+import { id as idLocale, enUS } from 'date-fns/locale'
+import { Printer, Sparkles, FileSpreadsheet, Check, ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import useChatStore from '../../store/useChatStore'
@@ -21,19 +23,83 @@ export default function ReportHeader({
   monthlyIncomeExpense,
   onExportCsv,
   onPrintReport,
+  anchorDate,
+  setAnchorDate,
+  periodSummary,
+  selectedMonthKey = null,
+  selectedMonthData = null,
 }) {
   const navigate = useNavigate()
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [csvExported, setCsvExported] = useState(false)
 
+  const anchor = anchorDate || new Date()
+  const isCurrentMonth = isSameMonth(anchor, new Date())
+  const dateLocale = locale === 'en' ? enUS : idLocale
+  const formattedAnchorMonth = format(anchor, 'MMMM yyyy', { locale: dateLocale })
+
+  const handlePrevMonth = () => {
+    triggerHaptic('light')
+    if (setAnchorDate) {
+      setAnchorDate((prev) => subMonths(startOfMonth(prev || new Date()), 1))
+    }
+  }
+
+  const handleNextMonth = () => {
+    if (isCurrentMonth) return
+    triggerHaptic('light')
+    if (setAnchorDate) {
+      setAnchorDate((prev) => addMonths(startOfMonth(prev || new Date()), 1))
+    }
+  }
+
+  const handleResetToCurrentMonth = () => {
+    triggerHaptic('light')
+    if (setAnchorDate) {
+      setAnchorDate(new Date())
+    }
+  }
+
   const handleOpenAiChat = () => {
     triggerHaptic('medium')
-    const latestData = monthlyIncomeExpense?.at(-1) || { income: 0, expense: 0, month: '' }
+    const isDrilldown = Boolean(selectedMonthKey && selectedMonthData?.current)
+    const isMultiMonth = (rangeMonths === 'ytd' || Number(rangeMonths) > 1) && !isDrilldown
+    const periodLabel = rangeMonths === 'ytd'
+      ? (locale === 'en' ? 'Year-to-Date (YTD)' : 'Tahun Berjalan (YTD)')
+      : `${rangeMonths} ${locale === 'en' ? 'Months' : 'Bulan'}`
 
-    const promptText = locale === 'en'
-      ? `Please analyze my financial report (${rangeMonths} period). This month income is ${formatCurrency(latestData.income, defaultCurrency)} and expense is ${formatCurrency(latestData.expense, defaultCurrency)}. What are your key insights and saving recommendations?`
-      : `Tolong analisis laporan keuangan saya (rentang ${rangeMonths}). Bulan ini pemasukan ${formatCurrency(latestData.income, defaultCurrency)} dan pengeluaran ${formatCurrency(latestData.expense, defaultCurrency)}. Apa saran penghematan dan optimasi terbaik untuk saya?`
+    let promptText
+    if (isDrilldown) {
+      const currentMonthData = selectedMonthData.current
+      const incFormatted = formatCurrency(currentMonthData.income, defaultCurrency)
+      const expFormatted = formatCurrency(currentMonthData.expense, defaultCurrency)
+      const netSavings = currentMonthData.income - currentMonthData.expense
+      const netSavingsFormatted = formatCurrency(netSavings, defaultCurrency)
+      const monthName = currentMonthData.month || selectedMonthKey
+
+      promptText = locale === 'en'
+        ? `Please analyze my financial report for ${monthName}. Total income is ${incFormatted} and total expense is ${expFormatted} with net savings of ${netSavingsFormatted}. What are your key insights and saving recommendations?`
+        : `Tolong analisis laporan keuangan saya untuk bulan ${monthName}. Total pemasukan ${incFormatted} dan total pengeluaran ${expFormatted} dengan surplus bersih ${netSavingsFormatted}. Apa saran optimasi dan penghematan untuk bulan ini?`
+    } else if (isMultiMonth && periodSummary) {
+      const incFormatted = formatCurrency(periodSummary.totalIncome, defaultCurrency)
+      const expFormatted = formatCurrency(periodSummary.totalExpense, defaultCurrency)
+      const avgIncFormatted = formatCurrency(periodSummary.avgIncome, defaultCurrency)
+      const avgExpFormatted = formatCurrency(periodSummary.avgExpense, defaultCurrency)
+      const netSavingsFormatted = formatCurrency(periodSummary.totalNetSavings, defaultCurrency)
+
+      promptText = locale === 'en'
+        ? `Please analyze my financial report (${periodLabel} period). Total income is ${incFormatted} (avg ${avgIncFormatted}/mo) and total expense is ${expFormatted} (avg ${avgExpFormatted}/mo) with net savings of ${netSavingsFormatted} (${periodSummary.periodSavingsRate}% savings rate). What are your key insights and saving recommendations?`
+        : `Tolong analisis laporan keuangan saya (rentang ${periodLabel}). Total pemasukan ${incFormatted} (rata-rata ${avgIncFormatted}/bln) dan total pengeluaran ${expFormatted} (rata-rata ${avgExpFormatted}/bln) dengan surplus bersih ${netSavingsFormatted} (tingkat tabungan ${periodSummary.periodSavingsRate}%). Apa saran penghematan dan optimasi terbaik untuk saya?`
+    } else {
+      const latestData = monthlyIncomeExpense?.at(-1) || { income: 0, expense: 0, month: '' }
+      const incFormatted = formatCurrency(latestData.income, defaultCurrency)
+      const expFormatted = formatCurrency(latestData.expense, defaultCurrency)
+
+      promptText = locale === 'en'
+        ? `Please analyze my financial report (1-month period). This month income is ${incFormatted} and expense is ${expFormatted}. What are your key insights and saving recommendations?`
+        : `Tolong analisis laporan keuangan saya (rentang 1 bulan). Bulan ini pemasukan ${incFormatted} dan pengeluaran ${expFormatted}. Apa saran penghematan dan optimasi terbaik untuk saya?`
+    }
 
     useChatStore.getState().openWithPrompt(promptText)
     navigate('/ai-chat')
@@ -105,7 +171,7 @@ export default function ReportHeader({
             ) : (
               <FileSpreadsheet className="h-3.5 w-3.5 text-[var(--muted)]" />
             )}
-            <span>{csvExported ? 'Diunduh' : 'CSV'}</span>
+            <span>{csvExported ? t('reports.csvDownloaded', 'Diunduh') : 'CSV'}</span>
           </button>
 
           {/* AI Advisor Button */}
@@ -132,32 +198,77 @@ export default function ReportHeader({
         </div>
       </div>
 
-      {/* Horizon Horizon Selector (1M / 3M / 6M / YTD / 1Y) */}
-      <div className="no-print mt-4 flex items-center justify-between border-t border-[var(--border)]/60 pt-3">
-        <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
-          {t('reports.timeHorizon', 'Rentang Waktu')}:
-        </span>
-        <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 shadow-2xs overflow-x-auto max-w-full">
-          {RANGE_OPTIONS.map((opt) => {
-            const isSelected = rangeMonths === opt.id
-            return (
+      {/* Month Anchor Navigation & Horizon Selector */}
+      <div className="no-print mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-[var(--border)]/60 pt-3">
+        {/* Month Stepper Navigator */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handlePrevMonth}
+            className="grid h-8 w-8 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] shadow-2xs transition hover:bg-[var(--panel)] active:scale-90 cursor-pointer"
+            title={t('reports.prevMonth', 'Bulan Sebelumnya')}
+            aria-label={t('reports.prevMonth', 'Bulan Sebelumnya')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-1.5 px-1.5">
+            <Calendar className="h-3.5 w-3.5 text-[var(--accent)]" />
+            <span className="text-xs sm:text-sm font-black text-[var(--fg)] capitalize">
+              {formattedAnchorMonth}
+            </span>
+            {!isCurrentMonth && (
               <button
-                key={opt.id}
                 type="button"
-                onClick={() => {
-                  triggerHaptic('light')
-                  setRangeMonths(opt.id)
-                }}
-                className={`rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-black transition cursor-pointer shrink-0 ${
-                  isSelected
-                    ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs ring-1 ring-[var(--border)]'
-                    : 'text-[var(--muted)] hover:text-[var(--fg)]'
-                }`}
+                onClick={handleResetToCurrentMonth}
+                className="ml-1 rounded-md bg-[var(--accent)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20 transition cursor-pointer"
               >
-                {opt.label}
+                {t('reports.today', 'Hari Ini')}
               </button>
-            )
-          })}
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            disabled={isCurrentMonth}
+            className={`grid h-8 w-8 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] shadow-2xs transition ${
+              isCurrentMonth
+                ? 'opacity-30 cursor-not-allowed'
+                : 'hover:bg-[var(--panel)] active:scale-90 cursor-pointer'
+            }`}
+            title={t('reports.nextMonth', 'Bulan Berikutnya')}
+            aria-label={t('reports.nextMonth', 'Bulan Berikutnya')}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Horizon Selector (1M / 3M / 6M / YTD / 1Y) */}
+        <div className="flex items-center justify-between sm:justify-end gap-2">
+          <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
+            {t('reports.timeHorizon', 'Rentang')}:
+          </span>
+          <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-1 shadow-2xs overflow-x-auto max-w-full">
+            {RANGE_OPTIONS.map((opt) => {
+              const isSelected = rangeMonths === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light')
+                    setRangeMonths(opt.id)
+                  }}
+                  className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-black transition cursor-pointer shrink-0 ${
+                    isSelected
+                      ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs ring-1 ring-[var(--border)]'
+                      : 'text-[var(--muted)] hover:text-[var(--fg)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
     </section>

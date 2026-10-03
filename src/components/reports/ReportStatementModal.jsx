@@ -136,8 +136,8 @@ export default function ReportStatementModal({
     async () => {
       if (!isOpen || (Array.isArray(propTransactions) && propTransactions.length > 0)) return []
       if (!startDate || !endDate) return []
-      const list = await db.transactions.where('date').between(startDate, endDate, true, true).toArray()
-      return (list || []).filter((tx) => !tx.deletedAt)
+      const list = await db.transactions.where('date').between(startDate, `${endDate}\uffff`, true, true).toArray()
+      return (list || []).filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
     },
     [isOpen, startDate, endDate, propTransactions],
     []
@@ -145,7 +145,7 @@ export default function ReportStatementModal({
 
   const transactions = useMemo(() => {
     if (Array.isArray(propTransactions) && propTransactions.length > 0) {
-      return propTransactions.filter((tx) => !tx.deletedAt)
+      return propTransactions.filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
     }
     return queriedTransactions || []
   }, [propTransactions, queriedTransactions])
@@ -219,9 +219,9 @@ export default function ReportStatementModal({
 
   const filteredTxs = useMemo(() => {
     if (!isOpen) return []
-    return filterTransactionsByDateRange(transactions, startDate, endDate).sort(
-      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
-    )
+    return filterTransactionsByDateRange(transactions, startDate, endDate)
+      .filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
   }, [isOpen, transactions, startDate, endDate])
 
   // Calculate live SHA-256 Checksum on data changes
@@ -318,7 +318,8 @@ export default function ReportStatementModal({
 
   const handleExportCsv = () => {
     triggerHaptic('light')
-    exportTransactionsToCsv(filteredTxs, wallets, defaultCurrency, locale)
+    const validTxs = (filteredTxs || []).filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
+    exportTransactionsToCsv(validTxs, wallets, defaultCurrency, locale)
   }
 
   const handlePrint = () => {

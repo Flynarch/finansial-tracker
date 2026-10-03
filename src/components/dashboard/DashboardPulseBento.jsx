@@ -51,14 +51,25 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
 
   // 1. Budget Stats
   const budgetRows = budgetGoalSummary?.budgetRows || []
-  const totalBudgetSpent = budgetRows.reduce(
-    (sum, r) => sum + convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates),
-    0
-  )
-  const totalBudgetLimit = budgetRows.reduce(
-    (sum, r) => sum + convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates),
-    0
-  )
+  const overallBudget = budgetRows.find((r) => r.category === 'all' || r.category === 'semua')
+  const categoryBudgetRows = budgetRows.filter((r) => r.category !== 'all' && r.category !== 'semua')
+
+  let totalBudgetSpent = 0
+  let totalBudgetLimit = 0
+
+  if (overallBudget) {
+    totalBudgetSpent = convertCurrency(overallBudget.spent || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
+    totalBudgetLimit = convertCurrency(overallBudget.limit || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
+  } else {
+    const topLevelRows = categoryBudgetRows.filter((r) => {
+      return !categoryBudgetRows.some((other) => other.id !== r.id && r.category?.startsWith(`${other.category}/`))
+    })
+
+    topLevelRows.forEach((r) => {
+      totalBudgetSpent += convertCurrency(r.spent || 0, r.currency || defaultCurrency, defaultCurrency, rates)
+      totalBudgetLimit += convertCurrency(r.limit || 0, r.currency || defaultCurrency, defaultCurrency, rates)
+    })
+  }
   const budgetPct = totalBudgetLimit > 0 ? Math.min(100, Math.round((totalBudgetSpent / totalBudgetLimit) * 100)) : 0
   const budgetWarnings = budgetRows.filter((r) => r.pct >= 80)
   const isOverBudget = totalBudgetSpent > totalBudgetLimit && totalBudgetLimit > 0

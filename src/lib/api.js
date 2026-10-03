@@ -304,7 +304,14 @@ export function getCachedCurrencyRates(baseCurrency = "USD") {
       const cached = window.localStorage.getItem(`ft_rates_${baseCurrency}`);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed?.rates) return parsed.rates;
+        if (parsed?.rates) {
+          // If cached rates are older than 24h TTL, trigger background refresh
+          const isExpired = !parsed.timestamp || (Date.now() - Number(parsed.timestamp) > 86400000);
+          if (isExpired) {
+            void fetchCurrencyRates(baseCurrency).catch(() => {});
+          }
+          return parsed.rates;
+        }
       }
     }
   } catch (err) {

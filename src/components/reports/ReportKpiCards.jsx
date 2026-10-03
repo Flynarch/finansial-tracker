@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { TrendingUp, TrendingDown, ShieldCheck, AlertTriangle, ArrowUpRight, ArrowDownRight, Scale, Inbox } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -9,22 +10,64 @@ import {
   formatDelta,
 } from '../../lib/reportAnalytics'
 
-export default function ReportKpiCards({ thisMonth, previousMonth }) {
+export default function ReportKpiCards({
+  thisMonth,
+  previousMonth,
+  periodSummary,
+  rangeMonths = 6,
+  selectedMonthKey = null,
+}) {
   const { t } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
 
-  const income = toSafeNumber(thisMonth?.income)
-  const expense = toSafeNumber(thisMonth?.expense)
+  const isMultiMonthMode = (rangeMonths === 'ytd' || Number(rangeMonths) > 1) && !selectedMonthKey
+
+  const income = isMultiMonthMode
+    ? toSafeNumber(periodSummary?.totalIncome)
+    : toSafeNumber(thisMonth?.income)
+  const expense = isMultiMonthMode
+    ? toSafeNumber(periodSummary?.totalExpense)
+    : toSafeNumber(thisMonth?.expense)
   const prevIncome = toSafeNumber(previousMonth?.income)
   const prevExpense = toSafeNumber(previousMonth?.expense)
 
-  const netSavings = income - expense
+  const netSavings = isMultiMonthMode
+    ? toSafeNumber(periodSummary?.totalNetSavings ?? (income - expense))
+    : income - expense
   const incomeDelta = formatDelta(income, prevIncome)
   const expenseDelta = formatDelta(expense, prevExpense)
 
-  const savingsRate = calculateSavingsRate(income, expense)
-  const { incomePercent, expensePercent, hasData } = calculateCashflowRatio(income, expense)
+  const savingsRate = isMultiMonthMode
+    ? (periodSummary?.periodSavingsRate ?? calculateSavingsRate(income, expense))
+    : calculateSavingsRate(income, expense)
+
+  const ratioResult = calculateCashflowRatio(income, expense)
+  const hasData = isMultiMonthMode
+    ? Boolean((periodSummary?.periodTxCount > 0) || income > 0 || expense > 0)
+    : ratioResult.hasData
+
+  const incomePercent = hasData
+    ? (ratioResult.hasData ? ratioResult.incomePercent : (income + expense > 0 ? Math.round((income / (income + expense)) * 100) : 50))
+    : 0
+  const expensePercent = hasData
+    ? (ratioResult.hasData ? ratioResult.expensePercent : 100 - incomePercent)
+    : 0
+
   const healthTier = calculateFinancialHealthTier(netSavings, hasData)
+
+  const periodTitle = useMemo(() => {
+    if (selectedMonthKey) {
+      const monthLabel = thisMonth?.month || selectedMonthKey
+      return t('reports.netSavingsSelectedMonth', `Surplus Bersih (${monthLabel})`, { month: monthLabel })
+    }
+    if (isMultiMonthMode) {
+      if (rangeMonths === 'ytd') {
+        return t('reports.netSavingsYtd', 'Surplus Bersih (Total Tahun Berjalan / YTD)')
+      }
+      return t('reports.netSavingsPeriod', `Surplus Bersih (Total ${rangeMonths} Bulan)`, { count: rangeMonths })
+    }
+    return t('reports.netSavings', 'Surplus Bersih')
+  }, [selectedMonthKey, isMultiMonthMode, rangeMonths, thisMonth?.month, t])
 
   return (
     <section className="overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-6 shadow-[var(--shadow-card)] transition">
@@ -33,7 +76,7 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">
-              {t('reports.netSavings', 'Surplus Bersih')}
+              {periodTitle}
             </span>
             {healthTier === 'empty' && (
               <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--muted)]">
@@ -162,7 +205,19 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
             {formatCurrency(income, defaultCurrency)}
           </p>
           <p className="mt-1 text-[11px] font-semibold text-[var(--muted)] truncate">
-            <span className="font-extrabold text-[var(--fg)]">{incomeDelta}</span> {t('reports.vsPrev', 'vs bulan lalu')}
+            {isMultiMonthMode ? (
+              <span>
+                {t('reports.avgMonthlyLine', 'Rata-rata')}:{' '}
+                <span className="font-extrabold text-[var(--fg)]">
+                  {formatCurrency(periodSummary?.avgIncome ?? 0, defaultCurrency)}
+                </span>
+                <span className="text-[10px] text-[var(--muted)]"> /bln</span>
+              </span>
+            ) : (
+              <span>
+                <span className="font-extrabold text-[var(--fg)]">{incomeDelta}</span> {t('reports.vsPrev', 'vs bulan lalu')}
+              </span>
+            )}
           </p>
         </div>
 
@@ -183,7 +238,19 @@ export default function ReportKpiCards({ thisMonth, previousMonth }) {
             {formatCurrency(expense, defaultCurrency)}
           </p>
           <p className="mt-1 text-[11px] font-semibold text-[var(--muted)] truncate">
-            <span className="font-extrabold text-[var(--fg)]">{expenseDelta}</span> {t('reports.vsPrev', 'vs bulan lalu')}
+            {isMultiMonthMode ? (
+              <span>
+                {t('reports.avgMonthlyLine', 'Rata-rata')}:{' '}
+                <span className="font-extrabold text-[var(--fg)]">
+                  {formatCurrency(periodSummary?.avgExpense ?? 0, defaultCurrency)}
+                </span>
+                <span className="text-[10px] text-[var(--muted)]"> /bln</span>
+              </span>
+            ) : (
+              <span>
+                <span className="font-extrabold text-[var(--fg)]">{expenseDelta}</span> {t('reports.vsPrev', 'vs bulan lalu')}
+              </span>
+            )}
           </p>
         </div>
       </div>

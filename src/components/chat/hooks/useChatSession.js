@@ -67,8 +67,17 @@ export function useChatSession({
           timestamp: m.timestamp || m.id || Date.now(),
         }))
         await db.transaction('rw', db.chatMessages, async () => {
-          await db.chatMessages.clear()
-          await db.chatMessages.bulkAdd(toSave)
+          await db.chatMessages.bulkPut(toSave)
+          // Prune messages deleted from current session state if stored count exceeds active session
+          const count = await db.chatMessages.count()
+          if (count > toSave.length) {
+            const currentIds = new Set(toSave.map((m) => m.id).filter(Boolean))
+            const allStored = await db.chatMessages.toArray()
+            const staleIds = allStored.filter((m) => !currentIds.has(m.id)).map((m) => m.id)
+            if (staleIds.length > 0) {
+              await db.chatMessages.bulkDelete(staleIds)
+            }
+          }
         })
       } catch (err) {
         console.warn('[useChatSession] Failed to persist chat messages to DB:', err)

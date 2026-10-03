@@ -6,4 +6,19 @@
     <color name="brandAccent">#6B7C5E</color>
     <color name="brandIncome">#86EFAC</color>
     <color name="brandExpense">#FDA4AF</color>
+
+    <!-- Widget Light Theme Colors -->
+    <color name="widget_background">#F5F4F0</color>
+    <color name="widget_text_primary">#17191E</color>
+    <color name="widget_text_secondary">#6E7178</color>
+    <color name="widget_hairline">#1417191E</color>
+    <color name="widget_income">#3E7A56</color>
+    <color name="widget_expense">#B0473E</color>
+    <color name="widget_btn_bg">#17191E</color>
+    <color name="widget_btn_icon">#F5F4F0</color>
+    <color name="widget_btn_ripple">#33F5F4F0</color>
+
+    <color name="widget_segment_track">#E8E7E1</color>
+    <color name="widget_segment_thumb">#FFFFFF</color>
+    <color name="widget_divider">#E2E0D8</color>
 </resources>

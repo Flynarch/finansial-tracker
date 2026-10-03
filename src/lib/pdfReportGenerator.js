@@ -1,4 +1,6 @@
 import { format } from 'date-fns'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { formatCurrency } from './utils'
 import { calculateSha256Checksum } from './accountingEngine'
 
@@ -396,6 +398,41 @@ export async function generateExecutiveReportPdf({
  */
 export async function downloadExecutiveReportPdf(reportParams) {
   const { doc, filename } = await generateExecutiveReportPdf(reportParams)
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const dataUri = doc.output('datauristring')
+      const base64Data = dataUri.split(',')[1]
+
+      await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      })
+
+      const isEn = reportParams?.locale === 'en' || (typeof localStorage !== 'undefined' && localStorage.getItem('ft_locale') === 'en')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: isEn ? 'PDF Report Saved' : 'Laporan PDF Berhasil Disimpan',
+              message: isEn
+                ? `File successfully saved to Documents: ${filename}`
+                : `File berhasil disimpan di Dokumen: ${filename}`,
+              type: 'success',
+            },
+          })
+        )
+      }
+      return { success: true, filename, isNative: true }
+    } catch (fsErr) {
+      console.warn('[pdfReportGenerator] Filesystem write failed, falling back to doc.save:', fsErr)
+      doc.save(filename)
+      return { success: true, filename }
+    }
+  }
+
   doc.save(filename)
   return { success: true, filename }
 }

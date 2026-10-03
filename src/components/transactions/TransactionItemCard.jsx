@@ -268,13 +268,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
           return (
             <div className={`shrink-0 max-w-[48%] pl-2 text-right flex flex-col items-end justify-center ml-auto ${isNew ? 'pt-2 sm:pt-2.5' : ''}`}>
               <p
-                className={`break-all text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
+                className={`whitespace-nowrap truncate max-w-full text-[14.5px] sm:text-[15px] font-black tabular-nums tracking-tight leading-tight ${amountColorClass}`}
               >
                 {amountPrefix}
                 {formatCurrency(Math.abs(Number(transaction.amount || 0)), transaction.currency)}
               </p>
               {String(transaction.currency || defaultCurrency) !== String(defaultCurrency) ? (
-                <p className="ft-muted break-all text-[10px] tabular-nums mt-0.5">
+                <p className="ft-muted whitespace-nowrap truncate max-w-full text-[10px] tabular-nums mt-0.5">
                   ≈{' '}
                   {formatCurrency(
                     convertCurrency(

@@ -95,8 +95,18 @@ export async function hashPin(pin) {
  * @param {string} storedSecret - The stored secret (PBKDF2, SHA-256, or legacy plaintext)
  * @returns {Promise<boolean>}
  */
+export function constantTimeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return mismatch === 0
+}
+
 export async function verifyPin(enteredPin, storedSecret) {
-  if (!storedSecret) return true
+  if (!storedSecret) return false
   const trimmedInput = String(enteredPin || '').trim()
   const trimmedStored = String(storedSecret).trim()
 
@@ -106,7 +116,7 @@ export async function verifyPin(enteredPin, storedSecret) {
     if (parts.length === 3) {
       const [, saltHex] = parts
       const derived = await derivePbkdf2Pin(trimmedInput, saltHex)
-      return derived === trimmedStored
+      return constantTimeCompare(derived, trimmedStored)
     }
     return false
   }
@@ -114,11 +124,11 @@ export async function verifyPin(enteredPin, storedSecret) {
   // 2. Legacy SHA-256 hash verification
   if (isPinHash(trimmedStored)) {
     const hashedInput = await hashPin(trimmedInput)
-    return hashedInput === trimmedStored
+    return constantTimeCompare(hashedInput, trimmedStored)
   }
 
   // 3. Legacy plaintext fallback
-  return trimmedInput === trimmedStored
+  return constantTimeCompare(trimmedInput, trimmedStored)
 }
 
 const ENCRYPTED_PREFIX = 'enc:v1:'

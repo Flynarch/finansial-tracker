@@ -29,6 +29,12 @@ export function clearFinancialLocalStorage() {
       'usd-idr-fallback-v1',
       'ft_expense_category_custom_v1',
       'ft_income_category_custom_v1',
+      'widget_config_range',
+      'widget_config_wallet_id',
+      'widget_config_wallet_name',
+      'fintrack_wallet_list',
+      'ft_entity_memory_v1',
+      'ft_merchant_category_memory_v1',
     ]
     keysToRemove.forEach((k) => {
       try {

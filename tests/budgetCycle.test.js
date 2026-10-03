@@ -31,14 +31,14 @@ describe('budgetUtils - getBudgetPeriodDateRange', () => {
     expect(res.isCustomCycle).toBe(true)
   })
 
-  it('clamps invalid startDay values safely between 1 and 28', () => {
+  it('clamps invalid startDay values safely between 1 and 31', () => {
     const resNegative = getBudgetPeriodDateRange('2026-05', -5)
     expect(resNegative.startDate).toBe('2026-05-01')
     expect(resNegative.endDate).toBe('2026-05-31')
 
     const resOverflow = getBudgetPeriodDateRange('2026-05', 35)
-    expect(resOverflow.startDate).toBe('2026-04-28')
-    expect(resOverflow.endDate).toBe('2026-05-27')
+    expect(resOverflow.startDate).toBe('2026-04-30')
+    expect(resOverflow.endDate).toBe('2026-05-30')
   })
 
   it('generates clear human-readable date labels for ID and EN', () => {

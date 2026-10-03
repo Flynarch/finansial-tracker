@@ -53,7 +53,9 @@ import {
   setCachedDashboardTransactions,
   getCachedDashboardWallets,
   setCachedDashboardWallets,
+  clearCachedDashboardState,
 } from '../hooks/useDashboardData'
+import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 
 const initialFormData = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -182,9 +184,6 @@ function Transactions() {
   const [isEntering, setIsEntering] = useState(false)
 
   // Android Hardware Back Button Handlers
-  useBackButton(() => setDetailTransaction(null), Boolean(detailTransaction))
-  useBackButton(() => setReceiptPreviewTx(null), Boolean(receiptPreviewTx))
-  useBackButton(() => setSingleDeleteTx(null), Boolean(singleDeleteTx))
   useBackButton(() => setIsMenuOpen(false), isMenuOpen)
   useBackButton(() => {
     setSelectedTxIds(new Set())
@@ -310,7 +309,7 @@ function Transactions() {
     const grouped = {}
     for (let i = 0; i < filteredTransactions.length; i++) {
       const tx = filteredTransactions[i]
-      const key = tx.date || 'unknown'
+      const key = tx.date ? String(tx.date).slice(0, 10) : 'unknown'
       if (!grouped[key]) {
         grouped[key] = []
       }
@@ -320,14 +319,15 @@ function Transactions() {
     const sortedEntries = Object.entries(grouped).sort((a, b) => String(b[0]).localeCompare(String(a[0])))
 
     return sortedEntries.map(([dateKey, items]) => {
+      const cleanDateKey = String(dateKey || '').slice(0, 10)
       let dateLabel
-      if (dateKey === todayStr) {
+      if (cleanDateKey === todayStr) {
         dateLabel = t('tx.today', 'HARI INI')
-      } else if (dateKey === yesterdayStr) {
+      } else if (cleanDateKey === yesterdayStr) {
         dateLabel = t('tx.yesterday', 'KEMARIN')
-      } else if (dateKey !== 'unknown') {
+      } else if (cleanDateKey !== 'unknown') {
         try {
-          const dateObj = new Date(`${dateKey}T12:00:00`)
+          const dateObj = new Date(`${cleanDateKey}T12:00:00`)
           dateLabel = format(dateObj, 'EEEE, d MMMM yyyy', {
             locale: locale === 'en' ? enUS : idLocale,
           }).toUpperCase()
@@ -476,7 +476,12 @@ function Transactions() {
       }
 
       if (nonSplitIds.length > 0) {
-        await db.transactions.where('id').anyOf(nonSplitIds).modify({ category: newCategory })
+        await db.transactions.where('id').anyOf(nonSplitIds).modify({
+          category: newCategory,
+          updatedAt: new Date().toISOString(),
+        })
+        clearCachedDashboardState()
+        scheduleNativeWidgetSync()
       }
 
       if (skippedSplitCount > 0) {
@@ -527,9 +532,17 @@ function Transactions() {
     try {
       setApiError('')
       setApiErrorTone('error')
+      const tgtWallet = allWallets?.find((w) => String(w.id) === String(editFormData.targetWalletId))
+      const tgtCurr = tgtWallet?.currency || defaultCurrency
+      const parsedTargetAmount =
+        editFormData.type === 'transfer' && editFormData.targetAmount
+          ? parseMoneyInput(editFormData.targetAmount, tgtCurr)
+          : undefined
+
       await updateTransaction(editingTransaction.id, {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+        targetAmount: parsedTargetAmount,
         receiptImage: editFormData.receiptImage || null,
         isSplit: Boolean(editFormData.isSplit),
         splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,

@@ -517,8 +517,26 @@ public class FinTrackNotificationPlugin extends Plugin {
                 topCategories = call.getString("topCategoriesJson", "[]");
             }
 
+            // Surplus indicator fields
+            Float incomeValNum = call.getFloat("incomeValNum");
+            Float expenseValNum = call.getFloat("expenseValNum");
+            String surplusFormatted = call.getString("surplusFormatted", "");
+
+            // Additional compact fields, locale and currency prefix
+            String balanceCompact = call.getString("balanceCompact");
+            String incomeCompact = call.getString("incomeCompact");
+            String expenseCompact = call.getString("expenseCompact");
+            String netCompact = call.getString("netCompact");
+            Integer netSignVal = call.getInt("netSign");
+            String netSign = netSignVal != null ? String.valueOf(netSignVal) : null;
+            String locale = call.getString("locale");
+            String currencyPrefix = call.getString("currencyPrefix");
+
+            // Wallet list for widget config activity
+            String walletList = call.getString("walletList", "[]");
+
             SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-            prefs.edit()
+            SharedPreferences.Editor editor = prefs.edit()
                 .putString("fintrack_widget_balance", balance)
                 .putString("total_net_worth", balance)
                 .putString("wallet_balance", balance)
@@ -541,7 +559,20 @@ public class FinTrackNotificationPlugin extends Plugin {
                 .putFloat("fintrack_widget_today_net_val", todayNetVal != null ? todayNetVal : 0f)
                 .putString("fintrack_widget_btn_text", btnText)
                 .putString("fintrack_widget_balance_label", balanceLabel)
-                .commit();
+                .putFloat("fintrack_widget_income_val_num", incomeValNum != null ? incomeValNum : 0f)
+                .putFloat("fintrack_widget_expense_val_num", expenseValNum != null ? expenseValNum : 0f)
+                .putString("fintrack_widget_surplus_formatted", surplusFormatted != null ? surplusFormatted : "")
+                .putString("fintrack_wallet_list", walletList != null ? walletList : "[]");
+
+            if (balanceCompact != null) editor.putString("fintrack_widget_balance_compact", balanceCompact);
+            if (incomeCompact != null) editor.putString("fintrack_widget_income_compact", incomeCompact);
+            if (expenseCompact != null) editor.putString("fintrack_widget_expense_compact", expenseCompact);
+            if (netCompact != null) editor.putString("fintrack_widget_net_compact", netCompact);
+            if (netSign != null) editor.putString("fintrack_widget_net_sign", netSign);
+            if (locale != null) editor.putString("fintrack_widget_locale", locale);
+            if (currencyPrefix != null) editor.putString("fintrack_widget_currency_prefix", currencyPrefix);
+
+            editor.commit();
 
             // Direct in-process update to all active widget instances
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
@@ -549,25 +580,57 @@ public class FinTrackNotificationPlugin extends Plugin {
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
             if (appWidgetIds != null && appWidgetIds.length > 0) {
                 for (int appWidgetId : appWidgetIds) {
-                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineData, sparklineDates, todayNet, todayNetVal != null ? todayNetVal : 0f, btnText, balanceLabel, dateText);
+                    FinTrackWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId);
                 }
             }
-
-            // Broadcast update intents for system launchers
-            Intent updateIntent = new Intent(context, FinTrackWidgetProvider.class);
-            updateIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-            updateIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-            context.sendBroadcast(updateIntent);
-
-            Intent customIntent = new Intent(context, FinTrackWidgetProvider.class);
-            customIntent.setAction(FinTrackWidgetProvider.ACTION_UPDATE_WIDGET);
-            context.sendBroadcast(customIntent);
 
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Failed to update widget data: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void getWidgetConfig(PluginCall call) {
+        Context context = getContext();
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+            JSObject ret = new JSObject();
+            if (prefs.contains("widget_config_range")) {
+                ret.put("range", prefs.getString("widget_config_range", null));
+            }
+            if (prefs.contains("widget_config_wallet_id")) {
+                ret.put("walletId", prefs.getString("widget_config_wallet_id", null));
+            }
+            if (prefs.contains("widget_config_wallet_name")) {
+                ret.put("walletName", prefs.getString("widget_config_wallet_name", null));
+            }
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to get widget config: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void setWidgetConfig(PluginCall call) {
+        Context context = getContext();
+        try {
+            String range = call.getString("range", "month");
+            String walletId = call.getString("walletId", "-1");
+            String walletName = call.getString("walletName", "Semua Wallet");
+            SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+            prefs.edit()
+                .putString("widget_config_range", range)
+                .putString("widget_config_wallet_id", walletId)
+                .putString("widget_config_wallet_name", walletName)
+                .apply();
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to set widget config: " + e.getMessage());
         }
     }
 }

@@ -349,6 +349,14 @@ export function addIncomeParentCategory(nameId, nameEn, colorKey, iconKey) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed) return null
   const en = String(nameEn || trimmed).trim() || trimmed
+  const tree = getMergedIncomeTree()
+  const exists = tree.some((p) => {
+    const pIdName = (p.names?.id || p.id || '').trim().toLowerCase()
+    const pEnName = (p.names?.en || p.id || '').trim().toLowerCase()
+    return pIdName === trimmed.toLowerCase() || pEnName === en.toLowerCase()
+  })
+  if (exists) return null
+
   const custom = loadCustom()
   const id = `ip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   custom.parents.push({ id, names: { id: trimmed, en }, children: [] })
@@ -361,6 +369,16 @@ export function addIncomeParentCategory(nameId, nameEn, colorKey, iconKey) {
 export function removeIncomeParentCategory(parentId) {
   const custom = loadCustom()
   custom.parents = custom.parents.filter((p) => p.id !== parentId)
+  delete custom.colors[parentId]
+  delete custom.icons[parentId]
+  delete custom.extras[parentId]
+  delete custom.hidden[parentId]
+  delete custom.names[parentId]
+  if (custom.names) {
+    Object.keys(custom.names).forEach((k) => {
+      if (k.startsWith(`${parentId}/`)) delete custom.names[k]
+    })
+  }
   saveCustom(custom)
 }
 
@@ -373,6 +391,17 @@ export function addIncomeSubcategory(parentId, nameId, nameEn) {
   const trimmed = String(nameId || '').trim()
   if (!trimmed || !parentId) return null
   const en = String(nameEn || trimmed).trim() || trimmed
+  const tree = getMergedIncomeTree()
+  const parent = tree.find((p) => p.id === parentId)
+  if (parent?.children) {
+    const exists = parent.children.some((c) => {
+      const cIdName = (c.names?.id || c.id || '').trim().toLowerCase()
+      const cEnName = (c.names?.en || c.id || '').trim().toLowerCase()
+      return cIdName === trimmed.toLowerCase() || cEnName === en.toLowerCase()
+    })
+    if (exists) return null
+  }
+
   const custom = loadCustom()
   let id = null
   if (isBuiltinIncomeCategory(parentId) || INCOME_TREE.some((x) => x.id === parentId)) {
@@ -381,10 +410,10 @@ export function addIncomeSubcategory(parentId, nameId, nameEn) {
     list.push({ id, names: { id: trimmed, en } })
     custom.extras[parentId] = list
   } else {
-    const parent = custom.parents.find((p) => p.id === parentId)
-    if (parent) {
+    const p = custom.parents.find((item) => item.id === parentId)
+    if (p) {
       id = `isub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
-      parent.children.push({ id, names: { id: trimmed, en } })
+      p.children.push({ id, names: { id: trimmed, en } })
     }
   }
   saveCustom(custom)

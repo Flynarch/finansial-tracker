@@ -74,16 +74,23 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const addTransaction = useTransactionStore((state) => state.addTransaction)
 
   const [txType, setTxType] = useState(() => 'expense')
-  const [form, setForm] = useState(() => ({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    amount: '',
-    category: getDefaultExpenseCategoryPath(),
-    notes: '',
-    currency: defaultCurrency,
-    walletId: initialWalletId || defaultWalletId || '',
-    targetWalletId: '',
-    receiptImage: '',
-  }))
+  const [form, setForm] = useState(() => {
+    const cachedWallets = (getCachedDashboardWallets() || []).filter((w) => !w.isArchived)
+    const activeWalletId = initialWalletId || defaultWalletId || (cachedWallets.length > 0 ? cachedWallets[0].id : '')
+    const activeWallet = cachedWallets.find((w) => String(w.id) === String(activeWalletId))
+    const activeCurrency = activeWallet?.currency || defaultCurrency
+    return {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      amount: '',
+      category: getDefaultExpenseCategoryPath(),
+      notes: '',
+      currency: activeCurrency,
+      walletId: activeWalletId,
+      targetWalletId: '',
+      targetAmount: '',
+      receiptImage: '',
+    }
+  })
   const [previewImage, setPreviewImage] = useState(null)
   const [investmentForm, setInvestmentForm] = useState(() => ({
     action: 'buy',
@@ -109,7 +116,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const liveWallets = useLiveQuery(
     async () => {
-      const raw = await db.wallets.toArray()
+      const raw = await db.wallets.filter((w) => !w.isArchived).toArray()
       if (!raw || raw.length === 0) return []
       return raw.map((w) => ({
         ...w,
@@ -148,6 +155,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const selectedWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.walletId)), [wallets, form.walletId])
   const selectedTargetWallet = useMemo(() => wallets?.find((w) => String(w.id) === String(form.targetWalletId)), [wallets, form.targetWalletId])
+  const isCrossCurrencyTransfer = useMemo(() => {
+    if (txType !== 'transfer') return false
+    if (!selectedWallet || !selectedTargetWallet) return false
+    const srcCurr = selectedWallet.currency || form.currency || 'IDR'
+    const tgtCurr = selectedTargetWallet.currency || 'IDR'
+    return srcCurr !== tgtCurr
+  }, [txType, selectedWallet, selectedTargetWallet, form.currency])
+  const targetCurrency = selectedTargetWallet?.currency || 'IDR'
   const isCashWallet = useMemo(
     () =>
       Boolean(
@@ -223,6 +238,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const [incomeParentId, setIncomeParentId] = useState(() => null)
   const [categoryCustomVersion, setCategoryCustomVersion] = useState(0)
   const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [categoryError, setCategoryError] = useState(false)
   const [walletError, setWalletError] = useState(false)
   const [amountError, setAmountError] = useState(false)
@@ -303,41 +319,36 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     }
   }, [])
 
-  const lastOpenRef = useRef(Boolean(isOpen))
   const lastNonceRef = useRef(nonce)
-
   useEffect(() => {
-    const isOpening = Boolean(isOpen) && (!lastOpenRef.current || lastNonceRef.current !== nonce)
-    lastOpenRef.current = Boolean(isOpen)
-    lastNonceRef.current = nonce
+    if (isOpen && lastNonceRef.current !== nonce) {
+      lastNonceRef.current = nonce
+      const availableWallets = (wallets?.length > 0 ? wallets : initialCachedWallets).filter((w) => !w.isArchived)
+      const activeWalletId = initialWalletId || defaultWalletId || (availableWallets.length > 0 ? availableWallets[0].id : '')
+      const activeWallet = availableWallets.find((w) => String(w.id) === String(activeWalletId))
+      const activeCurrency = activeWallet?.currency || defaultCurrency
 
-    if (isOpening) {
       setTxType('expense')
       setCategoryError(false)
       setWalletError(false)
       setAmountError(false)
       setSubmitError('')
-      const availableWallets = wallets?.length > 0 ? wallets : initialCachedWallets
-      const activeWalletId = initialWalletId || defaultWalletId || (availableWallets?.length > 0 ? availableWallets[0].id : '')
-      const activeWallet = availableWallets?.find((w) => String(w.id) === String(activeWalletId))
-      const activeCurrency = activeWallet?.currency || defaultCurrency
       setForm({
         date: format(new Date(), 'yyyy-MM-dd'),
         amount: '',
-        category: '',
+        category: getDefaultExpenseCategoryPath(),
         notes: '',
         currency: activeCurrency,
         walletId: activeWalletId,
         targetWalletId: '',
+        targetAmount: '',
         receiptImage: '',
       })
       setPreviewImage(null)
-      syncExpenseParentFromCategory('')
-      syncIncomeParentFromCategory('')
-      setExpenseParentId(null)
-      setIncomeParentId(null)
+      setTags([])
+      setTagInput('')
     }
-  }, [isOpen, nonce, initialWalletId, defaultWalletId, wallets, initialCachedWallets, defaultCurrency, syncExpenseParentFromCategory, syncIncomeParentFromCategory])
+  }, [isOpen, nonce, wallets, initialCachedWallets, initialWalletId, defaultWalletId, defaultCurrency])
 
   useEffect(() => {
     if (txType !== 'investment') return
@@ -539,10 +550,12 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (isSubmitting) return
+    setIsSubmitting(true)
     try {
       setSubmitError('')
       if (txType === 'investment') {
-        const effectiveDate = format(new Date(), 'yyyy-MM-dd')
+        const effectiveDate = investmentForm.date || format(new Date(), 'yyyy-MM-dd')
         const selectedType =
           investmentForm.action === 'sell' ? String(selectedOwnedInvestment?.type || investmentForm.type) : investmentForm.type
         const selectedCurrency =
@@ -563,120 +576,143 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         const investmentSub = investmentSubByType[assetType] || 'investasi_lain'
         if (!(quantity > 0) || !(totalAmount > 0) || !(unitPrice > 0)) throw new Error('invalid investment input')
 
-        if (side === 'buy') {
-          const investmentName = getInvestmentNameByType(selectedType)
-          const normalizedName = investmentName.toLowerCase()
-          const matchRows = (ownedInvestments || []).filter(
-            (row) =>
-              String(row?.type || '').toLowerCase() === String(selectedType || '').toLowerCase() &&
-              String(row?.name || '').toLowerCase() === normalizedName &&
-              String(row?.purchaseCurrency || defaultCurrency) === String(selectedCurrency || defaultCurrency),
-          )
-          if (matchRows.length === 0) {
-            await db.investments.add({
+        await db.transaction('rw', [
+          db.investments,
+          db.investmentOrders,
+          db.transactions,
+          db.wallets,
+          db.walletBalanceCache,
+          db.budgets,
+          db.notifications,
+        ], async () => {
+          if (side === 'buy') {
+            const rawTicker = investmentForm.name?.trim()
+            if ((selectedType === 'Saham' || selectedType === 'Crypto') && !rawTicker) {
+              throw new Error(selectedType === 'Saham' ? 'Nama/kode saham wajib diisi.' : 'Nama/simbol kripto wajib diisi.')
+            }
+            const investmentName = rawTicker || getInvestmentNameByType(selectedType)
+            const normalizedName = investmentName.toLowerCase()
+            const matchRows = (ownedInvestments || []).filter(
+              (row) =>
+                String(row?.type || '').toLowerCase() === String(selectedType || '').toLowerCase() &&
+                String(row?.name || '').toLowerCase() === normalizedName &&
+                String(row?.purchaseCurrency || defaultCurrency) === String(selectedCurrency || defaultCurrency),
+            )
+            let holdingId
+            if (matchRows.length === 0) {
+              holdingId = await db.investments.add({
+                name: investmentName,
+                type: selectedType,
+                quantity,
+                purchasePrice: unitPrice,
+                purchaseCurrency: selectedCurrency,
+              })
+            } else {
+              const sorted = matchRows.slice().sort((a, b) => Number(a.id) - Number(b.id))
+              const keep = sorted[0]
+              holdingId = keep.id
+              const existingQty = sorted.reduce((sum, row) => sum + toSafeNumber(row.quantity), 0)
+              const existingCost = sorted.reduce(
+                (sum, row) => sum + toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
+                0,
+              )
+              const nextQty = existingQty + quantity
+              const nextAvgPrice = nextQty > 0 ? (existingCost + totalAmount) / nextQty : unitPrice
+              await db.investments.update(keep.id, {
+                name: investmentName || keep.name,
+                type: selectedType || keep.type,
+                quantity: nextQty,
+                purchasePrice: nextAvgPrice,
+                purchaseCurrency: selectedCurrency,
+              })
+              const extraIds = sorted.slice(1).map((row) => row.id)
+              if (extraIds.length > 0) {
+                await db.investments.bulkDelete(extraIds)
+              }
+            }
+            const orderId = await db.investmentOrders.add({
+              date: effectiveDate,
+              createdAt,
+              side: 'buy',
               name: investmentName,
               type: selectedType,
               quantity,
-              purchasePrice: unitPrice,
-              purchaseCurrency: selectedCurrency,
+              unitPrice,
+              totalAmount,
+              currency: selectedCurrency,
+              fundingSource: investmentForm.fundingSource,
+              costBasis: unitPrice,
             })
+            if (investmentForm.fundingSource === 'balance') {
+              const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
+              await addTransaction({
+                date: effectiveDate,
+                amount: totalAmount,
+                type: 'expense',
+                category: `investasi_pengeluaran/${investmentSub}`,
+                notes: `Buy ${investmentName}`,
+                currency: selectedCurrency,
+                walletId: effectiveWalletId,
+                createdAt,
+                investmentId: holdingId,
+                investmentOrderId: orderId,
+                isExcludeFromAnalytics: true,
+                isExcludeAnalyticsTx: true,
+                excludeFromAnalytics: true,
+              })
+            }
           } else {
-            const sorted = matchRows.slice().sort((a, b) => Number(a.id) - Number(b.id))
-            const keep = sorted[0]
-            const existingQty = sorted.reduce((sum, row) => sum + toSafeNumber(row.quantity), 0)
-            const existingCost = sorted.reduce(
-              (sum, row) => sum + toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
-              0,
-            )
-            const nextQty = existingQty + quantity
-            const nextAvgPrice = nextQty > 0 ? (existingCost + totalAmount) / nextQty : unitPrice
-            await db.investments.update(keep.id, {
-              name: investmentName || keep.name,
-              type: selectedType || keep.type,
-              quantity: nextQty,
-              purchasePrice: nextAvgPrice,
-              purchaseCurrency: selectedCurrency,
+            if (!selectedOwnedInvestment) throw new Error('investment not found')
+            const ownedQty = toSafeNumber(selectedOwnedInvestment.quantity)
+            if (!(quantity > 0) || quantity > ownedQty) throw new Error('invalid sell qty')
+            let remaining = quantity
+            const sourceEntries = (selectedOwnedInvestment.sourceEntries || []).slice().sort((a, b) => Number(a.id) - Number(b.id))
+            for (const source of sourceEntries) {
+              if (remaining <= 0) break
+              const sourceQty = toSafeNumber(source.quantity)
+              const taken = Math.min(sourceQty, remaining)
+              const nextQty = sourceQty - taken
+              remaining -= taken
+              if (nextQty <= 0.0000001) {
+                await db.investments.delete(source.id)
+              } else {
+                await db.investments.update(source.id, { quantity: nextQty })
+              }
+            }
+            const orderId = await db.investmentOrders.add({
+              date: effectiveDate,
+              createdAt,
+              side: 'sell',
+              name: selectedOwnedInvestment.name,
+              type: selectedOwnedInvestment.type,
+              quantity,
+              unitPrice,
+              totalAmount,
+              currency: selectedCurrency,
+              fundingSource: investmentForm.fundingSource,
+              costBasis: Number(selectedOwnedInvestment.purchasePrice) || unitPrice,
             })
-            const extraIds = sorted.slice(1).map((row) => row.id)
-            if (extraIds.length > 0) {
-              await db.investments.bulkDelete(extraIds)
+            if (investmentForm.fundingSource === 'balance') {
+              const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
+              const sellCategory = assetType === 'saham' ? 'investasi/jual_saham' : `investasi/${investmentSub}`
+              await addTransaction({
+                date: effectiveDate,
+                amount: totalAmount,
+                type: 'income',
+                category: sellCategory,
+                notes: `Sell ${selectedOwnedInvestment.name}`,
+                currency: selectedCurrency,
+                walletId: effectiveWalletId,
+                createdAt,
+                investmentId: selectedOwnedInvestment.id || (selectedOwnedInvestment.sourceEntries?.[0]?.id ?? null),
+                investmentOrderId: orderId,
+                isExcludeFromAnalytics: true,
+                isExcludeAnalyticsTx: true,
+                excludeFromAnalytics: true,
+              })
             }
           }
-          await db.investmentOrders.add({
-            date: effectiveDate,
-            createdAt,
-            side: 'buy',
-            name: investmentName,
-            type: selectedType,
-            quantity,
-            unitPrice,
-            totalAmount,
-            currency: selectedCurrency,
-            fundingSource: investmentForm.fundingSource,
-          })
-          if (investmentForm.fundingSource === 'balance') {
-            const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
-            await addTransaction({
-              date: effectiveDate,
-              amount: totalAmount,
-              type: 'expense',
-              category: `investasi_pengeluaran/${investmentSub}`,
-              notes: `Buy ${investmentName}`,
-              currency: selectedCurrency,
-              walletId: effectiveWalletId,
-              createdAt,
-              isExcludeFromAnalytics: true,
-              isExcludeAnalyticsTx: true,
-              excludeFromAnalytics: true,
-            })
-          }
-        } else {
-          if (!selectedOwnedInvestment) throw new Error('investment not found')
-          const ownedQty = toSafeNumber(selectedOwnedInvestment.quantity)
-          if (!(quantity > 0) || quantity > ownedQty) throw new Error('invalid sell qty')
-          let remaining = quantity
-          const sourceEntries = (selectedOwnedInvestment.sourceEntries || []).slice().sort((a, b) => Number(a.id) - Number(b.id))
-          for (const source of sourceEntries) {
-            if (remaining <= 0) break
-            const sourceQty = toSafeNumber(source.quantity)
-            const taken = Math.min(sourceQty, remaining)
-            const nextQty = sourceQty - taken
-            remaining -= taken
-            if (nextQty <= 0.0000001) {
-              await db.investments.delete(source.id)
-            } else {
-              await db.investments.update(source.id, { quantity: nextQty })
-            }
-          }
-          await db.investmentOrders.add({
-            date: effectiveDate,
-            createdAt,
-            side: 'sell',
-            name: selectedOwnedInvestment.name,
-            type: selectedOwnedInvestment.type,
-            quantity,
-            unitPrice,
-            totalAmount,
-            currency: selectedCurrency,
-            fundingSource: investmentForm.fundingSource,
-          })
-          if (investmentForm.fundingSource === 'balance') {
-            const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
-            await addTransaction({
-              date: effectiveDate,
-              amount: totalAmount,
-              type: 'income',
-              category: `investasi/${investmentSub}`,
-              notes: `Sell ${selectedOwnedInvestment.name}`,
-              currency: selectedCurrency,
-              walletId: effectiveWalletId,
-              createdAt,
-              isExcludeFromAnalytics: true,
-              isExcludeAnalyticsTx: true,
-              excludeFromAnalytics: true,
-            })
-          }
-        }
+        })
       } else {
         if (txType !== 'transfer' && (!form.category || !form.category.trim())) {
           hapticWarning()
@@ -728,6 +764,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           currency: form.currency,
           walletId: Number(form.walletId),
           targetWalletId: txType === 'transfer' ? Number(form.targetWalletId) : undefined,
+          targetAmount: isCrossCurrencyTransfer && form.targetAmount ? parseMoneyInput(form.targetAmount, targetCurrency) : undefined,
           tags: tags.length > 0 ? tags : undefined,
           receiptImage: form.receiptImage || undefined,
         })
@@ -738,6 +775,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       console.warn('[QuickAddTransactionModal]', err)
       hapticWarning()
       setSubmitError(err?.message || t('common.error.saveFailed'))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -761,10 +800,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           <button
             type="submit"
             form="quick-add-transaction-form"
+            disabled={isSubmitting}
             style={{
               backgroundColor: modeAccent,
             }}
-            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
+            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
               txType === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
             }`}
           >
@@ -893,6 +933,29 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                       onClick={() => setWalletModalMode('targetWalletId')}
                       className="!h-[42px]"
                     />
+                    {isCrossCurrencyTransfer && (
+                      <div className="mt-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-2.5 space-y-1.5 animate-[ft-fade-in_0.2s_ease-out]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                            {t('tx.targetAmount', 'Nominal Diterima')} ({targetCurrency})
+                          </span>
+                          <span className="text-[10px] text-[var(--accent)] font-semibold">
+                            {t('tx.fixedRateLocked', 'Nilai tukar terkunci')}
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={form.targetAmount || ''}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setForm((prev) => ({ ...prev, targetAmount: formatMoneyInput(val, targetCurrency) }))
+                          }}
+                          placeholder={formatMoneyInput('0', targetCurrency)}
+                          className="w-full h-9 px-3 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-black text-[var(--fg)] tracking-wide focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>

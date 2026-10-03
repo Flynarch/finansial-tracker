@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { UserBubble, AiBubble, ChartBubble } from './ChatBubble'
 import CardCarousel from './CardCarousel'
 import ActionSuccessCard from './ActionSuccessCard'
@@ -7,7 +8,7 @@ import QuickChips from './QuickChips'
 import DeleteConfirmCard from './DeleteConfirmCard'
 import { translate } from '../../lib/i18n'
 
-export default function ChatMessageItem({
+const ChatMessageItem = memo(function ChatMessageItem({
   msg,
   isLatestMessage = false,
   isLastAi = false,
@@ -140,4 +141,6 @@ export default function ChatMessageItem({
       )}
     </div>
   )
-}
+})
+
+export default ChatMessageItem

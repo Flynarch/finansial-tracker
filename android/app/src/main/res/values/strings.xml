@@ -4,4 +4,28 @@
     <string name="title_activity_main">FinTrack</string>
     <string name="package_name">com.fintrack.app</string>
     <string name="custom_url_scheme">com.fintrack.app</string>
+    <string name="widget_description">Ringkasan kekayaan bersih, arus kas, dan grafik tren finansial</string>
+
+    <string name="widget_label_net_worth">Kekayaan bersih</string>
+    <string name="widget_label_balance_short">Saldo</string>
+    <string name="widget_period_month">Bulan ini</string>
+    <string name="widget_period_7d">7 hari</string>
+    <string name="widget_period_30d">30 hari</string>
+    <string name="widget_income">Masuk</string>
+    <string name="widget_expense">Keluar</string>
+    <string name="widget_add_cd">Catat transaksi</string>
+    <string name="widget_chart_cd">Tren arus kas</string>
+    <string name="widget_hidden_mask" translatable="false">••••••</string>
+
+    <!-- Widget Configuration Screen Strings -->
+    <string name="widget_config_title">FinTrack Widget</string>
+    <string name="widget_config_period">Periode</string>
+    <string name="widget_config_period_7d">7 hari</string>
+    <string name="widget_config_period_30d">30 hari</string>
+    <string name="widget_config_period_month">Bulan ini</string>
+    <string name="widget_config_hide_balance_title">Sembunyikan saldo</string>
+    <string name="widget_config_hide_balance_subtitle">Untuk privasi di layar utama</string>
+    <string name="widget_config_wallet">Wallet</string>
+    <string name="widget_config_wallet_all">Semua wallet</string>
+    <string name="widget_config_save">Simpan</string>
 </resources>

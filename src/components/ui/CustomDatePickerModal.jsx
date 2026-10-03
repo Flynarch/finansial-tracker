@@ -15,6 +15,7 @@ import {
   isValid,
   subDays,
   startOfYear,
+  endOfYear,
 } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -88,10 +89,10 @@ export default function CustomDatePickerModal({
       setTempEnd(todayStr)
     } else if (type === 'month') {
       setTempStart(format(startOfMonth(today), 'yyyy-MM-dd'))
-      setTempEnd(todayStr)
+      setTempEnd(format(endOfMonth(today), 'yyyy-MM-dd'))
     } else if (type === 'year') {
       setTempStart(format(startOfYear(today), 'yyyy-MM-dd'))
-      setTempEnd(todayStr)
+      setTempEnd(format(endOfYear(today), 'yyyy-MM-dd'))
     }
   }
 
@@ -172,7 +173,7 @@ export default function CustomDatePickerModal({
         <div className="flex items-center justify-between px-1">
           <button
             type="button"
-            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            onClick={() => setCurrentMonth(subMonths(startOfMonth(currentMonth || new Date()), 1))}
             className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
             aria-label={activeLocale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
           >
@@ -183,7 +184,7 @@ export default function CustomDatePickerModal({
           </span>
           <button
             type="button"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            onClick={() => setCurrentMonth(addMonths(startOfMonth(currentMonth || new Date()), 1))}
             className="rounded-xl border border-[var(--border)] p-1.5 text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
             aria-label={activeLocale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
           >

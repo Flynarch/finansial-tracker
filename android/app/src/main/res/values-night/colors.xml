@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#0F1218</color>
+    <color name="colorPrimaryDark">#0B0F1A</color>
+    <color name="colorAccent">#6B7C5E</color>
+    <color name="brandAccent">#6B7C5E</color>
+    <color name="brandIncome">#86EFAC</color>
+    <color name="brandExpense">#FDA4AF</color>
+
+    <!-- Widget Dark Theme Colors -->
+    <color name="widget_background">#14171D</color>
+    <color name="widget_text_primary">#F1F1EE</color>
+    <color name="widget_text_secondary">#8C9099</color>
+    <color name="widget_hairline">#14FFFFFF</color>
+    <color name="widget_income">#82BE97</color>
+    <color name="widget_expense">#E08B81</color>
+    <color name="widget_btn_bg">#F1F1EE</color>
+    <color name="widget_btn_icon">#14171D</color>
+    <color name="widget_btn_ripple">#3314171D</color>
+
+    <color name="widget_segment_track">#1C2028</color>
+    <color name="widget_segment_thumb">#262C38</color>
+    <color name="widget_divider">#222834</color>
+</resources>

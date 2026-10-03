@@ -186,14 +186,14 @@ export default function CustomDatePicker({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setViewDate((d) => subMonths(d, 1))}
+                onClick={() => setViewDate((d) => subMonths(startOfMonth(d || new Date()), 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
-                onClick={() => setViewDate((d) => addMonths(d, 1))}
+                onClick={() => setViewDate((d) => addMonths(startOfMonth(d || new Date()), 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
               >
                 <ChevronRight className="h-4 w-4" />

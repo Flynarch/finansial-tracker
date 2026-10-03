@@ -40,6 +40,8 @@ export default function TransactionEditSheet({
   if (currentTxKey !== prevTxKey) {
     setPrevTxKey(currentTxKey)
     if (currentTxKey) {
+      const tgtWallet = wallets?.find((w) => String(w.id) === String(transaction.targetWalletId))
+      const tgtCurr = tgtWallet?.currency || 'IDR'
       setInternalFormData({
         id: transaction.id,
         amount: formatMoneyValueForInput(transaction.amount || 0, transaction.currency || 'IDR'),
@@ -48,6 +50,7 @@ export default function TransactionEditSheet({
         date: transaction.date || getLocalDateString(),
         walletId: transaction.walletId ? String(transaction.walletId) : '',
         targetWalletId: transaction.targetWalletId ? String(transaction.targetWalletId) : '',
+        targetAmount: transaction.targetAmount ? formatMoneyValueForInput(transaction.targetAmount, tgtCurr) : '',
         notes: transaction.notes || '',
         currency: transaction.currency || 'IDR',
         isSplit: Boolean(transaction.isSplit),
@@ -65,6 +68,7 @@ export default function TransactionEditSheet({
   const [walletModalMode, setWalletModalMode] = useState(null)
   const [isCatModalOpen, setIsCatModalOpen] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [categoryError, setCategoryError] = useState(false)
   const [walletError, setWalletError] = useState(false)
   const [amountError, setAmountError] = useState(false)
@@ -131,6 +135,14 @@ export default function TransactionEditSheet({
     () => wallets?.find((w) => String(w.id) === String(formData?.targetWalletId)),
     [wallets, formData?.targetWalletId]
   )
+  const isCrossCurrencyTransfer = useMemo(() => {
+    if (formData?.type !== 'transfer') return false
+    if (!selectedWallet || !selectedTargetWallet) return false
+    const srcCurr = selectedWallet.currency || formData?.currency || 'IDR'
+    const tgtCurr = selectedTargetWallet.currency || 'IDR'
+    return srcCurr !== tgtCurr
+  }, [formData?.type, selectedWallet, selectedTargetWallet, formData?.currency])
+  const targetCurrency = selectedTargetWallet?.currency || 'IDR'
 
   const isCashWallet = useMemo(
     () =>
@@ -245,6 +257,8 @@ export default function TransactionEditSheet({
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (isSubmitting) return
+    setIsSubmitting(true)
     try {
       setSubmitError('')
       if (formData.type !== 'transfer' && (!formData.category || !formData.category.trim())) {
@@ -283,6 +297,19 @@ export default function TransactionEditSheet({
       }
 
       if (formData.isSplit && Array.isArray(formData.splitItems) && formData.splitItems.length > 0) {
+        for (const item of formData.splitItems) {
+          const itemAmount = Number(item.amount) || 0
+          if (itemAmount <= 0) {
+            setAmountError(true)
+            setSubmitError(t('tx.splitAmountInvalid', 'Setiap rincian transaksi harus memiliki nominal lebih dari 0.'))
+            return
+          }
+          if (!item.category || !String(item.category).trim()) {
+            setCategoryError(true)
+            setSubmitError(t('tx.splitCategoryRequired', 'Kategori pada setiap rincian transaksi harus dipilih.'))
+            return
+          }
+        }
         const splitSum = formData.splitItems.reduce((acc, item) => acc + (Number(item.amount) || 0), 0)
         if (Math.abs(splitSum - totalAmount) > 0.05) {
           setAmountError(true)
@@ -301,6 +328,7 @@ export default function TransactionEditSheet({
         await updateTransaction(transaction.id, {
           ...formData,
           amount: totalAmount,
+          targetAmount: isCrossCurrencyTransfer && formData.targetAmount ? parseMoneyInput(formData.targetAmount, targetCurrency) : null,
           updatedAt: new Date().toISOString(),
         })
         onSaved?.()
@@ -309,6 +337,8 @@ export default function TransactionEditSheet({
     } catch (err){
       console.warn('[TransactionEditSheet]', err)
       setSubmitError(err.message || t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -366,10 +396,11 @@ export default function TransactionEditSheet({
           <button
             type="submit"
             form="transaction-edit-form"
+            disabled={isSubmitting}
             style={{
               backgroundColor: modeAccent,
             }}
-            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer ${
+            className={`flex-1 h-[44px] rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
               formData.type === 'transfer' ? 'shadow-[0_4px_14px_rgba(37,99,235,0.35)] hover:opacity-90' : ''
             }`}
           >
@@ -503,6 +534,29 @@ export default function TransactionEditSheet({
                   onClick={() => setWalletModalMode('targetWalletId')}
                   className="!h-[42px]"
                 />
+                {isCrossCurrencyTransfer && (
+                  <div className="mt-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-2.5 space-y-1.5 animate-[ft-fade-in_0.2s_ease-out]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                        {t('tx.targetAmount', 'Nominal Diterima')} ({targetCurrency})
+                      </span>
+                      <span className="text-[10px] text-[var(--accent)] font-semibold">
+                        {t('tx.fixedRateLocked', 'Nilai tukar terkunci')}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.targetAmount || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setFormData((prev) => ({ ...prev, targetAmount: formatMoneyInput(val, targetCurrency) }))
+                      }}
+                      placeholder={formatMoneyInput('0', targetCurrency)}
+                      className="w-full h-9 px-3 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-black text-[var(--fg)] tracking-wide focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                )}
               </div>
             ) : formData.type === 'balance_adjustment' ? (
               <div>
@@ -741,7 +795,6 @@ export default function TransactionEditSheet({
           isOpen={isReceiptScannerOpen}
           onClose={() => setIsReceiptScannerOpen(false)}
           onApplyReceipt={handleApplyAiReceipt}
-          enableBackButton={false}
         />
       )}
     </BottomSheet>

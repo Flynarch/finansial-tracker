@@ -236,14 +236,14 @@ export default function HabitsView() {
       await LocalNotifications.schedule({
         notifications: [
           {
-            id: habitId,
+            id: 200000 + Number(habitId),
             title: t('habits.reminderNotifTitle', 'Pengingat Kebiasaan'),
             body: `${title} • ${t('habits.reminderNotifBody', 'Waktunya menyelesaikan target kebiasaan hari ini')}`,
             largeBody: `${title} • ${t('habits.reminderNotifBody', 'Waktunya menyelesaikan target kebiasaan hari ini')}`,
             summaryText: t('notifications.summaryHabit', 'Kebiasaan'),
             channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
             actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
-            extra: { route: '/todos' },
+            extra: { route: '/todos?tab=habits' },
             schedule: {
               on: { hour, minute },
               allowWhileIdle: true,
@@ -261,7 +261,7 @@ export default function HabitsView() {
 
   const cancelHabitNotification = async (habitId) => {
     try {
-      await LocalNotifications.cancel({ notifications: [{ id: habitId }] })
+      await LocalNotifications.cancel({ notifications: [{ id: 200000 + Number(habitId) }] })
     } catch (e) {
       console.error('Failed to cancel notification', e)
     }
@@ -292,7 +292,7 @@ export default function HabitsView() {
   }
 
   const toggleHabitToday = useCallback(async (habitId) => {
-    const log = await db.habitLogs.where({ habitId, date: todayKey }).first()
+    const log = await db.habitLogs.where('habitId').equals(habitId).filter(l => l.date === todayKey).first()
     if (log) {
       await db.habitLogs.delete(log.id)
     } else {
@@ -345,7 +345,7 @@ export default function HabitsView() {
     })
     
     await cancelHabitNotification(editHabitId)
-    if (editForm.reminderEnabled && editForm.reminderTime) {
+    if (!editForm.isPaused && editForm.reminderEnabled && editForm.reminderTime) {
       await scheduleHabitNotification(editHabitId, title, editForm.reminderTime)
     }
 

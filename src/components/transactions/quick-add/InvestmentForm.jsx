@@ -126,6 +126,24 @@ export default function InvestmentForm({
         </label>
       )}
 
+      {form.action === 'buy' && String(form.type || '').toLowerCase() !== 'emas' && (
+        <label className="ft-label">
+          {form.type === 'Saham' ? t('invest.stockName', 'Nama / Kode Saham (Ticker)') : t('invest.cryptoName', 'Nama / Simbol Kripto')}
+          <input
+            type="text"
+            value={form.name || ''}
+            placeholder={
+              form.type === 'Saham'
+                ? t('invest.stockPlaceholder', 'contoh: BBCA, BBRI')
+                : t('invest.cryptoPlaceholder', 'contoh: BTC, ETH')
+            }
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            className="ft-field"
+            required
+          />
+        </label>
+      )}
+
       {String(form.type || '').toLowerCase() === 'emas' ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] p-3">
           <p className="ft-muted mb-2 text-xs">
@@ -134,6 +152,23 @@ export default function InvestmentForm({
               ? `${formatMoneyInput(String(Math.round(goldAutoPrice)), 'IDR')} / ${t('invest.unit.gram', 'Gram')}`
               : '-'}
           </p>
+          <label className="ft-label mb-2">
+            {form.action === 'sell' ? t('addTx.investment.sellPrice', 'Harga Jual per Gram') : t('invest.buyPrice', 'Harga Beli per Gram')}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={form.purchasePrice}
+              placeholder={toSafeNumber(goldAutoPrice) > 0 ? formatMoneyInput(String(Math.round(goldAutoPrice)), form.purchaseCurrency) : '0'}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  purchasePrice: formatMoneyInput(e.target.value, p.purchaseCurrency),
+                }))
+              }
+              className="ft-field"
+              required
+            />
+          </label>
           {form.action === 'buy' && (
             <p className="mb-2 rounded-lg border border-amber-300/40 bg-amber-50/50 px-2 py-1 text-[11px] text-amber-700">
               {t('addTx.investment.goldMin', {
@@ -274,7 +309,7 @@ export default function InvestmentForm({
         {t('invest.buyCurrency', 'Mata Uang')}
         <select
           value={form.purchaseCurrency}
-          disabled={String(form.type || '').toLowerCase() === 'emas' || form.action === 'sell'}
+          disabled={form.action === 'sell'}
           onChange={(e) =>
             setForm((p) => ({
               ...p,
@@ -283,7 +318,7 @@ export default function InvestmentForm({
             }))
           }
           className={`ft-field ${
-            String(form.type || '').toLowerCase() === 'emas' || form.action === 'sell'
+            form.action === 'sell'
               ? 'cursor-not-allowed opacity-80'
               : ''
           }`}

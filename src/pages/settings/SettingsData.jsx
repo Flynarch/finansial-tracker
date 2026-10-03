@@ -27,9 +27,13 @@ import { resetExpenseCategoryCustomizations } from '../../lib/expenseCategories'
 import { resetIncomeCategoryCustomizations } from '../../lib/incomeCategories'
 import { invalidateAllBalances } from '../../lib/balanceEngine'
 import { clearCachedDashboardState } from '../../hooks/useDashboardData'
+import { clearEntityMemory } from '../../lib/ai/entityMemory'
+import { clearMerchantMemory } from '../../lib/ai/merchantCategorizer'
+import { cancelAllAppNotifications } from '../../lib/smartNotifications'
+import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
 
 export default function SettingsData() {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const navigate = useNavigate()
   const authProvider = useSettingsStore((s) => s.authProvider)
   const authUserEmail = useSettingsStore((s) => s.authUserEmail)
@@ -45,7 +49,7 @@ export default function SettingsData() {
   const [busyAction, setBusyAction] = useState(null)
   const fileInputRef = useRef(null)
   const canConfirmReset = resetConfirmText === 'RESET'
-  const canConfirmDeleteAccount = deleteAccountConfirmText === 'HAPUS'
+  const canConfirmDeleteAccount = ['HAPUS', 'DELETE'].includes((deleteAccountConfirmText || '').trim().toUpperCase())
   const isBusy = busyAction !== null
 
   const handleExportJson = async () => {
@@ -143,8 +147,10 @@ export default function SettingsData() {
         createdAt: Date.now(),
       })
 
-      // 3. Clear financial price caches and category customizations (preserves auth, profile & onboarding)
+      // 3. Clear financial price caches, learned memory, and category customizations (preserves auth, profile & onboarding)
       clearFinancialLocalStorage()
+      clearEntityMemory()
+      clearMerchantMemory()
       resetExpenseCategoryCustomizations()
       resetIncomeCategoryCustomizations()
 
@@ -152,7 +158,16 @@ export default function SettingsData() {
       await invalidateAllBalances()
       clearCachedDashboardState()
 
-      // 5. Notify all listeners of reset data
+      // 5. Cancel any scheduled native notifications and resync native widget
+      await cancelAllAppNotifications()
+      const { dailyReminderEnabled, dailyReminderTime } = useSettingsStore.getState()
+      if (dailyReminderEnabled) {
+        const { syncDailyReminderSchedule } = await import('../../lib/smartNotifications')
+        await syncDailyReminderSchedule(true, dailyReminderTime)
+      }
+      scheduleNativeWidgetSync(0)
+
+      // 6. Notify all listeners of reset data
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ft-data-restored'))
         window.dispatchEvent(new CustomEvent('ft_data_restored'))
@@ -171,8 +186,8 @@ export default function SettingsData() {
 
   const handleDeleteAccount = async () => {
     if (isBusy) return
-    if (deleteAccountConfirmText !== 'HAPUS') {
-      setStatusMessage(t('settings.deleteAccount.needConfirm', 'Ketik HAPUS untuk mengonfirmasi.'))
+    if (!['HAPUS', 'DELETE'].includes((deleteAccountConfirmText || '').trim().toUpperCase())) {
+      setStatusMessage(t('settings.deleteAccount.needConfirm', locale === 'en' ? 'Type DELETE to confirm.' : 'Ketik HAPUS untuk mengonfirmasi.'))
       return
     }
     try {
@@ -497,16 +512,16 @@ export default function SettingsData() {
               {t('settings.deleteAccount.warningHeader', 'Peringatan: Tindakan ini tidak dapat dibatalkan!')}
             </p>
             <ul className="list-disc list-inside space-y-1 text-[11px] opacity-90">
-              <li>Akun login ({authUserEmail}) akan dihapus permanen.</li>
-              <li>Seluruh cadangan cloud di Google Firestore & Storage akan dihapus.</li>
-              <li>Seluruh data finansial di perangkat ini akan dibersihkan.</li>
+              <li>{t('settings.deleteAccount.bullet1', `Akun login (${authUserEmail}) akan dihapus permanen.`, { email: authUserEmail })}</li>
+              <li>{t('settings.deleteAccount.bullet2', 'Seluruh cadangan cloud di Google Firestore & Storage akan dihapus.')}</li>
+              <li>{t('settings.deleteAccount.bullet3', 'Seluruh data finansial di perangkat ini akan dibersihkan.')}</li>
             </ul>
           </div>
 
           <p className="text-xs font-medium text-[var(--muted)] leading-relaxed">
             {t('settings.deleteAccount.modalDesc', 'Untuk mengonfirmasi penghapusan akun, silakan ketik')}
             <span className="mx-1 font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-              HAPUS
+              {locale === 'en' ? 'DELETE' : 'HAPUS'}
             </span>
             {t('settings.deleteAccount.modalDescSuffix', 'di bawah ini.')}
           </p>

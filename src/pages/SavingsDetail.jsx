@@ -3,17 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import useBackButton from '../hooks/useBackButton'
 import Modal from '../components/ui/Modal'
 import BottomSheet from '../components/ui/BottomSheet'
 import EmptyState from '../components/ui/EmptyState'
 import CustomDatePicker from '../components/ui/CustomDatePicker'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import PageHeader from '../components/ui/PageHeader'
+import { getCachedCurrencyRates } from '../lib/api'
 import {
   clampPercent,
+  convertCurrency,
   formatCurrency,
   formatMoneyInput,
   getMoneyInputCaret,
@@ -95,12 +97,6 @@ export default function SavingsDetail() {
   const [cashoutWalletModalOpen, setCashoutWalletModalOpen] = useState(false)
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false)
 
-  useBackButton(() => setIsCelebrationModalOpen(false), Boolean(isCelebrationModalOpen))
-  useBackButton(() => setCashoutWalletModalOpen(false), Boolean(cashoutWalletModalOpen))
-  useBackButton(() => setWalletModalOpen(false), Boolean(walletModalOpen))
-  useBackButton(() => setIsCashoutSheetOpen(false), Boolean(isCashoutSheetOpen))
-  useBackButton(() => setIsAiModalOpen(false), Boolean(isAiModalOpen))
-
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
@@ -125,6 +121,7 @@ export default function SavingsDetail() {
   )
 
   const [fundActionType, setFundActionType] = useState('add') // 'add' | 'withdraw'
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const togglePin = async () => {
     if (!goal) return
@@ -132,131 +129,173 @@ export default function SavingsDetail() {
   }
 
   const handleFundTransaction = async () => {
+    if (isSubmitting) return
     const targetCurrency = goal?.currency || defaultCurrency
     const val = parseMoneyInput(amountInput, targetCurrency)
     if (val <= 0) return
 
-    const isWithdraw = fundActionType === 'withdraw'
-    const currentGoalAmt = Number(goal?.currentAmount || 0)
-    const newGoalAmount = isWithdraw
-      ? Math.max(0, currentGoalAmt - val)
-      : currentGoalAmt + val
+    setIsSubmitting(true)
+    try {
+      const isWithdraw = fundActionType === 'withdraw'
+      const currentGoalAmt = Number(goal?.currentAmount || 0)
+      if (isWithdraw && currentGoalAmt <= 0) return
+      const effectiveVal = isWithdraw ? Math.min(val, currentGoalAmt) : val
+      if (effectiveVal <= 0) return
 
-    const now = new Date()
-    const selectedDate = new Date(`${dateInput}T00:00:00`)
-    selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
-    const formattedDate = format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
-    const walletIdNum = Number(selectedWalletId)
+      const newGoalAmount = isWithdraw
+        ? Math.max(0, currentGoalAmt - effectiveVal)
+        : currentGoalAmt + effectiveVal
 
-    await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
-      await db.goals.update(goalId, { currentAmount: newGoalAmount })
-
-      let walletObj = null
-      if (walletIdNum) {
-        walletObj = await db.wallets.get(walletIdNum)
+      const target = Number(goal?.targetAmount) || 0
+      const isNowCompleted = target > 0 && newGoalAmount >= target
+      const goalUpdates = {
+        currentAmount: newGoalAmount,
+      }
+      if (!isWithdraw && isNowCompleted) {
+        goalUpdates.isCompleted = true
+        goalUpdates.status = 'completed'
+      } else if (isWithdraw && newGoalAmount < target) {
+        goalUpdates.isCompleted = false
+        goalUpdates.status = 'active'
       }
 
-      let createdTxId = null
+      const now = new Date()
+      const selectedDate = new Date(`${dateInput}T00:00:00`)
+      selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
+      const walletIdNum = Number(selectedWalletId)
+
+      await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
+        await db.goals.update(goalId, goalUpdates)
+
+        let walletObj = null
+        if (walletIdNum) {
+          walletObj = await db.wallets.get(walletIdNum)
+        }
+
+        let createdTxId = null
+        if (walletIdNum) {
+          const walletCurrency = walletObj?.currency || defaultCurrency
+          const goalCurrency = goal.currency || defaultCurrency
+          const rates = getCachedCurrencyRates('USD')
+          const walletTxAmount = convertCurrency(effectiveVal, goalCurrency, walletCurrency, rates)
+
+          createdTxId = await db.transactions.add({
+            date: dateInput,
+            amount: roundCurrency(walletTxAmount, walletCurrency),
+            type: isWithdraw ? 'income' : 'expense',
+            category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
+            notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+            currency: walletCurrency,
+            walletId: walletIdNum,
+            goalId: goal.id,
+            createdAt: Date.now(),
+            deletedAt: null,
+            isExcludeAnalyticsTx: true,
+            isExcludeFromAnalytics: true,
+            excludeFromAnalytics: true,
+          })
+        }
+
+        const logPayload = {
+          goalId,
+          amount: isWithdraw ? -effectiveVal : effectiveVal,
+          notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
+          date: formattedDate,
+          transactionId: createdTxId || null,
+        }
+        if (walletObj) {
+          logPayload.walletName = walletObj.name
+        }
+        await db.goalLogs.add(logPayload)
+      })
+
       if (walletIdNum) {
-        createdTxId = await db.transactions.add({
-          date: dateInput,
-          amount: roundCurrency(val),
-          type: isWithdraw ? 'income' : 'expense',
-          category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
-          notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
-          currency: goal.currency || defaultCurrency,
+        await invalidateWalletBalance([walletIdNum])
+      }
+      clearCachedDashboardState()
+
+      const targetAmt = Number(goal?.targetAmount || 0)
+      const isTargetAchieved = !isWithdraw && targetAmt > 0 && newGoalAmount >= targetAmt
+
+      closeSheet()
+
+      if (isTargetAchieved) {
+        window.setTimeout(() => {
+          setIsCelebrationModalOpen(true)
+        }, 150)
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle Cairkan ke Dompet (Cashout all savings balance to selected wallet)
+  const handleCashoutToWallet = async () => {
+    if (isSubmitting) return
+    const walletIdNum = Number(cashoutWalletId)
+    if (!walletIdNum) return
+    const walletObj = await db.wallets.get(walletIdNum)
+    if (!walletObj) return
+
+    setIsSubmitting(true)
+    try {
+      const cashoutAmount = Number(goal.currentAmount || 0)
+      if (cashoutAmount <= 0) return
+
+      const now = new Date()
+      const formattedDate = format(now, 'yyyy-MM-dd HH:mm:ss')
+
+      await db.transaction('rw', [db.goals, db.transactions, db.goalLogs, db.wallets], async () => {
+        // 1. Update Goal
+        await db.goals.update(goalId, {
+          currentAmount: 0,
+          isCompleted: true,
+          status: 'completed',
+        })
+
+        const walletCurrency = walletObj?.currency || defaultCurrency
+        const goalCurrency = goal.currency || defaultCurrency
+        const rates = getCachedCurrencyRates('USD')
+        const cashoutInWallet = roundCurrency(convertCurrency(cashoutAmount, goalCurrency, walletCurrency, rates), walletCurrency)
+
+        // 2. Add Income Transaction to Wallet
+        const cashoutTxId = await db.transactions.add({
+          date: format(now, 'yyyy-MM-dd'),
+          amount: cashoutInWallet,
+          type: 'income',
+          category: 'cairkan_tabungan',
+          notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
+          currency: walletCurrency,
           walletId: walletIdNum,
-          goalId: goal.id,
+          goalId: Number(goalId),
           createdAt: Date.now(),
           deletedAt: null,
           isExcludeAnalyticsTx: true,
           isExcludeFromAnalytics: true,
           excludeFromAnalytics: true,
         })
-      }
 
-      const logPayload = {
-        goalId,
-        amount: isWithdraw ? -val : val,
-        notes: notesInput.trim() || (isWithdraw ? 'Penarikan Tabungan' : 'Setoran Tabungan'),
-        date: formattedDate,
-        transactionId: createdTxId || null,
-      }
-      if (walletObj) {
-        logPayload.walletName = walletObj.name
-      }
-      await db.goalLogs.add(logPayload)
-    })
+        // 3. Add Log Entry
+        await db.goalLogs.add({
+          goalId,
+          amount: -cashoutAmount,
+          notes: `Pencairan Tabungan ke ${walletObj.name}`,
+          date: formattedDate,
+          walletName: walletObj.name,
+          transactionId: cashoutTxId || null,
+        })
+      })
 
-    if (walletIdNum) {
       await invalidateWalletBalance([walletIdNum])
+      clearCachedDashboardState()
+
+      setIsCashoutSheetOpen(false)
+      setIsCelebrationModalOpen(false)
+      navigate('/savings?view=archive')
+    } finally {
+      setIsSubmitting(false)
     }
-
-    const targetAmt = Number(goal?.targetAmount || 0)
-    const isTargetAchieved = !isWithdraw && targetAmt > 0 && newGoalAmount >= targetAmt
-
-    closeSheet()
-
-    if (isTargetAchieved) {
-      window.setTimeout(() => {
-        setIsCelebrationModalOpen(true)
-      }, 150)
-    }
-  }
-
-  // Handle Cairkan ke Dompet (Cashout all savings balance to selected wallet)
-  const handleCashoutToWallet = async () => {
-    const walletIdNum = Number(cashoutWalletId)
-    if (!walletIdNum) return
-    const walletObj = await db.wallets.get(walletIdNum)
-    if (!walletObj) return
-
-    const cashoutAmount = Number(goal.currentAmount || 0)
-
-    const now = new Date()
-    const formattedDate = format(now, 'yyyy-MM-dd HH:mm:ss')
-
-    await db.transaction('rw', [db.goals, db.transactions, db.goalLogs, db.wallets], async () => {
-      // 1. Update Goal
-      await db.goals.update(goalId, {
-        currentAmount: 0,
-        isCompleted: true,
-        status: 'completed',
-      })
-
-      // 2. Add Income Transaction to Wallet
-      const cashoutTxId = await db.transactions.add({
-        date: format(now, 'yyyy-MM-dd'),
-        amount: roundCurrency(cashoutAmount),
-        type: 'income',
-        category: 'cairkan_tabungan',
-        notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
-        currency: goal.currency || defaultCurrency,
-        walletId: walletIdNum,
-        goalId: Number(goalId),
-        createdAt: Date.now(),
-        deletedAt: null,
-        isExcludeAnalyticsTx: true,
-        isExcludeFromAnalytics: true,
-        excludeFromAnalytics: true,
-      })
-
-      // 3. Add Log Entry
-      await db.goalLogs.add({
-        goalId,
-        amount: -cashoutAmount,
-        notes: `Pencairan Tabungan ke ${walletObj.name}`,
-        date: formattedDate,
-        walletName: walletObj.name,
-        transactionId: cashoutTxId || null,
-      })
-    })
-
-    await invalidateWalletBalance([walletIdNum])
-
-    setIsCashoutSheetOpen(false)
-    setIsCelebrationModalOpen(false)
-    navigate('/savings?view=archive')
   }
 
   const handleGetPrediction = async () => {
@@ -308,7 +347,8 @@ export default function SavingsDetail() {
     logs.forEach((log) => {
       let monthKey
       try {
-        monthKey = format(new Date(log.date), 'MMMM yyyy').toUpperCase()
+        const rawDate = typeof log.date === 'string' && log.date.length === 10 ? `${log.date}T12:00:00` : log.date
+        monthKey = format(new Date(rawDate), 'MMMM yyyy').toUpperCase()
       } catch (err){
       console.warn('[SavingsDetail]', err)
         monthKey = 'LAINNYA'
@@ -335,13 +375,14 @@ export default function SavingsDetail() {
     )
   }
 
-  const isComplete = goal.isCompleted || goal.isArchived
+  const isCompleted = Boolean(goal.isCompleted)
+  const isArchived = Boolean(goal.isArchived)
   const target = toSafeNumber(goal.targetAmount)
   const rawCurrent = toSafeNumber(goal.currentAmount)
-  const current = isComplete ? target : rawCurrent
-  const pct = isComplete ? 100 : target > 0 ? clampPercent((current / target) * 100) : 0
-  const remaining = isComplete ? 0 : Math.max(0, target - current)
-  const isTargetComplete = pct >= 100 || isComplete
+  const current = rawCurrent
+  const pct = isCompleted ? 100 : target > 0 ? clampPercent((current / target) * 100) : 0
+  const remaining = isCompleted ? 0 : Math.max(0, target - current)
+  const isTargetComplete = isCompleted || (pct >= 100 && !isArchived)
 
   let deadlineText = t('savings.noDeadline', 'Tanpa batas waktu')
   let daysLeft = null
@@ -578,7 +619,9 @@ export default function SavingsDetail() {
                       const absAmount = Math.abs(log.amount || 0)
                       const logDateStr = (() => {
                         try {
-                          return format(new Date(log.date), 'dd MMM yyyy, HH:mm')
+                          const isDateOnly = typeof log.date === 'string' && log.date.length === 10
+                          const rawDate = isDateOnly ? `${log.date}T12:00:00` : log.date
+                          return format(new Date(rawDate), isDateOnly ? 'dd MMM yyyy' : 'dd MMM yyyy, HH:mm')
                         } catch (err){
       console.warn('[SavingsDetail]', err)
                           return String(log.date || '')
@@ -772,7 +815,7 @@ export default function SavingsDetail() {
                 ? 'bg-[var(--earthy-terra)] hover:bg-[var(--earthy-terra-dark)]'
                 : 'bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)]'
             }`}
-            disabled={!amountInput || parseMoneyInput(amountInput) <= 0}
+            disabled={isSubmitting || !amountInput || parseMoneyInput(amountInput) <= 0}
             onClick={handleFundTransaction}
           >
             <Check className="h-4 w-4" />
@@ -816,7 +859,7 @@ export default function SavingsDetail() {
           <button
             type="button"
             className="w-full py-3.5 rounded-2xl font-black text-xs text-white bg-[var(--earthy-green)] hover:bg-[var(--earthy-green-dark)] shadow-md transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none uppercase tracking-wider"
-            disabled={!cashoutWalletId}
+            disabled={isSubmitting || !cashoutWalletId}
             onClick={handleCashoutToWallet}
           >
             <Check className="h-4 w-4" strokeWidth={3} />

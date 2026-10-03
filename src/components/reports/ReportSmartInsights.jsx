@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, TrendingDown, TrendingUp, Minus, CalendarClock, Tag, ArrowRight } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -14,10 +15,34 @@ export default function ReportSmartInsights({
   thisMonthExpense,
   averageMonthlyExpense,
   thisMonthIncome,
+  periodSummary,
+  rangeMonths = 6,
+  selectedMonthKey = null,
+  anchorDate = null,
 }) {
   const navigate = useNavigate()
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
+
+  const isCurrentMonthAnchor = useMemo(() => {
+    const now = new Date()
+    const anchor = anchorDate || now
+    return (
+      anchor.getFullYear() === now.getFullYear() &&
+      anchor.getMonth() === now.getMonth()
+    )
+  }, [anchorDate])
+
+  const isEarlyMonth = isCurrentMonthAnchor && new Date().getDate() <= 3
+  const isEarlyMonthDistorted =
+    isEarlyMonth &&
+    (toSafeNumber(thisMonthExpense) === 0 ||
+      (toSafeNumber(averageMonthlyExpense) > 0 &&
+        toSafeNumber(thisMonthExpense) < toSafeNumber(averageMonthlyExpense) * 0.2))
+
+  const isEarlyMonthZeroExpense =
+    toSafeNumber(thisMonthExpense) === 0 &&
+    (isCurrentMonthAnchor || toSafeNumber(averageMonthlyExpense) > 0)
 
   const hasExpense = toSafeNumber(totalExpense) > 0
   const topCategoryVal = toSafeNumber(topCategory?.value)
@@ -33,16 +58,30 @@ export default function ReportSmartInsights({
   const handleOpenAiAdvisor = () => {
     triggerHaptic('light')
     const store = useChatStore.getState()
-    const incomeFormatted = formatCurrency(toSafeNumber(thisMonthIncome), defaultCurrency)
-    const expenseFormatted = formatCurrency(toSafeNumber(thisMonthExpense), defaultCurrency)
+    const isMultiMonth = (rangeMonths === 'ytd' || Number(rangeMonths) > 1) && !selectedMonthKey
+    const periodLabel = rangeMonths === 'ytd'
+      ? (locale === 'en' ? 'Year-to-Date (YTD)' : 'Tahun Berjalan (YTD)')
+      : `${rangeMonths} ${locale === 'en' ? 'Months' : 'Bulan'}`
+
+    const incVal = isMultiMonth ? toSafeNumber(periodSummary?.totalIncome) : toSafeNumber(thisMonthIncome)
+    const expVal = isMultiMonth ? toSafeNumber(periodSummary?.totalExpense) : toSafeNumber(thisMonthExpense)
+    const incomeFormatted = formatCurrency(incVal, defaultCurrency)
+    const expenseFormatted = formatCurrency(expVal, defaultCurrency)
     const burnRateFormatted = formatCurrency(toSafeNumber(dailyBurnRate), defaultCurrency)
 
+    const trendStatus = isEarlyMonthDistorted || isEarlyMonthZeroExpense
+      ? (locale === 'en' ? 'Early in the month, spending trend not yet established' : 'Awal bulan, tren belanja belum stabil')
+      : hasHistory
+        ? `${diffPercent >= 0 ? '+' : ''}${diffPercent}% vs rata-rata`
+        : 'Belum ada data historis'
+
     const systemPromptContext = `[KONTEKS ANALISIS KEUANGAN FINTRACK]:
-- Pemasukan Periode Ini: ${incomeFormatted}
-- Pengeluaran Periode Ini: ${expenseFormatted}
+- Rentang Waktu: ${periodLabel}
+- Pemasukan Periode Ini: ${incomeFormatted}${isMultiMonth && periodSummary?.avgIncome ? ` (Rata-rata: ${formatCurrency(periodSummary.avgIncome, defaultCurrency)}/bln)` : ''}
+- Pengeluaran Periode Ini: ${expenseFormatted}${isMultiMonth && periodSummary?.avgExpense ? ` (Rata-rata: ${formatCurrency(periodSummary.avgExpense, defaultCurrency)}/bln)` : ''}
 - Pos Belanja Dominan: ${hasExpense ? `${topCategory?.label || 'Umum'} (${topCategoryPct}%)` : 'Belum Ada'}
 - Rata-rata Belanja Harian: ${burnRateFormatted}/hari
-- Tren vs Rata-rata: ${hasHistory ? `${diffPercent >= 0 ? '+' : ''}${diffPercent}%` : 'Belum ada data historis'}`
+- Tren vs Rata-rata: ${trendStatus}`
 
     store.addMessage({
       id: Date.now(),
@@ -51,12 +90,14 @@ export default function ReportSmartInsights({
       content: systemPromptContext,
     })
 
+    const hasAnyPeriodData = Boolean((periodSummary?.periodTxCount > 0) || incVal > 0 || expVal > 0)
+
     const promptText = locale === 'en'
-      ? hasExpense
-        ? `Please give me smart financial advice based on my current report: Top category is ${topCategory?.label || 'General'} (${topCategoryPct}% of spend), daily burn rate is ${burnRateFormatted}, and this month is ${diffPercent >= 0 ? '+' : ''}${diffPercent}% vs average.`
+      ? hasAnyPeriodData
+        ? `Please give me smart financial advice based on my financial report (${periodLabel}): Total income is ${incomeFormatted}, total expense is ${expenseFormatted}, top category is ${topCategory?.label || 'General'} (${topCategoryPct}% of spend), and daily burn rate is ${burnRateFormatted}. What are your key insights and saving recommendations?`
         : 'I currently have no transactions logged for this period. How can I start setting up a healthy monthly budget and financial goals?'
-      : hasExpense
-        ? `Tolong berikan rekomendasi finansial cerdas berdasarkan laporan terkini: Pos belanja terbesar adalah ${topCategory?.label || 'Umum'} (${topCategoryPct}% pengeluaran), rata-rata pengeluaran harian ${burnRateFormatted}, dan pengeluaran bulan ini ${diffPercent >= 0 ? '+' : ''}${diffPercent}% dibanding rata-rata.`
+      : hasAnyPeriodData
+        ? `Tolong berikan rekomendasi finansial cerdas berdasarkan laporan keuangan saya (${periodLabel}): Total pemasukan ${incomeFormatted}, total pengeluaran ${expenseFormatted}, pos belanja terbesar adalah ${topCategory?.label || 'Umum'} (${topCategoryPct}% pengeluaran), dan rata-rata belanja harian ${burnRateFormatted}. Apa saran penghematan dan optimasi terbaik untuk saya?`
         : 'Saat ini belum ada transaksi tercatat pada periode ini. Bagaimana panduan awal untuk menyusun anggaran bulanan dan target tabungan yang sehat?'
 
     store.openWithPrompt(promptText)
@@ -146,7 +187,7 @@ export default function ReportSmartInsights({
             </span>
             <div
               className={`grid h-6 w-6 place-items-center rounded-lg ${
-                !hasHistory
+                isEarlyMonthDistorted || isEarlyMonthZeroExpense || !hasHistory
                   ? 'bg-[var(--panel-strong)] text-[var(--muted)] border border-[var(--border)]'
                   : isLower
                     ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border border-[var(--status-income)]/20'
@@ -155,7 +196,7 @@ export default function ReportSmartInsights({
                       : 'bg-[var(--status-warning-soft)] text-[var(--status-warning)] border border-[var(--status-warning)]/20'
               }`}
             >
-              {!hasHistory ? (
+              {isEarlyMonthDistorted || isEarlyMonthZeroExpense || !hasHistory ? (
                 <Minus className="h-3.5 w-3.5" />
               ) : isLower ? (
                 <TrendingDown className="h-3.5 w-3.5" />
@@ -169,7 +210,7 @@ export default function ReportSmartInsights({
           <div className="mt-2">
             <p
               className={`text-sm font-black tabular-nums truncate ${
-                !hasHistory
+                isEarlyMonthDistorted || isEarlyMonthZeroExpense || !hasHistory
                   ? 'text-[var(--muted)]'
                   : isLower
                     ? 'text-emerald-600 dark:text-emerald-400'
@@ -178,16 +219,20 @@ export default function ReportSmartInsights({
                       : 'text-[var(--fg)]'
               }`}
             >
-              {!hasHistory ? '—' : diffPercent > 0 ? `+${diffPercent}%` : `${diffPercent}%`}
+              {isEarlyMonthDistorted || isEarlyMonthZeroExpense || !hasHistory ? '—' : diffPercent > 0 ? `+${diffPercent}%` : `${diffPercent}%`}
             </p>
             <p className="mt-0.5 text-[11px] font-medium text-[var(--muted)] truncate">
-              {!hasHistory
-                ? t('reports.noTrendComparison', 'Belum ada data pembanding')
-                : isLower
-                  ? t('reports.spendingLower', { percent: Math.abs(diffPercent) })
-                  : isHigher
-                    ? t('reports.spendingHigher', { percent: diffPercent })
-                    : t('reports.spendingNormal', 'Selaras dengan rata-rata')}
+              {isEarlyMonthZeroExpense
+                ? t('reports.earlyMonthNoExpense', 'Awal bulan berjalan, belum ada pengeluaran')
+                : isEarlyMonthDistorted
+                  ? t('reports.earlyMonthStabilizing', 'Awal bulan berjalan, tren belanja belum stabil')
+                  : !hasHistory
+                    ? t('reports.noTrendComparison', 'Belum ada data pembanding')
+                    : isLower
+                      ? t('reports.spendingLower', { percent: Math.abs(diffPercent) })
+                      : isHigher
+                        ? t('reports.spendingHigher', { percent: diffPercent })
+                        : t('reports.spendingNormal', 'Selaras dengan rata-rata')}
             </p>
           </div>
         </div>

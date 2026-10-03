@@ -767,7 +767,7 @@ function isObviousNonTransaction(text) {
             wallets,
             imageData: imageToSubmit,
             scanMode: modeToUse,
-            preferFastNlp: false,
+            preferFastNlp: !imageToSubmit,
             isQuickLog: true,
           })
         } catch (apiErr) {

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -25,10 +25,27 @@ import {
 } from '../../lib/chartTheme'
 import { triggerHaptic } from '../../lib/haptics'
 
-export default function ReportBarChart({ monthlyIncomeExpense }) {
+export default function ReportBarChart({
+  monthlyIncomeExpense,
+  selectedMonthKey = null,
+  onSelectMonthKey,
+  onClick,
+}) {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [chartMode, setChartMode] = useState('inflowOutflow') // 'inflowOutflow' | 'netFlow'
+
+  const handleBarClick = (entry) => {
+    const key = entry?.key || entry?.payload?.key
+    const setter = onSelectMonthKey || onClick
+    if (!key || !setter) return
+    triggerHaptic('light')
+    if (selectedMonthKey === key) {
+      setter(null)
+    } else {
+      setter(key)
+    }
+  }
 
   const hasData = (monthlyIncomeExpense || []).some(
     (m) => toSafeNumber(m.income) > 0 || toSafeNumber(m.expense) > 0
@@ -127,7 +144,17 @@ export default function ReportBarChart({ monthlyIncomeExpense }) {
       ) : (
         <div className="h-60 sm:h-68 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barGap={6} margin={CHART_MARGIN_DEFAULTS}>
+            <BarChart
+              data={chartData}
+              barGap={6}
+              margin={CHART_MARGIN_DEFAULTS}
+              onClick={(state) => {
+                if (state?.activePayload?.[0]?.payload) {
+                  handleBarClick(state.activePayload[0].payload)
+                }
+              }}
+              className="cursor-pointer"
+            >
               <defs>
                 <linearGradient id="incomeBarGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--status-income)" stopOpacity={1} />
@@ -149,6 +176,8 @@ export default function ReportBarChart({ monthlyIncomeExpense }) {
               <Tooltip
                 content={<ChartTooltip currency={defaultCurrency} />}
                 cursor={{ fill: 'var(--field-bg)', opacity: 0.4 }}
+                allowEscapeViewBox={{ x: false, y: false }}
+                wrapperStyle={{ pointerEvents: 'none', zIndex: 50 }}
               />
 
               {chartMode === 'inflowOutflow' ? (
@@ -168,17 +197,49 @@ export default function ReportBarChart({ monthlyIncomeExpense }) {
                   <Bar
                     dataKey="income"
                     name={t('reports.income', 'Pemasukan')}
-                    fill="url(#incomeBarGrad)"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={32}
-                  />
+                    onClick={(entry) => handleBarClick(entry)}
+                    className="cursor-pointer"
+                  >
+                    {chartData.map((entry) => {
+                      const isSelected = selectedMonthKey === entry.key
+                      return (
+                        <Cell
+                          key={`cell-inc-${entry.key || entry.month}`}
+                          fill={isSelected ? 'var(--status-income)' : 'url(#incomeBarGrad)'}
+                          opacity={selectedMonthKey ? (isSelected ? 1 : 0.35) : 1}
+                          stroke={isSelected ? 'var(--fg)' : 'none'}
+                          strokeWidth={isSelected ? 1.5 : 0}
+                          onClick={() => handleBarClick(entry)}
+                          className="cursor-pointer"
+                        />
+                      )
+                    })}
+                  </Bar>
                   <Bar
                     dataKey="expense"
                     name={t('reports.expense', 'Pengeluaran')}
-                    fill="url(#expenseBarGrad)"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={32}
-                  />
+                    onClick={(entry) => handleBarClick(entry)}
+                    className="cursor-pointer"
+                  >
+                    {chartData.map((entry) => {
+                      const isSelected = selectedMonthKey === entry.key
+                      return (
+                        <Cell
+                          key={`cell-exp-${entry.key || entry.month}`}
+                          fill={isSelected ? 'var(--status-expense)' : 'url(#expenseBarGrad)'}
+                          opacity={selectedMonthKey ? (isSelected ? 1 : 0.35) : 1}
+                          stroke={isSelected ? 'var(--fg)' : 'none'}
+                          strokeWidth={isSelected ? 1.5 : 0}
+                          onClick={() => handleBarClick(entry)}
+                          className="cursor-pointer"
+                        />
+                      )
+                    })}
+                  </Bar>
                 </>
               ) : (
                 <>
@@ -188,19 +249,60 @@ export default function ReportBarChart({ monthlyIncomeExpense }) {
                     name={t('reports.netFlow', 'Surplus / Defisit')}
                     radius={[6, 6, 6, 6]}
                     maxBarSize={36}
+                    onClick={(entry) => handleBarClick(entry)}
+                    className="cursor-pointer"
                   >
-                    {chartData.map((entry) => (
-                      <Cell
-                        key={`cell-${entry.month}`}
-                        fill={entry.netFlow >= 0 ? 'var(--status-income)' : 'var(--status-expense)'}
-                        opacity={0.9}
-                      />
-                    ))}
+                    {chartData.map((entry) => {
+                      const isSelected = selectedMonthKey === entry.key
+                      return (
+                        <Cell
+                          key={`cell-${entry.key || entry.month}`}
+                          fill={entry.netFlow >= 0 ? 'var(--status-income)' : 'var(--status-expense)'}
+                          opacity={selectedMonthKey ? (isSelected ? 1 : 0.35) : 0.9}
+                          stroke={isSelected ? 'var(--fg)' : 'none'}
+                          strokeWidth={isSelected ? 1.5 : 0}
+                          onClick={() => handleBarClick(entry)}
+                          className="cursor-pointer"
+                        />
+                      )
+                    })}
                   </Bar>
                 </>
               )}
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Interactive Month Selection Hint & Reset Footer */}
+      {hasData && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)]/50 pt-2.5 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[var(--muted)]">
+            <span className={`h-1.5 w-1.5 rounded-full ${selectedMonthKey ? 'bg-[var(--accent)] animate-pulse' : 'bg-[var(--muted-2)]'}`} />
+            {selectedMonthKey ? (
+              <span>
+                {t('reports.filteredByMonth', 'Menampilkan rincian untuk bulan')}:{' '}
+                <strong className="text-[var(--fg)]">
+                  {chartData.find((d) => d.key === selectedMonthKey)?.month || selectedMonthKey}
+                </strong>
+              </span>
+            ) : (
+              <span>{t('reports.tapBarHint', 'Ketuk batang grafik untuk melihat rincian bulan tertentu')}</span>
+            )}
+          </div>
+          {selectedMonthKey && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light')
+                const setter = onSelectMonthKey || onClick
+                if (setter) setter(null)
+              }}
+              className="font-bold text-[var(--accent)] hover:underline cursor-pointer"
+            >
+              {t('reports.showAllPeriod', 'Tampilkan Semua')}
+            </button>
+          )}
         </div>
       )}
     </section>

@@ -1,4 +1,4 @@
-import { format, subDays, differenceInCalendarDays, startOfWeek, isSameWeek, isBefore } from 'date-fns'
+import { format, subDays, subWeeks, differenceInCalendarDays, startOfWeek, isSameWeek, isBefore } from 'date-fns'
 
 export function calculateHabitStats(habit, allLogs) {
   const logs = allLogs.filter(log => log.habitId === habit.id)
@@ -32,7 +32,8 @@ export function calculateHabitStats(habit, allLogs) {
   
   // Count how many times it was completed this current week
   logs.forEach(log => {
-    const d = new Date(log.date)
+    const rawDate = typeof log.date === 'string' && log.date.length === 10 ? `${log.date}T12:00:00` : log.date
+    const d = new Date(rawDate)
     if (isSameWeek(d, todayDate, { weekStartsOn: 1 })) {
       currentWeekCompleted++
     }
@@ -40,19 +41,52 @@ export function calculateHabitStats(habit, allLogs) {
 
   if (habit.frequencyType === 'weekly') {
     const target = currentWeekTarget
-    
-    // Simplification for weekly stats streak
-    let currentWkCnt = 0
-    let lastWkCnt = 0
+    currentStreak = 0
+    bestStreak = 0
+    let tempStreak = 0
+
+    // Count completions per ISO week
+    const weekLogsCount = new Map()
     logs.forEach(log => {
-      const d = new Date(log.date)
-      if (isSameWeek(d, todayDate, { weekStartsOn: 1 })) currentWkCnt++
-      if (isSameWeek(d, subDays(todayDate, 7), { weekStartsOn: 1 })) lastWkCnt++
+      const rawDate = typeof log.date === 'string' && log.date.length === 10 ? `${log.date}T12:00:00` : log.date
+      const d = new Date(rawDate)
+      if (!isNaN(d.getTime())) {
+        const weekKey = format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+        weekLogsCount.set(weekKey, (weekLogsCount.get(weekKey) || 0) + 1)
+      }
     })
+
+    // Calculate current streak going back week by week from current week
+    let weekAnchor = startOfWeek(todayDate, { weekStartsOn: 1 })
+    const currentWkCnt = weekLogsCount.get(format(weekAnchor, 'yyyy-MM-dd')) || 0
     
-    currentStreak = currentWkCnt >= target ? 1 : 0
-    if (lastWkCnt >= target) currentStreak += 1
-    bestStreak = currentStreak
+    let streakActive = true
+    const maxWeeks = Math.max(53, Math.ceil(daysSinceCreation / 7))
+    for (let w = 0; w < maxWeeks; w++) {
+      const wKey = format(subWeeks(weekAnchor, w), 'yyyy-MM-dd')
+      const isDone = (weekLogsCount.get(wKey) || 0) >= target
+      if (w === 0) {
+        if (isDone) currentStreak++
+        // If current week not yet reached target, streak is still alive if last week was done
+      } else {
+        if (isDone && streakActive) {
+          currentStreak++
+        } else if (!isDone) {
+          if (habit.isPaused && currentStreak === 0) {
+            // preserve streak during pause period before the streak
+          } else {
+            streakActive = false
+          }
+        }
+      }
+      if (isDone) {
+        tempStreak++
+        bestStreak = Math.max(bestStreak, tempStreak)
+      } else {
+        tempStreak = 0
+      }
+    }
+    bestStreak = Math.max(bestStreak, currentStreak)
     
     // Completion Rate (Fair calculation)
     // How many FULL weeks have passed since createdAt?
@@ -66,7 +100,8 @@ export function calculateHabitStats(habit, allLogs) {
     
     let pastCompletions = 0
     logs.forEach(log => {
-      const d = new Date(log.date)
+      const rawDate = typeof log.date === 'string' && log.date.length === 10 ? `${log.date}T12:00:00` : log.date
+      const d = new Date(rawDate)
       if (isBefore(d, weekStart)) {
         pastCompletions++
       }
@@ -87,8 +122,9 @@ export function calculateHabitStats(habit, allLogs) {
     // Daily & Specific Days logic
     let tempStreak = 0
     
-    // Scan backwards for current streak (Max 365 days)
-    for (let i = 0; i < 365; i++) {
+    // Scan backwards for current streak
+    const maxDays = Math.max(366, daysSinceCreation)
+    for (let i = 0; i < maxDays; i++) {
       const d = subDays(todayDate, i)
       const dateStr = format(d, 'yyyy-MM-dd')
       const dayIdx = d.getDay()
@@ -103,8 +139,10 @@ export function calculateHabitStats(habit, allLogs) {
         if (logDates.has(dateStr)) {
           tempStreak++
         } else {
-          // Streak breaks if not completed, UNLESS it's today (gives them a chance to complete it today)
-          if (i !== 0) {
+          // If habit is paused, don't break the streak during the pause period before the streak
+          if (habit.isPaused && tempStreak === 0) {
+            // preserve streak, skip day
+          } else if (i !== 0) {
             break
           }
         }

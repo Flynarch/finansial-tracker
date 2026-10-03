@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import Decimal from 'decimal.js-light'
+export { getCachedCurrencyRates } from './api'
 
 /** When live FX fetch fails: 1 USD = currency rates (approximate fallback). */
 export const FALLBACK_EXCHANGE_RATES = Object.freeze({
@@ -11,26 +12,45 @@ export const FALLBACK_EXCHANGE_RATES = Object.freeze({
   JPY: 154.0,
   GBP: 0.79,
   AUD: 1.55,
+  THB: 34.5,
+  KRW: 1380,
+  SAR: 3.75,
+  VND: 25400,
+  CNY: 7.25,
+  HKD: 7.78,
+  CAD: 1.38,
+  CHF: 0.88,
+  PHP: 57.5,
+  INR: 84.5,
 })
 
 /** Cache for Intl.NumberFormat instances keyed by locale+currency to avoid re-instantiation on every call. */
 const _fmtCache = new Map()
 
-export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
+export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID', options = {}) {
   const cleanCurrency = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'IDR'
   const cleanLocale = typeof locale === 'string' && locale.trim() ? locale.trim() : 'id-ID'
   const numeric = Number(amount || 0)
-  const key = `${cleanLocale}:${cleanCurrency}`
+  const maxFractionDigits = options?.maxFractionDigits
+  const minFractionDigits = options?.minFractionDigits
+  const hasCustomFractions = maxFractionDigits !== undefined || minFractionDigits !== undefined
+
+  const key = hasCustomFractions
+    ? `${cleanLocale}:${cleanCurrency}:${minFractionDigits ?? ''}:${maxFractionDigits ?? ''}`
+    : `${cleanLocale}:${cleanCurrency}`
+
   let fmt = _fmtCache.get(key)
   if (!fmt) {
     const zeroDecimalCurrencies = ['IDR', 'JPY', 'KRW', 'VND']
     const isZeroDecimal = zeroDecimalCurrencies.includes(cleanCurrency)
+    const minDigits = minFractionDigits !== undefined ? minFractionDigits : (isZeroDecimal ? 0 : 2)
+    const maxDigits = maxFractionDigits !== undefined ? maxFractionDigits : (isZeroDecimal ? 0 : 2)
     try {
       fmt = new Intl.NumberFormat(cleanLocale, {
         style: 'currency',
         currency: cleanCurrency,
-        minimumFractionDigits: isZeroDecimal ? 0 : 2,
-        maximumFractionDigits: isZeroDecimal ? 0 : 2,
+        minimumFractionDigits: minDigits,
+        maximumFractionDigits: Math.max(minDigits, maxDigits),
       })
     } catch (err){
       console.warn('[utils]', err)
@@ -48,6 +68,10 @@ export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID') {
 
 export function formatCompactCurrency(amount, currency = 'IDR', locale = 'id', includeSymbol = true) {
   const n = Number(amount || 0)
+  if (!Number.isFinite(n)) {
+    return formatCurrency(0, currency, locale)
+  }
+
   const isEn = locale === 'en'
   const isIDR = currency === 'IDR'
   const prefix = includeSymbol ? (isIDR ? 'Rp\u00A0' : `${currency}\u00A0`) : ''
@@ -67,16 +91,16 @@ export function formatCompactCurrency(amount, currency = 'IDR', locale = 'id', i
     })
 
   if (abs >= 1_000_000_000_000) {
-    return `${prefix}${sign}${fmt(abs / 1_000_000_000_000, 1)}\u00A0T`
+    return `${sign}${prefix}${fmt(abs / 1_000_000_000_000, 1)}\u00A0T`
   }
   if (abs >= 1_000_000_000) {
-    return `${prefix}${sign}${fmt(abs / 1_000_000_000, 1)}\u00A0${isEn ? 'B' : 'M'}`
+    return `${sign}${prefix}${fmt(abs / 1_000_000_000, 1)}\u00A0${isEn ? 'B' : 'M'}`
   }
   if (abs >= 1_000_000) {
-    return `${prefix}${sign}${fmt(abs / 1_000_000, 1)}\u00A0${isEn ? 'M' : 'jt'}`
+    return `${sign}${prefix}${fmt(abs / 1_000_000, 1)}\u00A0${isEn ? 'M' : 'jt'}`
   }
   if (abs >= 100_000) {
-    return `${prefix}${sign}${fmt(abs / 1_000, 0)}\u00A0${isEn ? 'k' : 'rb'}`
+    return `${sign}${prefix}${fmt(abs / 1_000, 0)}\u00A0${isEn ? 'k' : 'rb'}`
   }
   return formatCurrency(n, currency, locale)
 }
@@ -128,11 +152,20 @@ export function formatMoneyInput(value, currency = 'IDR') {
 export function parseMoneyInput(value, currency = 'IDR') {
   const raw = String(value ?? '').trim()
   if (!raw) return 0
-  const isNegative = raw.startsWith('-')
+  const isNegative = raw.startsWith('-') || /^\(.*\)$/.test(raw)
   if (currency === 'IDR') {
     const trimmed = raw.replace(/[^\d]+$/, '')
-    const cleanSen = trimmed.replace(/[,.]00$/, '')
-    const num = toSafeNumber(cleanSen.replace(/[^\d]/g, ''))
+    // Support trailing sen: e.g. ,00, ,000, ,50, or .00, .50 (1-2 digits decimal, or 3 zero decimals after comma)
+    const decimalMatch = trimmed.match(/^(.*?)(?:,(000)|[,.]([\d]{1,2}))$/)
+    if (decimalMatch) {
+      const intDigits = decimalMatch[1].replace(/[^\d]/g, '')
+      const decDigits = decimalMatch[2] ? '0' : decimalMatch[3]
+      const intNum = toSafeNumber(intDigits)
+      const decNum = Number(`0.${decDigits}`)
+      const total = intNum + (Number.isFinite(decNum) ? decNum : 0)
+      return isNegative ? -total : total
+    }
+    const num = toSafeNumber(trimmed.replace(/[^\d]/g, ''))
     return isNegative ? -num : num
   }
 
@@ -360,9 +393,15 @@ export function safeFormatDate(val, formatPattern = 'dd MMM yyyy', options = {})
  * @param {number|string} val
  * @returns {number}
  */
-export function roundCurrency(val) {
+export function roundCurrency(val, currency = null) {
   const n = Number(val)
   if (!Number.isFinite(n)) return 0
+  if (currency && typeof currency === 'string') {
+    const cleanCurrency = currency.trim().toUpperCase()
+    if (['IDR', 'JPY', 'KRW', 'VND'].includes(cleanCurrency)) {
+      return new Decimal(n).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber()
+    }
+  }
   return new Decimal(n).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber()
 }
 

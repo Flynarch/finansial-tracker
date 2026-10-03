@@ -25,8 +25,19 @@ export default function TransactionFilterSheet({
 
   if (filters !== prevFilters) {
     setPrevFilters(filters)
-    if (filters.startDate !== draftFilters.startDate || filters.endDate !== draftFilters.endDate) {
-      setDraftFilters((p) => ({ ...p, startDate: filters.startDate, endDate: filters.endDate }))
+    if (
+      filters.startDate !== draftFilters.startDate ||
+      filters.endDate !== draftFilters.endDate ||
+      filters.minAmount !== draftFilters.minAmount ||
+      filters.maxAmount !== draftFilters.maxAmount
+    ) {
+      setDraftFilters((p) => ({
+        ...p,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        minAmount: filters.minAmount,
+        maxAmount: filters.maxAmount,
+      }))
     }
   }
 
@@ -526,6 +537,41 @@ export default function TransactionFilterSheet({
               </div>
             )}
           </div>
+
+          {/* 5. Rentang Nominal */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 space-y-2.5">
+            <span className="text-xs font-extrabold text-[var(--fg)] block">
+              {t('tx.filter.amountRange', 'Rentang Nominal')}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block mb-1">
+                  {t('tx.filter.minAmount', 'Nominal Min')}
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={t('tx.filter.minAmountPlaceholder', 'Min (0)')}
+                  value={draftFilters?.minAmount ?? ''}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, minAmount: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] placeholder:text-[var(--muted)]/60 focus:outline-none focus:border-[var(--accent)] transition"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block mb-1">
+                  {t('tx.filter.maxAmount', 'Nominal Maks')}
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={t('tx.filter.maxAmountPlaceholder', 'Maks (Tanpa Batas)')}
+                  value={draftFilters?.maxAmount ?? ''}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, maxAmount: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-bold text-[var(--fg)] placeholder:text-[var(--muted)]/60 focus:outline-none focus:border-[var(--accent)] transition"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
@@ -541,6 +587,8 @@ export default function TransactionFilterSheet({
                 categories: null,
                 startDate: datesMonthly.startDate,
                 endDate: datesMonthly.endDate,
+                minAmount: '',
+                maxAmount: '',
               }
               setDraftFilters(resetValues)
               onApplyFilters(resetValues)

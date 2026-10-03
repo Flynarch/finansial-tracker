@@ -4,6 +4,7 @@ import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { getLocalDateString } from '../lib/dateUtils'
 import { convertCurrency, roundCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
+import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
 import useSettingsStore from './useSettingsStore'
 
 const useLoanStore = create(() => ({
@@ -47,7 +48,7 @@ const useLoanStore = create(() => ({
     }
 
     let loanId = null
-    await db.transaction('rw', [db.loans, db.transactions], async () => {
+    await db.transaction('rw', [db.loans, db.transactions, db.wallets], async () => {
       loanId = await db.loans.add(newLoan)
 
       // Generate initial transaction in ledger for mandatory walletId (disbursement uses principal amount)
@@ -56,12 +57,23 @@ const useLoanStore = create(() => ({
       const txType = isDebt ? 'income' : 'expense'
       const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
 
+      let principalInWallet = principal
+      let txCurrency = loanData.currency || 'IDR'
+      if (walletId) {
+        const targetWallet = await db.wallets.get(Number(walletId))
+        if (targetWallet && targetWallet.currency && targetWallet.currency !== txCurrency) {
+          const rates = getCachedCurrencyRates('USD')
+          principalInWallet = roundCurrency(convertCurrency(principal, txCurrency, targetWallet.currency, rates), targetWallet.currency)
+          txCurrency = targetWallet.currency
+        }
+      }
+
       const initialTxId = await db.transactions.add({
         date: loanData.startDate || getLocalDateString(),
         type: txType,
         category: txCategory,
-        amount: principal,
-        currency: loanData.currency || 'IDR',
+        amount: principalInWallet,
+        currency: txCurrency,
         notes: txNotes,
         walletId,
         loanId,
@@ -76,6 +88,7 @@ const useLoanStore = create(() => ({
     })
 
     await invalidateWalletBalance([walletId])
+    clearCachedDashboardState()
     return loanId
   },
 
@@ -88,9 +101,18 @@ const useLoanStore = create(() => ({
       ? Number(loanData.principalAmount)
       : (existing.principalAmount !== undefined ? Number(existing.principalAmount) : total)
     const diffTotal = total - existing.totalAmount
-    const rawRemaining = loanData.remainingAmount !== undefined
-      ? Number(loanData.remainingAmount)
-      : existing.remainingAmount + diffTotal
+    let rawRemaining
+    if (loanData.remainingAmount !== undefined) {
+      rawRemaining = Number(loanData.remainingAmount)
+    } else {
+      const payments = await db.loanPayments.where('loanId').equals(Number(id)).toArray()
+      if (payments && payments.length > 0) {
+        const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+        rawRemaining = total - totalPaid
+      } else {
+        rawRemaining = existing.remainingAmount + diffTotal
+      }
+    }
     let newRemaining = Math.max(0, rawRemaining)
     newRemaining = roundCurrency(newRemaining)
     const isNowPaid = newRemaining <= 0
@@ -111,8 +133,15 @@ const useLoanStore = create(() => ({
     }
 
     const affectedWallets = []
-    await db.transaction('rw', [db.loans, db.transactions], async () => {
+    await db.transaction('rw', [db.loans, db.transactions, db.loanPayments, db.wallets], async () => {
       await db.loans.put(updated)
+
+      if (wasForgivenReopened) {
+        const forgivePayments = await db.loanPayments.where('loanId').equals(id).filter((p) => Boolean(p.isForgive)).toArray()
+        if (forgivePayments.length > 0) {
+          await db.loanPayments.bulkDelete(forgivePayments.map((p) => p.id))
+        }
+      }
 
       // Update initial transaction in db.transactions if linked
       if (existing.initialTransactionId) {
@@ -120,31 +149,43 @@ const useLoanStore = create(() => ({
         const oldPrincipal = existing.principalAmount !== undefined ? existing.principalAmount : existing.totalAmount
         const principalChanged = principal !== oldPrincipal
         const currencyChanged = Boolean(loanData.currency && loanData.currency !== existing.currency)
+        const initTx = await db.transactions.get(existing.initialTransactionId)
+
+        const loanCurrency = loanData.currency || existing.currency || 'IDR'
+        const effectiveWalletId = loanData.walletId ? Number(loanData.walletId) : (existing.walletId ? Number(existing.walletId) : (initTx?.walletId ? Number(initTx.walletId) : null))
+        const targetWallet = effectiveWalletId ? await db.wallets.get(effectiveWalletId) : null
+        const txTargetCurrency = targetWallet?.currency || initTx?.currency || loanCurrency
+        const rates = getCachedCurrencyRates('USD')
 
         if (existing.splitBillId) {
-          if (diffTotal !== 0) {
-            const initTx = await db.transactions.get(existing.initialTransactionId)
-            if (initTx) {
-              txUpdates.amount = Math.max(0, (Number(initTx.amount) || 0) + diffTotal)
-            }
+          if (diffTotal !== 0 && initTx) {
+            const diffInTxCurrency = roundCurrency(convertCurrency(diffTotal, loanCurrency, initTx.currency || txTargetCurrency, rates), initTx.currency || txTargetCurrency)
+            txUpdates.amount = Math.max(0, (Number(initTx.amount) || 0) + diffInTxCurrency)
           }
         } else {
           if (principalChanged) {
-            txUpdates.amount = principal
+            const targetCurrency = initTx?.currency || loanCurrency
+            if (loanCurrency !== targetCurrency) {
+              txUpdates.amount = roundCurrency(convertCurrency(principal, loanCurrency, targetCurrency, rates), targetCurrency)
+            } else {
+              txUpdates.amount = principal
+            }
           }
         }
-        if (loanData.walletId && Number(loanData.walletId) !== Number(existing.walletId)) {
-          txUpdates.walletId = Number(loanData.walletId)
-          if (existing.walletId) affectedWallets.push(Number(existing.walletId))
-          affectedWallets.push(Number(loanData.walletId))
-        } else if ((diffTotal !== 0 || principalChanged || currencyChanged) && existing.walletId) {
-          affectedWallets.push(Number(existing.walletId))
-        }
-        if (loanData.startDate && loanData.startDate !== existing.startDate) {
-          txUpdates.date = loanData.startDate
-        }
-        if (loanData.currency && loanData.currency !== existing.currency) {
-          txUpdates.currency = loanData.currency
+        if (!existing.splitBillId) {
+          if (loanData.walletId && Number(loanData.walletId) !== Number(existing.walletId)) {
+            txUpdates.walletId = Number(loanData.walletId)
+            if (existing.walletId) affectedWallets.push(Number(existing.walletId))
+            affectedWallets.push(Number(loanData.walletId))
+          } else if ((diffTotal !== 0 || principalChanged || currencyChanged) && existing.walletId) {
+            affectedWallets.push(Number(existing.walletId))
+          }
+          if (loanData.startDate && loanData.startDate !== existing.startDate) {
+            txUpdates.date = loanData.startDate
+          }
+          if (loanData.currency && loanData.currency !== existing.currency) {
+            txUpdates.currency = loanData.currency
+          }
         }
         if (!existing.splitBillId && (loanData.title !== undefined || loanData.personName !== undefined)) {
           const isDebt = existing.type === 'debt'
@@ -161,6 +202,7 @@ const useLoanStore = create(() => ({
     if (affectedWallets.length > 0) {
       await invalidateWalletBalance(affectedWallets)
     }
+    clearCachedDashboardState()
   },
 
   deleteLoan: async (id) => {
@@ -217,6 +259,7 @@ const useLoanStore = create(() => ({
     if (affectedWallets.size > 0) {
       await invalidateWalletBalance(Array.from(affectedWallets))
     }
+    clearCachedDashboardState()
   },
 
   recordPayment: async (loanId, amount, date, notes = '', paymentWalletId = null, inputCurrency = null, excessCategory = null) => {
@@ -358,6 +401,7 @@ const useLoanStore = create(() => ({
     if (effectiveWalletId) {
       await invalidateWalletBalance([Number(effectiveWalletId)])
     }
+    clearCachedDashboardState()
   },
 
   forgiveLoan: async (loanId, notes = '') => {
@@ -396,6 +440,7 @@ const useLoanStore = create(() => ({
     if (loan.walletId) {
       await invalidateWalletBalance([Number(loan.walletId)])
     }
+    clearCachedDashboardState()
   },
 }))
 

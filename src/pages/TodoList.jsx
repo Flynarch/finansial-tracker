@@ -1,7 +1,7 @@
 import { addDays, subDays, format, parse } from 'date-fns'
 import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
@@ -31,9 +31,24 @@ const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'
 
 function TodoList() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { t, locale } = useTranslation()
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
-  const [activeTab, setActiveTab] = useState('todo')
+  const activeTab = searchParams.get('tab') === 'habits' ? 'habits' : 'todo'
+  const setActiveTab = (tab) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (tab === 'habits') {
+          next.set('tab', 'habits')
+        } else {
+          next.delete('tab')
+        }
+        return next
+      },
+      { replace: true }
+    )
+  }
   const [filter, setFilter] = useState(() => 'all')
   const [isEntering, setIsEntering] = useState(false)
   const [sortPref, setSortPref] = useState(() => {
@@ -112,6 +127,9 @@ function TodoList() {
     const list = filteredTodos || []
     const next = list.slice()
     const tieBreak = (a, b) => {
+      if (Boolean(a?.completed) !== Boolean(b?.completed)) {
+        return a?.completed ? 1 : -1
+      }
       const created = Number(b?.createdAt || 0) - Number(a?.createdAt || 0)
       if (created !== 0) return created
       return Number(b?.id || 0) - Number(a?.id || 0)
@@ -120,6 +138,9 @@ function TodoList() {
     if (sortPref === 'priority') {
       const score = { high: 3, medium: 2, low: 1 }
       next.sort((a, b) => {
+        if (Boolean(a?.completed) !== Boolean(b?.completed)) {
+          return a?.completed ? 1 : -1
+        }
         const prio = (score[b?.priority] || 0) - (score[a?.priority] || 0)
         if (prio !== 0) return prio
         return tieBreak(a, b)
@@ -131,10 +152,12 @@ function TodoList() {
       const dueScore = (x) => {
         if (!x?.dueDate) return Number.POSITIVE_INFINITY
         const d = parse(String(x.dueDate), 'yyyy-MM-dd', new Date())
-        const timeVal = d && Number.isFinite(d.getTime()) ? d.getTime() : Number.POSITIVE_INFINITY
-        return timeVal
+        return d && Number.isFinite(d.getTime()) ? d.getTime() : Number.POSITIVE_INFINITY
       }
       next.sort((a, b) => {
+        if (Boolean(a?.completed) !== Boolean(b?.completed)) {
+          return a?.completed ? 1 : -1
+        }
         const due = dueScore(a) - dueScore(b)
         if (due !== 0) return due
         return tieBreak(a, b)
@@ -180,10 +203,11 @@ function TodoList() {
       .catch((err) => console.warn('[TodoList]', err))
   }, [todos, notifPermissionAsked])
 
-  const scheduleTodoDueNotifications = useCallback(async (todo) => {
+  const scheduleTodoDueNotifications = useCallback(async (todoOrId, maybeTodo) => {
     if (!Capacitor.isNativePlatform()) return
-    const id = Number(todo?.id)
-    if (!id) return
+    const todo = maybeTodo || (typeof todoOrId === 'object' && todoOrId !== null ? todoOrId : await db.todos.get(Number(todoOrId)))
+    const id = Number(todo?.id || todoOrId)
+    if (!id || !todo) return
     const rawDate = String(todo?.dueDate || '').trim()
     if (!rawDate) return
 
@@ -203,7 +227,7 @@ function TodoList() {
       const title = t('todo.notif.dueTodayTitle', 'Tenggat Komitmen Hari Ini')
       const body = `${todo.title} • ${t('todo.notif.dueTodayBadge', 'Jatuh tempo hari ini')}`
       notifs.push({
-        id: id * 10 + 1,
+        id: 100000 + id * 10 + 1,
         title,
         body,
         largeBody: body,
@@ -223,7 +247,7 @@ function TodoList() {
       const title = t('todo.notif.dueTomorrowTitle', 'Pengingat Komitmen Besok')
       const body = `${todo.title} • ${t('todo.notif.dueTomorrowBadge', 'Jatuh tempo besok')}`
       notifs.push({
-        id: id * 10 + 2,
+        id: 100000 + id * 10 + 2,
         title,
         body,
         largeBody: body,
@@ -253,7 +277,7 @@ function TodoList() {
     if (!id) return
     try {
       await LocalNotifications.cancel({
-        notifications: [{ id: id * 10 + 1 }, { id: id * 10 + 2 }],
+        notifications: [{ id: 100000 + id * 10 + 1 }, { id: 100000 + id * 10 + 2 }],
       })
     } catch {
       // ignore
@@ -328,8 +352,13 @@ function TodoList() {
     })
     if (next) {
       void cancelTodoDueNotifications(id)
+    } else {
+      const todo = await db.todos.get(id)
+      if (todo?.dueDate) {
+        void scheduleTodoDueNotifications(id, todo)
+      }
     }
-  }, [cancelTodoDueNotifications])
+  }, [cancelTodoDueNotifications, scheduleTodoDueNotifications])
 
   const onDeleteTodoFromCard = useCallback((todo) => {
     setDeleteTodoId(todo.id)

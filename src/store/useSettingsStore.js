@@ -89,7 +89,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
-      budgetCycleStartDay: next.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(next.budgetCycleStartDay) || 1))) : 1,
+      budgetCycleStartDay: next.budgetCycleStartDay !== undefined ? Math.min(31, Math.max(1, Math.floor(Number(next.budgetCycleStartDay) || 1))) : 1,
       widgetRange: next.widgetRange === 'month' ? 'month' : '7d',
       notificationAutoApprove: Boolean(next.notificationAutoApprove),
       hideBalance: Boolean(next.hideBalance),
@@ -122,6 +122,12 @@ const useSettingsStore = create((set, get) => ({
   setDefaultCurrency: async (defaultCurrency) => {
     set({ defaultCurrency })
     await get().persist({ defaultCurrency })
+    try {
+      const { clearCachedDashboardState } = await import('../hooks/dashboard/dashboardCache')
+      clearCachedDashboardState()
+    } catch (err) {
+      console.error('[useSettingsStore:clearDashboardCache]', err)
+    }
     try {
       const { scheduleNativeWidgetSync } = await import('../lib/nativeWidgetSync')
       scheduleNativeWidgetSync(100)
@@ -210,7 +216,7 @@ const useSettingsStore = create((set, get) => ({
     await get().persist({ budgetAlertsEnabled: next })
   },
   setBudgetCycleStartDay: async (budgetCycleStartDay) => {
-    const next = Math.min(28, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
+    const next = Math.min(31, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
     set({ budgetCycleStartDay: next })
     await get().persist({ budgetCycleStartDay: next })
   },
@@ -379,7 +385,7 @@ const useSettingsStore = create((set, get) => ({
       dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,
-      budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(28, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
+      budgetCycleStartDay: record.budgetCycleStartDay !== undefined ? Math.min(31, Math.max(1, Math.floor(Number(record.budgetCycleStartDay) || 1))) : 1,
       widgetRange: record.widgetRange === 'month' ? 'month' : '7d',
       notificationAutoApprove: Boolean(record.notificationAutoApprove),
       hideBalance: record.hideBalance !== undefined

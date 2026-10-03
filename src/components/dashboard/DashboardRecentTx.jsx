@@ -26,8 +26,9 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
 
   const formatDateHeader = useCallback(
     (dateKey) => {
-      if (!dateKey || dateKey === 'unknown') return 'Tanggal tidak diketahui'
-      const dateObj = new Date(`${dateKey}T12:00:00`)
+      if (!dateKey || dateKey === 'unknown' || dateKey === 'Unknown') return 'Tanggal tidak diketahui'
+      const cleanDateKey = String(dateKey || '').slice(0, 10)
+      const dateObj = new Date(`${cleanDateKey}T12:00:00`)
       if (Number.isNaN(dateObj.getTime())) return dateKey
       return format(dateObj, 'EEEE, d MMMM yyyy', {
         locale: locale === 'en' ? enUS : idLocale,

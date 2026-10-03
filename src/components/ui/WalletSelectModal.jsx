@@ -12,6 +12,7 @@ import { getCachedCurrencyRates } from '../../lib/api'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
+import useBackButton from '../../hooks/useBackButton'
 import MaskedBalance from './MaskedBalance'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
@@ -208,7 +209,10 @@ export default function WalletSelectModal({
   const { isMounted, isVisible, closeSheet } = useBottomSheet({
     isOpen,
     onClose,
+    useBackButton: false,
   })
+
+  useBackButton(onClose, Boolean(isOpen))
 
   const handleTouchEnd = () => {
     const elapsed = Date.now() - touchStartTime.current

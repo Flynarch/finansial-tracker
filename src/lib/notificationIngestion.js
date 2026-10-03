@@ -1,7 +1,7 @@
 import { WebPlugin, registerPlugin, Capacitor } from '@capacitor/core'
 import { format } from 'date-fns'
 import { db } from './db'
-import { toSafeNumber } from './utils'
+import { toSafeNumber, parseMoneyInput } from './utils'
 import { matchCategoryFromDescription, cleanMutationMerchant, maskFinancialAccountNumbers } from './merchantUtils'
 import { invalidateWalletBalance } from './balanceEngine'
 import { getRememberedCategory, enrichPendingMutationsWithAi } from './ai/merchantCategorizer'
@@ -46,6 +46,29 @@ export class FinTrackNotificationWeb extends WebPlugin {
   async updateWidgetData() {
     return { success: true }
   }
+  async getWidgetConfig() {
+    let range = null
+    let walletId = null
+    let walletName = null
+    try {
+      if (typeof localStorage !== 'undefined') {
+        range = localStorage.getItem('widget_config_range') || null
+        walletId = localStorage.getItem('widget_config_wallet_id') || null
+        walletName = localStorage.getItem('widget_config_wallet_name') || null
+      }
+    } catch { /* ignore */ }
+    return { range, walletId, walletName }
+  }
+  async setWidgetConfig(options = {}) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (options.range) localStorage.setItem('widget_config_range', options.range)
+        if (options.walletId) localStorage.setItem('widget_config_wallet_id', options.walletId)
+        if (options.walletName) localStorage.setItem('widget_config_wallet_name', options.walletName)
+      }
+    } catch { /* ignore */ }
+    return { success: true }
+  }
 }
 
 // Register Native Capacitor Plugin with fallback for Web preview
@@ -63,9 +86,7 @@ export function getNotificationTimestamp(val) {
 
 export function parseAmountFromRegexMatch(matchedStr = '') {
   if (!matchedStr) return 0
-  const trimmed = String(matchedStr).trim().replace(/[^\d]+$/, '')
-  const cleanSen = trimmed.replace(/[,.]00$/, '')
-  return toSafeNumber(cleanSen.replace(/[^0-9]/g, ''))
+  return parseMoneyInput(matchedStr, 'IDR')
 }
 
 /**
@@ -151,7 +172,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   if (lowerPkg.includes('gojek') || lowerPkg.includes('gopay') || /gopay/i.test(combined)) {
     // "Pembayaran Rp35.000 ke Solaria berhasil"
     // "Kamu menerima transfer Rp100.000 dari Andi"
-    const isIncome = /menerima|top up|cashback|masuk/i.test(combined)
+    const isIncome = /menerima|top up|cashback|masuk|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
     const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
@@ -168,7 +189,7 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
 
   // 6. OVO
   if (lowerPkg.includes('ovo') || /ovo/i.test(combined)) {
-    const isIncome = /top up|menerima|cashback/i.test(combined)
+    const isIncome = /top up|menerima|cashback|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
     const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
@@ -184,11 +205,16 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
   }
 
   // 7. DANA
-  if (((lowerPkg.includes('dana') && !lowerPkg.includes('danamon')) || /\bdana\b/i.test(combined)) && !/danamon/i.test(combined)) {
-    const isExplicitOutgoing = /(?:kirim uang(?!\s+diterima)|transfer ke|pembayaran|bayar|kamu telah membayar|telah membayar|berhasil dikirim(?:\s+ke)?|berhasil ditransfer(?:\s+ke)?|berhasil terkirim|terkirim(?:\s+ke)?|telah dikirim|uang keluar|kirim dana kaget)/i.test(combined)
-    const isExplicitIncoming = /(?:kirim uang diterima|isi saldo|saldo bertambah|dapat kiriman|kiriman uang|kamu menerima|menerima saldo|menerima kiriman|saldo masuk|dana masuk|dana diterima|penerimaan dana|dana kaget|dapat dana kaget|terima dana kaget|masuk ke saldo(?!\s*(?:ke\s+)?penerima)|top\s*up|cashback|saldo ditambahkan)/i.test(combined) ||
+  const combinedWithoutFundPhrases = combined.replace(/(?:pengembalian|sumber|penerimaan|penarikan|pindah|tarik|sisa)\s+dana/gi, '')
+  const isDanaBrand = ((lowerPkg.includes('dana') && !lowerPkg.includes('danamon')) ||
+    /\bdana\b/i.test(combinedWithoutFundPhrases) ||
+    /dana\s*kaget/i.test(combined)) && !/danamon/i.test(combined)
+  if (isDanaBrand) {
+    const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
+    const isExplicitOutgoing = !isRefund && /(?:kirim uang(?!\s+diterima)|transfer ke|pembayaran|bayar|kamu telah membayar|telah membayar|berhasil dikirim(?:\s+ke)?|berhasil ditransfer(?:\s+ke)?|berhasil terkirim|terkirim(?:\s+ke)?|telah dikirim|uang keluar|kirim dana kaget)/i.test(combined)
+    const isExplicitIncoming = isRefund || /(?:kirim uang diterima|isi saldo|saldo bertambah|dapat kiriman|kiriman uang|kamu menerima|menerima saldo|menerima kiriman|saldo masuk|dana masuk|dana diterima|penerimaan dana|dana kaget|dapat dana kaget|terima dana kaget|masuk ke saldo(?!\s*(?:ke\s+)?penerima)|top\s*up|cashback|saldo ditambahkan)/i.test(combined) ||
       (/(?:uang masuk)/i.test(combined) && !/(?:uang masuk ke saldo penerima|uang masuk ke rekening penerima|uang masuk ke tujuan)/i.test(combined))
-    const isIncome = !isExplicitOutgoing && isExplicitIncoming
+    const isIncome = isRefund || (!isExplicitOutgoing && isExplicitIncoming)
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
@@ -205,8 +231,9 @@ export function parseWithBankRegex(title = '', text = '', packageName = '') {
 
   // 8. ShopeePay
   if (lowerPkg.includes('shopee') || /shopeepay/i.test(combined)) {
-    const isIncome = /(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback)/i.test(combined) &&
-      !/(?:pembayaran|bayar|transfer ke|kirim ke)/i.test(combined)
+    const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
+    const isIncome = isRefund || (/(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback)/i.test(combined) &&
+      !/(?:pembayaran|bayar|transfer ke|kirim ke)/i.test(combined))
     const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
@@ -752,6 +779,10 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     'berhasil terkirim',
     'terkirim ke',
     'telah dikirim',
+    'pengembalian dana',
+    'refund',
+    'uang kembali',
+    'pengembalian saldo',
   ]
   return receiptKeywords.some((w) => combined.includes(w)) || /\bcr\b/i.test(combined)
 }
@@ -878,8 +909,8 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
         currency: fromMutation.currency || 'IDR',
         date: fromMutation.date,
         createdAt: fromMutation.createdAt,
-        walletId: fromMatch.wallet?.id || undefined,
-        targetWalletId: toMatch.wallet?.id || undefined,
+        walletId: fromMatch.wallet?.id ? Number(fromMatch.wallet.id) : null,
+        targetWalletId: toMatch.wallet?.id ? Number(toMatch.wallet.id) : null,
         category: 'transfer',
         notes: `[Pindah Dana] ${fromMutation.institution} -> ${toMutation.institution}`,
         cleanMerchant: `Pindah Dana: ${fromMutation.institution} -> ${toMutation.institution}`,
@@ -893,6 +924,7 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
           !toMatch.wallet ||
           isSameResolvedWallet,
         source: 'notification_listener_transfer',
+        deletedAt: null,
       })
     } else {
       result.push(current)
@@ -914,7 +946,7 @@ export function parseWithTokenBoundary(title = '', text = '') {
   const amount = parseAmountFromRegexMatch(amtMatch[1])
   if (amount <= 0) return null
 
-  const isIncome = /(masuk|terima|diterima|inflow|cr|kredit|top\s*up|cashback|refund)/i.test(combined)
+  const isIncome = /(masuk|terima|diterima|inflow|cr|kredit|top\s*up|cashback|refund|pengembalian|uang kembali|pengembalian saldo)/i.test(combined)
 
   return {
     institution: 'Bank / E-Wallet',
@@ -1112,7 +1144,10 @@ export async function syncNotificationQueue(options = {}) {
       }
 
       if (item.type === 'transfer') {
-        toInsert.push(item)
+        toInsert.push({
+          ...item,
+          deletedAt: item.deletedAt !== undefined ? item.deletedAt : null,
+        })
         syncedCount++
 
         // If fromWallet & toWallet are defined and not pending review, adjust balances
@@ -1131,9 +1166,11 @@ export async function syncNotificationQueue(options = {}) {
 
       // Single mutation: match best wallet
       const matchResult = findBestMatchingWallet(item.institution, availableWallets, item.rawDescription)
-      const fallbackWallet = defaultWalletId ? availableWallets.find((w) => Number(w.id) === Number(defaultWalletId)) : null
-      const matchedWallet = matchResult.wallet || fallbackWallet
-      let resolvedWalletId = matchedWallet?.id ? Number(matchedWallet.id) : undefined
+      const fallbackWallet = defaultWalletId
+        ? availableWallets.find((w) => Number(w.id) === Number(defaultWalletId))
+        : (availableWallets[0] || null)
+      const matchedWallet = matchResult?.wallet || fallbackWallet
+      let resolvedWalletId = matchedWallet?.id ? Number(matchedWallet.id) : (availableWallets[0]?.id ? Number(availableWallets[0].id) : null)
 
       // SAFE STAGING MODE:
       // By default (notificationAutoApprove = false), ALL auto-ingested transactions enter
@@ -1157,6 +1194,7 @@ export async function syncNotificationQueue(options = {}) {
         suggestedInstitution: item.institution,
         cleanMerchant: item.cleanMerchant || item.notes || '',
         refNumber: item.refNumber || undefined,
+        deletedAt: null,
       })
 
       if (resolvedWalletId && !isPendingReview) {
@@ -1340,7 +1378,7 @@ export async function syncHistoricalSms(options = {}) {
       const rawDescription = item.rawDescription || parsed.rawDescription || (item.text ? `${item.title || ''} ${item.text}` : '')
 
       const matchResult = findBestMatchingWallet(institution, availableWallets, rawDescription)
-      const resolvedWalletId = matchResult?.wallet?.id ? Number(matchResult.wallet.id) : undefined
+      const resolvedWalletId = matchResult?.wallet?.id ? Number(matchResult.wallet.id) : (availableWallets[0]?.id ? Number(availableWallets[0].id) : null)
       const resolvedCurrency = matchResult?.wallet?.currency || parsed.currency || 'IDR'
 
       toInsert.push({
@@ -1356,6 +1394,7 @@ export async function syncHistoricalSms(options = {}) {
         isPendingReview: true,
         suggestedInstitution: institution,
         cleanMerchant: cleanMerchant,
+        deletedAt: null,
       })
     }
 

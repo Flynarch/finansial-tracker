@@ -244,7 +244,7 @@ export default function TodoDetailPage() {
       const title = t('todo.notif.dueTodayTitle', 'Tenggat Komitmen Hari Ini')
       const body = `${data.title} • ${t('todo.notif.dueTodayBadge', 'Jatuh tempo hari ini')}`
       notifs.push({
-        id: id * 10 + 1,
+        id: 100000 + id * 10 + 1,
         title,
         body,
         largeBody: body,
@@ -264,7 +264,7 @@ export default function TodoDetailPage() {
       const title = t('todo.notif.dueTomorrowTitle', 'Pengingat Komitmen Besok')
       const body = `${data.title} • ${t('todo.notif.dueTomorrowBadge', 'Jatuh tempo besok')}`
       notifs.push({
-        id: id * 10 + 2,
+        id: 100000 + id * 10 + 2,
         title,
         body,
         largeBody: body,
@@ -293,7 +293,7 @@ export default function TodoDetailPage() {
     if (!Capacitor.isNativePlatform()) return
     try {
       await LocalNotifications.cancel({
-        notifications: [{ id: id * 10 + 1 }, { id: id * 10 + 2 }],
+        notifications: [{ id: 100000 + id * 10 + 1 }, { id: 100000 + id * 10 + 2 }],
       })
     } catch (err){
       console.warn('[TodoDetailPage]', err)
@@ -365,34 +365,65 @@ export default function TodoDetailPage() {
     if (!sub?.id || !todoId) return
     const nextChecked = !sub.checked
     triggerHaptic(nextChecked ? 'success' : 'light')
+    let wasAllDone = false
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.sub_tasks.update(sub.id, { checked: nextChecked })
       const allSubs = await db.sub_tasks.where('todoId').equals(todoId).toArray()
       if (allSubs.length > 0) {
         const allDone = allSubs.every((s) => (s.id === sub.id ? nextChecked : s.checked))
+        wasAllDone = allDone
         if (allDone) {
-          triggerHaptic('success')
           await db.todos.update(todoId, { completed: true })
-          void cancelNotificationForTodo(todoId)
         } else {
           await db.todos.update(todoId, { completed: false })
         }
       }
     })
-  }, [todoId, cancelNotificationForTodo])
+    if (wasAllDone) {
+      triggerHaptic('success')
+      void cancelNotificationForTodo(todoId)
+    } else {
+      const effectiveTodo = todo || (await db.todos.get(todoId))
+      if (effectiveTodo?.dueDate) {
+        void scheduleNotificationForTodo(todoId, effectiveTodo)
+      }
+    }
+  }, [todo, todoId, cancelNotificationForTodo, scheduleNotificationForTodo])
 
   const handleDeleteSubTask = useCallback(async (subId) => {
     if (!subId || !todoId) return
     triggerHaptic('light')
+    let wasAllDone = false
+    let hasSubs = false
     await db.transaction('rw', db.todos, db.sub_tasks, async () => {
       await db.sub_tasks.delete(subId)
       const remainingSubs = await db.sub_tasks.where('todoId').equals(todoId).toArray()
       if (remainingSubs.length > 0) {
+        hasSubs = true
         const allDone = remainingSubs.every((s) => s.checked)
+        wasAllDone = allDone
         await db.todos.update(todoId, { completed: allDone })
+      } else {
+        // If all subtasks were deleted, re-evaluate parent status based on todo itself
+        await db.todos.update(todoId, { completed: false })
       }
     })
-  }, [todoId])
+    if (hasSubs) {
+      if (wasAllDone) {
+        void cancelNotificationForTodo(todoId)
+      } else {
+        const effectiveTodo = todo || (await db.todos.get(todoId))
+        if (effectiveTodo?.dueDate) {
+          void scheduleNotificationForTodo(todoId, effectiveTodo)
+        }
+      }
+    } else {
+      const effectiveTodo = todo || (await db.todos.get(todoId))
+      if (effectiveTodo?.dueDate) {
+        void scheduleNotificationForTodo(todoId, effectiveTodo)
+      }
+    }
+  }, [todoId, todo, cancelNotificationForTodo, scheduleNotificationForTodo])
 
   const handleAddSubTask = useCallback(async () => {
     const label = newSubLabel.trim()
@@ -406,8 +437,12 @@ export default function TodoDetailPage() {
       })
       await db.todos.update(todoId, { completed: false })
     })
+    const effectiveTodo = todo || (await db.todos.get(todoId))
+    if (effectiveTodo?.dueDate) {
+      void scheduleNotificationForTodo(todoId, effectiveTodo)
+    }
     setNewSubLabel('')
-  }, [newSubLabel, todoId])
+  }, [newSubLabel, todoId, todo, scheduleNotificationForTodo])
 
   const startEditingSubTask = useCallback((row) => {
     setEditingSubId(row.id)
@@ -713,7 +748,7 @@ export default function TodoDetailPage() {
                             </button>
                             <span
                               onClick={() => startEditingSubTask(row)}
-                              title={'Klik untuk mengedit'}
+                              title={t('todo.subtask.clickToEdit', 'Klik untuk mengedit')}
                               className={`text-sm font-medium transition min-w-0 break-words [overflow-wrap:anywhere] cursor-pointer hover:opacity-80 ${
                                 row.checked ? 'text-[var(--muted)] line-through opacity-70' : 'text-[var(--fg)]'
                               }`}

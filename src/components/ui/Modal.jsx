@@ -61,6 +61,7 @@ function Modal({
         } ${className}`}
         style={{
           boxShadow: 'var(--shadow-card)',
+          contain: 'paint layout',
         }}
       >
         {/* ZONE 1: FIXED TOP HEADER */}
@@ -74,7 +75,7 @@ function Modal({
                   e.stopPropagation()
                   closeSheet()
                 }}
-                className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer"
+                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">

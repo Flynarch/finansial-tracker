@@ -259,7 +259,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setViewDate((d) => subMonths(d, 1))}
+                onClick={() => setViewDate((d) => subMonths(startOfMonth(d || new Date()), 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
                 aria-label={activeLocale === 'en' ? 'Previous Month' : 'Bulan Sebelumnya'}
               >
@@ -267,7 +267,7 @@ export default function CustomDateTimePicker({ dateValue, timeValue, onChangeDat
               </button>
               <button
                 type="button"
-                onClick={() => setViewDate((d) => addMonths(d, 1))}
+                onClick={() => setViewDate((d) => addMonths(startOfMonth(d || new Date()), 1))}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
                 aria-label={activeLocale === 'en' ? 'Next Month' : 'Bulan Berikutnya'}
               >

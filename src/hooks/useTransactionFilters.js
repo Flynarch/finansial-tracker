@@ -35,7 +35,14 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
       }
 
       if (!isAllTypes) {
-        if (!activeTypes || activeTypes.length === 0 || !activeTypes.includes(item.type)) return false
+        if (!activeTypes || activeTypes.length === 0) return false
+        let matchesType = activeTypes.includes(item.type)
+        if (!matchesType && item.type === 'balance_adjustment') {
+          const numAmt = Number(item.amount) || 0
+          if (activeTypes.includes('income') && numAmt > 0) matchesType = true
+          else if (activeTypes.includes('expense') && numAmt < 0) matchesType = true
+        }
+        if (!matchesType) return false
       }
 
       if (!isAllWallets) {
@@ -67,8 +74,14 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
         if (!matchCat) return false
       }
 
-      if (startDate && item.date < startDate) return false
-      if (endDate && item.date > endDate) return false
+      const itemDateStr = String(item.date || '').slice(0, 10)
+      if (startDate && itemDateStr < startDate) return false
+      if (endDate && itemDateStr > endDate) return false
+
+      const minAmt = filters?.minAmount ? Number(filters.minAmount) : null
+      const maxAmt = filters?.maxAmount ? Number(filters.maxAmount) : null
+      if (minAmt !== null && Number(item.amount) < minAmt) return false
+      if (maxAmt !== null && Number(item.amount) > maxAmt) return false
 
       return true
     })
@@ -95,6 +108,8 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
       startDate: `${yyyy}-${mm}-01`,
       endDate: `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`,
       tag: '',
+      minAmount: '',
+      maxAmount: '',
     }
   })
 
@@ -111,6 +126,8 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
       startDate: '',
       endDate: '',
       tag: '',
+      minAmount: '',
+      maxAmount: '',
     })
   }, [])
 
@@ -158,6 +175,8 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
     if (filters.tag) count += 1
     if (filters.search) count += 1
     if (filters.startDate !== defaultMonthStart || filters.endDate !== defaultMonthEnd) count += 1
+    if (filters.minAmount) count += 1
+    if (filters.maxAmount) count += 1
     return count
   }, [filters, userWallets.length, usedCategories.length, defaultMonthStart, defaultMonthEnd])
 

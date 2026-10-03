@@ -169,7 +169,7 @@ export default function BottomSheet({
                 {showCloseButton && (
                   <button
                     type="button"
-                    className="flex h-9 w-9 min-h-[36px] min-w-[36px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer ft-spring-press"
+                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-all text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[color-mix(in_srgb,var(--fg)_8%,transparent)] active:scale-95 cursor-pointer ft-spring-press"
                     onClick={(e) => {
                       e.stopPropagation()
                       closeSheet()

@@ -76,6 +76,7 @@ describe('utils - parseMoneyInput & formatMoneyInput', () => {
 
   it('safely strips trailing sen (,00 or .00) for IDR inputs without 100x multiplication error', () => {
     expect(parseMoneyInput('50.000,00', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('50.000,000', 'IDR')).toBe(50000)
     expect(parseMoneyInput('50.000.00', 'IDR')).toBe(50000)
     expect(parseMoneyInput('1.500.000,00', 'IDR')).toBe(1500000)
     expect(parseMoneyInput('25000,00', 'IDR')).toBe(25000)
@@ -83,6 +84,12 @@ describe('utils - parseMoneyInput & formatMoneyInput', () => {
     expect(parseMoneyInput('50.000,00.', 'IDR')).toBe(50000)
     expect(parseMoneyInput('50.000,00.-', 'IDR')).toBe(50000)
     expect(parseMoneyInput('Rp 50.000,00.', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('Rp 50.000,000', 'IDR')).toBe(50000)
+    expect(parseMoneyInput('12.345,50', 'IDR')).toBe(12345.5)
+    expect(parseMoneyInput('12.345.50', 'IDR')).toBe(12345.5)
+    expect(parseMoneyInput('(50.000)', 'IDR')).toBe(-50000)
+    expect(parseMoneyInput('(50.000,000)', 'IDR')).toBe(-50000)
+    expect(parseMoneyInput('(12.345,50)', 'IDR')).toBe(-12345.5)
   })
 
   it('formats and parses foreign currency decimal inputs', () => {
@@ -279,6 +286,14 @@ describe('utils - roundCurrency (decimal-safe)', () => {
     const res = roundCurrency('125.456')
     expect(typeof res).toBe('number')
     expect(res).toBe(125.46)
+  })
+
+  it('correctly rounds zero-decimal currencies (IDR, JPY, KRW, VND) to 0 decimal places', () => {
+    expect(roundCurrency(1234.56, 'IDR')).toBe(1235)
+    expect(roundCurrency(1234.56, 'JPY')).toBe(1235)
+    expect(roundCurrency(1234.56, 'KRW')).toBe(1235)
+    expect(roundCurrency(1234.56, 'VND')).toBe(1235)
+    expect(roundCurrency(1234.56, 'USD')).toBe(1234.56)
   })
 })
 

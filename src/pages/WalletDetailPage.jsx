@@ -108,10 +108,10 @@ export default function WalletDetailPage() {
     ])
     const txMap = new Map()
     for (const tx of [...srcTxsNum, ...srcTxsStr]) {
-      if (tx && tx.id != null && !tx.deletedAt) txMap.set(tx.id, tx)
+      if (tx && tx.id != null && !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1) txMap.set(tx.id, tx)
     }
     for (const tx of [...tgtTxsNum, ...tgtTxsStr]) {
-      if (tx && tx.id != null && !tx.deletedAt && tx.type === 'transfer') txMap.set(tx.id, tx)
+      if (tx && tx.id != null && !tx.deletedAt && tx.type === 'transfer' && tx.isPendingReview !== true && tx.isPendingReview !== 1) txMap.set(tx.id, tx)
     }
     const txs = Array.from(txMap.values())
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
@@ -165,13 +165,6 @@ export default function WalletDetailPage() {
     currency: 'IDR',
   })
 
-  useBackButton(() => setDetailTransaction(null), Boolean(detailTransaction))
-  useBackButton(() => setReceiptPreviewTx(null), Boolean(receiptPreviewTx))
-  useBackButton(() => setSingleDeleteTx(null), Boolean(singleDeleteTx))
-  useBackButton(() => setEditingTransaction(null), Boolean(editingTransaction))
-  useBackButton(() => setIsDeleteModalOpen(false), Boolean(isDeleteModalOpen))
-  useBackButton(() => setIsEditBalanceModalOpen(false), Boolean(isEditBalanceModalOpen))
-  useBackButton(() => setIsEditWalletModalOpen(false), Boolean(isEditWalletModalOpen))
   useBackButton(() => setIsActionMenuOpen(false), Boolean(isActionMenuOpen))
 
   const {
@@ -205,9 +198,17 @@ export default function WalletDetailPage() {
     if (!editingTransaction?.id) return
     try {
       setPageError('')
+      const tgtWallet = allWallets?.find((w) => String(w.id) === String(editFormData.targetWalletId))
+      const tgtCurr = tgtWallet?.currency || defaultCurrency
+      const parsedTargetAmount =
+        editFormData.type === 'transfer' && editFormData.targetAmount
+          ? parseMoneyInput(editFormData.targetAmount, tgtCurr)
+          : undefined
+
       await updateTransaction(editingTransaction.id, {
         ...editFormData,
         amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+        targetAmount: parsedTargetAmount,
         receiptImage: editFormData.receiptImage || null,
         isSplit: Boolean(editFormData.isSplit),
         splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
@@ -231,7 +232,8 @@ export default function WalletDetailPage() {
 
   const handleExportWalletCsv = async () => {
     setIsActionMenuOpen(false)
-    await exportTransactionsToCsv(allTransactions || [], wallet ? [wallet] : [], wallet?.currency || defaultCurrency, locale)
+    const validTxs = (allTransactions || []).filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
+    await exportTransactionsToCsv(validTxs, wallet ? [wallet] : [], wallet?.currency || defaultCurrency, locale)
   }
 
   const handleOpenEditWallet = () => {
@@ -268,6 +270,7 @@ export default function WalletDetailPage() {
     const query = searchQuery.trim().toLowerCase()
 
     return allTransactions.filter((tx) => {
+      if (tx.isPendingReview === true || tx.isPendingReview === 1) return false
       // Tab Filter
       let matchesTab = true
       if (activeTab !== 'all') {
@@ -338,7 +341,8 @@ export default function WalletDetailPage() {
           dateLabel = t('common.yesterday', 'Kemarin')
         } else {
           try {
-            dateLabel = format(new Date(dateKey), 'dd MMMM yyyy')
+            const rawDate = typeof dateKey === 'string' && dateKey.length === 10 ? `${dateKey}T12:00:00` : dateKey
+            dateLabel = format(new Date(rawDate), 'dd MMMM yyyy')
           } catch (err) {
             console.error('[WalletDetailPage:formatDate]', err)
             dateLabel = dateKey

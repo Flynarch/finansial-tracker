@@ -7,25 +7,28 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RectF;
-import android.graphics.Shader;
-import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.ArrayMap;
+import android.util.Log;
+import android.util.SizeF;
 import android.view.View;
 import android.widget.RemoteViews;
+
 import org.json.JSONArray;
-import org.json.JSONObject;
+
 import java.util.Locale;
+import java.util.Map;
 
 public class FinTrackWidgetProvider extends AppWidgetProvider {
 
+    private static final String TAG = "FinTrackWidget";
     public static final String ACTION_UPDATE_WIDGET = "com.fintrack.app.ACTION_UPDATE_WIDGET";
 
     @Override
@@ -62,365 +65,452 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
             if (!prefs.contains(key)) return defaultVal;
             Object val = prefs.getAll().get(key);
             if (val == null) return defaultVal;
-            if (val instanceof Number) {
-                long lVal = ((Number) val).longValue();
-                return String.format(Locale.getDefault(), "Rp %,d", lVal).replace(',', '.');
-            }
             return String.valueOf(val);
         } catch (Exception e) {
             return defaultVal;
         }
     }
 
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
-        SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-
-        String balance = getSafeString(prefs, "fintrack_widget_balance", null);
-        if (balance == null || balance.trim().isEmpty() || "Rp 0".equals(balance)) {
-            String fallback = getSafeString(prefs, "total_net_worth", null);
-            if (fallback == null || fallback.trim().isEmpty()) {
-                fallback = getSafeString(prefs, "wallet_balance", "Rp 0");
-            }
-            if (fallback != null && !fallback.trim().isEmpty()) {
-                balance = fallback;
-            }
-        }
-        if (balance == null || balance.trim().isEmpty()) {
-            balance = "Rp 0";
-        }
-
-        String income = getSafeString(prefs, "fintrack_widget_income", null);
-        if (income == null || income.trim().isEmpty() || "Masuk: Rp 0".equals(income)) {
-            String fallback = getSafeString(prefs, "month_income", null);
-            if (fallback == null || fallback.trim().isEmpty()) {
-                fallback = getSafeString(prefs, "income", "Masuk: Rp 0");
-            }
-            if (fallback != null && !fallback.trim().isEmpty()) {
-                income = fallback;
-            }
-        }
-        if (income == null || income.trim().isEmpty()) {
-            income = "Masuk: Rp 0";
-        }
-
-        String expense = getSafeString(prefs, "fintrack_widget_expense", null);
-        if (expense == null || expense.trim().isEmpty() || "Keluar: Rp 0".equals(expense)) {
-            String fallback = getSafeString(prefs, "month_expense", null);
-            if (fallback == null || fallback.trim().isEmpty()) {
-                fallback = getSafeString(prefs, "expense", "Keluar: Rp 0");
-            }
-            if (fallback != null && !fallback.trim().isEmpty()) {
-                expense = fallback;
-            }
-        }
-        if (expense == null || expense.trim().isEmpty()) {
-            expense = "Keluar: Rp 0";
-        }
-
-        String period = getSafeString(prefs, "fintrack_widget_period", null);
-        if (period == null || period.trim().isEmpty()) {
-            period = getSafeString(prefs, "period", "(Bulan Ini)");
-        }
-
-        String sparklineJson = getSafeString(prefs, "fintrack_widget_sparkline", null);
-        if (sparklineJson == null || sparklineJson.trim().isEmpty() || "[]".equals(sparklineJson)) {
-            sparklineJson = getSafeString(prefs, "sparklineData", "[]");
-        }
-
-        String sparklineIncomeJson = getSafeString(prefs, "fintrack_widget_sparkline_income", "[]");
-        String sparklineExpenseJson = getSafeString(prefs, "fintrack_widget_sparkline_expense", "[]");
-        String topCategoriesJson = getSafeString(prefs, "fintrack_widget_top_categories", "[]");
-
-        String btnText = getSafeString(prefs, "fintrack_widget_btn_text", "Catat Baru");
-        String balanceLabel = getSafeString(prefs, "fintrack_widget_balance_label", "Kekayaan Bersih");
-        String dateText = getSafeString(prefs, "fintrack_widget_date", null);
-        if (dateText == null || dateText.trim().isEmpty()) {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
-            dateText = sdf.format(new java.util.Date());
-        }
-
-        String sparklineDatesJson = getSafeString(prefs, "fintrack_widget_sparkline_dates", null);
-        String todayNet = getSafeString(prefs, "fintrack_widget_today_net", null);
-        float todayNetVal = prefs.getFloat("fintrack_widget_today_net_val", 0f);
-
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson,
-                sparklineDatesJson, todayNet, todayNetVal, btnText, balanceLabel, dateText,
-                sparklineIncomeJson, sparklineExpenseJson, topCategoriesJson);
-    }
-
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
-                                      String balance, String income, String expense, String period, String sparklineJson) {
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, "Catat Baru", "Kekayaan Bersih");
-    }
-
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
-                                      String balance, String income, String expense, String period, String sparklineJson,
-                                      String btnText, String balanceLabel) {
-        String dateText = getSafeString(context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE), "fintrack_widget_date", null);
-        if (dateText == null || dateText.trim().isEmpty()) {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
-            dateText = sdf.format(new java.util.Date());
-        }
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson, btnText, balanceLabel, dateText);
-    }
-
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
-                                      String balance, String income, String expense, String period, String sparklineJson,
-                                      String btnText, String balanceLabel, String dateText) {
-        SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-        String sparklineDatesJson = getSafeString(prefs, "fintrack_widget_sparkline_dates", null);
-        String todayNet = getSafeString(prefs, "fintrack_widget_today_net", null);
-        float todayNetVal = prefs.getFloat("fintrack_widget_today_net_val", 0f);
-        String sparklineIncomeJson = getSafeString(prefs, "fintrack_widget_sparkline_income", "[]");
-        String sparklineExpenseJson = getSafeString(prefs, "fintrack_widget_sparkline_expense", "[]");
-        String topCategoriesJson = getSafeString(prefs, "fintrack_widget_top_categories", "[]");
-
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson,
-                sparklineDatesJson, todayNet, todayNetVal, btnText, balanceLabel, dateText,
-                sparklineIncomeJson, sparklineExpenseJson, topCategoriesJson);
-    }
-
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
-                                      String balance, String income, String expense, String period, String sparklineJson,
-                                      String sparklineDatesJson, String todayNet, float todayNetVal,
-                                      String btnText, String balanceLabel, String dateText) {
-        SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-        String sparklineIncomeJson = getSafeString(prefs, "fintrack_widget_sparkline_income", "[]");
-        String sparklineExpenseJson = getSafeString(prefs, "fintrack_widget_sparkline_expense", "[]");
-        String topCategoriesJson = getSafeString(prefs, "fintrack_widget_top_categories", "[]");
-
-        updateAppWidget(context, appWidgetManager, appWidgetId, balance, income, expense, period, sparklineJson,
-                sparklineDatesJson, todayNet, todayNetVal, btnText, balanceLabel, dateText,
-                sparklineIncomeJson, sparklineExpenseJson, topCategoriesJson);
-    }
-
-    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId,
-                                      String balance, String income, String expense, String period, String sparklineJson,
-                                      String sparklineDatesJson, String todayNet, float todayNetVal,
-                                      String btnText, String balanceLabel, String dateText,
-                                      String sparklineIncomeJson, String sparklineExpenseJson, String topCategoriesJson) {
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_fintrack_balance);
-
-        // 1. Hero Balance & Label
-        views.setTextViewText(R.id.widget_total_balance, balance != null ? balance : "Rp 0");
-        views.setTextViewText(R.id.widget_balance_label, balanceLabel != null ? balanceLabel : "Kekayaan Bersih");
-
-        // 2. Inline Today Net Delta Pill
-        if (todayNet != null && !todayNet.trim().isEmpty() && !"Rp 0".equals(todayNet.trim()) && !"+Rp 0".equals(todayNet.trim())) {
-            String pillText = todayNet.trim();
-            if (!pillText.startsWith("↑") && !pillText.startsWith("↓") && !pillText.startsWith("±")) {
-                if (todayNetVal > 0 || pillText.startsWith("+")) {
-                    pillText = "↑ " + pillText;
-                } else if (todayNetVal < 0 || pillText.startsWith("-")) {
-                    pillText = "↓ " + pillText;
-                }
-            }
-            views.setTextViewText(R.id.widget_today_net, pillText);
-            if (todayNetVal > 0 || pillText.contains("+")) {
-                views.setTextColor(R.id.widget_today_net, Color.parseColor("#86EFAC")); // Soft emerald
-                views.setInt(R.id.widget_today_net, "setBackgroundResource", R.drawable.widget_delta_pill_bg);
-            } else if (todayNetVal < 0 || pillText.contains("-")) {
-                views.setTextColor(R.id.widget_today_net, Color.parseColor("#FDA4AF")); // Soft rose
-                views.setInt(R.id.widget_today_net, "setBackgroundResource", R.drawable.widget_delta_pill_negative_bg);
-            } else {
-                views.setTextColor(R.id.widget_today_net, Color.parseColor("#94A3B8"));
-                views.setInt(R.id.widget_today_net, "setBackgroundResource", R.drawable.widget_delta_pill_bg);
-            }
-            views.setViewVisibility(R.id.widget_today_net, View.VISIBLE);
-        } else {
-            views.setViewVisibility(R.id.widget_today_net, View.GONE);
-        }
-
-        // 3. Multi-Wave Sparkline Trend Chart
-        Bitmap sparklineBitmap = createMultiWaveSparklineBitmap(sparklineJson, sparklineIncomeJson, sparklineExpenseJson, 200);
-        if (sparklineBitmap != null) {
-            views.setImageViewBitmap(R.id.widget_sparkline, sparklineBitmap);
-            views.setViewVisibility(R.id.widget_sparkline, View.VISIBLE);
-        } else {
-            views.setViewVisibility(R.id.widget_sparkline, View.GONE);
-        }
-
-        // 4. Middle Stat Row: Date & Range on Left
-        if (dateText == null || dateText.trim().isEmpty()) {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("EEEE, d MMM", new Locale("id", "ID"));
-            dateText = sdf.format(new java.util.Date());
-        }
-        String periodText = period != null ? period : "Bulan Ini";
-        if (!periodText.startsWith("(") && !periodText.endsWith(")")) {
-            periodText = "(" + periodText + ")";
-        }
-        views.setTextViewText(R.id.widget_period_label, periodText);
-
-        // 5. Middle Stat Row: Cashflow Chips on Right (strip "Masuk: " / "Keluar: " prefixes)
-        String displayIncome = income != null ? income : "+Rp 0";
-        if (displayIncome.startsWith("Masuk: ")) displayIncome = displayIncome.substring(7);
-        else if (displayIncome.startsWith("In: ")) displayIncome = displayIncome.substring(4);
-        views.setTextViewText(R.id.widget_income_text, displayIncome);
-
-        String displayExpense = expense != null ? expense : "-Rp 0";
-        if (displayExpense.startsWith("Keluar: ")) displayExpense = displayExpense.substring(8);
-        else if (displayExpense.startsWith("Out: ")) displayExpense = displayExpense.substring(5);
-        views.setTextViewText(R.id.widget_expense_text, displayExpense);
-
-        // 6. Bottom Row: Semicircular Category Gauge
-        Bitmap gaugeBitmap = createCategoryGaugeBitmap(topCategoriesJson);
-        if (gaugeBitmap != null) {
-            views.setImageViewBitmap(R.id.widget_category_gauge, gaugeBitmap);
-            views.setViewVisibility(R.id.widget_category_gauge, View.VISIBLE);
-        } else {
-            views.setViewVisibility(R.id.widget_category_gauge, View.GONE);
-        }
-
-        // 7. Bottom Row: Top 3 Category Legend
+    private static float getSafeFloat(SharedPreferences prefs, String key, float defaultVal) {
         try {
-            JSONArray catArr = new JSONArray(topCategoriesJson != null ? topCategoriesJson : "[]");
-            int catCount = catArr.length();
-            int[] catViewIds = new int[] { R.id.widget_cat_1, R.id.widget_cat_2, R.id.widget_cat_3 };
-            int[] catColors = new int[] { Color.parseColor("#2DD4BF"), Color.parseColor("#38BDF8"), Color.parseColor("#FB923C") };
+            if (!prefs.contains(key)) return defaultVal;
+            Object val = prefs.getAll().get(key);
+            if (val == null) return defaultVal;
+            if (val instanceof Number) return ((Number) val).floatValue();
+            return Float.parseFloat(String.valueOf(val));
+        } catch (Exception e) {
+            return defaultVal;
+        }
+    }
 
-            for (int c = 0; c < 3; c++) {
-                if (c < catCount) {
-                    JSONObject catObj = catArr.optJSONObject(c);
-                    if (catObj != null) {
-                        String catName = catObj.optString("name", "Kategori");
-                        int pct = catObj.optInt("percentage", 0);
-                        String colorHex = catObj.optString("color", null);
-                        int textColor = catColors[c];
-                        if (colorHex != null && colorHex.startsWith("#")) {
-                            try { textColor = Color.parseColor(colorHex); } catch (Exception ignored) {}
-                        }
-                        String displayText = "• " + catName + (pct > 0 ? " " + pct + "%" : "");
-                        views.setTextViewText(catViewIds[c], displayText);
-                        views.setTextColor(catViewIds[c], textColor);
-                        views.setViewVisibility(catViewIds[c], View.VISIBLE);
-                    } else {
-                        views.setViewVisibility(catViewIds[c], View.GONE);
-                    }
-                } else {
-                    views.setViewVisibility(catViewIds[c], View.GONE);
+    private static String stripLeadingSigns(String s) {
+        if (s == null) return "0";
+        String res = s.trim();
+        while (res.startsWith("+") || res.startsWith("-") || res.startsWith("\u2212")) {
+            res = res.substring(1).trim();
+        }
+        return res.isEmpty() ? "0" : res;
+    }
+
+    private static class WidgetModel {
+        String labelSmall;
+        String labelMediumLarge;
+        String periodSmall;
+        String periodInline;
+        String balanceSmall;
+        String balanceMediumLarge;
+        String incomeDisplay;
+        String expenseDisplay;
+        String netDisplay;
+        int netSign;
+        boolean hideBalance;
+    }
+
+    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+
+            // Read preferences
+            String balance = getSafeString(prefs, "fintrack_widget_balance", null);
+            if (balance == null || balance.trim().isEmpty() || "Rp 0".equals(balance) || "0".equals(balance)) {
+                String fallback = getSafeString(prefs, "total_net_worth", null);
+                if (fallback == null || fallback.trim().isEmpty()) {
+                    fallback = getSafeString(prefs, "wallet_balance", "0");
                 }
+                if (fallback != null && !fallback.trim().isEmpty()) {
+                    balance = fallback;
+                }
+            }
+            if (balance == null || balance.trim().isEmpty()) {
+                balance = "0";
+            }
+
+            String balanceCompact = getSafeString(prefs, "fintrack_widget_balance_compact", null);
+            if (balanceCompact == null || balanceCompact.trim().isEmpty()) {
+                balanceCompact = balance;
+            }
+
+            String incomeCompact = getSafeString(prefs, "fintrack_widget_income_compact", null);
+            if (incomeCompact == null || incomeCompact.trim().isEmpty()) {
+                String rawIncome = getSafeString(prefs, "fintrack_widget_income", null);
+                if (rawIncome == null || rawIncome.trim().isEmpty()) {
+                    rawIncome = getSafeString(prefs, "month_income", null);
+                    if (rawIncome == null || rawIncome.trim().isEmpty()) {
+                        rawIncome = getSafeString(prefs, "income", "0");
+                    }
+                }
+                if (rawIncome != null) {
+                    rawIncome = rawIncome.trim();
+                    if (rawIncome.startsWith("Masuk:")) rawIncome = rawIncome.substring(6).trim();
+                    else if (rawIncome.startsWith("In:")) rawIncome = rawIncome.substring(3).trim();
+                }
+                incomeCompact = stripLeadingSigns(rawIncome);
+            } else {
+                incomeCompact = stripLeadingSigns(incomeCompact);
+            }
+
+            String expenseCompact = getSafeString(prefs, "fintrack_widget_expense_compact", null);
+            if (expenseCompact == null || expenseCompact.trim().isEmpty()) {
+                String rawExpense = getSafeString(prefs, "fintrack_widget_expense", null);
+                if (rawExpense == null || rawExpense.trim().isEmpty()) {
+                    rawExpense = getSafeString(prefs, "month_expense", null);
+                    if (rawExpense == null || rawExpense.trim().isEmpty()) {
+                        rawExpense = getSafeString(prefs, "expense", "0");
+                    }
+                }
+                if (rawExpense != null) {
+                    rawExpense = rawExpense.trim();
+                    if (rawExpense.startsWith("Keluar:")) rawExpense = rawExpense.substring(7).trim();
+                    else if (rawExpense.startsWith("Out:")) rawExpense = rawExpense.substring(4).trim();
+                }
+                expenseCompact = stripLeadingSigns(rawExpense);
+            } else {
+                expenseCompact = stripLeadingSigns(expenseCompact);
+            }
+
+            String netCompact = getSafeString(prefs, "fintrack_widget_net_compact", null);
+            int netSign = 0;
+            String netSignStr = getSafeString(prefs, "fintrack_widget_net_sign", null);
+            if (netSignStr != null && !netSignStr.trim().isEmpty()) {
+                try {
+                    netSign = Integer.parseInt(netSignStr.trim());
+                } catch (Exception e) {
+                    try {
+                        float f = Float.parseFloat(netSignStr.trim());
+                        netSign = f > 0 ? 1 : (f < 0 ? -1 : 0);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+
+            if (netCompact == null || netCompact.trim().isEmpty()) {
+                float incVal = getSafeFloat(prefs, "fintrack_widget_income_val_num", 0f);
+                float expVal = getSafeFloat(prefs, "fintrack_widget_expense_val_num", 0f);
+                float surplus = incVal - expVal;
+                if (Math.abs(surplus) > 0.01f) {
+                    netSign = surplus > 0 ? 1 : -1;
+                    netCompact = getSafeString(prefs, "fintrack_widget_surplus_formatted", String.format(Locale.US, "%,.0f", Math.abs(surplus)));
+                } else {
+                    netSign = 0;
+                    netCompact = "";
+                }
+            } else {
+                netCompact = stripLeadingSigns(netCompact);
+            }
+
+            String localeStr = getSafeString(prefs, "fintrack_widget_locale", "id");
+            String currencyPrefix = getSafeString(prefs, "fintrack_widget_currency_prefix", "Rp");
+
+            // Localized context
+            Configuration config = new Configuration(context.getResources().getConfiguration());
+            Locale targetLocale = "en".equalsIgnoreCase(localeStr) ? Locale.ENGLISH : new Locale("id", "ID");
+            config.setLocale(targetLocale);
+            Context locCtx = context.createConfigurationContext(config);
+
+            // Period text
+            String range = prefs.getString("widget_config_range_" + appWidgetId, prefs.getString("widget_config_range", "month"));
+            String periodText;
+            if ("7d".equals(range)) {
+                periodText = locCtx.getString(R.string.widget_period_7d);
+            } else if ("30d".equals(range)) {
+                periodText = locCtx.getString(R.string.widget_period_30d);
+            } else {
+                periodText = locCtx.getString(R.string.widget_period_month);
+            }
+
+            String walletId = prefs.getString("widget_config_wallet_id_" + appWidgetId, prefs.getString("widget_config_wallet_id", "-1"));
+            String walletName = prefs.getString("widget_config_wallet_name_" + appWidgetId, prefs.getString("widget_config_wallet_name", ""));
+            if (!"-1".equals(walletId) && walletName != null && !walletName.trim().isEmpty()) {
+                periodText = walletName.trim() + " \u00B7 " + periodText;
+            }
+
+            // Hide balance preference
+            boolean hideBalance = false;
+            try {
+                if (prefs.contains("widget_config_hide_balance_" + appWidgetId)) {
+                    Object val = prefs.getAll().get("widget_config_hide_balance_" + appWidgetId);
+                    if (val instanceof Boolean) {
+                        hideBalance = (Boolean) val;
+                    } else if (val != null) {
+                        hideBalance = "true".equalsIgnoreCase(String.valueOf(val).trim());
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+
+            WidgetModel model = new WidgetModel();
+            model.labelSmall = locCtx.getString(R.string.widget_label_balance_short);
+            model.labelMediumLarge = locCtx.getString(R.string.widget_label_net_worth);
+            model.periodSmall = periodText;
+            model.periodInline = " \u00B7 " + periodText;
+            model.hideBalance = hideBalance;
+
+            if (hideBalance) {
+                String masked = currencyPrefix + " " + locCtx.getString(R.string.widget_hidden_mask);
+                model.balanceSmall = masked;
+                model.balanceMediumLarge = masked;
+            } else {
+                model.balanceSmall = balanceCompact;
+                model.balanceMediumLarge = balance;
+            }
+
+            model.incomeDisplay = "+" + incomeCompact;
+            model.expenseDisplay = "\u2212" + expenseCompact;
+            model.netSign = netSign;
+            if (netSign > 0) {
+                model.netDisplay = "+" + netCompact;
+            } else if (netSign < 0) {
+                model.netDisplay = "\u2212" + netCompact;
+            } else {
+                model.netDisplay = "";
+            }
+
+            // Render trend bitmap for large layout
+            Bundle options = appWidgetManager.getAppWidgetOptions(appWidgetId);
+            int orientation = context.getResources().getConfiguration().orientation;
+            boolean isLandscape = (orientation == Configuration.ORIENTATION_LANDSCAPE);
+            int widthDp = isLandscape
+                ? (options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0) : 0)
+                : (options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) : 0);
+            if (widthDp <= 0) {
+                int minWidth = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) : 0;
+                widthDp = minWidth > 0 ? minWidth : 220;
+            }
+            widthDp = Math.max(widthDp, 220);
+
+            int heightDp = isLandscape
+                ? (options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) : 0)
+                : (options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) : 0);
+            if (heightDp <= 0) {
+                heightDp = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) : 0;
+            }
+            int targetHeightDp = heightDp > 140 ? (heightDp - 130) : 56;
+            targetHeightDp = Math.max(targetHeightDp, 48);
+
+            float density = context.getResources().getDisplayMetrics().density;
+            int widthPx = Math.round((widthDp - 32) * density);
+            widthPx = Math.min(Math.max(widthPx, 100), 1200);
+            int heightPx = Math.max(Math.round(targetHeightDp * density), 20);
+
+            String sparklineJson = getSafeString(prefs, "fintrack_widget_sparkline", null);
+            if (sparklineJson == null || sparklineJson.trim().isEmpty() || "[]".equals(sparklineJson)) {
+                sparklineJson = getSafeString(prefs, "sparklineData", "[]");
+            }
+            Bitmap chartBitmap = renderTrendBitmap(context, sparklineJson, widthPx, heightPx);
+
+            // Build RemoteViews for small, medium, and large
+            RemoteViews smallViews = buildViews(context, locCtx, R.layout.widget_fintrack_small, model, null, appWidgetId);
+            RemoteViews mediumViews = buildViews(context, locCtx, R.layout.widget_fintrack_medium, model, null, appWidgetId);
+            RemoteViews largeViews = buildViews(context, locCtx, R.layout.widget_fintrack_large, model, chartBitmap, appWidgetId);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Map<SizeF, RemoteViews> viewMapping = new ArrayMap<>();
+                viewMapping.put(new SizeF(110f, 110f), smallViews);
+                viewMapping.put(new SizeF(220f, 110f), mediumViews);
+                viewMapping.put(new SizeF(220f, 180f), largeViews);
+                appWidgetManager.updateAppWidget(appWidgetId, new RemoteViews(viewMapping));
+            } else {
+                int minWidth = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) : 0;
+                int maxHeight = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) : 0;
+                RemoteViews selectedViews;
+                if (minWidth > 0 && minWidth < 200) {
+                    selectedViews = smallViews;
+                } else if (maxHeight >= 170) {
+                    selectedViews = largeViews;
+                } else {
+                    selectedViews = mediumViews;
+                }
+                appWidgetManager.updateAppWidget(appWidgetId, selectedViews);
             }
         } catch (Exception e) {
-            views.setTextViewText(R.id.widget_cat_1, "• Makan");
-            views.setTextViewText(R.id.widget_cat_2, "• Transport");
-            views.setTextViewText(R.id.widget_cat_3, "• Belanja");
+            Log.e(TAG, "Failed to update widget id " + appWidgetId, e);
+        }
+    }
+
+    private static RemoteViews buildViews(Context context, Context locCtx, int layoutId, WidgetModel m, Bitmap chartOrNull, int appWidgetId) {
+        RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
+
+        // Header label & period
+        if (layoutId == R.layout.widget_fintrack_small) {
+            views.setTextViewText(R.id.widget_label, m.labelSmall);
+            views.setTextViewText(R.id.widget_period, m.periodSmall);
+        } else {
+            views.setTextViewText(R.id.widget_label, m.labelMediumLarge);
+            views.setTextViewText(R.id.widget_period, m.periodInline);
         }
 
-        // 8. Bottom Row: Action Button ("Catat Baru")
-        String displayBtn = btnText != null ? btnText : "Catat Baru";
-        if ("+ Catat".equals(displayBtn) || "Catat Baru".equals(displayBtn)) {
-            displayBtn = "Catat Baru";
-        } else if ("+ Add".equals(displayBtn) || "New Entry".equals(displayBtn)) {
-            displayBtn = "New Entry";
-        }
-        views.setTextViewText(R.id.widget_btn_add, displayBtn);
-
-        // Click on entire widget container opens the app
-        Intent openAppIntent = new Intent(context, MainActivity.class);
-        openAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingOpenIntent = PendingIntent.getActivity(
-                context,
-                0,
-                openAppIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-        views.setOnClickPendingIntent(R.id.widget_container, pendingOpenIntent);
-
-        // Click on Catat Baru button opens app directly with fintrack://quick-add
+        // PendingIntent for + button (quick add)
         Intent quickAddIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("fintrack://quick-add"));
         quickAddIntent.setClass(context, MainActivity.class);
         quickAddIntent.setPackage(context.getPackageName());
         quickAddIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingQuickAddIntent = PendingIntent.getActivity(
+        PendingIntent pendingQuickAdd = PendingIntent.getActivity(
                 context,
-                1,
+                appWidgetId * 10 + 1,
                 quickAddIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
-        views.setOnClickPendingIntent(R.id.widget_btn_add, pendingQuickAddIntent);
+        views.setOnClickPendingIntent(R.id.widget_btn_add, pendingQuickAdd);
 
-        appWidgetManager.updateAppWidget(appWidgetId, views);
-    }
+        // PendingIntent for whole container (open app)
+        Intent openAppIntent = new Intent(context, MainActivity.class);
+        openAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingOpen = PendingIntent.getActivity(
+                context,
+                appWidgetId * 10 + 0,
+                openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(android.R.id.background, pendingOpen);
 
-    /**
-     * Generate an offscreen Bitmap containing a multi-wave sparkline trend chart.
-     * Renders up to 3 overlapping Bezier wave curves (Net Worth with gradient fill, Income wave, Expense wave),
-     * glowing milestone dots, horizontal baseline divider, and 30-day timeline markers.
-     */
-    public static Bitmap createMultiWaveSparklineBitmap(String sparklineJson, String sparklineIncomeJson, String sparklineExpenseJson, int targetHeight) {
-        int width = 800;
-        int height = targetHeight > 0 ? targetHeight : 200;
-        float leftPadding = 25f;
-        float rightPadding = 25f;
-        float topPadding = 20f;
-        float bottomPadding = 36f;
-        float usableWidth = width - leftPadding - rightPadding;
-        float usableHeight = height - topPadding - bottomPadding;
-        float baselineY = topPadding + usableHeight;
-
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-
-        float[] netPoints = parsePoints(sparklineJson);
-        float[] incomePoints = parsePoints(sparklineIncomeJson);
-        float[] expensePoints = parsePoints(sparklineExpenseJson);
-
-        int len = netPoints != null ? netPoints.length : 0;
-        if (len < 2 && incomePoints != null && incomePoints.length >= 2) {
-            len = incomePoints.length;
-        }
-        if (len < 2) {
-            drawPlaceholderWave(canvas, width, height, leftPadding, usableWidth, usableHeight, topPadding, baselineY);
-            return bitmap;
+        // Hero Balance
+        if (layoutId == R.layout.widget_fintrack_small) {
+            views.setTextViewText(R.id.widget_balance, m.balanceSmall);
+        } else {
+            views.setTextViewText(R.id.widget_balance, m.balanceMediumLarge);
         }
 
-        float stepX = usableWidth / (len - 1);
+        // Flow row (medium & large only)
+        if (layoutId == R.layout.widget_fintrack_medium || layoutId == R.layout.widget_fintrack_large) {
+            if (m.hideBalance) {
+                views.setViewVisibility(R.id.widget_flow_row, View.GONE);
+            } else {
+                views.setViewVisibility(R.id.widget_flow_row, View.VISIBLE);
+                views.setTextViewText(R.id.widget_income_label, locCtx.getString(R.string.widget_income));
+                views.setTextViewText(R.id.widget_income_value, m.incomeDisplay);
+                views.setTextViewText(R.id.widget_expense_label, locCtx.getString(R.string.widget_expense));
+                views.setTextViewText(R.id.widget_expense_value, m.expenseDisplay);
 
-        // 1. Draw Expense Wave (Soft Rose / Coral) first (background layer)
-        if (expensePoints != null && expensePoints.length == len) {
-            drawWaveCurve(canvas, expensePoints, len, leftPadding, stepX, topPadding, usableHeight, baselineY,
-                    Color.argb(200, 251, 113, 133), // #FB7185
-                    Color.argb(25, 251, 113, 133),
-                    3.5f, false);
-        }
-
-        // 2. Draw Income Wave (Cyan / Teal) second
-        if (incomePoints != null && incomePoints.length == len) {
-            drawWaveCurve(canvas, incomePoints, len, leftPadding, stepX, topPadding, usableHeight, baselineY,
-                    Color.argb(220, 45, 212, 191), // #2DD4BF
-                    Color.argb(30, 45, 212, 191),
-                    3.5f, false);
-        }
-
-        // 3. Draw Net Worth Wave (Emerald / Sage) third (hero foreground layer with gradient fill)
-        if (netPoints != null && netPoints.length == len) {
-            drawWaveCurve(canvas, netPoints, len, leftPadding, stepX, topPadding, usableHeight, baselineY,
-                    Color.rgb(52, 211, 153), // #34D399 Vibrant emerald
-                    Color.argb(40, 16, 185, 129), // Rich fill gradient
-                    5.5f, true);
-
-            // Glowing milestone dots on hero curve (indices: day 6, day 18, and day len-1)
-            float[] pointsY = computeYCoordinates(netPoints, len, topPadding, usableHeight);
-            int[] milestones = new int[] {
-                    Math.min(len - 1, Math.max(1, len * 6 / 30)),
-                    Math.min(len - 1, Math.max(1, len * 18 / 30)),
-                    len - 1
-            };
-            for (int mIdx : milestones) {
-                float mx = leftPadding + mIdx * stepX;
-                float my = pointsY[mIdx];
-                drawGlowDot(canvas, mx, my, Color.rgb(52, 211, 153));
+                if (m.netSign != 0 && !m.netDisplay.isEmpty()) {
+                    views.setTextViewText(R.id.widget_net_value, m.netDisplay);
+                    views.setTextColor(R.id.widget_net_value, m.netSign > 0 ? locCtx.getColor(R.color.widget_income) : locCtx.getColor(R.color.widget_expense));
+                    views.setViewVisibility(R.id.widget_net_value, View.VISIBLE);
+                } else {
+                    views.setViewVisibility(R.id.widget_net_value, View.GONE);
+                }
             }
         }
 
-        // 4. Baseline divider line
-        Paint baselinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        baselinePaint.setColor(Color.argb(25, 255, 255, 255)); // 10% white
-        baselinePaint.setStrokeWidth(1.2f);
-        canvas.drawLine(leftPadding, baselineY, width - rightPadding, baselineY, baselinePaint);
+        // Chart (large only)
+        if (layoutId == R.layout.widget_fintrack_large) {
+            if (chartOrNull != null) {
+                views.setImageViewBitmap(R.id.widget_chart, chartOrNull);
+                views.setViewVisibility(R.id.widget_chart, View.VISIBLE);
+            } else {
+                views.setViewVisibility(R.id.widget_chart, View.GONE);
+            }
+        }
 
-        // 5. Timeline markers at baseline (30h lalu, 6, 12, 15, 20, 25, Hari ini)
-        drawTimelineMarkers(canvas, len, leftPadding, stepX, baselineY);
+        return views;
+    }
+
+    public static Bitmap renderTrendBitmap(Context ctx, String netPointsJson, int widthPx, int heightPx) {
+        if (widthPx <= 0) widthPx = 200;
+        if (heightPx <= 0) heightPx = 56;
+        Bitmap bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+
+        float density = ctx.getResources().getDisplayMetrics().density;
+        int hairlineColor = ctx.getColor(R.color.widget_hairline);
+        int incomeColor = ctx.getColor(R.color.widget_income);
+        int expenseColor = ctx.getColor(R.color.widget_expense);
+
+        float[] rawPoints = parsePoints(netPointsJson);
+        if (rawPoints == null || rawPoints.length < 2) {
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setStyle(Paint.Style.STROKE);
+            p.setColor(hairlineColor);
+            p.setStrokeWidth(1.0f * density);
+            float midY = heightPx / 2f;
+            canvas.drawLine(0f, midY, widthPx, midY, p);
+            return bitmap;
+        }
+
+        int len = rawPoints.length;
+        float[] cum = new float[len];
+        cum[0] = rawPoints[0];
+        boolean allZeros = (cum[0] == 0f);
+        for (int i = 1; i < len; i++) {
+            cum[i] = cum[i - 1] + rawPoints[i];
+            if (cum[i] != 0f) {
+                allZeros = false;
+            }
+        }
+
+        if (allZeros) {
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setStyle(Paint.Style.STROKE);
+            p.setColor(hairlineColor);
+            p.setStrokeWidth(1.0f * density);
+            float midY = heightPx / 2f;
+            canvas.drawLine(0f, midY, widthPx, midY, p);
+            return bitmap;
+        }
+
+        float minVal = 0f;
+        float maxVal = 0f;
+        for (float v : cum) {
+            if (v < minVal) minVal = v;
+            if (v > maxVal) maxVal = v;
+        }
+        float range = maxVal - minVal;
+        if (range <= 0.0001f) {
+            range = 1f;
+        }
+
+        float topInset = 4f * density;
+        float bottomInset = 4f * density;
+        float usableHeight = heightPx - topInset - bottomInset;
+        if (usableHeight <= 0f) usableHeight = heightPx;
+
+        // Draw zero baseline
+        float zeroY = topInset + (maxVal - 0f) / range * usableHeight;
+        Paint baselinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        baselinePaint.setStyle(Paint.Style.STROKE);
+        baselinePaint.setColor(hairlineColor);
+        baselinePaint.setStrokeWidth(1.0f * density);
+        canvas.drawLine(0f, zeroY, widthPx, zeroY, baselinePaint);
+
+        float dotRadius = 3.0f * density;
+        float horizontalPadding = dotRadius + 1.0f * density;
+        float leftPadding = horizontalPadding;
+        float rightPadding = horizontalPadding;
+        float usableWidth = widthPx - leftPadding - rightPadding;
+        if (usableWidth <= 0f) usableWidth = widthPx;
+        float stepX = usableWidth / (len - 1);
+
+        float[] pointsX = new float[len];
+        float[] pointsY = new float[len];
+        for (int i = 0; i < len; i++) {
+            pointsX[i] = leftPadding + i * stepX;
+            pointsY[i] = topInset + (maxVal - cum[i]) / range * usableHeight;
+        }
+
+        Path path = new Path();
+        path.moveTo(pointsX[0], pointsY[0]);
+        for (int i = 1; i < len; i++) {
+            float prevX = pointsX[i - 1];
+            float prevY = pointsY[i - 1];
+            float curX = pointsX[i];
+            float curY = pointsY[i];
+            float midX = (prevX + curX) / 2f;
+            path.cubicTo(midX, prevY, midX, curY, curX, curY);
+        }
+
+        int trendColor = (cum[len - 1] >= 0f) ? incomeColor : expenseColor;
+
+        Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+        linePaint.setStyle(Paint.Style.STROKE);
+        linePaint.setColor(trendColor);
+        linePaint.setStrokeWidth(1.5f * density);
+        linePaint.setStrokeCap(Paint.Cap.ROUND);
+        linePaint.setStrokeJoin(Paint.Join.ROUND);
+        canvas.drawPath(path, linePaint);
+
+        Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dotPaint.setStyle(Paint.Style.FILL);
+        dotPaint.setColor(trendColor);
+        canvas.drawCircle(pointsX[len - 1], pointsY[len - 1], dotRadius, dotPaint);
 
         return bitmap;
     }
@@ -442,283 +532,5 @@ public class FinTrackWidgetProvider extends AppWidgetProvider {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private static float[] computeYCoordinates(float[] values, int len, float topPadding, float usableHeight) {
-        float[] pointsY = new float[len];
-        float minVal = Float.MAX_VALUE;
-        float maxVal = -Float.MAX_VALUE;
-        for (int i = 0; i < len; i++) {
-            if (values[i] < minVal) minVal = values[i];
-            if (values[i] > maxVal) maxVal = values[i];
-        }
-        float range = maxVal - minVal;
-        for (int i = 0; i < len; i++) {
-            if (range <= 0.0001f) {
-                pointsY[i] = topPadding + usableHeight * 0.5f;
-            } else {
-                float normalized = (values[i] - minVal) / range;
-                // Leave 15% breathing room at top and bottom so curves don't clip
-                pointsY[i] = topPadding + (0.85f - normalized * 0.70f) * usableHeight;
-            }
-        }
-        return pointsY;
-    }
-
-    private static void drawWaveCurve(Canvas canvas, float[] values, int len, float leftPadding, float stepX,
-                                      float topPadding, float usableHeight, float baselineY,
-                                      int strokeColor, int fillColor, float strokeWidth, boolean drawFill) {
-        float[] pointsY = computeYCoordinates(values, len, topPadding, usableHeight);
-
-        Path linePath = new Path();
-        linePath.moveTo(leftPadding, pointsY[0]);
-
-        for (int i = 1; i < len; i++) {
-            float prevX = leftPadding + (i - 1) * stepX;
-            float prevY = pointsY[i - 1];
-            float curX = leftPadding + i * stepX;
-            float curY = pointsY[i];
-            float midX = (prevX + curX) / 2f;
-            linePath.cubicTo(midX, prevY, midX, curY, curX, curY);
-        }
-
-        if (drawFill) {
-            Path fillPath = new Path(linePath);
-            fillPath.lineTo(leftPadding + (len - 1) * stepX, baselineY);
-            fillPath.lineTo(leftPadding, baselineY);
-            fillPath.close();
-
-            LinearGradient gradient = new LinearGradient(
-                    0f, topPadding, 0f, baselineY,
-                    fillColor, Color.TRANSPARENT, Shader.TileMode.CLAMP
-            );
-            Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-            fillPaint.setStyle(Paint.Style.FILL);
-            fillPaint.setShader(gradient);
-            canvas.drawPath(fillPath, fillPaint);
-
-            // Layered glow effect under hero line
-            Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-            glowPaint.setStyle(Paint.Style.STROKE);
-            glowPaint.setColor(Color.argb(45, Color.red(strokeColor), Color.green(strokeColor), Color.blue(strokeColor)));
-            glowPaint.setStrokeWidth(strokeWidth * 2.2f);
-            glowPaint.setStrokeCap(Paint.Cap.ROUND);
-            glowPaint.setStrokeJoin(Paint.Join.ROUND);
-            canvas.drawPath(linePath, glowPaint);
-        }
-
-        // Crisp core curve
-        Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
-        linePaint.setStyle(Paint.Style.STROKE);
-        linePaint.setColor(strokeColor);
-        linePaint.setStrokeWidth(strokeWidth);
-        linePaint.setStrokeCap(Paint.Cap.ROUND);
-        linePaint.setStrokeJoin(Paint.Join.ROUND);
-        canvas.drawPath(linePath, linePaint);
-    }
-
-    private static void drawGlowDot(Canvas canvas, float x, float y, int color) {
-        // Outer halo ring
-        Paint haloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        haloPaint.setStyle(Paint.Style.FILL);
-        haloPaint.setColor(Color.argb(45, Color.red(color), Color.green(color), Color.blue(color)));
-        canvas.drawCircle(x, y, 14f, haloPaint);
-
-        // Middle soft ring
-        Paint midPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        midPaint.setStyle(Paint.Style.FILL);
-        midPaint.setColor(Color.argb(90, Color.red(color), Color.green(color), Color.blue(color)));
-        canvas.drawCircle(x, y, 8f, midPaint);
-
-        // Inner solid ring
-        Paint innerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        innerPaint.setStyle(Paint.Style.FILL);
-        innerPaint.setColor(color);
-        canvas.drawCircle(x, y, 5f, innerPaint);
-
-        // Core white center
-        Paint corePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        corePaint.setStyle(Paint.Style.FILL);
-        corePaint.setColor(Color.WHITE);
-        canvas.drawCircle(x, y, 2.5f, corePaint);
-    }
-
-    private static void drawTimelineMarkers(Canvas canvas, int len, float leftPadding, float stepX, float baselineY) {
-        Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        tickPaint.setColor(Color.argb(35, 255, 255, 255));
-        tickPaint.setStrokeWidth(1.2f);
-
-        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(Color.parseColor("#64748B")); // Muted slate
-        textPaint.setTextSize(17f);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
-
-        int[] dayIndices = new int[] { 0, 5, 11, 14, 19, 24, len - 1 };
-        String[] labels = new String[] { "30h lalu", "6", "12", "15", "20", "25", "Hari ini" };
-
-        for (int i = 0; i < dayIndices.length; i++) {
-            int idx = dayIndices[i];
-            if (idx >= len) continue;
-            float x = leftPadding + idx * stepX;
-            canvas.drawLine(x, baselineY, x, baselineY + 4f, tickPaint);
-            canvas.drawText(labels[i], x, baselineY + 20f, textPaint);
-        }
-    }
-
-    private static void drawPlaceholderWave(Canvas canvas, int width, int height, float leftPadding, float usableWidth, float usableHeight, float topPadding, float baselineY) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setStyle(Paint.Style.STROKE);
-        p.setColor(Color.argb(45, 134, 168, 121));
-        p.setStrokeWidth(3f);
-
-        Path path = new Path();
-        float startY = topPadding + usableHeight * 0.5f;
-        path.moveTo(leftPadding, startY);
-        path.cubicTo(leftPadding + usableWidth * 0.33f, topPadding + usableHeight * 0.3f,
-                leftPadding + usableWidth * 0.66f, topPadding + usableHeight * 0.7f,
-                leftPadding + usableWidth, startY);
-        canvas.drawPath(path, p);
-    }
-
-    /**
-     * Generate an offscreen Bitmap containing a semicircular gauge for top 3 expense categories.
-     * Features a 180° speedometer-style arc with colored pill segments and subtle inner concentric ring.
-     */
-    public static Bitmap createCategoryGaugeBitmap(String topCategoriesJson) {
-        int width = 160;
-        int height = 110;
-        float centerX = width / 2f;
-        float centerY = 95f;
-        float radius = 62f;
-        float strokeWidth = 16f;
-
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-
-        RectF arcRect = new RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
-
-        // 1. Draw subtle background track (180 degrees semicircle)
-        Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        trackPaint.setStyle(Paint.Style.STROKE);
-        trackPaint.setStrokeWidth(strokeWidth);
-        trackPaint.setStrokeCap(Paint.Cap.ROUND);
-        trackPaint.setColor(Color.argb(35, 255, 255, 255)); // 14% translucent white track
-        canvas.drawArc(arcRect, 180f, 180f, false, trackPaint);
-
-        // 2. Parse top categories
-        int p1 = 45, p2 = 30, p3 = 25;
-        int c1 = Color.parseColor("#2DD4BF"); // Teal
-        int c2 = Color.parseColor("#38BDF8"); // Sky
-        int c3 = Color.parseColor("#FB923C"); // Amber
-
-        try {
-            JSONArray arr = new JSONArray(topCategoriesJson != null ? topCategoriesJson : "[]");
-            if (arr.length() > 0) {
-                JSONObject o1 = arr.optJSONObject(0);
-                if (o1 != null) {
-                    p1 = o1.optInt("percentage", 45);
-                    String col = o1.optString("color", null);
-                    if (col != null && col.startsWith("#")) {
-                        try { c1 = Color.parseColor(col); } catch (Exception ignored) {}
-                    }
-                }
-            }
-            if (arr.length() > 1) {
-                JSONObject o2 = arr.optJSONObject(1);
-                if (o2 != null) {
-                    p2 = o2.optInt("percentage", 30);
-                    String col = o2.optString("color", null);
-                    if (col != null && col.startsWith("#")) {
-                        try { c2 = Color.parseColor(col); } catch (Exception ignored) {}
-                    }
-                }
-            } else {
-                p2 = 0;
-            }
-            if (arr.length() > 2) {
-                JSONObject o3 = arr.optJSONObject(2);
-                if (o3 != null) {
-                    p3 = o3.optInt("percentage", 25);
-                    String col = o3.optString("color", null);
-                    if (col != null && col.startsWith("#")) {
-                        try { c3 = Color.parseColor(col); } catch (Exception ignored) {}
-                    }
-                }
-            } else {
-                p3 = 0;
-            }
-        } catch (Exception ignored) {}
-
-        int totalP = p1 + p2 + p3;
-        if (totalP <= 0) {
-            totalP = 100;
-            p1 = 45; p2 = 30; p3 = 25;
-        }
-
-        float sweep1 = (p1 / (float) totalP) * 180f;
-        float sweep2 = (p2 / (float) totalP) * 180f;
-        float sweep3 = (p3 / (float) totalP) * 180f;
-
-        // Draw segmented colored arcs
-        float curAngle = 180f;
-
-        Paint segPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        segPaint.setStyle(Paint.Style.STROKE);
-        segPaint.setStrokeWidth(strokeWidth);
-        segPaint.setStrokeCap(Paint.Cap.ROUND);
-
-        float gap = 3.5f;
-
-        if (sweep1 > gap) {
-            segPaint.setColor(c1);
-            canvas.drawArc(arcRect, curAngle + (gap / 2f), sweep1 - gap, false, segPaint);
-        }
-        curAngle += sweep1;
-
-        if (sweep2 > gap) {
-            segPaint.setColor(c2);
-            canvas.drawArc(arcRect, curAngle + (gap / 2f), sweep2 - gap, false, segPaint);
-        }
-        curAngle += sweep2;
-
-        if (sweep3 > gap) {
-            segPaint.setColor(c3);
-            canvas.drawArc(arcRect, curAngle + (gap / 2f), sweep3 - gap, false, segPaint);
-        }
-
-        // Inner decorative concentric arc
-        Paint innerRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        innerRingPaint.setStyle(Paint.Style.STROKE);
-        innerRingPaint.setStrokeWidth(2f);
-        innerRingPaint.setColor(Color.argb(25, 255, 255, 255));
-        RectF innerRect = new RectF(centerX - 40f, centerY - 40f, centerX + 40f, centerY + 40f);
-        canvas.drawArc(innerRect, 180f, 180f, false, innerRingPaint);
-
-        // Center typography: "TOP 3"
-        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(Color.parseColor("#94A3B8"));
-        textPaint.setTextSize(16f);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        canvas.drawText("TOP 3", centerX, centerY - 8f, textPaint);
-
-        return bitmap;
-    }
-
-    public static Bitmap createSparklineBitmap(String sparklineJson) {
-        return createMultiWaveSparklineBitmap(sparklineJson, null, null, 200);
-    }
-
-    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson) {
-        return createMultiWaveSparklineBitmap(sparklineJson, null, null, 200);
-    }
-
-    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, int targetHeight) {
-        return createMultiWaveSparklineBitmap(sparklineJson, null, null, targetHeight);
-    }
-
-    public static Bitmap createSparklineBitmap(String sparklineJson, String sparklineDatesJson, String todayNet, float todayNetVal) {
-        return createMultiWaveSparklineBitmap(sparklineJson, null, null, 200);
     }
 }

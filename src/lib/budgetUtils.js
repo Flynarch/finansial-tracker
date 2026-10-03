@@ -15,9 +15,13 @@ export { roundCurrency }
  */
 export function getCurrentBudgetMonthKey(date = new Date(), startDay = 1) {
   const safeDate = date instanceof Date && !isNaN(date.getTime()) ? date : new Date()
-  const safeDay = Math.min(28, Math.max(1, Math.floor(Number(startDay) || 1)))
-  if (safeDay > 1 && safeDate.getDate() >= safeDay) {
-    return format(addMonths(safeDate, 1), 'yyyy-MM')
+  const safeDay = Math.min(31, Math.max(1, Math.floor(Number(startDay) || 1)))
+  if (safeDay > 1) {
+    const maxDaysInMonth = new Date(safeDate.getFullYear(), safeDate.getMonth() + 1, 0).getDate()
+    const effectiveStartDay = Math.min(safeDay, maxDaysInMonth)
+    if (safeDate.getDate() >= effectiveStartDay) {
+      return format(addMonths(startOfMonth(safeDate), 1), 'yyyy-MM')
+    }
   }
   return format(safeDate, 'yyyy-MM')
 }
@@ -101,12 +105,12 @@ export function calculateBudgetSpent(budgetCategory, monthExpenseTxs, defaultCur
 /**
  * Calculate the date range for a given budget month and custom start day (payday cycle).
  * @param {string} monthStr - Month in 'yyyy-MM' format (e.g. '2026-03')
- * @param {number} [startDay=1] - Cycle start day (1-28). Default 1.
+ * @param {number} [startDay=1] - Cycle start day (1-31). Default 1.
  * @param {string} [locale='id'] - 'id' or 'en'
  * @returns {{ startDate: string, endDate: string, label: string, isCustomCycle: boolean }}
  */
 export function getBudgetPeriodDateRange(monthStr, startDay = 1, locale = 'id') {
-  const safeDay = Math.min(28, Math.max(1, Math.floor(Number(startDay) || 1)))
+  const safeDay = Math.min(31, Math.max(1, Math.floor(Number(startDay) || 1)))
   const dateLocale = String(locale || '').toLowerCase().startsWith('en') ? enUS : idLocale
 
   let targetYear = new Date().getFullYear()
@@ -132,9 +136,17 @@ export function getBudgetPeriodDateRange(monthStr, startDay = 1, locale = 'id') 
     return { startDate, endDate, label, isCustomCycle: false }
   }
 
-  // Payday cycle: starts on safeDay of previous month, ends on (safeDay - 1) of target month
-  const start = new Date(targetYear, targetMonthIndex - 1, safeDay)
-  const end = new Date(targetYear, targetMonthIndex, safeDay - 1)
+  // Payday cycle: starts on safeDay of previous month, ends on the day before next cycle starts
+  // Clamped to maximum days in respective months to prevent month skipping and overlapping on days 29, 30, 31
+  const maxDaysPrev = new Date(targetYear, targetMonthIndex, 0).getDate()
+  const actualStartDay = Math.min(safeDay, maxDaysPrev)
+  const start = new Date(targetYear, targetMonthIndex - 1, actualStartDay)
+
+  const maxDaysTarget = new Date(targetYear, targetMonthIndex + 1, 0).getDate()
+  const nextCycleStartDay = Math.min(safeDay, maxDaysTarget)
+  const actualEndDay = nextCycleStartDay - 1
+  const end = new Date(targetYear, targetMonthIndex, actualEndDay)
+
   const startDate = format(start, 'yyyy-MM-dd')
   const endDate = format(end, 'yyyy-MM-dd')
   const label = `${format(start, 'd MMM', { locale: dateLocale })} - ${format(end, 'd MMM yyyy', { locale: dateLocale })}`

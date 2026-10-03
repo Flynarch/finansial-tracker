@@ -27,9 +27,35 @@ const PATTERN_DOTS = [
 
 function LockScreen({ onUnlock }) {
   const { t } = useTranslation()
-  const securityMethod = useSettingsStore((s) => s.securityMethod || 'biometric')
+  const rawSecurityMethod = useSettingsStore((s) => s.securityMethod)
+  const storedPin = useSettingsStore((s) => s.storedPin)
   const lockSecret = useSettingsStore((s) => s.lockSecret || '')
   const biometricEnabled = useSettingsStore((s) => s.biometricEnabled !== false)
+  const unlock = useSettingsStore((s) => s.unlock)
+
+  // Resolve effective security method:
+  // If 'none' or not in ['pin', 'pattern', 'biometric'], determine fallback based on storedPin/lockSecret
+  let computedMethod = rawSecurityMethod
+  if (!computedMethod || computedMethod === 'none' || !['pin', 'pattern', 'biometric'].includes(computedMethod)) {
+    if (storedPin || (lockSecret && !lockSecret.includes('-'))) {
+      computedMethod = 'pin'
+    } else if (lockSecret && lockSecret.includes('-')) {
+      computedMethod = 'pattern'
+    } else {
+      computedMethod = 'none'
+    }
+  }
+
+  const [modeOverride, setModeOverride] = useState(null)
+  const securityMethod = modeOverride || computedMethod
+
+  // Safety guard: If no method configured or no secret exists at all, unlock immediately
+  useEffect(() => {
+    if (computedMethod === 'none') {
+      onUnlock?.()
+      unlock?.()
+    }
+  }, [computedMethod, onUnlock, unlock])
 
   const [error, setError] = useState('')
   const [isAuthenticating, setIsAuthenticating] = useState(false)
@@ -40,6 +66,22 @@ function LockScreen({ onUnlock }) {
   const [isShaking, setIsShaking] = useState(false)
   const [isBioFilling, setIsBioFilling] = useState(false)
   const [bioFillCount, setBioFillCount] = useState(0)
+  const [failedAttempts, setFailedAttempts] = useState(0)
+  const [lockoutSeconds, setLockoutSeconds] = useState(0)
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return undefined
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          setError('')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [lockoutSeconds])
 
   // Pattern state
   const [patternPath, setPatternPath] = useState([])
@@ -162,7 +204,7 @@ function LockScreen({ onUnlock }) {
 
   // Automatically prompt native biometric/device passcode on mount AT MOST ONCE if biometric enabled
   useEffect(() => {
-    if (!biometricEnabled || hasAutoPromptedRef.current) return
+    if (securityMethod === 'none' || !biometricEnabled || hasAutoPromptedRef.current) return
     hasAutoPromptedRef.current = true
     const timer = setTimeout(() => {
       if (isMountedRef.current) {
@@ -170,11 +212,11 @@ function LockScreen({ onUnlock }) {
       }
     }, 280)
     return () => clearTimeout(timer)
-  }, [biometricEnabled])
+  }, [biometricEnabled, securityMethod])
 
   // Handle PIN digit input
   const handlePinDigit = async (digit) => {
-    if (isBioFilling || isSuccessUnlocked) return
+    if (isBioFilling || isSuccessUnlocked || lockoutSeconds > 0) return
     triggerHaptic('light')
     setError('')
 
@@ -182,17 +224,25 @@ function LockScreen({ onUnlock }) {
     setPinInput(nextPin)
 
     if (nextPin.length === 4) {
-      const isMatch = await verifyPin(nextPin, lockSecret)
+      const isMatch = await verifyPin(nextPin, lockSecret || storedPin)
       if (isMatch) {
         triggerHaptic('success')
         setIsSuccessUnlocked(true)
+        setFailedAttempts(0)
         setTrackedTimeout(() => {
           onUnlock()
         }, 300)
       } else {
         triggerHaptic('warning')
         setIsShaking(true)
-        setError(t('lock.incorrectPin', 'PIN salah'))
+        const nextFailed = failedAttempts + 1
+        setFailedAttempts(nextFailed)
+        if (nextFailed >= 5) {
+          setLockoutSeconds(30)
+          setError(t('lock.tooManyAttempts', 'Terlalu banyak percobaan salah. Coba lagi dalam 30 detik.'))
+        } else {
+          setError(t('lock.incorrectPin', 'PIN salah'))
+        }
         setTrackedTimeout(() => {
           setPinInput('')
           setIsShaking(false)
@@ -202,7 +252,7 @@ function LockScreen({ onUnlock }) {
   }
 
   const handlePinDelete = () => {
-    if (isBioFilling || isSuccessUnlocked) return
+    if (isBioFilling || isSuccessUnlocked || lockoutSeconds > 0) return
     triggerHaptic('selection')
     setError('')
     setPinInput((prev) => prev.slice(0, -1))
@@ -226,7 +276,7 @@ function LockScreen({ onUnlock }) {
   }
 
   const handlePatternStart = (e) => {
-    if (isSuccessUnlocked) return
+    if (isSuccessUnlocked || lockoutSeconds > 0) return
     setError('')
     const pt = getSvgPoint(e)
     if (!pt) return
@@ -242,7 +292,7 @@ function LockScreen({ onUnlock }) {
   }
 
   const handlePatternMove = (e) => {
-    if (!isDrawingPattern || isSuccessUnlocked) return
+    if (!isDrawingPattern || isSuccessUnlocked || lockoutSeconds > 0) return
     const pt = getSvgPoint(e)
     if (!pt) return
     setCursorPos(pt)
@@ -255,22 +305,30 @@ function LockScreen({ onUnlock }) {
   }
 
   const handlePatternEnd = async () => {
-    if (!isDrawingPattern || isSuccessUnlocked) return
+    if (!isDrawingPattern || isSuccessUnlocked || lockoutSeconds > 0) return
     setIsDrawingPattern(false)
     setCursorPos(null)
 
     if (patternPath.length === 0) return
 
     const drawnStr = patternPath.join('-')
-    const isMatch = !lockSecret || (await verifyPin(drawnStr, lockSecret))
+    const isMatch = Boolean(lockSecret) && (await verifyPin(drawnStr, lockSecret))
     if (isMatch) {
       triggerHaptic('success')
       setIsSuccessUnlocked(true)
+      setFailedAttempts(0)
       setTrackedTimeout(() => onUnlock(), 300)
     } else {
       triggerHaptic('warning')
       setIsShaking(true)
-      setError(t('lock.incorrectPattern', 'Pola salah'))
+      const nextFailed = failedAttempts + 1
+      setFailedAttempts(nextFailed)
+      if (nextFailed >= 5) {
+        setLockoutSeconds(30)
+        setError(t('lock.tooManyAttempts', 'Terlalu banyak percobaan salah. Coba lagi dalam 30 detik.'))
+      } else {
+        setError(t('lock.incorrectPattern', 'Pola salah'))
+      }
       setTrackedTimeout(() => {
         setPatternPath([])
         setIsShaking(false)
@@ -312,10 +370,14 @@ function LockScreen({ onUnlock }) {
         </p>
 
         {/* Error Alert */}
-        {error ? (
+        {error || lockoutSeconds > 0 ? (
           <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-bold text-rose-500 animate-fadeIn">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{error}</span>
+            <span>
+              {lockoutSeconds > 0
+                ? `${t('lock.tooManyAttempts', 'Terlalu banyak percobaan salah.')} (${lockoutSeconds}s)`
+                : error}
+            </span>
           </p>
         ) : (
           <div className="h-4 mt-2" />
@@ -357,7 +419,7 @@ function LockScreen({ onUnlock }) {
                       key={idx}
                       type="button"
                       onClick={handleBiometricUnlock}
-                      disabled={isAuthenticating || isSuccessUnlocked || isBioFilling}
+                      disabled={isAuthenticating || isSuccessUnlocked || isBioFilling || lockoutSeconds > 0}
                       className="h-14 w-14 rounded-2xl flex items-center justify-center text-[var(--lock)] hover:bg-[var(--lock-soft)] border border-transparent hover:border-[var(--lock)]/25 transition active:scale-90 cursor-pointer mx-auto"
                       aria-label={t('settings.biometricAuth', 'Verifikasi Biometrik')}
                     >
@@ -371,7 +433,7 @@ function LockScreen({ onUnlock }) {
                       key={idx}
                       type="button"
                       onClick={handlePinDelete}
-                      disabled={pinInput.length === 0 || isBioFilling || isSuccessUnlocked}
+                      disabled={pinInput.length === 0 || isBioFilling || isSuccessUnlocked || lockoutSeconds > 0}
                       className="h-14 w-14 rounded-2xl flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-90 cursor-pointer disabled:opacity-30 disabled:pointer-events-none mx-auto"
                       aria-label={t('common.delete', 'Hapus')}
                     >
@@ -384,7 +446,7 @@ function LockScreen({ onUnlock }) {
                     key={idx}
                     type="button"
                     onClick={() => handlePinDigit(item)}
-                    disabled={isBioFilling || isSuccessUnlocked}
+                    disabled={isBioFilling || isSuccessUnlocked || lockoutSeconds > 0}
                     className="h-14 w-14 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 text-[var(--fg)] text-xl font-black transition-all hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)] active:scale-90 active:bg-[var(--lock-soft)] active:text-[var(--lock)] cursor-pointer shadow-2xs mx-auto flex items-center justify-center"
                   >
                     {item}
@@ -501,7 +563,7 @@ function LockScreen({ onUnlock }) {
 
         {/* ── MODE 3: BIOMETRIC ONLY ── */}
         {securityMethod === 'biometric' && (
-          <div className="mt-4 w-full">
+          <div className="mt-4 w-full space-y-2.5">
             <button
               type="button"
               onClick={handleBiometricUnlock}
@@ -514,6 +576,33 @@ function LockScreen({ onUnlock }) {
                   ? t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
                   : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
               </span>
+            </button>
+            {(storedPin || lockSecret) && (
+              <button
+                type="button"
+                onClick={() => setModeOverride(storedPin || !lockSecret.includes('-') ? 'pin' : 'pattern')}
+                className="flex items-center justify-center gap-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-4 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
+              >
+                <Lock className="h-4 w-4 text-[var(--muted)]" />
+                <span>{t('lock.unlockWithPin', 'Buka dengan PIN / Sandi')}</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── MODE 4: UNCONFIGURED / EMERGENCY UNLOCK ── */}
+        {securityMethod === 'none' && (
+          <div className="mt-4 w-full">
+            <button
+              type="button"
+              onClick={() => {
+                onUnlock?.()
+                unlock?.()
+              }}
+              className="flex items-center justify-center gap-2 w-full rounded-2xl bg-[var(--fg)] py-4 px-4 text-xs font-extrabold text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer"
+            >
+              <Lock className="h-5 w-5" />
+              <span>{t('lock.unlockBtn', 'Buka Aplikasi')}</span>
             </button>
           </div>
         )}

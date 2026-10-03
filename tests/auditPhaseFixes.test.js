@@ -335,13 +335,13 @@ describe('Audit Phase 1-3 Fixes Verification', () => {
         date: '2026-03-01',
       })
 
-      const b1 = await db.budgets.add({
+      await db.budgets.add({
         category: 'custom_cat',
         limit: 500000,
         month: '2026-03',
       })
 
-      const b2 = await db.budgets.add({
+      await db.budgets.add({
         category: 'custom_cat/sub1',
         limit: 200000,
         month: '2026-03',
@@ -363,7 +363,10 @@ describe('Audit Phase 1-3 Fixes Verification', () => {
       expect(updated2.category).toBe('lainnya_kategori/umum')
 
       const budgets = await db.budgets.toArray()
-      expect(budgets.some((b) => b.id === b1 || b.id === b2)).toBe(false)
+      expect(budgets.some((b) => b.category === 'custom_cat' || b.category.startsWith('custom_cat/'))).toBe(false)
+      const fallbackBudget = budgets.find((b) => b.category === 'lainnya_kategori/umum' && b.month === '2026-03')
+      expect(fallbackBudget).toBeDefined()
+      expect(fallbackBudget.limit).toBe(700000)
 
       const updatedRTx = await db.recurringTransactions.get(rTx)
       expect(updatedRTx.category).toBe('lainnya_kategori/umum')

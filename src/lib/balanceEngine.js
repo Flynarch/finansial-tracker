@@ -1,5 +1,6 @@
 import { db, computeWalletBalance, computeAllWalletBalances } from './db'
 import { scheduleNativeWidgetSync } from './nativeWidgetSync'
+import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
 
 /**
  * In-memory balance cache to avoid redundant recalculation
@@ -123,6 +124,7 @@ export async function invalidateWalletBalance(walletIds) {
       pendingInvalidations.delete(cleanId)
     }
   }
+  clearCachedDashboardState()
   scheduleNativeWidgetSync()
 }
 
@@ -138,6 +140,7 @@ export async function invalidateAllBalances() {
   } catch (err) {
     console.warn('[balanceEngine] Failed to clear walletBalanceCache:', err)
   }
+  clearCachedDashboardState()
   scheduleNativeWidgetSync()
 }
 

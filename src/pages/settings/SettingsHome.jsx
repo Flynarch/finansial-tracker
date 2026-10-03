@@ -184,92 +184,100 @@ export default function SettingsHome() {
 
   const executePerformLogout = async () => {
     try {
+      const e2eePhrase = getSessionMnemonicPhrase()
+      const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
+
       const backup = await exportAllDataAsJson().catch(() => null)
       if (backup && authUserId) {
         const hasData = (backup.transactions && backup.transactions.length > 0) || (backup.wallets && backup.wallets.length > 0)
-        if (hasData) {
-          const e2eePhrase = getSessionMnemonicPhrase()
-          const isE2eeActive = Boolean(e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12)
+        if (hasData && isE2eeActive) {
+          let uploadPayload = null
 
-          if (isE2eeActive) {
-            let uploadPayload = null
+          try {
+            uploadPayload = await exportAllDataAsEncryptedEnvelope(e2eePhrase.trim())
+          } catch (err) {
+            console.error('Failed to encrypt backup envelope for E2EE cloud backup, aborting upload to protect privacy:', err)
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('ft-show-toast', {
+                  detail: {
+                    title: t('settings.security.e2eeEncryptFailedTitle', 'Enkripsi Gagal'),
+                    message: t(
+                      'settings.security.e2eeEncryptFailedMsg',
+                      'Gagal mengenkripsi data cadangan E2EE. Unggahan ke cloud dibatalkan untuk menjaga keamanan.',
+                    ),
+                    type: 'danger',
+                  },
+                })
+              )
+            }
+            return
+          }
+
+          if (uploadPayload) {
             try {
-              uploadPayload = await exportAllDataAsEncryptedEnvelope(e2eePhrase.trim())
+              const uploadRes = await Promise.race([
+                uploadLatestBackup(authUserId, uploadPayload, { isEncrypted: true }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 15000)),
+              ])
+              if (!uploadRes) {
+                throw new Error('BACKUP_FAILED')
+              }
             } catch (err) {
-              console.error('Failed to encrypt backup envelope for E2EE cloud backup, aborting upload to protect privacy:', err)
+              console.warn('[SettingsHome] Cloud backup before logout failed:', err)
               if (typeof window !== 'undefined') {
+                const errorKey = err?.message === 'TIMEOUT' ? 'profile.cloud.err.timeout' : (err?.i18nKey || firebaseErrorToI18nKey(err) || 'profile.cloud.err.generic')
                 window.dispatchEvent(
                   new CustomEvent('ft-show-toast', {
                     detail: {
-                      title: t('settings.security.e2eeEncryptFailedTitle', 'Enkripsi Gagal'),
-                      message: t(
-                        'settings.security.e2eeEncryptFailedMsg',
-                        'Gagal mengenkripsi data cadangan E2EE. Unggahan ke cloud dibatalkan untuk menjaga keamanan.',
-                      ),
+                      title: t('common.error', 'Terjadi Kesalahan'),
+                      message: t(errorKey, 'Gagal mencadangkan data ke cloud. Logout dibatalkan agar data lokal Anda tidak hilang.'),
                       type: 'danger',
                     },
                   })
                 )
               }
-            }
-
-            if (uploadPayload) {
-              await Promise.race([
-                uploadLatestBackup(authUserId, uploadPayload, { isEncrypted: true }),
-                new Promise((resolve) => setTimeout(resolve, 7000)),
-              ]).catch((err) => {
-                if (typeof window !== 'undefined') {
-                  const errorKey = err ? (err.i18nKey || firebaseErrorToI18nKey(err)) : 'profile.cloud.err.generic'
-                  window.dispatchEvent(
-                    new CustomEvent('ft-show-toast', {
-                      detail: {
-                        title: t('common.error', 'Terjadi Kesalahan'),
-                        message: t(errorKey),
-                        type: 'danger',
-                      },
-                    })
-                  )
-                }
-              })
+              // ABORT LOGOUT to protect local data from being wiped!
+              return
             }
           }
         }
       }
 
-      // Safely clear financial and feature data tables without deleting settings configuration
-      const dataTables = [
-        db.transactions,
-        db.investments,
-        db.investmentOrders,
-        db.budgets,
-        db.goals,
-        db.goalLogs,
-        db.calendarEvents,
-        db.recurringTransactions,
-        db.todos,
-        db.sub_tasks,
-        db.habits,
-        db.habitLogs,
-        db.ideas,
-        db.board_links,
-        db.notifications,
-        db.wallets,
-        db.loans,
-        db.loanPayments,
-        db.walletBalanceCache,
-      ]
-      await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch((err) => console.warn('[SettingsHome]', err))))
-      clearFinancialLocalStorage()
-    } catch (err){
-      console.warn('[SettingsHome]', err)
-      /* ignore */
-    } finally {
+      // Safely clear financial and feature data tables only if user has an active E2EE cloud backup
+      // If user does not have E2EE, preserve local data on this device so records are not lost
+      if (isE2eeActive) {
+        const dataTables = [
+          db.transactions,
+          db.investments,
+          db.investmentOrders,
+          db.budgets,
+          db.goals,
+          db.goalLogs,
+          db.calendarEvents,
+          db.recurringTransactions,
+          db.todos,
+          db.sub_tasks,
+          db.habits,
+          db.habitLogs,
+          db.ideas,
+          db.board_links,
+          db.notifications,
+          db.wallets,
+          db.loans,
+          db.loanPayments,
+          db.walletBalanceCache,
+        ]
+        await Promise.all(dataTables.map((tbl) => tbl?.clear?.().catch((err) => console.warn('[SettingsHome]', err))))
+        clearFinancialLocalStorage()
+      }
+
       await signOutCurrentUser().catch((err) => console.warn('[SettingsHome]', err))
       try {
         localStorage.removeItem('ft_onboarding_seen_v1')
         localStorage.removeItem('ft_onboarding_progress')
       } catch (err){
-      console.warn('[SettingsHome]', err)
+        console.warn('[SettingsHome]', err)
         /* ignore */
       }
       clearSessionMnemonicPhrase()
@@ -283,6 +291,9 @@ export default function SettingsHome() {
         emailVerified: false,
       }).catch((err) => console.warn('[SettingsHome]', err))
       navigate('/dashboard', { replace: true })
+    } catch (err){
+      console.warn('[SettingsHome]', err)
+      /* ignore */
     }
   }
 

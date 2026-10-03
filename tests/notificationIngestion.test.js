@@ -13,6 +13,7 @@ import {
   cleanSuspectPromoTransactions,
   parseAmountFromRegexMatch,
   extractTransactionRef,
+  syncHistoricalSms,
 } from '../src/lib/notificationIngestion'
 import { db } from '../src/lib/db'
 
@@ -21,6 +22,8 @@ describe('notificationIngestion - 3-Tier Parsing Cascade', () => {
     expect(parseAmountFromRegexMatch('50.000,00')).toBe(50000)
     expect(parseAmountFromRegexMatch('1.500.000,00')).toBe(1500000)
     expect(parseAmountFromRegexMatch('25000.00')).toBe(25000)
+    expect(parseAmountFromRegexMatch('12.345,50')).toBe(12345.5)
+    expect(parseAmountFromRegexMatch('12.345.50')).toBe(12345.5)
 
     const bcaWithSen = parseWithBankRegex(
       'm-BCA',
@@ -680,6 +683,47 @@ describe('notificationIngestion - DANA Mutation Ingestion & Classification', () 
     expect(parsed.amount).toBe(10000)
     expect(parsed.type).toBe('income')
   })
+
+  it('correctly parses QRIS refund and pengembalian dana as income', () => {
+    const refundNotif = {
+      title: 'DANA',
+      text: 'Pengembalian dana pembayaran QRIS Fore Coffee sebesar Rp 50.000 berhasil',
+      packageName: 'id.dana',
+      timestamp: Date.now(),
+    }
+    expect(isFinancialMutation(refundNotif.title, refundNotif.text, refundNotif.packageName)).toBe(true)
+    const parsed = parseFinancialNotification(refundNotif)
+    expect(parsed).not.toBeNull()
+    expect(parsed.institution).toBe('DANA')
+    expect(parsed.amount).toBe(50000)
+    expect(parsed.type).toBe('income')
+
+    const shopeeRefund = {
+      title: 'ShopeePay',
+      text: 'Pengembalian dana pembayaran ShopeePay sebesar Rp 25.000 berhasil',
+      packageName: 'com.shopee.id',
+      timestamp: Date.now(),
+    }
+    expect(isFinancialMutation(shopeeRefund.title, shopeeRefund.text, shopeeRefund.packageName)).toBe(true)
+    const parsedShopee = parseFinancialNotification(shopeeRefund)
+    expect(parsedShopee).not.toBeNull()
+    expect(parsedShopee.institution).toBe('ShopeePay')
+    expect(parsedShopee.amount).toBe(25000)
+    expect(parsedShopee.type).toBe('income')
+
+    const gopayRefund = {
+      title: 'GoPay',
+      text: 'Pengembalian dana Rp 30.000 berhasil masuk ke saldo',
+      packageName: 'com.gojek.app',
+      timestamp: Date.now(),
+    }
+    expect(isFinancialMutation(gopayRefund.title, gopayRefund.text, gopayRefund.packageName)).toBe(true)
+    const parsedGopay = parseFinancialNotification(gopayRefund)
+    expect(parsedGopay).not.toBeNull()
+    expect(parsedGopay.institution).toBe('GoPay')
+    expect(parsedGopay.amount).toBe(30000)
+    expect(parsedGopay.type).toBe('income')
+  })
 })
 
 describe('notificationIngestion - Ref Numbers & Official Package Enhancements', () => {
@@ -851,6 +895,26 @@ describe('notificationIngestion - Ref Numbers & Official Package Enhancements', 
     const updateRes = await webPlugin.updateCustomPackages({ packages: ['com.test.bank'] })
     expect(updateRes.success).toBe(true)
     expect(updateRes.count).toBe(1)
+  })
+
+  it('sets deletedAt: null explicitly on ingested transactions', async () => {
+    await db.transactions.clear()
+    await syncHistoricalSms({
+      force: true,
+      mockMutations: [
+        {
+          institution: 'BCA',
+          amount: 50000,
+          type: 'expense',
+          date: '2026-09-15',
+          notes: 'Kopi Kenangan',
+        },
+      ],
+    })
+
+    const txs = await db.transactions.toArray()
+    expect(txs.length).toBe(1)
+    expect(txs[0].deletedAt).toBeNull()
   })
 })
 

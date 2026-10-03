@@ -149,11 +149,13 @@ export async function downloadLatestBackupJson(uid) {
         const listRes = await listAll(folderRef)
         if (listRes?.items?.length) {
           const versionedItems = listRes.items
-            .filter((item) => /backup_\d+\.json$/.test(item.name || item.path || ''))
+            .filter((item) => /backup_\d+\.json$/.test(item.name || item.fullPath || ''))
             .sort((a, b) => {
-              const nameA = a.name || a.path || ''
-              const nameB = b.name || b.path || ''
-              return nameB.localeCompare(nameA)
+              const getTs = (ref) => {
+                const match = (ref.name || ref.fullPath || '').match(/backup_(\d+)\.json/)
+                return match ? Number(match[1]) : 0
+              }
+              return getTs(b) - getTs(a)
             })
           if (versionedItems.length > 0) {
             downloadUrl = await getDownloadURL(versionedItems[0]).catch(() => null)

@@ -175,7 +175,7 @@ export const MiniChartCard = memo(function MiniChartCard({
                   dataKey={xKey}
                   type={xKey === 'time' ? 'number' : 'category'}
                   scale={xKey === 'time' ? 'time' : 'auto'}
-                  domain={xKey === 'time' ? ['dataMin', 'dataMax'] : undefined}
+                  domain={xKey === 'time' ? (data?.length === 1 ? [data[0].time - 86400000, data[0].time + 86400000] : ['dataMin', 'dataMax']) : undefined}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: 'var(--muted)', fontSize: 10 }}
@@ -206,7 +206,8 @@ export const MiniChartCard = memo(function MiniChartCard({
               )}
               <Area
                 type="monotone" dataKey="value" stroke={stroke || 'var(--accent)'} fill={`url(#${gradientId})`}
-                strokeWidth={2} dot={false}
+                strokeWidth={2}
+                dot={data?.length === 1 ? { r: 4, fill: stroke || 'var(--accent)', strokeWidth: 2, stroke: 'var(--panel-strong)' } : false}
                 isAnimationActive={animate} animationBegin={24}
                 animationDuration={animationDuration} animationEasing={animationEasing}
               />

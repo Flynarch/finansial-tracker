@@ -191,13 +191,13 @@ export function getCategoryToneClass(tone) {
     case 'teal':
       return 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/25'
     case 'slate':
-      return 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/25'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/25'
     case 'orange':
       return 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25'
     case 'pink':
       return 'bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/25'
     case 'yellow':
-      return 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border border-yellow-500/25'
+      return 'bg-yellow-500/15 text-amber-700 dark:text-amber-300 border border-yellow-500/25'
     case 'cyan':
       return 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25'
     case 'violet':
@@ -205,7 +205,7 @@ export function getCategoryToneClass(tone) {
     case 'fuchsia':
       return 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-500/25'
     case 'lime':
-      return 'bg-lime-500/15 text-lime-600 dark:text-lime-400 border border-lime-500/25'
+      return 'bg-lime-500/15 text-lime-700 dark:text-lime-300 border border-lime-500/25'
     case 'blue':
       return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
     default:
@@ -308,7 +308,7 @@ export function getCategoryColorClass(iconKey, type = 'expense', categoryId) {
     case 'health':
       return 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25'
     case 'investment':
-      return 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border border-yellow-500/25'
+      return 'bg-yellow-500/15 text-amber-700 dark:text-amber-300 border border-yellow-500/25'
     case 'gift':
     case 'bonus':
       return 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25'

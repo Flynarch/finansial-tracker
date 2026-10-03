@@ -28,7 +28,9 @@ export function generateInstallmentSchedule(loan, payments = []) {
     : (tenor > 0 ? Math.round(totalAmount / tenor) : totalAmount)
 
   const isFullyPaid = loan.status === 'paid' || (Number(loan.remainingAmount) <= 0 && totalAmount > 0)
-  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.principalAmount ?? p.amount) || 0), 0)
+  const totalPaid = (payments || [])
+    .filter((p) => loan?.status === 'forgiven' || !p?.isForgive)
+    .reduce((sum, p) => sum + (Number(p.principalAmount ?? p.amount) || 0), 0)
 
   let baseDate = new Date()
   if (loan.startDate) {
@@ -161,7 +163,7 @@ export function getLoanInstallmentSummary(loan, payments = []) {
   const nextInstallment = isFullyPaid ? null : (schedule.find((s) => s.status !== 'paid') || null)
 
   const totalPaid = Array.isArray(payments) && payments.length > 0
-    ? payments.reduce((sum, p) => sum + (Number(p?.principalAmount ?? p?.amount) || 0), 0)
+    ? payments.filter((p) => loan?.status === 'forgiven' || !p?.isForgive).reduce((sum, p) => sum + (Number(p?.principalAmount ?? p?.amount) || 0), 0)
     : Math.max(0, (Number(loan.totalAmount) || 0) - (Number(loan.remainingAmount) || 0))
 
   return {

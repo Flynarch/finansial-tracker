@@ -1,22 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Capacitor } from '@capacitor/core'
-import { LocalNotifications } from '@capacitor/local-notifications'
 import { db } from '../lib/db'
 import { format } from 'date-fns'
 import useSettingsStore from '../store/useSettingsStore'
 import { translate } from '../lib/i18n'
-import {
-  NOTIFICATION_CHANNELS,
-  NOTIFICATION_ACTION_TYPES,
-  FINTRACK_NOTIFICATION_COLOR,
-  NOTIFICATION_SMALL_ICON,
-  NOTIFICATION_LARGE_ICON,
-} from '../lib/smartNotifications'
 
 export default function useNotificationEngine() {
-  const todos = useLiveQuery(() => db.todos.where('completed').equals(0).toArray())
-  const habits = useLiveQuery(() => db.habits.where('reminderEnabled').equals(1).toArray())
+  const todos = useLiveQuery(() => db.todos.filter((t) => !t.completed).toArray())
+  const habits = useLiveQuery(() => db.habits.filter((h) => Boolean(h.reminderEnabled) && !h.isPaused).toArray())
   const intervalRef = useRef(null)
 
   useEffect(() => {
@@ -61,31 +53,9 @@ export default function useNotificationEngine() {
                 createdAt: now.toISOString()
               })
 
-              if (Capacitor.isNativePlatform()) {
-                const largeBody = message
-                const summaryText = translate(locale, 'notifications.summaryCommitment', isEn ? 'Schedule' : 'Jadwal')
-
-                await LocalNotifications.schedule({
-                  notifications: [
-                    {
-                      id: Number(todo.id) ? Number(todo.id) + 88000 : Math.floor(Math.random() * 10000) + 88000,
-                      title,
-                      body: message,
-                      largeBody,
-                      summaryText,
-                      channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
-                      actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
-                      extra: { route: `/todos/${todo.id}`, todoId: todo.id, type: 'todo' },
-                      schedule: { at: new Date(Date.now() + 500) },
-                      smallIcon: NOTIFICATION_SMALL_ICON,
-                      largeIcon: NOTIFICATION_LARGE_ICON,
-                      iconColor: FINTRACK_NOTIFICATION_COLOR,
-                    }
-                  ]
-                }).catch((err) => console.warn('[useNotificationEngine]', err))
-              } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                 new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
-                  body: message
+                  body: message,
                 })
               }
             }
@@ -96,7 +66,7 @@ export default function useNotificationEngine() {
       if (habits) {
         for (const habit of habits) {
           if (habit.reminderTime === currentTimeStr) {
-            const log = await db.habitLogs.where({ habitId: habit.id, date: todayStr }).first()
+            const log = await db.habitLogs.where('habitId').equals(habit.id).filter(l => l.date === todayStr).first()
             if (!log) {
               const existing = await db.notifications
                 .filter(n => n.relatedId === `habit_${habit.id}` && isCreatedToday(n.createdAt))
@@ -115,31 +85,9 @@ export default function useNotificationEngine() {
                   createdAt: now.toISOString()
                 })
   
-                if (Capacitor.isNativePlatform()) {
-                  const largeBody = message
-                  const summaryText = translate(locale, 'notifications.summaryHabit', isEn ? 'Habits' : 'Kebiasaan')
-
-                  await LocalNotifications.schedule({
-                    notifications: [
-                      {
-                        id: Number(habit.id) ? Number(habit.id) + 77000 : Math.floor(Math.random() * 10000) + 77000,
-                        title,
-                        body: message,
-                        largeBody,
-                        summaryText,
-                        channelId: NOTIFICATION_CHANNELS.BILL_REMINDERS,
-                        actionTypeId: NOTIFICATION_ACTION_TYPES.BILL_REMINDER,
-                        extra: { route: '/todos' },
-                        schedule: { at: new Date(Date.now() + 500) },
-                        smallIcon: NOTIFICATION_SMALL_ICON,
-                        largeIcon: NOTIFICATION_LARGE_ICON,
-                        iconColor: FINTRACK_NOTIFICATION_COLOR,
-                      }
-                    ]
-                  }).catch((err) => console.warn('[useNotificationEngine]', err))
-                } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                   new Notification(title.startsWith('FinTrack') ? title : `FinTrack • ${title}`, {
-                    body: message
+                    body: message,
                   })
                 }
               }

@@ -19,6 +19,7 @@ import { createTransaction } from '../../services/transactionService'
 import { formatCurrency, formatMoneyInput, parseMoneyInput, roundCurrency } from '../../lib/utils'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import useSettingsStore from '../../store/useSettingsStore'
 
 const QUICK_SPLIT_CATEGORIES = [
@@ -52,6 +53,33 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     { id: '2', name: 'Teman 2', amount: '', isPayer: false },
   ])
 
+  const handleReset = () => {
+    setStep(1)
+    setBillTitle('')
+    setBillDate(format(new Date(), 'yyyy-MM-dd'))
+    setCategory('makanan/makan_diluar')
+    setTotalAmountInput('')
+    setCreatedSummary(null)
+    setErrorMsg('')
+    setParticipants([
+      { id: 'me', name: 'Saya (Payer)', amount: '', isPayer: true },
+      { id: '1', name: 'Teman 1', amount: '', isPayer: false },
+      { id: '2', name: 'Teman 2', amount: '', isPayer: false },
+    ])
+  }
+
+  useBackButton(() => {
+    if (walletModalOpen) {
+      return
+    }
+    if (step === 2) {
+      setStep(1)
+    } else if (step === 1 || step === 3) {
+      handleReset()
+      onClose?.()
+    }
+  }, Boolean(isOpen && !walletModalOpen))
+
   const wallets = useLiveQuery(
     async () => {
       if (!isOpen) return []
@@ -79,7 +107,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   }, [wallets, walletId, defaultWalletId])
 
   const activeWalletId = selectedWallet?.id || walletId || ''
-  const activeCurrency = currency || selectedWallet?.currency || defaultCurrency || 'IDR'
+  const activeCurrency = selectedWallet?.currency || currency || defaultCurrency || 'IDR'
   const parsedTotal = parseMoneyInput(totalAmountInput, activeCurrency)
 
   // Equal split calculation per person with exact rounding sum
@@ -99,7 +127,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
 
   // Custom split sum and remainder
   const customSum = useMemo(() => {
-    return participants.reduce((sum, p) => sum + parseMoneyInput(p.amount, activeCurrency), 0)
+    return roundCurrency(participants.reduce((sum, p) => sum + parseMoneyInput(p.amount, activeCurrency), 0))
   }, [participants, activeCurrency])
 
   const remainingCustom = roundCurrency(parsedTotal - customSum)
@@ -186,7 +214,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
         return
       }
 
-      if (splitMode === 'custom' && customSum !== parsedTotal) {
+      if (splitMode === 'custom' && Math.abs(customSum - parsedTotal) > 0.009) {
         setErrorMsg(
           `Total pembagian (${formatCurrency(customSum, activeCurrency, locale)}) harus sama dengan total tagihan (${formatCurrency(parsedTotal, activeCurrency, locale)}).`,
         )
@@ -200,7 +228,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
       const userShare = splitMode === 'equal'
         ? payerShareEqual
         : parseMoneyInput(payer?.amount || 0, activeCurrency)
-      const friendsShare = parsedTotal - userShare
+      const friendsShare = roundCurrency(parsedTotal - userShare)
 
       // 1. Record transactions and loans atomically inside a Dexie transaction
       let personalTxId = null
@@ -296,24 +324,10 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
     return `https://wa.me/?text=${encodeURIComponent(text)}`
   }
 
-  const handleReset = () => {
-    setStep(1)
-    setBillTitle('')
-    setBillDate(format(new Date(), 'yyyy-MM-dd'))
-    setCategory('makanan/makan_diluar')
-    setTotalAmountInput('')
-    setCreatedSummary(null)
-    setErrorMsg('')
-    setParticipants([
-      { id: 'me', name: 'Saya (Payer)', amount: '', isPayer: true },
-      { id: '1', name: 'Teman 1', amount: '', isPayer: false },
-      { id: '2', name: 'Teman 2', amount: '', isPayer: false },
-    ])
-  }
-
   return (
     <Modal
       isOpen={isOpen}
+      enableBackButton={false}
       title={step === 3 ? t('splitBill.completedTitle', 'Split Bill Selesai') : t('splitBill.modalTitle', 'Bagi Tagihan (Split Bill)')}
       onClose={() => {
         handleReset()

@@ -34,7 +34,7 @@ export default function TodoCardWidget({
       try {
         const item = items[idx]
         if (item) {
-          const subTaskInDb = await db.sub_tasks.where({ todoId: Number(todoId), label: item.title }).first()
+          const subTaskInDb = await db.sub_tasks.where('todoId').equals(Number(todoId)).filter((st) => st.label === item.title).first()
           if (subTaskInDb) {
             await db.sub_tasks.update(subTaskInDb.id, { checked: !item.completed })
           }

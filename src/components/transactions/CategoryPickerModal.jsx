@@ -4,6 +4,7 @@ import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import Button from '../ui/Button'
 import CategoryIcon from '../ui/CategoryIcon'
 import useTranslation from '../../hooks/useTranslation'
+import useBackButton from '../../hooks/useBackButton'
 import { resolveExpenseParentIconKey, resolveIncomeParentIconKey } from '../../lib/categoryIcon'
 import {
   addExpenseSubcategory,
@@ -62,6 +63,18 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
       }
     }
   }
+
+  useBackButton(() => {
+    if (editMode) {
+      setEditMode(false)
+    } else if (txType === 'expense' && expenseParentId) {
+      setExpenseParentId(null)
+    } else if (txType === 'income' && incomeParentId) {
+      setIncomeParentId(null)
+    } else {
+      onClose?.()
+    }
+  }, Boolean(isOpen))
 
   useEffect(() => {
     const handleChanged = () => setCategoryVersion((v) => v + 1)
@@ -171,6 +184,7 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
           ? 'Kategori Pemasukan'
           : 'Income Category'
       }
+      enableBackButton={false}
       onClose={onClose}
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2.5 bg-[var(--field-bg)]/40">

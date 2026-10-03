@@ -8,6 +8,7 @@ import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import AnimatedCounter from '../ui/AnimatedCounter'
 import MaskedBalance from '../ui/MaskedBalance'
+import AnimatedWalletBalance from './AnimatedWalletBalance'
 
 const STORAGE_KEY = 'dashboard_carousel_slide'
 
@@ -234,9 +235,13 @@ export default function WalletCarousel({
           {/* Main amount */}
           <div className="relative z-10 ft-hero-number mt-2 break-words flex items-center min-h-[2.5rem]">
             {hideBalance ? (
-              <MaskedBalance size="hero" />
+              <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                <MaskedBalance size="hero" />
+              </div>
             ) : (
-              <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
+              <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                <AnimatedCounter value={sisaKeuangan} currency={defaultCurrency} />
+              </div>
             )}
           </div>
 
@@ -252,7 +257,15 @@ export default function WalletCarousel({
                   {t('dashboard.income', 'Pemasukan')}
                 </p>
                 <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem] text-[var(--status-income)]">
-                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthIncome} currency={defaultCurrency} />}
+                  {hideBalance ? (
+                    <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                      <MaskedBalance size="md" />
+                    </div>
+                  ) : (
+                    <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                      <AnimatedCounter value={monthIncome} currency={defaultCurrency} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -267,7 +280,15 @@ export default function WalletCarousel({
                   {t('dashboard.expense', 'Pengeluaran')}
                 </p>
                 <div className="mt-0.5 text-[13px] font-black tabular-nums truncate flex items-center min-h-[1.2rem] text-[var(--status-expense)]">
-                  {hideBalance ? <MaskedBalance size="md" /> : <AnimatedCounter value={monthExpense} currency={defaultCurrency} />}
+                  {hideBalance ? (
+                    <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                      <MaskedBalance size="md" />
+                    </div>
+                  ) : (
+                    <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                      <AnimatedCounter value={monthExpense} currency={defaultCurrency} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -323,9 +344,13 @@ export default function WalletCarousel({
             {/* Main amount */}
             <div className="relative z-10 ft-hero-number mt-2 break-all flex items-center min-h-[2.5rem]">
               {hideBalance ? (
-                <MaskedBalance size="hero" />
+                <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                  <MaskedBalance size="hero" />
+                </div>
               ) : (
-                <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
+                <div className="animate-[ft-fade-in_0.25s_ease-out]">
+                  <AnimatedCounter value={totalSaldo} currency={defaultCurrency} />
+                </div>
               )}
             </div>
           </div>
@@ -377,7 +402,11 @@ export default function WalletCarousel({
                       )}
                     </div>
                     <span className="ft-wallet-mini-balance flex items-center">
-                      {hideBalance ? <MaskedBalance size="sm" /> : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}
+                      <AnimatedWalletBalance
+                        balance={w.currentBalance ?? w.balance ?? 0}
+                        currency={w.currency || defaultCurrency}
+                        hideBalance={hideBalance}
+                      />
                     </span>
                   </div>
                 </button>

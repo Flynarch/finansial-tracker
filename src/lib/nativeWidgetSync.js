@@ -21,8 +21,14 @@ let syncDebounceTimer = null
  * @param {string} [params.dateText]
  * @param {number[]} [params.sparklinePoints]
  * @param {string[]} [params.sparklineDates]
+ * @param {number[]} [params.incomeSparklinePoints]
+ * @param {number[]} [params.expenseSparklinePoints]
+ * @param {Array<{category: string, total: number}>} [params.topCategories]
  * @param {number|null} [params.todayNet]
  * @param {string|null} [params.todayNetFormatted]
+ * @param {number|null} [params.todayNetVal]
+ * @param {Array<{id: string, name: string, currency: string}>|string|null} [params.walletList]
+ * @returns {Promise<void>}
  */
 export async function syncNativeWidgetData({
   totalBalance = 0,
@@ -38,6 +44,8 @@ export async function syncNativeWidgetData({
   topCategories = [],
   todayNet = null,
   todayNetFormatted = null,
+  todayNetVal = null,
+  walletList = null,
 } = {}) {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
     return
@@ -51,6 +59,25 @@ export async function syncNativeWidgetData({
     const cleanBalNum = typeof totalBalance === 'number' ? totalBalance : Number(totalBalance) || 0
     const cleanIncNum = typeof monthIncome === 'number' ? monthIncome : Number(monthIncome) || 0
     const cleanExpNum = typeof monthExpense === 'number' ? monthExpense : Number(monthExpense) || 0
+    const surplusNum = cleanIncNum - cleanExpNum
+    const surplusFormatted = formatCompactCurrency(Math.abs(surplusNum), defaultCurrency, locale, true)
+
+    const cleanCurrency = typeof defaultCurrency === 'string' && defaultCurrency.trim()
+      ? defaultCurrency.trim().toUpperCase()
+      : 'IDR'
+    const currencyPrefix = cleanCurrency === 'IDR' ? 'Rp' : cleanCurrency
+
+    // Balance keeps its sign (net worth can be negative); flow values are absolute because native UI renders the sign
+    const balanceCompact = formatCompactCurrency(cleanBalNum, defaultCurrency, locale, true)
+    const incomeCompact = formatCompactCurrency(Math.abs(cleanIncNum), defaultCurrency, locale, true)
+    const expenseCompact = formatCompactCurrency(Math.abs(cleanExpNum), defaultCurrency, locale, true)
+    const netCompact = surplusFormatted
+    let netSign = 0
+    if (surplusNum > 0) {
+      netSign = 1
+    } else if (surplusNum < 0) {
+      netSign = -1
+    }
 
     const formattedBalance = formatCurrency(cleanBalNum, defaultCurrency, locale)
     const incomePrefix = isEn ? 'In: ' : 'Masuk: '
@@ -84,8 +111,17 @@ export async function syncNativeWidgetData({
 
     let cleanTodayNetVal = 0
     let formattedTodayNet = ''
-    if (todayNet != null && !isNaN(Number(todayNet))) {
+    if (todayNetVal != null && !isNaN(Number(todayNetVal))) {
+      cleanTodayNetVal = Number(todayNetVal)
+    } else if (todayNet != null && !isNaN(Number(todayNet))) {
       cleanTodayNetVal = Number(todayNet)
+    } else if (safePoints.length > 0) {
+      cleanTodayNetVal = safePoints[safePoints.length - 1]
+    }
+
+    if (todayNetFormatted) {
+      formattedTodayNet = todayNetFormatted
+    } else if (cleanTodayNetVal !== 0 || (todayNet != null && !isNaN(Number(todayNet)))) {
       const absVal = Math.abs(cleanTodayNetVal)
       const compact = formatCompactCurrency(absVal, defaultCurrency, locale, true)
       if (cleanTodayNetVal > 0) {
@@ -95,14 +131,6 @@ export async function syncNativeWidgetData({
       } else {
         formattedTodayNet = formatCurrency(0, defaultCurrency, locale)
       }
-    } else if (todayNetFormatted) {
-      formattedTodayNet = todayNetFormatted
-      cleanTodayNetVal = safePoints.length > 0 ? safePoints[safePoints.length - 1] : 0
-    } else if (safePoints.length > 0) {
-      cleanTodayNetVal = safePoints[safePoints.length - 1]
-      const absVal = Math.abs(cleanTodayNetVal)
-      const compact = formatCompactCurrency(absVal, defaultCurrency, locale, true)
-      formattedTodayNet = cleanTodayNetVal > 0 ? `+${compact}` : cleanTodayNetVal < 0 ? `-${compact}` : formatCurrency(0, defaultCurrency, locale)
     } else {
       formattedTodayNet = formatCurrency(0, defaultCurrency, locale)
     }
@@ -115,6 +143,13 @@ export async function syncNativeWidgetData({
         localStorage.setItem('fintrack_widget_expense', formattedExpense)
         localStorage.setItem('fintrack_widget_income_val', incomeValue)
         localStorage.setItem('fintrack_widget_expense_val', expenseValue)
+        localStorage.setItem('fintrack_widget_balance_compact', balanceCompact)
+        localStorage.setItem('fintrack_widget_income_compact', incomeCompact)
+        localStorage.setItem('fintrack_widget_expense_compact', expenseCompact)
+        localStorage.setItem('fintrack_widget_net_compact', netCompact)
+        localStorage.setItem('fintrack_widget_net_sign', String(netSign))
+        localStorage.setItem('fintrack_widget_locale', locale)
+        localStorage.setItem('fintrack_widget_currency_prefix', currencyPrefix)
         localStorage.setItem('fintrack_widget_date', dateText)
         localStorage.setItem('fintrack_widget_period', effectivePeriod)
         localStorage.setItem('fintrack_widget_sparkline', sparklineJson)
@@ -144,6 +179,13 @@ export async function syncNativeWidgetData({
       expense: formattedExpense,
       monthExpense: formattedExpense,
       expenseValue,
+      balanceCompact,
+      incomeCompact,
+      expenseCompact,
+      netCompact,
+      netSign,
+      locale,
+      currencyPrefix,
       dateText,
       period: effectivePeriod,
       sparklineData: sparklineJson,
@@ -159,6 +201,10 @@ export async function syncNativeWidgetData({
       todayNetVal: cleanTodayNetVal,
       btnText,
       balanceLabel,
+      incomeValNum: cleanIncNum,
+      expenseValNum: cleanExpNum,
+      surplusFormatted,
+      walletList: typeof walletList === 'string' ? walletList : (Array.isArray(walletList) ? JSON.stringify(walletList) : '[]'),
     })
   } catch (err) {
     // Non-blocking fallback
@@ -186,8 +232,54 @@ export async function syncNativeWidgetFromDb() {
     const allTxs = (await db.transactions.toArray()).filter((tx) => !tx.deletedAt)
     const computedWallets = computeAllWalletBalances(wallets, allTxs, activeRates)
 
-    const totalBalance = computedWallets
+    // Publish wallet list for widget config activity
+    const walletListForConfig = wallets
       .filter((w) => !w.isArchived)
+      .map((w) => ({ id: String(w.id), name: w.name || 'Wallet', currency: w.currency || 'IDR' }))
+
+    // Read widget config for wallet filtering
+    let configWalletId = null
+    let configRange = null
+    let configWalletName = ''
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('fintrack_wallet_list', JSON.stringify(walletListForConfig))
+      }
+      const nativeCfg = await FinTrackNotificationPlugin.getWidgetConfig().catch(() => null)
+      if (nativeCfg) {
+        if (nativeCfg.walletId && nativeCfg.walletId !== '-1') {
+          configWalletId = Number(nativeCfg.walletId)
+        }
+        if (nativeCfg.range && ['7d', '30d', 'month'].includes(nativeCfg.range)) {
+          configRange = nativeCfg.range
+        }
+        if (nativeCfg.walletName) {
+          configWalletName = nativeCfg.walletName
+        }
+      }
+      if (!configWalletId && typeof localStorage !== 'undefined') {
+        const cfgWalletId = localStorage.getItem('widget_config_wallet_id')
+        if (cfgWalletId && cfgWalletId !== '-1') {
+          configWalletId = Number(cfgWalletId)
+        }
+        const cfgRange = localStorage.getItem('widget_config_range')
+        if (cfgRange && ['7d', '30d', 'month'].includes(cfgRange)) {
+          configRange = cfgRange
+        }
+        const cfgName = localStorage.getItem('widget_config_wallet_name')
+        if (cfgName) {
+          configWalletName = cfgName
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Apply wallet filter if configured
+    let filteredWallets = computedWallets.filter((w) => !w.isArchived)
+    if (configWalletId) {
+      filteredWallets = filteredWallets.filter((w) => Number(w.id) === configWalletId)
+    }
+
+    const totalBalance = filteredWallets
       .reduce((sum, w) => sum + convertCurrency(Number(w.currentBalance) || 0, w.currency || defaultCurrency, defaultCurrency, activeRates), 0)
 
     const budgetCycleStartDay = settings.budgetCycleStartDay || 1
@@ -200,6 +292,7 @@ export async function syncNativeWidgetFromDb() {
 
     for (const tx of allTxs) {
       if (!tx?.date || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
+      if (configWalletId && Number(tx.walletId) !== configWalletId) continue
 
       const txCurrency = tx.currency || defaultCurrency
       if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
@@ -253,6 +346,7 @@ export async function syncNativeWidgetFromDb() {
     const dayMetricsMap = new Map()
     for (const tx of allTxs) {
       if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || !tx.date) continue
+      if (configWalletId && Number(tx.walletId) !== configWalletId) continue
       const dateKey = tx.date.slice(0, 10)
       const txCurrency = tx.currency || defaultCurrency
 
@@ -297,9 +391,12 @@ export async function syncNativeWidgetFromDb() {
       }
     }
 
-    const widgetRange = settings.widgetRange || '7d'
+    const widgetRange = configRange || settings.widgetRange || '7d'
     const isSevenDays = widgetRange === '7d'
+    const isThirtyDays = widgetRange === '30d'
     const daysCount = isSevenDays ? 7 : 30
+    let rangeIncome = 0
+    let rangeExpense = 0
 
     for (let i = daysCount - 1; i >= 0; i--) {
       const d = subDays(now, i)
@@ -310,6 +407,9 @@ export async function syncNativeWidgetFromDb() {
       sparklinePoints.push(metric.net)
       incomeSparklinePoints.push(metric.income)
       expenseSparklinePoints.push(metric.expense)
+
+      rangeIncome += metric.income
+      rangeExpense += metric.expense
 
       if (i < 7) {
         sevenDaysIncome += metric.income
@@ -343,11 +443,26 @@ export async function syncNativeWidgetFromDb() {
       )
     }
 
-    const effectiveIncome = isSevenDays ? sevenDaysIncome : monthIncome
-    const effectiveExpense = isSevenDays ? sevenDaysExpense : monthExpense
-    const effectivePeriod = isSevenDays
+    const effectiveIncome = isSevenDays
+      ? sevenDaysIncome
+      : isThirtyDays
+        ? rangeIncome
+        : monthIncome
+    const effectiveExpense = isSevenDays
+      ? sevenDaysExpense
+      : isThirtyDays
+        ? rangeExpense
+        : monthExpense
+    let effectivePeriod = isSevenDays
       ? (isEn ? 'Last 7 Days' : '7 Hari Terakhir')
-      : periodLabel
+      : isThirtyDays
+        ? (isEn ? 'Last 30 Days' : '30 Hari Terakhir')
+        : periodLabel
+
+    // Append wallet name if filtering by specific wallet
+    if (configWalletId && configWalletName) {
+      effectivePeriod = `${configWalletName} • ${effectivePeriod}`
+    }
 
     await syncNativeWidgetData({
       totalBalance,
@@ -361,6 +476,8 @@ export async function syncNativeWidgetFromDb() {
       topCategories,
       sparklineDates,
       todayNet,
+      todayNetVal: todayNet,
+      walletList: walletListForConfig,
     })
   } catch (err) {
     console.error('[nativeWidgetSync] Failed to sync widget from DB:', err)

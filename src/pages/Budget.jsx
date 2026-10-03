@@ -129,7 +129,12 @@ function Budget() {
       totalSpent = convertCurrency(allBudget.spent, allBudget.currency || defaultCurrency, defaultCurrency, rates)
       totalLimit = convertCurrency(allBudget.limit, allBudget.currency || defaultCurrency, defaultCurrency, rates)
     } else {
-      categoryBudgets.forEach((b) => {
+      // Exclude subcategory budgets if their parent category budget is already present
+      const topLevelCategoryBudgets = categoryBudgets.filter((b) => {
+        return !categoryBudgets.some((other) => other.id !== b.id && b.category.startsWith(`${other.category}/`))
+      })
+
+      topLevelCategoryBudgets.forEach((b) => {
         totalSpent += convertCurrency(b.spent, b.currency || defaultCurrency, defaultCurrency, rates)
         totalLimit += convertCurrency(b.limit, b.currency || defaultCurrency, defaultCurrency, rates)
       })
@@ -200,13 +205,22 @@ function Budget() {
         tx.splitItems.forEach((si) => {
           const itemType = si.type || tx.type
           if (itemType === 'expense') {
+            const isExcluded = Boolean(
+              si.isExcludeAnalyticsTx ??
+              si.isExcludeFromAnalytics ??
+              si.excludeFromAnalytics ??
+              tx.isExcludeAnalyticsTx ??
+              tx.isExcludeFromAnalytics ??
+              tx.excludeFromAnalytics ??
+              false
+            )
             const itemTx = {
               ...tx,
               ...si,
               category: si.category || tx.category,
-              isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
-              excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
-              isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+              isExcludeFromAnalytics: isExcluded,
+              excludeFromAnalytics: isExcluded,
+              isExcludeAnalyticsTx: isExcluded,
             }
             processItem(si.category || tx.category, si.amount, itemTx)
           }
@@ -475,7 +489,7 @@ function Budget() {
                             <h3 className="truncate text-sm font-extrabold text-[var(--fg)]">
                               {displayLabel}
                             </h3>
-                            <p className="mt-0.5 text-xs font-bold text-[var(--muted)] tabular-nums">
+                            <p className="mt-0.5 text-xs font-bold text-[var(--muted)] tabular-nums whitespace-nowrap truncate">
                               {formatCurrency(spent, b.currency || defaultCurrency)} <span className="font-normal text-[var(--muted-2)]">/ {formatCurrency(limit, b.currency || defaultCurrency)}</span>
                             </p>
                           </div>

@@ -29,7 +29,7 @@ export default function BudgetCycleModal({ isOpen, onClose, currentMonth }) {
     onClose()
   }
 
-  const days = Array.from({ length: 28 }, (_, i) => i + 1)
+  const days = Array.from({ length: 31 }, (_, i) => i + 1)
 
   return (
     <Modal
@@ -99,10 +99,10 @@ export default function BudgetCycleModal({ isOpen, onClose, currentMonth }) {
           </button>
         </div>
 
-        {/* 28-day Selection Grid */}
+        {/* 31-day Selection Grid */}
         <div className="space-y-1.5 pt-1">
           <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider block">
-            {t('budget.selectStartDay', 'Pilih Tanggal Mulai (1 - 28)')}
+            {t('budget.selectStartDay', 'Pilih Tanggal Mulai (1 - 31)')}
           </label>
           <div className="grid grid-cols-7 gap-1.5">
             {days.map((d) => {

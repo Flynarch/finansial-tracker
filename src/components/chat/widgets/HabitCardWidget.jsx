@@ -60,7 +60,10 @@ export default function HabitCardWidget({
       }
 
       if (isLoggedToday) {
-        await db.habitLogs.where({ habitId: resolvedId, date: todayStr }).delete()
+        const logToDelete = await db.habitLogs.where('habitId').equals(resolvedId).filter(l => l.date === todayStr).first()
+        if (logToDelete) {
+          await db.habitLogs.delete(logToDelete.id)
+        }
       } else {
         await db.habitLogs.add({
           habitId: resolvedId,

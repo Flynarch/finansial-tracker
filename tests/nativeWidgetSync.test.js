@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { syncNativeWidgetData, syncNativeWidgetFromDb } from '../src/lib/nativeWidgetSync'
 import { FinTrackNotificationPlugin } from '../src/lib/notificationIngestion'
 import { db } from '../src/lib/db'
+import { formatCompactCurrency } from '../src/lib/utils'
 import useSettingsStore from '../src/store/useSettingsStore'
+
+vi.mock('../src/lib/api', () => ({
+  getCachedCurrencyRates: vi.fn(() => null),
+}))
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -18,6 +23,8 @@ vi.mock('@capacitor/core', () => ({
 vi.mock('../src/lib/notificationIngestion', () => ({
   FinTrackNotificationPlugin: {
     updateWidgetData: vi.fn().mockResolvedValue({ success: true }),
+    getWidgetConfig: vi.fn().mockResolvedValue({ range: null, walletId: null, walletName: null }),
+    setWidgetConfig: vi.fn().mockResolvedValue({ success: true }),
   },
 }))
 
@@ -199,4 +206,186 @@ describe('nativeWidgetSync - Localization & Widget Contract', () => {
     expect(payload.period).toBe('Bulan Ini')
     expect(payload.monthIncome).toContain('Masuk:')
   })
+
+  it('computes and transmits surplus values in widget payload', async () => {
+    useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+
+    await syncNativeWidgetData({
+      totalBalance: 10000000,
+      monthIncome: 5000000,
+      monthExpense: 2000000,
+      defaultCurrency: 'IDR',
+    })
+
+    const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+    expect(payload.incomeValNum).toBe(5000000)
+    expect(payload.expenseValNum).toBe(2000000)
+    expect(payload.surplusFormatted).toBeDefined()
+    expect(payload.surplusFormatted).toContain('3') // 3 juta
+  })
+
+  it('filters widget metrics to a single wallet when configured in widget config', async () => {
+    useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+    const todayStr = new Date().toISOString().slice(0, 10)
+
+    db.wallets.toArray.mockResolvedValue([
+      { id: 1, name: 'BCA Main', balance: 5000000, currency: 'IDR', isArchived: 0 },
+      { id: 2, name: 'Mandiri Savings', balance: 10000000, currency: 'IDR', isArchived: 0 },
+    ])
+
+    db.transactions.toArray.mockResolvedValue([
+      {
+        id: 201,
+        date: todayStr,
+        walletId: 1,
+        type: 'income',
+        amount: 3000000,
+        currency: 'IDR',
+      },
+      {
+        id: 202,
+        date: todayStr,
+        walletId: 2,
+        type: 'income',
+        amount: 8000000,
+        currency: 'IDR',
+      },
+    ])
+
+    // Mock widget configured for wallet 1 (BCA Main)
+    FinTrackNotificationPlugin.getWidgetConfig.mockResolvedValueOnce({
+      range: 'month',
+      walletId: '1',
+      walletName: 'BCA Main',
+    })
+
+    await syncNativeWidgetFromDb()
+
+    const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+    // Balance should only be for wallet 1 (5M + 3M = 8M, not 15M + 11M)
+    expect(payload.balance).toContain('8.000.000')
+    // Income should only be from wallet 1 (3M)
+    expect(payload.incomeValNum).toBe(3000000)
+    // Period should include wallet name
+    expect(payload.period).toContain('BCA Main')
+    // walletList should be passed
+    expect(payload.walletList).toBeDefined()
+  })
+
+  describe('Extended Widget Payload Contract (Compact Metrics, Net Metrics & Localization)', () => {
+    it('includes compact metrics, surplus netSign (1), locale, and currencyPrefix (IDR surplus)', async () => {
+      useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+      const totalBalance = 15000000
+      const monthIncome = 10000000
+      const monthExpense = 4000000
+      const defaultCurrency = 'IDR'
+
+      await syncNativeWidgetData({
+        totalBalance,
+        monthIncome,
+        monthExpense,
+        defaultCurrency,
+        sparklinePoints: [1000, 2000],
+      })
+
+      expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
+      const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+
+      expect(payload.balanceCompact).toBe(formatCompactCurrency(Math.abs(totalBalance), defaultCurrency, 'id', true))
+      expect(payload.incomeCompact).toBe(formatCompactCurrency(Math.abs(monthIncome), defaultCurrency, 'id', true))
+      expect(payload.expenseCompact).toBe(formatCompactCurrency(Math.abs(monthExpense), defaultCurrency, 'id', true))
+      expect(payload.netCompact).toBe(formatCompactCurrency(Math.abs(monthIncome - monthExpense), defaultCurrency, 'id', true))
+      expect(payload.netSign).toBe(1)
+      expect(payload.locale).toBe('id')
+      expect(payload.currencyPrefix).toBe('Rp')
+
+      // Existing backward compatibility keys
+      expect(payload.balance).toBeDefined()
+      expect(payload.income).toBeDefined()
+      expect(payload.expense).toBeDefined()
+      expect(payload.sparklineData).toBeDefined()
+      expect(payload.incomeValNum).toBe(monthIncome)
+      expect(payload.expenseValNum).toBe(monthExpense)
+      expect(payload.surplusFormatted).toBeDefined()
+    })
+
+    it('includes compact metrics, deficit netSign (-1) when expense exceeds income', async () => {
+      useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+      const totalBalance = 5000000
+      const monthIncome = 2000000
+      const monthExpense = 7000000
+      const defaultCurrency = 'IDR'
+
+      await syncNativeWidgetData({
+        totalBalance,
+        monthIncome,
+        monthExpense,
+        defaultCurrency,
+      })
+
+      expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
+      const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+
+      expect(payload.balanceCompact).toBe(formatCompactCurrency(Math.abs(totalBalance), defaultCurrency, 'id', true))
+      expect(payload.incomeCompact).toBe(formatCompactCurrency(Math.abs(monthIncome), defaultCurrency, 'id', true))
+      expect(payload.expenseCompact).toBe(formatCompactCurrency(Math.abs(monthExpense), defaultCurrency, 'id', true))
+      expect(payload.netCompact).toBe(formatCompactCurrency(Math.abs(monthIncome - monthExpense), defaultCurrency, 'id', true))
+      expect(payload.netSign).toBe(-1)
+      expect(payload.locale).toBe('id')
+      expect(payload.currencyPrefix).toBe('Rp')
+    })
+
+    it('includes compact metrics, zero netSign (0) when income equals expense', async () => {
+      useSettingsStore.setState({ locale: 'id', defaultCurrency: 'IDR' })
+      const totalBalance = 1000000
+      const monthIncome = 3000000
+      const monthExpense = 3000000
+      const defaultCurrency = 'IDR'
+
+      await syncNativeWidgetData({
+        totalBalance,
+        monthIncome,
+        monthExpense,
+        defaultCurrency,
+      })
+
+      expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
+      const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+
+      expect(payload.balanceCompact).toBe(formatCompactCurrency(Math.abs(totalBalance), defaultCurrency, 'id', true))
+      expect(payload.incomeCompact).toBe(formatCompactCurrency(Math.abs(monthIncome), defaultCurrency, 'id', true))
+      expect(payload.expenseCompact).toBe(formatCompactCurrency(Math.abs(monthExpense), defaultCurrency, 'id', true))
+      expect(payload.netCompact).toBe(formatCompactCurrency(0, defaultCurrency, 'id', true))
+      expect(payload.netSign).toBe(0)
+      expect(payload.locale).toBe('id')
+      expect(payload.currencyPrefix).toBe('Rp')
+    })
+
+    it('handles locale en and USD currency correctly', async () => {
+      useSettingsStore.setState({ locale: 'en', defaultCurrency: 'USD' })
+      const totalBalance = 25000
+      const monthIncome = 8000
+      const monthExpense = 4500
+      const defaultCurrency = 'USD'
+
+      await syncNativeWidgetData({
+        totalBalance,
+        monthIncome,
+        monthExpense,
+        defaultCurrency,
+      })
+
+      expect(FinTrackNotificationPlugin.updateWidgetData).toHaveBeenCalledTimes(1)
+      const payload = FinTrackNotificationPlugin.updateWidgetData.mock.calls[0][0]
+
+      expect(payload.balanceCompact).toBe(formatCompactCurrency(Math.abs(totalBalance), defaultCurrency, 'en', true))
+      expect(payload.incomeCompact).toBe(formatCompactCurrency(Math.abs(monthIncome), defaultCurrency, 'en', true))
+      expect(payload.expenseCompact).toBe(formatCompactCurrency(Math.abs(monthExpense), defaultCurrency, 'en', true))
+      expect(payload.netCompact).toBe(formatCompactCurrency(Math.abs(monthIncome - monthExpense), defaultCurrency, 'en', true))
+      expect(payload.netSign).toBe(1)
+      expect(payload.locale).toBe('en')
+      expect(payload.currencyPrefix).toBe('USD')
+    })
+  })
 })
+
