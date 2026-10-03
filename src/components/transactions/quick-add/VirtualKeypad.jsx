@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Delete, ChevronDown, Check, Calculator } from 'lucide-react'
 import { triggerHaptic } from '../../../lib/haptics'
 import { formatMoneyInput, formatCurrency } from '../../../lib/utils'
+import { resolveCalculatedAmount } from '../../../lib/calcParser'
 import useTranslation from '../../../hooks/useTranslation'
 import useSettingsStore from '../../../store/useSettingsStore'
 
@@ -138,33 +139,48 @@ export const VirtualKeypad = memo(function VirtualKeypad({
     onChangeAmount('')
   }, [onChangeAmount])
 
-  // Commit calculation result
+  // Helper to commit current calculation
+  const applyCalculatedAmount = useCallback(() => {
+    const resolved = resolveCalculatedAmount(amount, currency)
+    if (resolved && resolved !== amount) {
+      onChangeAmount(formatMoneyInput(resolved, currency))
+      return true
+    }
+    if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
+      onChangeAmount(formatMoneyInput(String(calcEvaluation.result), currency))
+      return true
+    }
+    return false
+  }, [amount, currency, calcEvaluation, onChangeAmount])
+
+  // Commit calculation result directly via button
   const handleCommit = useCallback(() => {
     triggerHaptic('medium')
-    if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
-      const formatted = formatMoneyInput(String(calcEvaluation.result), currency)
-      onChangeAmount(formatted)
-    } else {
+    const didApply = applyCalculatedAmount()
+    if (!didApply) {
       onCommitCalc?.()
     }
-  }, [calcEvaluation, currency, onChangeAmount, onCommitCalc])
+  }, [applyCalculatedAmount, onCommitCalc])
 
   // Done button commits calc if active and closes keypad
   const handleDone = useCallback(() => {
     triggerHaptic('medium')
-    if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
-      const formatted = formatMoneyInput(String(calcEvaluation.result), currency)
-      onChangeAmount(formatted)
-    }
+    applyCalculatedAmount()
     onClose?.()
-  }, [calcEvaluation, currency, onChangeAmount, onClose])
+  }, [applyCalculatedAmount, onClose])
+
+  // Close chevron commits calc if active and closes keypad
+  const handleClose = useCallback(() => {
+    triggerHaptic('light')
+    applyCalculatedAmount()
+    onClose?.()
+  }, [applyCalculatedAmount, onClose])
 
   // Physical desktop keyboard support when keypad is open
   useEffect(() => {
     if (!isOpen) return undefined
 
     const handleKeyDown = (e) => {
-      // Don't intercept if target is another input or textarea
       const tag = e.target?.tagName?.toLowerCase()
       if (tag === 'textarea' || (tag === 'input' && e.target?.getAttribute('data-virtual-keypad-target') !== 'true')) {
         return
@@ -187,19 +203,22 @@ export const VirtualKeypad = memo(function VirtualKeypad({
         handleBackspace()
       } else if (e.key === 'Escape') {
         e.preventDefault()
-        onClose?.()
+        handleClose()
       } else if (e.key === 'Enter') {
         e.preventDefault()
         handleDone()
       } else if (e.key === 'c' || e.key === 'C') {
         e.preventDefault()
         handleClear()
+      } else if (e.key === '=') {
+        e.preventDefault()
+        handleCommit()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, handleDigit, handleOperator, handleDecimal, handleK, handleBackspace, handleClear, handleDone, onClose])
+  }, [isOpen, handleDigit, handleOperator, handleDecimal, handleK, handleBackspace, handleClear, handleCommit, handleDone, handleClose])
 
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isEntering, setIsEntering] = useState(false)
@@ -217,6 +236,8 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   }, [isOpen])
 
   if (!shouldRender || typeof document === 'undefined') return null
+
+  const hasCalcResult = calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
 
   return createPortal(
     <div
@@ -236,22 +257,52 @@ export const VirtualKeypad = memo(function VirtualKeypad({
         role="region"
         data-virtual-keypad="true"
         aria-label={t('calculator.title', 'Kalkulator')}
-        className="w-full max-w-md bg-[var(--panel-strong)] border-t border-[var(--border)] rounded-t-[28px] pointer-events-auto p-3.5 pb-[max(1rem,calc(0.75rem+env(safe-area-inset-bottom)))] select-none touch-manipulation"
+        className="w-full max-w-md bg-[var(--panel-strong)] border-t border-[var(--border)] rounded-t-[32px] pointer-events-auto p-3.5 pb-[max(1rem,calc(0.75rem+env(safe-area-inset-bottom)))] select-none touch-manipulation"
         style={{
-          boxShadow: '0 -10px 32px rgba(0,0,0,0.18)',
+          boxShadow: '0 -10px 32px rgba(0,0,0,0.22)',
         }}
       >
+        {/* Subtle Sheet Grab Handle */}
+        <div className="w-10 h-1 rounded-full bg-[var(--border-strong)] mx-auto mb-2.5 opacity-60" />
+
+        {/* Live Calculation Result Banner / Pill */}
+        {hasCalcResult && (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2.5 rounded-2xl bg-[var(--field-bg)] border border-[var(--border-strong)] shadow-2xs animate-[ft-fade-in_0.15s_ease-out]">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Calculator className="w-4 h-4 text-[var(--accent)] shrink-0" />
+              <span className="text-xs text-[var(--muted)] truncate font-mono">
+                {amount}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCommit}
+              aria-label={t('calculator.apply', 'Terapkan')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-[var(--accent)] text-white shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
+              title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
+            >
+              <span className="tabular-nums">= {formatCurrency(calcEvaluation.result, currency)}</span>
+              <span className="text-[10px] opacity-90 border-l border-white/30 pl-1.5 font-medium">
+                {t('calculator.apply', 'Terapkan')}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Top Operator & Tool Strip */}
         <div
           data-testid="virtual-keypad-toolbar"
-          className="flex items-center justify-between gap-1.5 pb-3 border-b border-[var(--border)]/60"
+          className="flex items-center justify-between gap-1.5 pb-2.5 border-b border-[var(--border)]/60"
         >
           {/* Quick math operators */}
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto ft-hide-scrollbar py-0.5">
+          <div
+            data-testid="calculator-operator-bar"
+            className="flex items-center gap-1 flex-1 overflow-x-auto ft-hide-scrollbar py-0.5"
+          >
             <button
               type="button"
               onClick={handleClear}
-              className="h-8 px-2.5 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-rose-500 hover:border-rose-400 font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 px-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-rose-500 hover:border-rose-400 font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('common.clear', 'Bersihkan')}
             >
               C
@@ -259,7 +310,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               type="button"
               onClick={() => handleOperator('+')}
-              className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('calculator.add', 'Tambah (+)')}
             >
               +
@@ -267,7 +318,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               type="button"
               onClick={() => handleOperator('-')}
-              className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('calculator.subtract', 'Kurang (-)')}
             >
               −
@@ -275,7 +326,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               type="button"
               onClick={() => handleOperator('*')}
-              className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('calculator.multiply', 'Kali (*)')}
             >
               ×
@@ -283,7 +334,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               type="button"
               onClick={() => handleOperator('/')}
-              className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('calculator.divide', 'Bagi (/)')}
             >
               ÷
@@ -291,7 +342,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               type="button"
               onClick={handleK}
-              className="h-8 px-2 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="h-8.5 px-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title={t('calculator.thousandsK', 'Ribuan (k)')}
             >
               k
@@ -300,49 +351,46 @@ export const VirtualKeypad = memo(function VirtualKeypad({
               <button
                 type="button"
                 onClick={handleDecimal}
-                className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
                 title={t('calculator.decimal', 'Desimal (.)')}
               >
                 .
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={handleCommit}
+              disabled={!calcEvaluation.isValid || !calcEvaluation.hasExpression || calcEvaluation.result === null}
+              aria-label={t('calculator.calculate', 'Hitung')}
+              className={`h-8.5 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-2xs select-none touch-manipulation active:scale-95 cursor-pointer ${
+                calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
+                  ? 'bg-[var(--accent)] text-white hover:opacity-95 shadow-sm'
+                  : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted-2)] opacity-40 cursor-not-allowed'
+              }`}
+              title={t('calculator.calculate', 'Hitung (=)')}
+            >
+              =
+            </button>
           </div>
 
-          {/* Right Action: Live Calc Pill OR Selesai / Close Button */}
+          {/* Right Action: Selesai and Close buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null ? (
-              <button
-                type="button"
-                onClick={handleCommit}
-                className="h-8 px-2.5 rounded-lg text-xs font-bold bg-[var(--accent)] text-white shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer animate-[ft-fade-in_0.15s_ease-out]"
-                title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
-              >
-                <Calculator className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-black tabular-nums">
-                  = {formatCurrency(calcEvaluation.result, currency)}
-                </span>
-                <span className="text-[10px] opacity-90 border-l border-white/30 pl-1.5 font-medium">
-                  {t('calculator.apply', 'Terapkan')}
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleDone}
-                style={{ backgroundColor: modeAccent }}
-                className="h-8 px-3 rounded-lg text-xs font-extrabold text-white flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
-                title={t('common.done', 'Selesai')}
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>{t('common.done', 'Selesai')}</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleDone}
+              style={{ backgroundColor: modeAccent }}
+              className="h-8.5 px-3 rounded-xl text-xs font-extrabold text-white flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+              title={t('common.done', 'Selesai')}
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>{t('common.done', 'Selesai')}</span>
+            </button>
 
             {/* Collapse Keypad Chevron */}
             <button
               type="button"
-              onClick={onClose}
-              className="h-8 w-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-2xs"
+              onClick={handleClose}
+              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-2xs"
               aria-label={t('common.close', 'Tutup')}
             >
               <ChevronDown className="w-4 h-4" />

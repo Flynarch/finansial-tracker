@@ -17,6 +17,7 @@ describe('Virtual Keypad & Smooth Animation Tests', () => {
       initialCurrency = 'IDR',
       isOpen = true,
       onClose,
+      onChangeAmount,
     }) {
       const [amount, setAmount] = useState(initialAmount)
       const calcEval = evaluateExpression(amount, initialCurrency)
@@ -26,7 +27,10 @@ describe('Virtual Keypad & Smooth Animation Tests', () => {
           isOpen={isOpen}
           onClose={onClose || vi.fn()}
           amount={amount}
-          onChangeAmount={setAmount}
+          onChangeAmount={(val) => {
+            setAmount(val)
+            onChangeAmount?.(val)
+          }}
           currency={initialCurrency}
           calcEvaluation={calcEval}
           modeAccent="#0ea5e9"
@@ -96,12 +100,36 @@ describe('Virtual Keypad & Smooth Animation Tests', () => {
       fireEvent.click(clearBtn)
     })
 
-    it('calls onClose when close chevron or Selesai is tapped', () => {
+    it('calls onClose when close chevron or Selesai is tapped and automatically applies calculation', () => {
       const onClose = vi.fn()
-      render(<ControlledKeypad initialAmount="10.000" onClose={onClose} />)
+      const onChangeAmount = vi.fn()
+      render(<ControlledKeypad initialAmount="10.000 + 25.000" onClose={onClose} onChangeAmount={onChangeAmount} />)
 
       const doneBtn = screen.getByRole('button', { name: /selesai|done/i })
       fireEvent.click(doneBtn)
+      expect(onChangeAmount).toHaveBeenCalledWith('35.000')
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('automatically applies calculation when close chevron is tapped', () => {
+      const onClose = vi.fn()
+      const onChangeAmount = vi.fn()
+      render(<ControlledKeypad initialAmount="50.000 * 2" onClose={onClose} onChangeAmount={onChangeAmount} />)
+
+      const closeChevron = screen.getByRole('button', { name: /tutup|close/i })
+      fireEvent.click(closeChevron)
+      expect(onChangeAmount).toHaveBeenCalledWith('100.000')
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('safely resolves trailing operators on close without breaking', () => {
+      const onClose = vi.fn()
+      const onChangeAmount = vi.fn()
+      render(<ControlledKeypad initialAmount="75.000 + " onClose={onClose} onChangeAmount={onChangeAmount} />)
+
+      const doneBtn = screen.getByRole('button', { name: /selesai|done/i })
+      fireEvent.click(doneBtn)
+      expect(onChangeAmount).toHaveBeenCalledWith('75.000')
       expect(onClose).toHaveBeenCalled()
     })
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Calculator } from 'lucide-react'
 import { formatMoneyInput, getMoneyInputCaret, formatCurrency } from '../../../lib/utils'
-import { evaluateExpression } from '../../../lib/calcParser'
+import { evaluateExpression, resolveCalculatedAmount } from '../../../lib/calcParser'
 import useTranslation from '../../../hooks/useTranslation'
 import useBackButton from '../../../hooks/useBackButton'
 import VirtualKeypad from './VirtualKeypad'
@@ -21,7 +21,6 @@ export default function AmountInput({
 }) {
   const { t } = useTranslation()
   const [isAmountFocused, setIsAmountFocused] = useState(false)
-  const [showCalcBar, setShowCalcBar] = useState(false)
   const [isKeypadOpen, setIsKeypadOpen] = useState(false)
   const amountInputRef = useRef(null)
   const amountFieldRef = useRef(null)
@@ -33,10 +32,13 @@ export default function AmountInput({
   const hasCalcResult = calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
 
   const handleCommitCalc = useCallback(() => {
-    if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
+    const resolved = resolveCalculatedAmount(amount, currency)
+    if (resolved && resolved !== amount) {
+      onChangeAmount(formatMoneyInput(resolved, currency))
+    } else if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
       onChangeAmount(formatMoneyInput(String(calcEvaluation.result), currency))
     }
-  }, [calcEvaluation, currency, onChangeAmount])
+  }, [amount, calcEvaluation, currency, onChangeAmount])
 
   const openKeypad = useCallback(() => {
     setIsAmountFocused(true)
@@ -51,7 +53,7 @@ export default function AmountInput({
 
   useBackButton(closeKeypad, isKeypadOpen)
 
-  // Tapping anywhere outside the amount field / keypad closes the keypad
+  // Tapping anywhere outside the amount field / keypad closes the keypad and commits calculation
   useEffect(() => {
     if (!isKeypadOpen) return undefined
     const handlePointerDown = (e) => {
@@ -64,90 +66,6 @@ export default function AmountInput({
     document.addEventListener('pointerdown', handlePointerDown, true)
     return () => document.removeEventListener('pointerdown', handlePointerDown, true)
   }, [isKeypadOpen, closeKeypad])
-
-  const handleInsertOperator = (op) => {
-    const trimmed = String(amount || '').trim()
-    if (!trimmed) {
-      if (op === '-') {
-        onChangeAmount('-')
-      }
-      return
-    }
-
-    const updated = /[+\-*/]$/.test(trimmed)
-      ? trimmed.slice(0, -1).trim() + ` ${op} `
-      : `${trimmed} ${op} `
-
-    onChangeAmount(updated)
-
-    window.requestAnimationFrame(() => {
-      const el = amountInputRef.current
-      if (el) {
-        el.focus()
-        const len = el.value.length
-        el.setSelectionRange(len, len)
-      }
-    })
-  }
-
-  const handleInsert000 = () => {
-    const trimmed = String(amount || '').trim()
-    if (!trimmed || /[+\-*/]$/.test(trimmed)) return
-
-    if (/[+\-*/]/.test(trimmed)) {
-      const updated = trimmed + '000'
-      onChangeAmount(updated)
-    } else {
-      const rawDigits = trimmed.replace(/\D/g, '')
-      if (!rawDigits || rawDigits === '0') return
-      const updated = formatMoneyInput(rawDigits + '000', currency)
-      onChangeAmount(updated)
-    }
-
-    window.requestAnimationFrame(() => {
-      const el = amountInputRef.current
-      if (el) {
-        el.focus()
-        const len = el.value.length
-        el.setSelectionRange(len, len)
-      }
-    })
-  }
-
-  const handleInsertDecimal = () => {
-    const trimmed = String(amount || '').trim()
-    if (!trimmed || /[+\-*/]$/.test(trimmed)) {
-      onChangeAmount(`${trimmed}0.`)
-    } else if (!/\.\d*$/.test(trimmed)) {
-      onChangeAmount(`${trimmed}.`)
-    }
-
-    window.requestAnimationFrame(() => {
-      const el = amountInputRef.current
-      if (el) {
-        el.focus()
-        const len = el.value.length
-        el.setSelectionRange(len, len)
-      }
-    })
-  }
-
-  const handleInsertK = () => {
-    const trimmed = String(amount || '').trim()
-    if (!trimmed || /[+\-*/]$/.test(trimmed) || /[kK]$/.test(trimmed)) return
-
-    const updated = `${trimmed}k`
-    onChangeAmount(updated)
-
-    window.requestAnimationFrame(() => {
-      const el = amountInputRef.current
-      if (el) {
-        el.focus()
-        const len = el.value.length
-        el.setSelectionRange(len, len)
-      }
-    })
-  }
 
   const handleInputChange = (e) => {
     const rawValue = e.target.value
@@ -182,14 +100,14 @@ export default function AmountInput({
             <button
               type="button"
               onClick={handleCommitCalc}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-[var(--field-bg)] border border-[var(--border-strong)] text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs animate-[ft-fade-in_0.15s_ease-out] truncate"
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[var(--field-bg)] border border-[var(--border-strong)] text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs animate-[ft-fade-in_0.15s_ease-out] truncate group"
               title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
             >
-              <Calculator className="w-3 h-3 text-[var(--accent)] shrink-0" />
-              <span className="font-extrabold text-[var(--accent)] tabular-nums truncate">
+              <Calculator className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+              <span className="font-black text-[var(--accent)] tabular-nums truncate">
                 = {formatCurrency(calcEvaluation.result, currency)}
               </span>
-              <span className="text-[9.5px] text-[var(--muted)] font-medium border-l border-[var(--border)] pl-1.5 shrink-0">
+              <span className="text-[9.5px] text-[var(--muted)] font-medium border-l border-[var(--border)] pl-1.5 shrink-0 group-hover:text-[var(--fg)]">
                 {t('calculator.apply', 'Terapkan')}
               </span>
             </button>
@@ -197,12 +115,9 @@ export default function AmountInput({
             <button
               type="button"
               onPointerDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setShowCalcBar((prev) => !prev)
-                openKeypad()
-              }}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95 cursor-pointer shadow-2xs ${
-                showCalcBar || isKeypadOpen
+              onClick={openKeypad}
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                isKeypadOpen
                   ? 'bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border-strong)]'
                   : 'bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] border border-[var(--border)] hover:border-[var(--border-strong)]'
               }`}
@@ -284,7 +199,7 @@ export default function AmountInput({
             value={amount}
             onChange={handleInputChange}
             onFocus={() => {
-              setIsAmountFocused(true)
+              openKeypad()
             }}
             onBlur={() => {
               setIsAmountFocused(false)
@@ -322,65 +237,6 @@ export default function AmountInput({
           transform: isKeypadOpen || isAmountFocused || hasError ? 'scaleX(1)' : 'scaleX(0.98)',
         }}
       />
-
-      {/* Quick Calculator Operator Bar */}
-      {(isAmountFocused || showCalcBar || calcEvaluation.hasExpression || isKeypadOpen) && (
-        <div
-          data-testid="calculator-operator-bar"
-          className="mt-2.5 flex items-center justify-between gap-1.5 px-0.5 animate-[ft-fade-in_0.15s_ease-out]"
-        >
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {[
-              { label: '+', op: '+', title: t('calculator.add', 'Tambah (+)') },
-              { label: '−', op: '-', title: t('calculator.subtract', 'Kurang (-)') },
-              { label: '×', op: '*', title: t('calculator.multiply', 'Kali (*)') },
-              { label: '÷', op: '/', title: t('calculator.divide', 'Bagi (/)') },
-              currency === 'IDR'
-                ? { label: '000', op: '000', title: t('calculator.add000', 'Tambah 000') }
-                : { label: '.', op: '.', title: t('calculator.decimal', 'Desimal (.)') },
-              { label: 'k', op: 'k', title: t('calculator.thousandsK', 'Ribuan (k)') },
-            ].map((btn) => (
-              <button
-                key={btn.op}
-                type="button"
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  if (btn.op === '000') {
-                    handleInsert000()
-                  } else if (btn.op === '.') {
-                    handleInsertDecimal()
-                  } else if (btn.op === 'k') {
-                    handleInsertK()
-                  } else {
-                    handleInsertOperator(btn.op)
-                  }
-                }}
-                className="flex-1 h-8 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] text-xs font-bold hover:border-[var(--accent)] hover:bg-[var(--panel-strong)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs select-none touch-manipulation"
-                title={btn.title}
-              >
-                {btn.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Equal / Calculate Button */}
-          <button
-            type="button"
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={handleCommitCalc}
-            disabled={!calcEvaluation.isValid || !calcEvaluation.hasExpression || calcEvaluation.result === null}
-            aria-label={t('calculator.calculate', 'Hitung')}
-            className={`h-8 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1 shadow-2xs select-none touch-manipulation active:scale-95 cursor-pointer ${
-              calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
-                ? 'bg-[var(--accent)] text-white hover:opacity-95 shadow-sm'
-                : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted-2)] opacity-50 cursor-not-allowed'
-            }`}
-            title={t('calculator.calculate', 'Hitung')}
-          >
-            =
-          </button>
-        </div>
-      )}
 
       {/* Custom In-App Minimalist Numeric Keypad with Smooth Entrance/Exit Animations */}
       <VirtualKeypad

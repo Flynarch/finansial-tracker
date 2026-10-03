@@ -83,10 +83,38 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
         hasExpression,
       }
     }
-  } catch (err) {
-    console.error('[calcParser]', err)
-    // Math syntax error while user is typing (e.g. "50000 + ")
+  } catch {
+    // Incomplete expression while user is typing (e.g. "50000 + ")
   }
 
   return { isValid: false, result: null, hasExpression }
 }
+
+/**
+ * Resolves a potentially unfinished or finished math expression into a formatted money string.
+ * Strips any trailing math operators (e.g. "50.000 + " -> "50.000").
+ *
+ * @param {string} input - User input string
+ * @param {string} [currency='IDR'] - Currency code
+ * @param {object} [options={}] - Options object
+ * @returns {string} Fully evaluated money amount string or original input
+ */
+export function resolveCalculatedAmount(input, currency = 'IDR', options = {}) {
+  if (!input || typeof input !== 'string') return ''
+  const trimmed = input.trim()
+  if (!trimmed) return ''
+
+  // If input contains mathematical operators or shorthand suffixes
+  if (/[+\-*/kKmMbBjJrR(]/.test(trimmed)) {
+    // Clean up trailing operators like "50.000 + " -> "50.000"
+    const cleaned = trimmed.replace(/\s*[+\-*/]+\s*$/, '').trim()
+    if (!cleaned) return ''
+    const evalResult = evaluateExpression(cleaned, currency, options)
+    if (evalResult.isValid && evalResult.result !== null) {
+      return String(evalResult.result)
+    }
+  }
+
+  return trimmed
+}
+
