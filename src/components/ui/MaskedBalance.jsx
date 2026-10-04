@@ -13,12 +13,12 @@ const SIZE_MAP = {
     defaultCount: 6,
   },
   md: {
-    container: 'h-4 gap-1.5',
+    container: 'h-4 gap-1.5 px-0.5 shrink-0',
     dot: 'h-2 w-2',
     defaultCount: 5,
   },
   sm: {
-    container: 'h-3.5 gap-1',
+    container: 'h-3.5 gap-1 px-0.5 shrink-0',
     dot: 'h-1.5 w-1.5',
     defaultCount: 5,
   },

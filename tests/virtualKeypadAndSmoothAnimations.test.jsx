@@ -181,8 +181,8 @@ describe('Virtual Keypad & Smooth Animation Tests', () => {
         <AnimatedWalletBalance balance={5000000} currency="IDR" hideBalance={true} />
       )
 
-      // Masked width style should be applied (44px)
-      expect(wrapper.style.width).toBe('44px')
+      // Masked width style should be applied (50px)
+      expect(wrapper.style.width).toBe('50px')
     })
   })
 })

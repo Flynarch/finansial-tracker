@@ -30,8 +30,8 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
     }
   }, [formatted])
 
-  // Sm masked balance with 5 dots + gap is ~44px
-  const maskedWidth = 44
+  // Sm masked balance with 5 dots + gap is 50px
+  const maskedWidth = 50
   const targetWidth = hideBalance ? maskedWidth : (measuredWidth || 'auto')
 
   return (
