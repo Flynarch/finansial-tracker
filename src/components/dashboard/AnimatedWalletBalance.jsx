@@ -68,8 +68,8 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
               : 'block'
             : `transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 hideBalance
-                  ? 'opacity-0 scale-90 translate-y-1 pointer-events-none'
-                  : 'opacity-100 scale-100 translate-y-0'
+                  ? 'opacity-0 scale-90 translate-y-1 blur-[3px] pointer-events-none'
+                  : 'opacity-100 scale-100 translate-y-0 blur-0'
               }`
         }`}
       >
@@ -86,8 +86,8 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
               : 'hidden'
             : `transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 hideBalance
-                  ? 'opacity-100 scale-100 translate-y-0'
-                  : 'opacity-0 scale-90 -translate-y-1 pointer-events-none'
+                  ? 'opacity-100 scale-100 translate-y-0 blur-0'
+                  : 'opacity-0 scale-90 -translate-y-1 blur-[2px] pointer-events-none'
               }`
         }`}
       >

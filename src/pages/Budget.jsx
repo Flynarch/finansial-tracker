@@ -398,6 +398,8 @@ function Budget() {
           <div className="h-3 w-full rounded-full bg-[color-mix(in_srgb,var(--field-bg)_80%,transparent)] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] overflow-hidden relative z-10 p-0.5">
             <div
               className={`h-full rounded-full transition-all duration-700 ease-out shadow-xs transform-gpu ${
+                summary.pct >= 80 ? 'ft-progress-sheen' : ''
+              } ${
                 summary.pct >= 100
                   ? 'bg-[var(--status-expense)]'
                   : summary.pct >= 80

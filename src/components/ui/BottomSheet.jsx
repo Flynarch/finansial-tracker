@@ -164,10 +164,16 @@ export default function BottomSheet({
                 className="mx-auto -mt-1.5 mb-2 pt-1 pb-1 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
               >
                 <div
-                  className="h-1.5 rounded-full bg-[var(--border-strong)] hover:bg-[var(--muted)]"
+                  className={`rounded-full ${
+                    dragOffset >= 80
+                      ? 'h-2 bg-[var(--accent)] shadow-xs'
+                      : 'h-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'
+                  }`}
                   style={{
                     width: `${Math.min(64, Math.max(44, 44 + (dragOffset > 0 ? dragOffset * 0.2 : 0)))}px`,
-                    transition: isDragging ? 'none' : 'width 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease',
+                    transition: isDragging
+                      ? 'background-color 150ms ease, height 150ms ease'
+                      : 'width 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, height 150ms ease',
                   }}
                 />
               </div>

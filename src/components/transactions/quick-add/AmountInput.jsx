@@ -153,7 +153,7 @@ export default function AmountInput({
             ref={amountInputRef}
             type="text"
             readOnly
-            inputMode="numeric"
+            inputMode="none"
             data-virtual-keypad-target="true"
             value={amount}
             onChange={handleInputChange}

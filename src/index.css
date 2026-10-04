@@ -2910,6 +2910,53 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   }
 }
 
+[data-theme="light"] .ft-card-sheen::after {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(79, 111, 82, 0.02) 20%,
+    rgba(79, 111, 82, 0.09) 50%,
+    rgba(79, 111, 82, 0.02) 80%,
+    transparent 100%
+  );
+}
+
+/* ── Progress Bar Milestone Sheen ────────────────────────────────────────── */
+.ft-progress-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.ft-progress-sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: ft-progress-sheen-sweep 3.5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes ft-progress-sheen-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  35% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ft-spring-press {
     transition: none;
@@ -2918,7 +2965,8 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   .ft-spring-press:active {
     transform: none;
   }
-  .ft-card-sheen::after {
+  .ft-card-sheen::after,
+  .ft-progress-sheen::after {
     animation: none;
     display: none;
   }

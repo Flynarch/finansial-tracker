@@ -238,3 +238,22 @@ describe('Package 6: Zero-Decimal Currencies & Sign Edge Cases in AnimatedCounte
     expect(container.textContent).not.toContain('+')
   })
 })
+
+describe('Package 7: Polish & Micro-Delight Enhancements', () => {
+  it('renders AnimatedWalletBalance with frost-to-focus blur transition class', () => {
+    const { container } = render(
+      <AnimatedWalletBalance balance={1250000} currency="IDR" hideBalance={true} size="sm" />
+    )
+    const blurredEl = container.querySelector('span[class*="blur"]')
+    expect(blurredEl).toBeTruthy()
+    expect(blurredEl.className).toContain('blur')
+  })
+
+  it('triggers haptic selection when toggleHideBalance is called', async () => {
+    const vibrateSpy = vi.fn()
+    navigator.vibrate = vibrateSpy
+    const useSettingsStore = (await import('../src/store/useSettingsStore')).default
+    useSettingsStore.getState().toggleHideBalance()
+    expect(vibrateSpy).toHaveBeenCalledWith(8)
+  })
+})

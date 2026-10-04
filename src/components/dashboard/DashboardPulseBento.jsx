@@ -153,6 +153,8 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)]">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
+                      budgetPct >= 80 || isOverBudget ? 'ft-progress-sheen' : ''
+                    } ${
                       isOverBudget
                         ? 'bg-[var(--status-expense)]'
                         : budgetPct >= 80
@@ -261,7 +263,9 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                 {/* Progress Bar */}
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--field-bg)]">
                   <div
-                    className="h-full rounded-full bg-[var(--status-income)] transition-all duration-500"
+                    className={`h-full rounded-full bg-[var(--status-income)] transition-all duration-500 ${
+                      goalPct >= 100 ? 'ft-progress-sheen' : ''
+                    }`}
                     style={{ width: `${Math.min(100, Math.max(goalPct, totalGoalCurrent > 0 ? 4 : 0))}%` }}
                   />
                 </div>

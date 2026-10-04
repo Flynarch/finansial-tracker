@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
 import { derivePbkdf2Pin, isPinHash, encryptSecret, decryptSecret, migrateSecretIfNeeded } from '../lib/crypto'
+import { triggerHaptic } from '../lib/haptics'
 
 const SETTINGS_KEY = 'preferences'
 
@@ -98,6 +99,7 @@ const useSettingsStore = create((set, get) => ({
   toggleHideBalance: () => {
     const next = !get().hideBalance
     set({ hideBalance: next })
+    triggerHaptic('selection')
     try {
       if (typeof window !== 'undefined') {
         window.localStorage?.setItem?.('ft_hide_balance', next ? '1' : '0')
