@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { lazy } from 'react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Skeleton from '../src/components/ui/Skeleton'
 import PageSkeleton from '../src/components/ui/PageSkeleton'
 import EmptyState from '../src/components/ui/EmptyState'
+import SettingsLayout from '../src/pages/settings/SettingsLayout'
 
 afterEach(() => {
   cleanup()
@@ -69,6 +72,15 @@ describe('Skeleton and EmptyState Quality Assurance Suite', () => {
       'profile',
       'wallet-detail',
       'settings',
+      'settings-home',
+      'settings-security',
+      'settings-categories',
+      'settings-recurring',
+      'settings-currency',
+      'settings-notifications',
+      'settings-ai',
+      'settings-data',
+      'settings-help',
       'chat',
       'add-account',
       'generic',
@@ -87,6 +99,30 @@ describe('Skeleton and EmptyState Quality Assurance Suite', () => {
     it('falls back to GenericSkeleton on unknown variant', () => {
       render(<PageSkeleton variant="unknown-custom-variant" />)
       expect(screen.getByRole('status')).toBeDefined()
+    })
+
+    it('renders all dedicated settings skeletons with distinct structures', () => {
+      const settingsVariants = [
+        'settings-home',
+        'settings-security',
+        'settings-categories',
+        'settings-recurring',
+        'settings-currency',
+        'settings-notifications',
+        'settings-ai',
+        'settings-data',
+        'settings-help',
+      ]
+
+      settingsVariants.forEach((variant) => {
+        const { container, unmount } = render(<PageSkeleton variant={variant} />)
+        const statusEl = screen.getByRole('status')
+        expect(statusEl).toBeDefined()
+        expect(statusEl.getAttribute('aria-busy')).toBe('true')
+        // Must contain at least one skeleton element
+        expect(container.querySelectorAll('.ft-skeleton').length).toBeGreaterThan(0)
+        unmount()
+      })
     })
   })
 
@@ -157,6 +193,49 @@ describe('Skeleton and EmptyState Quality Assurance Suite', () => {
         const svg = container.querySelector('svg')
         expect(svg).not.toBeNull()
         unmount()
+      })
+    })
+  })
+
+  describe('SettingsLayout Sub-route Skeleton Fallbacks', () => {
+    const NeverResolvingChild = lazy(() => new Promise(() => {}))
+
+    const SUBROUTES = [
+      { path: '/settings/security', expectedVariant: 'settings-security' },
+      { path: '/settings/categories', expectedVariant: 'settings-categories' },
+      { path: '/settings/recurring', expectedVariant: 'settings-recurring' },
+      { path: '/settings/currency', expectedVariant: 'settings-currency' },
+      { path: '/settings/notifications', expectedVariant: 'settings-notifications' },
+      { path: '/settings/ai', expectedVariant: 'settings-ai' },
+      { path: '/settings/data', expectedVariant: 'settings-data' },
+      { path: '/settings/help', expectedVariant: 'settings-help' },
+      { path: '/settings', expectedVariant: 'settings-home' },
+    ]
+
+    SUBROUTES.forEach(({ path }) => {
+      it(`renders dedicated skeleton fallback for route "${path}"`, () => {
+        const { container } = render(
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/settings" element={<SettingsLayout />}>
+                <Route index element={<NeverResolvingChild />} />
+                <Route path="security" element={<NeverResolvingChild />} />
+                <Route path="categories" element={<NeverResolvingChild />} />
+                <Route path="recurring" element={<NeverResolvingChild />} />
+                <Route path="currency" element={<NeverResolvingChild />} />
+                <Route path="notifications" element={<NeverResolvingChild />} />
+                <Route path="ai" element={<NeverResolvingChild />} />
+                <Route path="data" element={<NeverResolvingChild />} />
+                <Route path="help" element={<NeverResolvingChild />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        )
+
+        const statusEl = screen.getByRole('status')
+        expect(statusEl).toBeDefined()
+        expect(statusEl.getAttribute('aria-busy')).toBe('true')
+        expect(container.querySelectorAll('.ft-skeleton').length).toBeGreaterThan(0)
       })
     })
   })

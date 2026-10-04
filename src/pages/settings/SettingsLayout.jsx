@@ -15,11 +15,23 @@ const ROUTES_META = [
   { path: '/settings/help', titleKey: 'settings.helpTitle' },
 ]
 
+const SUBROUTE_SKELETON_MAP = {
+  '/settings/security': 'settings-security',
+  '/settings/categories': 'settings-categories',
+  '/settings/recurring': 'settings-recurring',
+  '/settings/currency': 'settings-currency',
+  '/settings/notifications': 'settings-notifications',
+  '/settings/ai': 'settings-ai',
+  '/settings/data': 'settings-data',
+  '/settings/help': 'settings-help',
+}
+
 export default function SettingsLayout() {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const meta = ROUTES_META.find((r) => matchPath({ path: r.path, end: true }, location.pathname))
+  const skeletonVariant = SUBROUTE_SKELETON_MAP[location.pathname] || 'settings-home'
 
   return (
     <div className="ft-settings-page">
@@ -41,7 +53,7 @@ export default function SettingsLayout() {
         </header>
       ) : null}
       <Suspense
-        fallback={<PageSkeleton variant="settings" />}
+        fallback={<PageSkeleton variant={skeletonVariant} />}
       >
         <Outlet />
       </Suspense>
