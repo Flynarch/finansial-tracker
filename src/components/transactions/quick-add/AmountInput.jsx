@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, Calculator } from 'lucide-react'
-import { formatMoneyInput, getMoneyInputCaret, formatCurrency } from '../../../lib/utils'
-import { evaluateExpression, resolveCalculatedAmount } from '../../../lib/calcParser'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Camera } from 'lucide-react'
+import { formatMoneyInput, getMoneyInputCaret } from '../../../lib/utils'
+import { resolveCalculatedAmount } from '../../../lib/calcParser'
 import useTranslation from '../../../hooks/useTranslation'
 import useBackButton from '../../../hooks/useBackButton'
 import VirtualKeypad from './VirtualKeypad'
@@ -25,20 +25,12 @@ export default function AmountInput({
   const amountInputRef = useRef(null)
   const amountFieldRef = useRef(null)
 
-  const calcEvaluation = useMemo(() => {
-    return evaluateExpression(amount, currency)
-  }, [amount, currency])
-
-  const hasCalcResult = calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
-
   const handleCommitCalc = useCallback(() => {
     const resolved = resolveCalculatedAmount(amount, currency)
     if (resolved && resolved !== amount) {
       onChangeAmount(formatMoneyInput(resolved, currency))
-    } else if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
-      onChangeAmount(formatMoneyInput(String(calcEvaluation.result), currency))
     }
-  }, [amount, calcEvaluation, currency, onChangeAmount])
+  }, [amount, currency, onChangeAmount])
 
   const openKeypad = useCallback(() => {
     setIsAmountFocused(true)
@@ -95,40 +87,7 @@ export default function AmountInput({
             {txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}
           </div>
 
-          {/* Inline Calculator Result Pill */}
-          {hasCalcResult ? (
-            <button
-              type="button"
-              onClick={handleCommitCalc}
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[var(--field-bg)] border border-[var(--border-strong)] text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs animate-[ft-fade-in_0.15s_ease-out] truncate group"
-              title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
-            >
-              <Calculator className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-              <span className="font-black text-[var(--accent)] tabular-nums truncate">
-                = {formatCurrency(calcEvaluation.result, currency)}
-              </span>
-              <span className="text-[9.5px] text-[var(--muted)] font-medium border-l border-[var(--border)] pl-1.5 shrink-0 group-hover:text-[var(--fg)]">
-                {t('calculator.apply', 'Terapkan')}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={openKeypad}
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95 cursor-pointer shadow-2xs ${
-                isKeypadOpen
-                  ? 'bg-[var(--panel-strong)] text-[var(--fg)] border border-[var(--border-strong)]'
-                  : 'bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] border border-[var(--border)] hover:border-[var(--border-strong)]'
-              }`}
-              title={t('calculator.title', 'Kalkulator')}
-            >
-              <Calculator className="w-3 h-3 text-[var(--accent)] shrink-0" />
-              <span>{t('calculator.title', 'Kalkulator')}</span>
-            </button>
-          )}
-
-          {hasError && !calcEvaluation.hasExpression && (
+          {hasError && (
             <span className="text-[10px] font-medium text-rose-500/80 animate-[ft-fade-in_0.2s_ease-out] truncate">
               {t('addTx.invalidAmountSubtle', 'Wajib diisi & > 0')}
             </span>
@@ -245,8 +204,6 @@ export default function AmountInput({
         onChangeAmount={onChangeAmount}
         currency={currency}
         modeAccent={modeAccent}
-        calcEvaluation={calcEvaluation}
-        onCommitCalc={handleCommitCalc}
       />
     </div>
   )

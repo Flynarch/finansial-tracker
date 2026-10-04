@@ -1,9 +1,9 @@
-import { memo, useState, useEffect, useRef, useCallback } from 'react'
+import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Delete, ChevronDown, Check, Calculator } from 'lucide-react'
 import { triggerHaptic } from '../../../lib/haptics'
 import { formatMoneyInput, formatCurrency } from '../../../lib/utils'
-import { resolveCalculatedAmount } from '../../../lib/calcParser'
+import { evaluateExpression, resolveCalculatedAmount } from '../../../lib/calcParser'
 import useTranslation from '../../../hooks/useTranslation'
 import useSettingsStore from '../../../store/useSettingsStore'
 
@@ -14,7 +14,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   onChangeAmount,
   currency = 'IDR',
   modeAccent = 'var(--accent)',
-  calcEvaluation = { isValid: false, hasExpression: false, result: null },
+  calcEvaluation: calcEvaluationProp,
   onCommitCalc,
 }) {
   const { t } = useTranslation()
@@ -22,53 +22,95 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   const longPressTimerRef = useRef(null)
   const isLongPressRef = useRef(false)
   const [justCalculated, setJustCalculated] = useState(false)
+  const [expression, setExpression] = useState(amount || '')
+  const wasOpenRef = useRef(false)
+
+  // Sync internal calculator expression when keypad opens
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setExpression(amount || '')
+      setJustCalculated(false)
+    }
+    wasOpenRef.current = isOpen
+  }, [isOpen, amount])
+
+  // Internal real-time evaluation of the calculator expression
+  const calcEvaluation = useMemo(() => {
+    if (calcEvaluationProp && !expression) return calcEvaluationProp
+    return evaluateExpression(expression, currency)
+  }, [expression, currency, calcEvaluationProp])
+
+  const hasExpression = /[+\-*/×÷−–—kKmMbBjJrR(]/.test(expression)
+  const hasCalcResult = calcEvaluation.isValid && hasExpression && calcEvaluation.result !== null
 
   // Handle single digit press (0-9)
   const handleDigit = useCallback((digit) => {
     triggerHaptic('light')
     if (justCalculated) {
       setJustCalculated(false)
-      onChangeAmount(digit === '0' ? '0' : digit)
+      const nextVal = digit === '0' ? '0' : digit
+      setExpression(nextVal)
+      onChangeAmount?.(nextVal)
       return
     }
 
-    const current = String(amount || '')
+    const current = String(expression || '')
     if (!current || current === '0') {
-      onChangeAmount(digit === '0' ? '0' : digit)
+      const nextVal = digit === '0' ? '0' : digit
+      setExpression(nextVal)
+      onChangeAmount?.(nextVal)
       return
     }
 
-    // If current contains math operators, format the active operand cleanly
+    // If typing within a math expression (e.g. 50.000 * 2)
     if (/[+\-*/×÷−–—]/.test(current)) {
       const lastOpMatch = current.match(/^(.*[+\-*/×÷−–—]\s*)(.*)$/)
       if (lastOpMatch) {
         const prefix = lastOpMatch[1]
         const rawOperand = lastOpMatch[2]
+        let nextExpr
         if (currency === 'IDR') {
           const nextDigits = (rawOperand.replace(/\D/g, '') + digit).replace(/^0+/, '') || '0'
-          onChangeAmount(prefix + formatMoneyInput(nextDigits, currency))
+          nextExpr = prefix + formatMoneyInput(nextDigits, currency)
         } else {
-          onChangeAmount(prefix + rawOperand + digit)
+          nextExpr = prefix + rawOperand + digit
+        }
+        setExpression(nextExpr)
+        // Update transaction form with evaluated result only
+        const ev = evaluateExpression(nextExpr, currency)
+        if (ev.isValid && ev.result !== null) {
+          onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
         }
         return
       }
-      onChangeAmount(current + digit)
+      const nextExpr = current + digit
+      setExpression(nextExpr)
+      const ev = evaluateExpression(nextExpr, currency)
+      if (ev.isValid && ev.result !== null) {
+        onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+      }
     } else if (/[kKmMbBjJrRtTuU(]/.test(current)) {
-      onChangeAmount(current + digit)
+      const nextExpr = current + digit
+      setExpression(nextExpr)
+      const ev = evaluateExpression(nextExpr, currency)
+      if (ev.isValid && ev.result !== null) {
+        onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+      }
     } else {
       const rawDigits = current.replace(/\D/g, '') + digit
-      onChangeAmount(formatMoneyInput(rawDigits, currency))
+      const formatted = formatMoneyInput(rawDigits, currency)
+      setExpression(formatted)
+      onChangeAmount?.(formatted)
     }
-  }, [amount, currency, justCalculated, onChangeAmount])
+  }, [expression, currency, justCalculated, onChangeAmount])
 
   // Handle 000 shortcut
   const handleTripleZero = useCallback(() => {
     triggerHaptic('light')
     if (justCalculated) return
 
-    const current = String(amount || '')
+    const current = String(expression || '')
     if (!current || current === '0') return
-    // Prevent trailing 000 right after an operator
     if (/[+\-*/×÷−–—]\s*$/.test(current)) return
 
     if (/[+\-*/×÷−–—]/.test(current)) {
@@ -78,58 +120,77 @@ export const VirtualKeypad = memo(function VirtualKeypad({
         const rawOperand = lastOpMatch[2]
         const rawDigits = rawOperand.replace(/\D/g, '')
         if (!rawDigits || rawDigits === '0') return
-        onChangeAmount(prefix + formatMoneyInput(rawDigits + '000', currency))
+        const nextExpr = prefix + formatMoneyInput(rawDigits + '000', currency)
+        setExpression(nextExpr)
+        const ev = evaluateExpression(nextExpr, currency)
+        if (ev.isValid && ev.result !== null) {
+          onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+        }
         return
       }
-      onChangeAmount(current + '000')
+      const nextExpr = current + '000'
+      setExpression(nextExpr)
+      const ev = evaluateExpression(nextExpr, currency)
+      if (ev.isValid && ev.result !== null) {
+        onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+      }
     } else {
       const rawDigits = current.replace(/\D/g, '')
       if (!rawDigits || rawDigits === '0') return
-      onChangeAmount(formatMoneyInput(rawDigits + '000', currency))
+      const formatted = formatMoneyInput(rawDigits + '000', currency)
+      setExpression(formatted)
+      onChangeAmount?.(formatted)
     }
-  }, [amount, currency, justCalculated, onChangeAmount])
+  }, [expression, currency, justCalculated, onChangeAmount])
 
   // Handle decimal dot
   const handleDecimal = useCallback(() => {
     triggerHaptic('light')
     if (justCalculated) {
       setJustCalculated(false)
-      onChangeAmount('0.')
+      setExpression('0.')
+      onChangeAmount?.('0.')
       return
     }
 
-    const current = String(amount || '')
+    const current = String(expression || '')
     if (!current || /[+\-*/×÷−–—]\s*$/.test(current)) {
-      onChangeAmount(`${current}0.`)
+      setExpression(`${current}0.`)
     } else if (!/\.\d*$/.test(current)) {
-      onChangeAmount(`${current}.`)
+      setExpression(`${current}.`)
     }
-  }, [amount, justCalculated, onChangeAmount])
+  }, [expression, justCalculated, onChangeAmount])
 
   // Handle 'k' shortcut
   const handleK = useCallback(() => {
     triggerHaptic('light')
     if (justCalculated) return
 
-    const current = String(amount || '').trim()
+    const current = String(expression || '').trim()
     if (!current || /[+\-*/×÷−–—]\s*$/.test(current) || /[kK]$/.test(current)) return
-    onChangeAmount(`${current}k`)
-  }, [amount, justCalculated, onChangeAmount])
+    const nextExpr = `${current}k`
+    setExpression(nextExpr)
+    const ev = evaluateExpression(nextExpr, currency)
+    if (ev.isValid && ev.result !== null) {
+      onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+    }
+  }, [expression, currency, justCalculated, onChangeAmount])
 
   // Handle math operators (+, -, *, /)
   const handleOperator = useCallback((op) => {
     triggerHaptic('light')
     setJustCalculated(false)
-    const current = String(amount || '').trim()
+    const current = String(expression || '').trim()
     if (!current) {
-      if (op === '-' || op === '−') onChangeAmount('-')
+      if (op === '-' || op === '−') setExpression('-')
       return
     }
 
-    // Replace any trailing operator cleanly to avoid consecutive syntax errors
+    // Clean trailing operator and append new operator
     const cleaned = current.replace(/\s*[+\-*/×÷−–—]+\s*$/, '').trim()
-    onChangeAmount(`${cleaned} ${op} `)
-  }, [amount, onChangeAmount])
+    setExpression(`${cleaned} ${op} `)
+    // Note: The form continues to display the evaluated result, never the math operator
+  }, [expression])
 
   // Handle single backspace
   const handleBackspace = useCallback(() => {
@@ -138,29 +199,48 @@ export const VirtualKeypad = memo(function VirtualKeypad({
       setJustCalculated(false)
     }
 
-    const current = String(amount || '')
+    const current = String(expression || '')
     if (!current) return
 
-    // If string ends with an operator and spaces (e.g. " + ")
+    // If trailing operator and spaces
     if (/\s*[+\-*/×÷−–—]+\s*$/.test(current)) {
-      onChangeAmount(current.replace(/\s*[+\-*/×÷−–—]+\s*$/, ''))
+      const nextExpr = current.replace(/\s*[+\-*/×÷−–—]+\s*$/, '')
+      setExpression(nextExpr)
+      const ev = evaluateExpression(nextExpr, currency)
+      if (ev.isValid && ev.result !== null) {
+        onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+      } else if (!/[+\-*/×÷−–—]/.test(nextExpr)) {
+        onChangeAmount?.(nextExpr)
+      }
       return
     }
 
-    // If within second operand of an expression
+    // If within second operand
     if (/[+\-*/×÷−–—]/.test(current)) {
       const lastOpMatch = current.match(/^(.*[+\-*/×÷−–—]\s*)(.*)$/)
       if (lastOpMatch) {
         const prefix = lastOpMatch[1]
         const rawOperand = lastOpMatch[2]
         const nextOperand = rawOperand.slice(0, -1)
+        let nextExpr
         if (!nextOperand) {
-          onChangeAmount(prefix)
+          nextExpr = prefix
         } else if (currency === 'IDR' && !/[kK]/.test(nextOperand)) {
           const raw = nextOperand.replace(/\D/g, '')
-          onChangeAmount(prefix + (raw ? formatMoneyInput(raw, currency) : ''))
+          nextExpr = prefix + (raw ? formatMoneyInput(raw, currency) : '')
         } else {
-          onChangeAmount(prefix + nextOperand)
+          nextExpr = prefix + nextOperand
+        }
+        setExpression(nextExpr)
+        const ev = evaluateExpression(nextExpr, currency)
+        if (ev.isValid && ev.result !== null) {
+          onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+        } else {
+          const prev = prefix.replace(/\s*[+\-*/×÷−–—]+\s*$/, '').trim()
+          const prevEv = evaluateExpression(prev, currency)
+          if (prevEv.isValid && prevEv.result !== null) {
+            onChangeAmount?.(formatMoneyInput(String(prevEv.result), currency))
+          }
         }
         return
       }
@@ -168,17 +248,24 @@ export const VirtualKeypad = memo(function VirtualKeypad({
 
     const next = current.slice(0, -1).trim()
     if (!next) {
-      onChangeAmount('')
+      setExpression('')
+      onChangeAmount?.('')
       return
     }
 
     if (!/[+\-*/×÷−–—kKmMbBjJrRtTuU(]/.test(next)) {
       const raw = next.replace(/\D/g, '')
-      onChangeAmount(raw ? formatMoneyInput(raw, currency) : '')
+      const formatted = raw ? formatMoneyInput(raw, currency) : ''
+      setExpression(formatted)
+      onChangeAmount?.(formatted)
     } else {
-      onChangeAmount(next)
+      setExpression(next)
+      const ev = evaluateExpression(next, currency)
+      if (ev.isValid && ev.result !== null) {
+        onChangeAmount?.(formatMoneyInput(String(ev.result), currency))
+      }
     }
-  }, [amount, currency, justCalculated, onChangeAmount])
+  }, [expression, currency, justCalculated, onChangeAmount])
 
   // Long press on backspace clears all
   const handleBackspacePointerDown = (e) => {
@@ -188,7 +275,8 @@ export const VirtualKeypad = memo(function VirtualKeypad({
       isLongPressRef.current = true
       triggerHaptic('medium')
       setJustCalculated(false)
-      onChangeAmount('')
+      setExpression('')
+      onChangeAmount?.('')
     }, 450)
   }
 
@@ -207,26 +295,31 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   const handleClear = useCallback(() => {
     triggerHaptic('medium')
     setJustCalculated(false)
-    onChangeAmount('')
+    setExpression('')
+    onChangeAmount?.('')
   }, [onChangeAmount])
 
-  // Helper to commit current calculation
+  // Commit current calculation result into expression and form amount
   const applyCalculatedAmount = useCallback(() => {
-    const resolved = resolveCalculatedAmount(amount, currency)
-    if (resolved && resolved !== amount) {
-      onChangeAmount(formatMoneyInput(resolved, currency))
+    const resolved = resolveCalculatedAmount(expression, currency)
+    if (resolved) {
+      const formatted = formatMoneyInput(resolved, currency)
+      setExpression(formatted)
+      onChangeAmount?.(formatted)
       setJustCalculated(true)
       return true
     }
-    if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
-      onChangeAmount(formatMoneyInput(String(calcEvaluation.result), currency))
+    if (calcEvaluation.isValid && calcEvaluation.result !== null) {
+      const formatted = formatMoneyInput(String(calcEvaluation.result), currency)
+      setExpression(formatted)
+      onChangeAmount?.(formatted)
       setJustCalculated(true)
       return true
     }
     return false
-  }, [amount, currency, calcEvaluation, onChangeAmount])
+  }, [expression, currency, calcEvaluation, onChangeAmount])
 
-  // Commit calculation result directly via button
+  // Commit calculation result directly via = button
   const handleCommit = useCallback(() => {
     triggerHaptic('medium')
     const didApply = applyCalculatedAmount()
@@ -235,21 +328,21 @@ export const VirtualKeypad = memo(function VirtualKeypad({
     }
   }, [applyCalculatedAmount, onCommitCalc])
 
-  // Done button commits calc if active and closes keypad
+  // Done button commits calculation and closes keypad
   const handleDone = useCallback(() => {
     triggerHaptic('medium')
     applyCalculatedAmount()
     onClose?.()
   }, [applyCalculatedAmount, onClose])
 
-  // Close chevron commits calc if active and closes keypad
+  // Close chevron commits calculation and closes keypad
   const handleClose = useCallback(() => {
     triggerHaptic('light')
     applyCalculatedAmount()
     onClose?.()
   }, [applyCalculatedAmount, onClose])
 
-  // Physical desktop keyboard support when keypad is open
+  // Physical desktop keyboard support
   useEffect(() => {
     if (!isOpen) return undefined
 
@@ -309,8 +402,6 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   }, [isOpen])
 
   if (!shouldRender || typeof document === 'undefined') return null
-
-  const hasCalcResult = calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
 
   return createPortal(
     <div
@@ -377,28 +468,34 @@ export const VirtualKeypad = memo(function VirtualKeypad({
           </div>
         </div>
 
-        {/* Live Calculation Result Banner / Interactive Pill */}
-        {hasCalcResult && (
+        {/* In-Keypad Calculation Expression Display & Live Result Pill */}
+        {hasExpression && (
           <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-2xl bg-[var(--field-bg)] border border-[var(--border-strong)] shadow-2xs animate-[ft-fade-in_0.15s_ease-out]">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Calculator className="w-4 h-4 text-[var(--accent)] shrink-0" />
               <span className="text-xs text-[var(--muted)] truncate font-mono">
-                {amount}
+                {expression}
               </span>
             </div>
-            <button
-              type="button"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={handleCommit}
-              aria-label={t('calculator.apply', 'Terapkan')}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-[var(--accent)] text-white shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
-              title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
-            >
-              <span className="tabular-nums">= {formatCurrency(calcEvaluation.result, currency)}</span>
-              <span className="text-[10px] opacity-90 border-l border-white/30 pl-1.5 font-medium">
-                {t('calculator.apply', 'Terapkan')}
+            {hasCalcResult ? (
+              <button
+                type="button"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={handleCommit}
+                aria-label={t('calculator.apply', 'Terapkan')}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-[var(--accent)] text-white shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
+                title={t('calculator.tapToApply', 'Tekan untuk terapkan')}
+              >
+                <span className="tabular-nums">= {formatCurrency(calcEvaluation.result, currency)}</span>
+                <span className="text-[10px] opacity-90 border-l border-white/30 pl-1.5 font-medium">
+                  {t('calculator.apply', 'Terapkan')}
+                </span>
+              </button>
+            ) : (
+              <span className="text-xs text-[var(--muted-2)] font-mono shrink-0">
+                = ...
               </span>
-            </button>
+            )}
           </div>
         )}
 

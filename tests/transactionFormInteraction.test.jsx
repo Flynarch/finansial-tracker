@@ -57,20 +57,28 @@ describe('Transaction Form UI Interaction Tests', () => {
       expect(input.value).toBe('50.000')
     })
 
-    it('evaluates inline calculator expressions and applies result via button click', () => {
+    it('evaluates calculator expressions and applies result via keypad', () => {
       const onChangeAmount = vi.fn()
       render(<ControlledAmountInput onChangeAmount={onChangeAmount} />)
 
       const input = screen.getByRole('textbox')
-      // Type inline math expression
-      fireEvent.change(input, { target: { value: '25000+15000' } })
+      fireEvent.focus(input)
 
-      expect(onChangeAmount).toHaveBeenCalledWith('25000+15000')
-      expect(input.value).toBe('25000+15000')
+      // Enter digits and operation via virtual keypad
+      fireEvent.click(screen.getByRole('button', { name: '2' }))
+      fireEvent.click(screen.getByRole('button', { name: '5' }))
+      fireEvent.click(screen.getByRole('button', { name: '000' }))
+      fireEvent.click(screen.getByRole('button', { name: '+' }))
+      fireEvent.click(screen.getByRole('button', { name: '1' }))
+      fireEvent.click(screen.getByRole('button', { name: '5' }))
+      fireEvent.click(screen.getByRole('button', { name: '000' }))
 
-      // Calculator apply button should appear
+      // In-keypad calculator apply button should appear with evaluated result
       const applyBtn = screen.getByRole('button', { name: /terapkan|apply/i })
       expect(applyBtn).toBeDefined()
+
+      // Form receives the evaluated result
+      expect(onChangeAmount).toHaveBeenCalledWith('40.000')
 
       // Click to apply
       fireEvent.click(applyBtn)
@@ -89,18 +97,29 @@ describe('Transaction Form UI Interaction Tests', () => {
       const operatorBar = screen.getByTestId('calculator-operator-bar')
       expect(operatorBar).toBeDefined()
 
-      // Click '+' button
+      // Click '+' button then '1', '0', '000'
       const plusBtn = screen.getByRole('button', { name: '+' })
       fireEvent.click(plusBtn)
-      expect(onChangeAmount).toHaveBeenCalledWith('50.000 + ')
+      fireEvent.click(screen.getByRole('button', { name: '1' }))
+      fireEvent.click(screen.getByRole('button', { name: '0' }))
+      fireEvent.click(screen.getByRole('button', { name: '000' }))
+
+      // Transaction form displays evaluated result
+      expect(onChangeAmount).toHaveBeenCalledWith('60.000')
     })
 
     it('calculates and commits using the equal button on the operator bar', () => {
       const onChangeAmount = vi.fn()
-      render(<ControlledAmountInput initialAmount="30.000 + 20.000" onChangeAmount={onChangeAmount} />)
+      render(<ControlledAmountInput initialAmount="30.000" onChangeAmount={onChangeAmount} />)
 
       const input = screen.getByRole('textbox')
       fireEvent.focus(input)
+
+      // Add 20.000 via keypad
+      fireEvent.click(screen.getByRole('button', { name: '+' }))
+      fireEvent.click(screen.getByRole('button', { name: '2' }))
+      fireEvent.click(screen.getByRole('button', { name: '0' }))
+      fireEvent.click(screen.getByRole('button', { name: '000' }))
 
       // Equal button with aria-label / title 'Hitung' or 'Calculate' should be enabled and apply
       const calcEqualBtn = screen.getByRole('button', { name: /hitung|calculate/i })
@@ -126,7 +145,7 @@ describe('Transaction Form UI Interaction Tests', () => {
       // Click k button
       const kBtn = screen.getByRole('button', { name: 'k' })
       fireEvent.click(kBtn)
-      expect(onChangeAmount).toHaveBeenCalledWith('25.000k')
+      expect(onChangeAmount).toHaveBeenCalledWith('25.000.000')
     })
 
     it('allows currency selection when isCashWallet is true', () => {
