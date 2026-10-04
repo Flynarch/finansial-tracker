@@ -299,7 +299,7 @@ function Budget() {
         />
 
         {/* Summary Hero Card */}
-        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5">
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5 ft-card-sheen">
           {/* Main Metric Section */}
           <div className="relative z-10 space-y-2.5">
             {/* Top Row: Total Terpakai + Status Badge on left, MonthPicker on top right */}

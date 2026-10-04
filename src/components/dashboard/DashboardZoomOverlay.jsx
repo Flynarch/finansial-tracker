@@ -81,13 +81,18 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   }, [zoomCombinedChartSeries])
 
   const lastScrubbedIndexRef = useRef(null)
+  const lastTickRef = useRef(0)
 
   const handleZoomChartTouchOrMove = (e) => {
     setZoomTooltipDismissed?.(false)
     const activeIdx = e?.activeTooltipIndex
     if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
       lastScrubbedIndexRef.current = activeIdx
-      triggerHaptic('selection')
+      const now = performance.now()
+      if (now - lastTickRef.current >= 35) {
+        lastTickRef.current = now
+        triggerHaptic('selection')
+      }
     }
   }
 
@@ -549,6 +554,9 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       onMouseLeave={() => {
                         lastScrubbedIndexRef.current = null
                         setZoomTooltipDismissed?.(true)
+                      }}
+                      onTouchEnd={() => {
+                        lastScrubbedIndexRef.current = null
                       }}
                     >
                     <defs>

@@ -2884,28 +2884,43 @@ body.hide-bottom-nav [aria-label="Open AI Chat"] {
   bottom: 0;
   left: 0;
   background: linear-gradient(
-    105deg,
+    110deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.03) 30%,
-    rgba(255, 255, 255, 0.12) 50%,
-    rgba(255, 255, 255, 0.03) 70%,
+    rgba(255, 255, 255, 0.02) 20%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.02) 80%,
     transparent 100%
   );
-  transform: translateX(-120%);
-  animation: ft-sheen-sweep 4s ease-in-out infinite;
+  transform: translateX(-130%);
+  animation: ft-sheen-sweep 7.5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
   pointer-events: none;
   border-radius: inherit;
+  z-index: 1;
 }
 
 @keyframes ft-sheen-sweep {
   0% {
-    transform: translateX(-120%);
+    transform: translateX(-130%);
   }
-  30% {
-    transform: translateX(120%);
+  35% {
+    transform: translateX(130%);
   }
   100% {
-    transform: translateX(120%);
+    transform: translateX(130%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-spring-press {
+    transition: none;
+    will-change: auto;
+  }
+  .ft-spring-press:active {
+    transform: none;
+  }
+  .ft-card-sheen::after {
+    animation: none;
+    display: none;
   }
 }
 

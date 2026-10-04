@@ -366,6 +366,9 @@ export default function WalletCarousel({
                   key={w.id}
                   onClick={() => navigate(`/wallet/${w.id}`)}
                   className="ft-wallet-mini ft-spring-press"
+                  style={w.color ? {
+                    boxShadow: `0 2px 14px -3px ${w.color}24, inset 0 0 0 1px ${w.color}30`,
+                  } : undefined}
                   title={`${w.name} - ${hideBalance ? '••••••' : formatCurrency(w.currentBalance ?? w.balance ?? 0, w.currency || defaultCurrency)}`}
                 >
 

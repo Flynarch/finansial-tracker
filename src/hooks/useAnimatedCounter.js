@@ -53,6 +53,7 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
   const isFirstMountRef = useRef(true)
   const [currentValue, setCurrentValue] = useState(() => numericTarget)
   const prevValueRef = useRef(numericTarget)
+  const currentValRef = useRef(numericTarget)
   const animFrameRef = useRef(null)
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
     if (!enabled || reduceMotion) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
       prevValueRef.current = numericTarget
+      currentValRef.current = numericTarget
       const frame = requestAnimationFrame(() => {
         setCurrentValue(numericTarget)
       })
@@ -72,6 +74,7 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
       isFirstMountRef.current = false
       if (skipInitial) {
         prevValueRef.current = numericTarget
+        currentValRef.current = numericTarget
         return undefined
       }
     }
@@ -90,6 +93,7 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
       const frame = requestAnimationFrame(() => {
         setCurrentValue(endValue)
         prevValueRef.current = endValue
+        currentValRef.current = endValue
       })
       return () => cancelAnimationFrame(frame)
     }
@@ -104,11 +108,13 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
       const easeProgress = smoothFinancialEase(progress)
       const nextVal = startValue + (endValue - startValue) * easeProgress
 
+      currentValRef.current = nextVal
       setCurrentValue(nextVal)
 
       if (progress < 1) {
         animFrameRef.current = requestAnimationFrame(animate)
       } else {
+        currentValRef.current = endValue
         setCurrentValue(endValue)
         prevValueRef.current = endValue
       }
@@ -123,6 +129,7 @@ export function useAnimatedCounter(targetValue, { duration, enabled = true, skip
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current)
       }
+      prevValueRef.current = currentValRef.current
     }
   }, [numericTarget, duration, enabled, reduceMotion, skipInitial])
 

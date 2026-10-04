@@ -67,6 +67,7 @@ export const MiniChartCard = memo(function MiniChartCard({
 }) {
   const [scrubbedPoint, setScrubbedPoint] = useState(null)
   const lastScrubbedIndexRef = useRef(null)
+  const lastTickRef = useRef(0)
   const reactId = useId()
   const gradientId = useMemo(() => `miniGradFade_${reactId.replace(/:/g, '')}`, [reactId])
 
@@ -84,7 +85,11 @@ export const MiniChartCard = memo(function MiniChartCard({
       const activeIdx = e.activeTooltipIndex
       if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
         lastScrubbedIndexRef.current = activeIdx
-        triggerHaptic('selection')
+        const now = performance.now()
+        if (now - lastTickRef.current >= 35) {
+          lastTickRef.current = now
+          triggerHaptic('selection')
+        }
       }
       const payload = e.activePayload[0]
       const rawVal = payload.value

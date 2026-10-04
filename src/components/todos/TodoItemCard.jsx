@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { ChevronRight, Check, Clock } from 'lucide-react'
 import { priorityClass, TODO_CATEGORY_META } from './TodoMeta'
 
@@ -48,6 +48,7 @@ export const TodoItemCard = memo(function TodoItemCard({
   dueBadgeClass,
   t,
 }) {
+  const [justToggled, setJustToggled] = useState(false)
   const showProg = subProgress && subProgress.total > 0
   const doneStyle = todo.completed ? 'opacity-60' : ''
   const dimCompleted = todo.completed ? 'opacity-70' : ''
@@ -155,6 +156,7 @@ export const TodoItemCard = memo(function TodoItemCard({
             if (finalDx <= -60) {
               onDeleteTodoFromCard(todo)
             } else if (finalDx >= 60) {
+              setJustToggled(true)
               toggleCardComplete(todo.id, todo.completed)
             }
             updateBgVisual(bgEl, 'none')
@@ -166,6 +168,7 @@ export const TodoItemCard = memo(function TodoItemCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
+                setJustToggled(true)
                 toggleCardComplete(todo.id, todo.completed)
               }}
               className="flex h-9 w-9 min-h-[36px] min-w-[36px] shrink-0 items-center justify-center -m-1 p-1 rounded-xl cursor-pointer group/check self-center"
@@ -178,7 +181,12 @@ export const TodoItemCard = memo(function TodoItemCard({
                     : 'border-[var(--border-strong)] bg-[var(--field-bg)] group-hover/check:border-[var(--status-income)]/60'
                 }`}
               >
-                {todo.completed && <Check className="h-3.5 w-3.5 ft-check-animated" strokeWidth={3} />}
+                {todo.completed && (
+                  <Check
+                    className={`h-3.5 w-3.5 ${justToggled ? 'ft-check-animated' : ''}`}
+                    strokeWidth={3}
+                  />
+                )}
               </div>
             </button>
 

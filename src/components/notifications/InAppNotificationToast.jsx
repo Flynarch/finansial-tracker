@@ -51,9 +51,21 @@ export default function InAppNotificationToast() {
   const queueRef = useRef([])
   const isShowingRef = useRef(false)
   const timerRef = useRef(null)
+  const dismissTimerRef = useRef(null)
+  const remainingTimeRef = useRef(4500)
+  const timerStartRef = useRef(0)
+  const isPausedRef = useRef(false)
+  const [isPaused, setIsPaused] = useState(false)
   const processedIdsRef = useRef(new Set())
   const touchStartRef = useRef({ y: 0, time: 0, moved: false })
   const processNextToastRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
+    }
+  }, [])
 
   // Listen to new unread database notifications without dropping items in batch
   const recentNotifications = useLiveQuery(async () => {
@@ -70,10 +82,16 @@ export default function InAppNotificationToast() {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    isPausedRef.current = false
+    setIsPaused(false)
     setIsVisible(false)
     setDragOffset(0)
 
-    setTimeout(() => {
+    dismissTimerRef.current = setTimeout(() => {
       setActiveToast(null)
       isShowingRef.current = false
       if (queueRef.current.length > 0 && typeof processNextToastRef.current === 'function') {
@@ -81,6 +99,28 @@ export default function InAppNotificationToast() {
       }
     }, 320)
   }, [])
+
+  const pauseTimer = useCallback(() => {
+    if (isPausedRef.current) return
+    isPausedRef.current = true
+    setIsPaused(true)
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+      const elapsed = Date.now() - timerStartRef.current
+      remainingTimeRef.current = Math.max(500, remainingTimeRef.current - elapsed)
+    }
+  }, [])
+
+  const resumeTimer = useCallback(() => {
+    if (!isPausedRef.current) return
+    isPausedRef.current = false
+    setIsPaused(false)
+    timerStartRef.current = Date.now()
+    timerRef.current = setTimeout(() => {
+      dismissToast()
+    }, remainingTimeRef.current)
+  }, [dismissToast])
 
   const processNextToast = useCallback(() => {
     if (isShowingRef.current || queueRef.current.length === 0) return
@@ -97,9 +137,15 @@ export default function InAppNotificationToast() {
       setIsVisible(true)
     })
 
+    const duration = nextItem.duration || 4500
+    remainingTimeRef.current = duration
+    timerStartRef.current = Date.now()
+    isPausedRef.current = false
+    setIsPaused(false)
+
     timerRef.current = setTimeout(() => {
       dismissToast()
-    }, nextItem.duration || 4500)
+    }, duration)
   }, [dismissToast])
 
   useEffect(() => {
@@ -180,6 +226,7 @@ export default function InAppNotificationToast() {
   // Touch handlers for swipe-up dismiss gesture with velocity tracking
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return
+    pauseTimer()
     setIsDragging(true)
     touchStartRef.current = {
       y: e.touches[0].clientY,
@@ -214,6 +261,7 @@ export default function InAppNotificationToast() {
       dismissToast()
     } else {
       setDragOffset(0)
+      resumeTimer()
     }
   }
 
@@ -222,7 +270,7 @@ export default function InAppNotificationToast() {
   const { Icon, color, bg } = getToastIcon(activeToast?.type, activeToast?.title, activeToast?.message)
 
   return createPortal(
-    <div className="fixed top-[max(1.25rem,calc(env(safe-area-inset-top)+0.75rem))] inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+    <div className="fixed top-[max(1.25rem,calc(env(safe-area-inset-top)+0.75rem))] inset-x-0 z-[70] flex justify-center px-4 pointer-events-none">
       <div
         role="alert"
         tabIndex={0}
@@ -230,6 +278,13 @@ export default function InAppNotificationToast() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => {
+          setIsDragging(false)
+          setDragOffset(0)
+          resumeTimer()
+        }}
+        onMouseEnter={pauseTimer}
+        onMouseLeave={resumeTimer}
         className={`w-full max-w-sm cursor-pointer select-none pointer-events-auto transform-gpu ${
           isVisible
             ? 'opacity-100'
@@ -307,6 +362,8 @@ export default function InAppNotificationToast() {
             style={{
               width: isVisible ? '0%' : '100%',
               transitionDuration: isVisible ? `${activeToast?.duration || 4500}ms` : '0ms',
+              transitionPlayState: isPaused ? 'paused' : 'running',
+              animationPlayState: isPaused ? 'paused' : 'running',
             }}
           />
         </div>

@@ -11,22 +11,40 @@ export const AnimatedCounter = memo(function AnimatedCounter({
   prefix = '',
   suffix = '',
   skipInitial = false,
+  showSign = false,
 }) {
   const animatedValue = useAnimatedCounter(value, { duration, skipInitial })
 
-  // Clean rounding for zero-decimal currencies (IDR, JPY, KRW) to eliminate micro-jitter
-  const safeRoundedValue =
-    currency === 'IDR' || currency === 'JPY' || currency === 'KRW'
-      ? Math.round(animatedValue)
-      : animatedValue
+  // Clean rounding for zero-decimal currencies (IDR, JPY, KRW, VND) to eliminate micro-jitter
+  const cleanCurrency = typeof currency === 'string' ? currency.trim().toUpperCase() : 'IDR'
+  const isZeroDecimal =
+    cleanCurrency === 'IDR' ||
+    cleanCurrency === 'JPY' ||
+    cleanCurrency === 'KRW' ||
+    cleanCurrency === 'VND'
+
+  const rawRounded = isZeroDecimal ? Math.round(animatedValue) : animatedValue
+  const safeRoundedValue = Math.abs(rawRounded) === 0 ? 0 : rawRounded
+
+  let dynamicPrefix = prefix
+  let valToFormat = safeRoundedValue
+
+  if (showSign) {
+    if (safeRoundedValue > 0) {
+      dynamicPrefix = `${prefix}+`
+    } else if (safeRoundedValue < 0) {
+      dynamicPrefix = `${prefix}-`
+      valToFormat = Math.abs(safeRoundedValue)
+    }
+  }
 
   const displayString = formatter
-    ? formatter(safeRoundedValue)
-    : formatCurrency(safeRoundedValue, currency)
+    ? formatter(valToFormat)
+    : formatCurrency(valToFormat, currency)
 
   return (
     <span className={`tabular-nums font-inherit transition-colors duration-200 ${className}`}>
-      {prefix}
+      {dynamicPrefix}
       {displayString}
       {suffix}
     </span>

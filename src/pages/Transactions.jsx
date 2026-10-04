@@ -899,27 +899,47 @@ function Transactions() {
             if (swipedTransactionId === txId) setSwipedTransactionId(null)
 
             if (typeof window !== 'undefined') {
+              const hasCascade = Boolean(
+                deletedTxCopy.loanId ||
+                deletedTxCopy.goalId ||
+                deletedTxCopy.investmentId ||
+                deletedTxCopy.investmentOrderId ||
+                deletedTxCopy.splitBillId
+              )
+
               window.dispatchEvent(
                 new CustomEvent('ft-show-toast', {
                   detail: {
                     title: t('tx.deleted', 'Transaksi Dihapus'),
-                    message: t('tx.undoHint', 'Ketuk Urungkan untuk mengembalikan transaksi'),
+                    message: hasCascade
+                      ? undefined
+                      : t('tx.undoHint', 'Ketuk Urungkan untuk mengembalikan transaksi'),
                     type: 'warning',
                     duration: 5000,
-                    action: {
-                      label: t('common.undo', 'Urungkan'),
-                      onClick: async () => {
-                        try {
-                          await db.transactions.update(txId, { deletedAt: null })
-                          if (deletedTxCopy.walletId) {
-                            await invalidateWalletBalance([deletedTxCopy.walletId, deletedTxCopy.targetWalletId].filter(Boolean))
-                          }
-                          triggerHaptic('success')
-                        } catch (e) {
-                          console.warn('[Transactions:undoDelete]', e)
-                        }
-                      },
-                    },
+                    action: hasCascade
+                      ? undefined
+                      : {
+                          label: t('common.undo', 'Urungkan'),
+                          onClick: async () => {
+                            try {
+                              const updatePayload = { deletedAt: null }
+                              if (deletedTxCopy.receiptImage) {
+                                updatePayload.receiptImage = deletedTxCopy.receiptImage
+                              }
+                              await db.transactions.update(txId, updatePayload)
+                              if (deletedTxCopy.walletId) {
+                                await invalidateWalletBalance(
+                                  [deletedTxCopy.walletId, deletedTxCopy.targetWalletId].filter(Boolean)
+                                )
+                              }
+                              clearCachedDashboardState()
+                              scheduleNativeWidgetSync()
+                              triggerHaptic('success')
+                            } catch (e) {
+                              console.warn('[Transactions:undoDelete]', e)
+                            }
+                          },
+                        },
                   },
                 })
               )

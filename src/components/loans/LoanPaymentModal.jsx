@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Button from '../ui/Button'
 import ToastBanner from '../ui/ToastBanner'
@@ -36,6 +36,13 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const [sheetError, setSheetError] = useState('')
   const [showPayoffStamp, setShowPayoffStamp] = useState(false)
   const amountInputRef = useRef(null)
+  const payoffTimerRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (payoffTimerRef.current) clearTimeout(payoffTimerRef.current)
+    }
+  }, [])
 
   const [cachedLoan, setCachedLoan] = useState(incomingLoan)
   const [prevIncomingLoan, setPrevIncomingLoan] = useState(incomingLoan)
@@ -159,7 +166,8 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
         setShowPayoffStamp(true)
         hapticSuccess()
         onSaved?.()
-        setTimeout(() => {
+        if (payoffTimerRef.current) clearTimeout(payoffTimerRef.current)
+        payoffTimerRef.current = setTimeout(() => {
           setShowPayoffStamp(false)
           onClose?.()
         }, 1300)
@@ -183,12 +191,12 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       onClose={onClose}
       title={isDebt ? t('loans.payment.titleDebt', 'Bayar Cicilan Hutang') : t('loans.payment.titleReceivable', 'Terima Pembayaran Piutang')}
     >
-      {showPayoffStamp && <CanvasConfettiOverlay duration={2000} />}
+      {showPayoffStamp && <CanvasConfettiOverlay duration={2000} variant="cannons" />}
       <div className="relative space-y-2.5 pt-0.5 pb-2">
         {showPayoffStamp && (
           <div className="absolute inset-0 z-50 bg-[var(--panel-strong)]/90 backdrop-blur-xs flex flex-col items-center justify-center rounded-2xl animate-in fade-in duration-200">
             <div
-              className={`loan-stamp ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'} flex flex-col items-center justify-center text-center shadow-2xl`}
+              className={`loan-stamp !relative !top-auto !right-auto ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'} flex flex-col items-center justify-center text-center shadow-2xl`}
               style={{
                 width: '6.5rem',
                 height: '6.5rem',

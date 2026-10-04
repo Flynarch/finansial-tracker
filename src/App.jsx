@@ -1,8 +1,13 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoadingScreen from './components/ui/LoadingScreen'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+
+function GoalDetailRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/savings/${id}`} replace />
+}
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
@@ -48,6 +53,10 @@ function App() {
             <Route path="/budget" element={<Budget />} />
             <Route path="/savings" element={<Savings />} />
             <Route path="/savings/:id" element={<SavingsDetail />} />
+            <Route path="/goal" element={<Navigate to="/savings" replace />} />
+            <Route path="/goals" element={<Navigate to="/savings" replace />} />
+            <Route path="/goal/:id" element={<GoalDetailRedirect />} />
+            <Route path="/goals/:id" element={<GoalDetailRedirect />} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/add-account" element={<AddAccountPage />} />
             <Route path="/wallet/add" element={<Navigate to="/add-account" replace />} />

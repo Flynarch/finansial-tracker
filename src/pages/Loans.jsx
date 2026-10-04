@@ -312,7 +312,7 @@ export default function Loans() {
         />
 
         {/* Summary Card Header */}
-        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-[var(--shadow-card)] space-y-3.5">
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 shadow-[var(--shadow-card)] space-y-3.5 ft-card-sheen">
           <div className="grid grid-cols-2 gap-4 divide-x divide-[var(--border)]">
             {/* Total Debt */}
             <div className="min-w-0">
@@ -379,9 +379,9 @@ export default function Loans() {
               }`}
             >
               <AnimatedCounter
-                value={Math.abs(totals.netPosition)}
+                value={totals.netPosition}
                 currency={defaultCurrency}
-                prefix={totals.netPosition > 0 ? '+' : totals.netPosition < 0 ? '-' : ''}
+                showSign={true}
               />
             </span>
           </div>

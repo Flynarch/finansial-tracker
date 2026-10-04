@@ -84,6 +84,7 @@ const HabitItemCard = memo(function HabitItemCard({
   setConfirmDeleteId,
 }) {
   const isSwiped = swipedId === habit.id
+  const [justToggled, setJustToggled] = useState(false)
 
   return (
     <li key={habit.id} className="group relative overflow-hidden rounded-[1.25rem]">
@@ -118,6 +119,7 @@ const HabitItemCard = memo(function HabitItemCard({
                 ignoreNextClickRef.current = false
                 return
               }
+              setJustToggled(true)
               toggleHabitToday(habit.id)
             }}
             className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-[2.5px] transition-transform duration-200 ${isTodayList && !habit.isPaused ? 'active:scale-95' : 'opacity-40'} ${isDone ? 'shadow-md' : 'shadow-sm bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)]'}`}
@@ -129,7 +131,7 @@ const HabitItemCard = memo(function HabitItemCard({
           >
             {isDone ? (
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" className="ft-check-animated" />
+                <path d="M20 6L9 17l-5-5" className={justToggled ? "ft-check-animated" : ""} />
               </svg>
             ) : habit.isPaused ? (
               <Pause size={14} className="text-amber-500" />

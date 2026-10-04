@@ -13,6 +13,7 @@ import CustomDatePicker from '../components/ui/CustomDatePicker'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import PageHeader from '../components/ui/PageHeader'
 import CanvasConfettiOverlay from '../components/ui/CanvasConfettiOverlay'
+import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { getCachedCurrencyRates } from '../lib/api'
 import {
   clampPercent,
@@ -493,7 +494,7 @@ export default function SavingsDetail() {
         )}
 
         {/* ── Spacious & Aesthetic Hero Card ── */}
-        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-4">
+        <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-4 ft-card-sheen">
           <div className="relative z-10 space-y-3">
             {/* Top Row: Title + % badge */}
             <div className="flex items-center justify-between gap-2 -mt-0.5">
@@ -509,10 +510,10 @@ export default function SavingsDetail() {
             {/* Middle Row: Inline Big Amount + Target */}
             <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
               <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                {formatCurrency(current, currency)}
+                <AnimatedCounter value={current} currency={currency} />
               </p>
               <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
-                / {formatCurrency(target, currency)}
+                / <AnimatedCounter value={target} currency={currency} />
               </span>
             </div>
 
@@ -520,7 +521,9 @@ export default function SavingsDetail() {
             <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-xs font-bold tabular-nums">
               <div className="flex items-center gap-1.5">
                 <span className="text-[var(--muted)]">{t('savings.remainingShort', 'Sisa')}:</span>
-                <span className="font-black text-[var(--fg)]">{formatCurrency(remaining, currency)}</span>
+                <span className="font-black text-[var(--fg)]">
+                  <AnimatedCounter value={remaining} currency={currency} />
+                </span>
               </div>
               <span className="text-[var(--earthy-green)] font-black">
                 {Math.round(pct)}% {t('savings.reached', 'Tercapai')}
@@ -871,7 +874,7 @@ export default function SavingsDetail() {
       </BottomSheet>
 
       {/* ── Celebration Certificate Modal ── */}
-      {isCelebrationModalOpen && <CanvasConfettiOverlay duration={3000} />}
+      {isCelebrationModalOpen && <CanvasConfettiOverlay duration={3000} variant="cannons" />}
       <Modal
         isOpen={isCelebrationModalOpen}
         onClose={() => setIsCelebrationModalOpen(false)}

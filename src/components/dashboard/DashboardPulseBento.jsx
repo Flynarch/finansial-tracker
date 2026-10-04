@@ -3,6 +3,7 @@ import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus } fro
 import { formatCompactCurrency, convertCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
 import AnimatedCounter from '../ui/AnimatedCounter'
+import { triggerHaptic } from '../../lib/haptics'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
   isDbLoading = false,
@@ -96,11 +97,17 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
         <div
           role="button"
           tabIndex={0}
-          onClick={onOpenBudgetDetail}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') onOpenBudgetDetail?.()
+          onClick={() => {
+            triggerHaptic('light')
+            onOpenBudgetDetail?.()
           }}
-          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[128px]"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              triggerHaptic('light')
+              onOpenBudgetDetail?.()
+            }
+          }}
+          className="ft-bento-card ft-spring-press group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between min-h-[128px]"
         >
           <div>
             {/* Top Row: Icon + Title on left, Chevron on right */}
@@ -199,11 +206,17 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
         <div
           role="button"
           tabIndex={0}
-          onClick={onOpenSavingsDetail}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') onOpenSavingsDetail?.()
+          onClick={() => {
+            triggerHaptic('light')
+            onOpenSavingsDetail?.()
           }}
-          className="ft-bento-card group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between active:scale-[0.98] min-h-[128px]"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              triggerHaptic('light')
+              onOpenSavingsDetail?.()
+            }
+          }}
+          className="ft-bento-card ft-spring-press group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between min-h-[128px]"
         >
           <div>
             {/* Top Row: Icon + Title on left, Chevron on right */}

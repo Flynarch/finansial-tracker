@@ -28,8 +28,12 @@ export function getParentRoute(pathname) {
     return '/dashboard'
   }
 
-  // Savings Detail Page (/savings/:id) -> /savings
-  if (pathname.startsWith('/savings/')) {
+  // Savings / Goal Detail Page (/savings/:id, /goal/:id, /goals/:id) -> /savings
+  if (
+    pathname.startsWith('/savings/') ||
+    pathname.startsWith('/goal/') ||
+    pathname.startsWith('/goals/')
+  ) {
     return '/savings'
   }
 

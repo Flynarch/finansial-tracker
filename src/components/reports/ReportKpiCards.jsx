@@ -115,9 +115,9 @@ export default function ReportKpiCards({
             }`}
           >
             <AnimatedCounter
-              value={Math.abs(netSavings)}
+              value={netSavings}
               currency={defaultCurrency}
-              prefix={healthTier === 'surplus' ? '+' : netSavings < 0 ? '-' : ''}
+              showSign={true}
             />
           </p>
         </div>

@@ -53,11 +53,13 @@ describe('Package 1: AnimatedWalletBalance (sm & lg)', () => {
     expect(container.textContent).toContain('1.500.000')
   })
 
-  it('renders large size lg with MaskedBalance when hidden', () => {
+  it('renders large size lg with MaskedBalance when hidden with 106px width', () => {
     const { container } = render(
       <AnimatedWalletBalance balance={50000000} currency="IDR" hideBalance={true} size="lg" />
     )
     expect(container.querySelector('[aria-hidden="false"]')).toBeTruthy()
+    const wrapper = container.firstChild
+    expect(wrapper.style.width).toBe('106px')
   })
 })
 
@@ -75,6 +77,13 @@ describe('Package 2: CanvasConfettiOverlay', () => {
     const canvas = document.querySelector('canvas')
     expect(canvas).toBeTruthy()
   })
+
+  it('supports cannons variant without crashing', () => {
+    const onComplete = vi.fn()
+    render(<CanvasConfettiOverlay duration={500} variant="cannons" onComplete={onComplete} />)
+    const canvas = document.querySelector('canvas')
+    expect(canvas).toBeTruthy()
+  })
 })
 
 describe('Package 3: AnimatedCounter Rolling Tickers', () => {
@@ -85,12 +94,26 @@ describe('Package 3: AnimatedCounter Rolling Tickers', () => {
     expect(container.textContent).toBeTruthy()
     expect(container.textContent).toContain('2.500.000')
   })
+
+  it('renders signed positive and negative values correctly when showSign is enabled', () => {
+    const { container: posContainer } = render(
+      <AnimatedCounter value={500000} currency="IDR" skipInitial={true} showSign={true} />
+    )
+    expect(posContainer.textContent).toContain('+')
+    expect(posContainer.textContent).toContain('500.000')
+
+    const { container: negContainer } = render(
+      <AnimatedCounter value={-500000} currency="IDR" skipInitial={true} showSign={true} />
+    )
+    expect(negContainer.textContent).toContain('-')
+    expect(negContainer.textContent).toContain('500.000')
+  })
 })
 
 describe('Package 4: InAppNotificationToast with Actionable Undo', () => {
   it('renders action button and triggers onClick when action is present', async () => {
     const handleUndo = vi.fn()
-    render(
+    const { unmount } = render(
       <BrowserRouter>
         <InAppNotificationToast />
       </BrowserRouter>
@@ -117,5 +140,101 @@ describe('Package 4: InAppNotificationToast with Actionable Undo', () => {
     expect(undoBtn).toBeTruthy()
     fireEvent.click(undoBtn)
     expect(handleUndo).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('pauses and resumes on hover/touch without crashing', async () => {
+    const { unmount } = render(
+      <BrowserRouter>
+        <InAppNotificationToast />
+      </BrowserRouter>
+    )
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: 'Info',
+            message: 'Testing pause',
+            type: 'info',
+            duration: 3000,
+          },
+        })
+      )
+    })
+
+    const alert = await screen.findByRole('alert')
+    fireEvent.mouseEnter(alert)
+    fireEvent.mouseLeave(alert)
+    expect(alert).toBeTruthy()
+    unmount()
+  })
+
+  it('unmounts cleanly while a toast countdown is actively pending', () => {
+    const { unmount } = render(
+      <BrowserRouter>
+        <InAppNotificationToast />
+      </BrowserRouter>
+    )
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: 'Auto Dismiss Test',
+            message: 'Testing unmount cleanup',
+            type: 'success',
+            duration: 5000,
+          },
+        })
+      )
+    })
+
+    expect(() => unmount()).not.toThrow()
+  })
+})
+
+describe('Package 5: Route Redirects & Goal Navigation Hierarchy', () => {
+  it('resolves /goal/:id and /goals/:id hierarchical parent routes to /savings', async () => {
+    const { getParentRoute } = await import('../src/lib/navigationHierarchy')
+    expect(getParentRoute('/goal/laptop-baru')).toBe('/savings')
+    expect(getParentRoute('/goals/rumah-idaman')).toBe('/savings')
+    expect(getParentRoute('/savings/dana-darurat')).toBe('/savings')
+  })
+
+  it('redirects /goal/:id and /goals/:id to /savings/:id cleanly', async () => {
+    const { MemoryRouter, Routes, Route, Navigate, useParams } = await import('react-router-dom')
+    function GoalDetailRedirect() {
+      const { id } = useParams()
+      return <Navigate to={`/savings/${id}`} replace />
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/goal/goal-42']}>
+        <Routes>
+          <Route path="/savings/:id" element={<div data-testid="savings-target">Savings Detail</div>} />
+          <Route path="/goal/:id" element={<GoalDetailRedirect />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    expect(screen.getByTestId('savings-target')).toBeTruthy()
+  })
+})
+
+describe('Package 6: Zero-Decimal Currencies & Sign Edge Cases in AnimatedCounter', () => {
+  it('handles zero decimal VND currency correctly', () => {
+    const { container } = render(
+      <AnimatedCounter value={50000} currency="VND" skipInitial={true} />
+    )
+    expect(container.textContent).toContain('50.000')
+  })
+
+  it('does not display negative prefix when value is -0 or 0 with showSign', () => {
+    const { container } = render(
+      <AnimatedCounter value={-0} currency="IDR" skipInitial={true} showSign={true} />
+    )
+    expect(container.textContent).not.toContain('-')
+    expect(container.textContent).not.toContain('+')
   })
 })

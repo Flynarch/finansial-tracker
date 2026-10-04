@@ -306,7 +306,7 @@ function Savings() {
 
         {/* Summary Hero Card (Active View Only) */}
         {!showArchive && (
-          <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5">
+          <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] p-5 sm:p-6 shadow-[var(--shadow-card)] space-y-3.5 ft-card-sheen">
             {/* Main Metric Section */}
             <div className="relative z-10 space-y-2.5">
               <div className="flex items-center justify-between gap-2 -mt-0.5">
@@ -406,7 +406,7 @@ function Savings() {
                   <div
                     key={g.id}
                     onClick={() => navigate(`/savings/${g.id}`)}
-                    className="relative overflow-visible rounded-2xl border transition-all duration-200 border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)] cursor-pointer"
+                    className="relative overflow-visible rounded-2xl border transition-all duration-200 border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)] cursor-pointer ft-spring-press"
                   >
                     <div className="relative z-10 p-4 sm:p-5 flex flex-col justify-between h-full space-y-4">
                       {/* Top Part: Icon, Name + Percentage next to name, Amount & 3-dots Menu */}

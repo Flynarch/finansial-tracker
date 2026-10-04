@@ -32,8 +32,8 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
   }, [formatted])
 
   const isLg = size === 'lg'
-  // Sm masked balance is 50px, Lg masked balance is 72px
-  const maskedWidth = isLg ? 72 : 50
+  // Sm masked balance is 50px, Lg masked balance is 106px to prevent 6-dot truncation
+  const maskedWidth = isLg ? 106 : 50
   const targetWidth = hideBalance ? maskedWidth : (measuredWidth || 'auto')
   const heightCls = isLg ? 'h-8 sm:h-9' : 'h-4'
   const textCls = isLg ? 'ft-display text-xl sm:text-3xl font-black' : 'text-[13px] font-bold'

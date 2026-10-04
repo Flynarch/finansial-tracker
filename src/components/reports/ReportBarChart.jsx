@@ -35,6 +35,19 @@ export default function ReportBarChart({
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [chartMode, setChartMode] = useState('inflowOutflow') // 'inflowOutflow' | 'netFlow'
   const lastScrubbedIndexRef = useRef(null)
+  const lastTickRef = useRef(0)
+
+  const handleTouchOrHover = (e) => {
+    const activeIdx = e?.activeTooltipIndex
+    if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
+      lastScrubbedIndexRef.current = activeIdx
+      const now = performance.now()
+      if (now - lastTickRef.current >= 35) {
+        lastTickRef.current = now
+        triggerHaptic('selection')
+      }
+    }
+  }
 
   const handleBarClick = (entry) => {
     const key = entry?.key || entry?.payload?.key
@@ -149,13 +162,8 @@ export default function ReportBarChart({
               data={chartData}
               barGap={6}
               margin={CHART_MARGIN_DEFAULTS}
-              onMouseMove={(e) => {
-                const activeIdx = e?.activeTooltipIndex
-                if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
-                  lastScrubbedIndexRef.current = activeIdx
-                  triggerHaptic('selection')
-                }
-              }}
+              onMouseMove={handleTouchOrHover}
+              onTouchMove={handleTouchOrHover}
               onMouseLeave={() => {
                 lastScrubbedIndexRef.current = null
               }}
