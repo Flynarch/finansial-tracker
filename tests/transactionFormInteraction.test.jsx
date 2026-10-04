@@ -38,11 +38,11 @@ describe('Transaction Form UI Interaction Tests', () => {
       )
     }
 
-    it('renders the amount input field with numeric inputMode and placeholder', () => {
+    it('renders the amount input field with inputMode="none" and placeholder', () => {
       render(<ControlledAmountInput />)
       const input = screen.getByRole('textbox')
       expect(input).toBeDefined()
-      expect(input.getAttribute('inputmode')).toBe('numeric')
+      expect(input.getAttribute('inputmode')).toBe('none')
       expect(input.getAttribute('placeholder')).toBe('0')
     })
 
