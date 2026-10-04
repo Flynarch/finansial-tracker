@@ -1,5 +1,5 @@
 import { useId, useMemo } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import useTransactionStore from '../../store/useTransactionStore'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -7,9 +7,9 @@ import { navItems } from './navItems'
 import { triggerHaptic } from '../../lib/haptics'
 
 function linkClassName({ isActive }) {
-  return `flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1 text-[11px] leading-tight transition-colors duration-150 ${
+  return `relative z-1 flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1 text-[11px] leading-tight transition-colors duration-200 ${
     isActive
-      ? 'text-[var(--nav-item-active)] bg-[var(--panel-strong)] shadow-2xs font-black'
+      ? 'text-[var(--nav-item-active)] font-black'
       : 'text-[var(--nav-item-inactive)] hover:text-[var(--nav-item-hover)] font-medium'
   } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.98]`
 }
@@ -123,6 +123,18 @@ function BottomNav() {
   const leftItems = primaryItems.slice(0, 2)
   const rightItems = primaryItems.slice(2, 4)
 
+  const location = useLocation()
+  const reduceMotion = useSettingsStore((state) => state.reduceMotion)
+
+  const activeColIndex = useMemo(() => {
+    const p = location.pathname
+    if (p === '/dashboard' || p.startsWith('/dashboard/')) return 0
+    if (p === '/transactions' || p.startsWith('/transactions/')) return 1
+    if (p === '/todos' || p.startsWith('/todos/')) return 3
+    if (p === '/profile' || p.startsWith('/profile/')) return 4
+    return -1
+  }, [location.pathname])
+
   const unviewedMutationsCount = useSettingsStore((state) => state.unviewedMutationsCount || 0)
 
   return (
@@ -170,6 +182,23 @@ function BottomNav() {
             </svg>
 
             <div className="relative z-10 grid h-full grid-cols-5 items-end gap-1 px-1.5 pb-1.5 pt-1">
+              {/* Fluid Sliding Active Pill */}
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute top-1 bottom-1.5 left-1.5 rounded-2xl bg-[var(--panel-strong)] shadow-2xs border border-[var(--border)]/40 ${
+                  reduceMotion
+                    ? 'transition-opacity duration-150'
+                    : 'transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)]'
+                }`}
+                style={{
+                  width: 'calc((100% - 28px) / 5)',
+                  opacity: activeColIndex >= 0 ? 1 : 0,
+                  transform:
+                    activeColIndex >= 0
+                      ? `translate3d(calc(${activeColIndex} * (100% + 4px)), 0, 0)`
+                      : undefined,
+                }}
+              />
               {leftItems.map((item) => (
                 <NavLink
                   key={item.path}

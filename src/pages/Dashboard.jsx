@@ -18,6 +18,9 @@ import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
 import EmailVerificationBanner from '../components/auth/EmailVerificationBanner'
+import PullToRefresh from '../components/ui/PullToRefresh'
+import { clearCachedDashboardState } from '../hooks/useDashboardData'
+import { fetchCurrencyRates } from '../lib/api'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 import useSettingsStore from '../store/useSettingsStore'
 
@@ -170,8 +173,20 @@ export default function Dashboard() {
     return `${sign}${fmt(abs, 0)}`
   }, [locale])
 
+  const handleRefresh = useCallback(async () => {
+    try {
+      clearCachedDashboardState()
+      await Promise.allSettled([
+        fetchCurrencyRates('USD'),
+        scheduleNativeWidgetSync(),
+      ])
+    } catch (err) {
+      console.warn('[Dashboard:handleRefresh]', err)
+    }
+  }, [])
+
   return (
-    <div>
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-full">
       <div
         className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
           isEntering ? 'opacity-100' : 'opacity-0'
@@ -350,6 +365,6 @@ export default function Dashboard() {
           loan={payLoan}
         />
       </div>
-    </div>
+    </PullToRefresh>
   )
 }

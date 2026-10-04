@@ -53,12 +53,27 @@ export function SettingsSplitRow({
 }
 
 export function SettingsSegmentControl({ options, value, onChange, ariaLabel }) {
+  const count = options.length || 1
+  const activeIndex = options.findIndex((opt) => opt.value === value)
+
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="flex w-full items-center rounded-xl bg-[var(--field-bg)] p-1 border border-[var(--border)] gap-1 shadow-2xs"
+      className="relative flex w-full items-center rounded-xl bg-[var(--field-bg)] p-1 border border-[var(--border)] gap-1 shadow-2xs"
     >
+      {/* Fluid Sliding Pill Indicator */}
+      {activeIndex >= 0 ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-lg bg-[var(--panel-strong)] shadow-xs border border-[var(--border)] transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{
+            width: `calc((100% - ${(count - 1) * 4}px - 8px) / ${count})`,
+            transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
+          }}
+        />
+      ) : null}
+
       {options.map((opt) => {
         const isActive = opt.value === value
         const OptIcon = opt.icon
@@ -69,10 +84,10 @@ export function SettingsSegmentControl({ options, value, onChange, ariaLabel }) 
             role="radio"
             aria-checked={isActive}
             onClick={() => onChange(opt.value)}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 px-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer select-none active:scale-[0.98] ${
+            className={`relative z-1 flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 px-2.5 text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer select-none active:scale-[0.98] ${
               isActive
-                ? 'bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs border border-[var(--border)] font-extrabold'
-                : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)]/50'
+                ? 'text-[var(--fg)] font-extrabold'
+                : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
             {OptIcon ? <OptIcon className="h-3.5 w-3.5 shrink-0" /> : null}

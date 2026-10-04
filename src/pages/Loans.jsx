@@ -390,22 +390,32 @@ export default function Loans() {
           )}
         </div>
 
-        {/* Primary Type Tab Switcher (Underline Style) */}
-        <div className="flex items-center gap-6 px-3 border-b border-[var(--border)] pt-1">
+        {/* Primary Type Tab Switcher (Fluid Sliding Pill) */}
+        <div className="relative flex items-center rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)] shrink-0">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-[var(--panel-strong)] shadow-xs transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{
+              width: 'calc(50% - 2px)',
+              transform: activeTab === 'receivable' ? 'translateX(calc(100% + 2px))' : 'translateX(0)',
+            }}
+          />
           <button
             type="button"
             onClick={() => {
               triggerHaptic('light')
               setActiveTab('debt')
             }}
-            className={`pb-3 text-sm font-extrabold transition-all cursor-pointer relative ${
-              activeTab === 'debt' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            className={`relative z-1 flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-colors duration-200 cursor-pointer active:scale-[0.98] ${
+              activeTab === 'debt' ? 'text-[var(--earthy-terra)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            {t('loans.myDebt', 'Utang Saya')} ({rows.filter((r) => r.type === 'debt' && !r.isSettled).length})
-            {activeTab === 'debt' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-terra)]" />
-            )}
+            <span>{t('loans.myDebt', 'Utang Saya')}</span>
+            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'debt' ? 'bg-[var(--earthy-terra)]/15 text-[var(--earthy-terra)]' : 'bg-[var(--field-bg)] text-[var(--muted)]'
+            }`}>
+              {rows.filter((r) => r.type === 'debt' && !r.isSettled).length}
+            </span>
           </button>
 
           <button
@@ -414,14 +424,16 @@ export default function Loans() {
               triggerHaptic('light')
               setActiveTab('receivable')
             }}
-            className={`pb-3 text-sm font-extrabold transition-all cursor-pointer relative ${
-              activeTab === 'receivable' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            className={`relative z-1 flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-colors duration-200 cursor-pointer active:scale-[0.98] ${
+              activeTab === 'receivable' ? 'text-[var(--earthy-green)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
             }`}
           >
-            {t('loans.myReceivable', 'Piutang Saya')} ({rows.filter((r) => r.type === 'receivable' && !r.isSettled).length})
-            {activeTab === 'receivable' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[var(--earthy-green)]" />
-            )}
+            <span>{t('loans.myReceivable', 'Piutang Saya')}</span>
+            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'receivable' ? 'bg-[var(--earthy-green)]/15 text-[var(--earthy-green)]' : 'bg-[var(--field-bg)] text-[var(--muted)]'
+            }`}>
+              {rows.filter((r) => r.type === 'receivable' && !r.isSettled).length}
+            </span>
           </button>
         </div>
 

@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
 import EmptyState from '../ui/EmptyState'
+import PullToRefresh from '../ui/PullToRefresh'
 import { TransactionItemCard } from './TransactionItemCard'
 import { isTransactionNew } from '../../lib/transactionLastSeen'
 
@@ -49,6 +50,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   showTopFade,
   showBottomFade,
   onScroll,
+  onRefresh,
   isBulkMode,
   selectedTxIds,
   toggleSelectTx,
@@ -106,13 +108,17 @@ export const TransactionListSection = memo(function TransactionListSection({
 
   if (filteredTransactions.length === 0) {
     return (
-      <div className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center py-12 px-4 my-auto">
+      <PullToRefresh
+        onRefresh={onRefresh}
+        disabled={!onRefresh}
+        className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center py-12 px-4 my-auto"
+      >
         <EmptyState
           variant="transactions"
           title={t('tx.emptyTitle', 'Belum Ada Transaksi')}
           description={t('tx.emptyDesc', 'Catat pengeluaran atau pemasukan pertamamu untuk mulai memantau arus kas.')}
         />
-      </div>
+      </PullToRefresh>
     )
   }
 
@@ -120,12 +126,19 @@ export const TransactionListSection = memo(function TransactionListSection({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div
-        ref={listScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar touch-pan-y overscroll-contain px-0.5"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        onScroll={handleScrollInternal}
+      <PullToRefresh
+        onRefresh={onRefresh}
+        disabled={!onRefresh}
+        scrollContainerRef={listScrollRef}
+        className="flex min-h-0 flex-1 flex-col"
+        contentClassName="flex min-h-0 flex-1 flex-col"
       >
+        <div
+          ref={listScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar touch-pan-y overscroll-contain px-0.5"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          onScroll={handleScrollInternal}
+        >
         <div className="min-h-full space-y-3 pt-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-6">
           {visibleGroups.map((group, idx) => (
             <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
@@ -210,6 +223,7 @@ export const TransactionListSection = memo(function TransactionListSection({
           )}
         </div>
       </div>
+      </PullToRefresh>
 
       {/* Top & Bottom Subtle Fade Overlays */}
       <div

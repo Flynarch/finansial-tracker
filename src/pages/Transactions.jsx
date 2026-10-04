@@ -592,6 +592,20 @@ function Transactions() {
     await exportTransactionsToCsv(filteredTransactions, allWallets, defaultCurrency, locale)
   }
 
+  const handleRefresh = useCallback(async () => {
+    try {
+      clearCachedDashboardState()
+      await Promise.allSettled([
+        fetchCurrencyRates(defaultCurrency || 'USD'),
+        scheduleNativeWidgetSync(),
+        syncNotificationQueue(),
+      ])
+      updateLastSeenTxTimestamp()
+    } catch (err) {
+      console.warn('[Transactions:handleRefresh]', err)
+    }
+  }, [defaultCurrency])
+
   return (
     <div className="h-full flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
@@ -715,19 +729,31 @@ function Transactions() {
           }
         />
 
-        {/* View Switcher: Semua Transaksi vs Tampungan */}
-        <div className="flex items-center gap-1 rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)] shrink-0">
+        {/* View Switcher: Semua Transaksi vs Tampungan (Fluid Sliding Pill) */}
+        <div className="relative flex items-center rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)] shrink-0">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-[var(--panel-strong)] shadow-xs transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{
+              width: 'calc(50% - 2px)',
+              transform: activeViewTab === 'staging' ? 'translateX(calc(100% + 2px))' : 'translateX(0)',
+            }}
+          />
           <button
             type="button"
             onClick={() => setSelectedViewTab('all')}
-            className={"flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition active:scale-[0.98] cursor-pointer " + (activeViewTab === 'all' ? "bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs" : "text-[var(--muted)] hover:text-[var(--fg)]")}
+            className={`relative z-1 flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-colors duration-200 active:scale-[0.98] cursor-pointer ${
+              activeViewTab === 'all' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
           >
             <span>{t('tx.tab.all', 'Semua Transaksi')}</span>
           </button>
           <button
             type="button"
             onClick={() => setSelectedViewTab('staging')}
-            className={"flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition active:scale-[0.98] cursor-pointer " + (activeViewTab === 'staging' ? "bg-[var(--panel-strong)] text-[var(--fg)] shadow-xs" : "text-[var(--muted)] hover:text-[var(--fg)]")}
+            className={`relative z-1 flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-colors duration-200 active:scale-[0.98] cursor-pointer ${
+              activeViewTab === 'staging' ? 'text-[var(--fg)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
           >
             <span>{t('tx.tab.staging', 'Tampungan')}</span>
             {pendingReviewTxs.length > 0 ? (
@@ -811,6 +837,7 @@ function Transactions() {
           showTopFade={showTopFade}
           showBottomFade={showBottomFade}
           onScroll={handleScroll}
+          onRefresh={handleRefresh}
           isBulkMode={isBulkMode}
           selectedTxIds={selectedTxIds}
           toggleSelectTx={toggleSelectTx}
