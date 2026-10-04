@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
-import { Bell, Clock, HandCoins, Sparkles, X, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Bell, Clock, HandCoins, Sparkles, X, CheckCircle2, AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import { hapticImpact } from '../../lib/haptics'
 
@@ -132,6 +132,8 @@ export default function InAppNotificationToast() {
         type: notif.type,
         route: notif.route,
         relatedId: notif.relatedId,
+        action: notif.action,
+        duration: notif.duration,
       })
     }
   }, [recentNotifications, enqueueToast, t])
@@ -264,6 +266,25 @@ export default function InAppNotificationToast() {
           <p className="mt-0.5 text-[11.5px] font-medium leading-snug text-[var(--muted)] line-clamp-2">
             {activeToast?.message}
           </p>
+
+          {/* Action Slot (e.g. Urungkan / Undo) */}
+          {activeToast?.action && (
+            <div className="mt-2.5 flex items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  hapticImpact('medium')
+                  activeToast.action.onClick?.()
+                  dismissToast()
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--field-bg)] hover:bg-[var(--panel)] border border-[var(--border)] text-[11px] font-black text-[var(--accent)] active:scale-95 transition shadow-2xs cursor-pointer"
+              >
+                <RotateCcw size={12} strokeWidth={2.5} />
+                <span>{activeToast.action.label || t('common.undo', 'Urungkan')}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Close Button */}
@@ -282,8 +303,11 @@ export default function InAppNotificationToast() {
         {/* Bottom Progress Timer Line */}
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--border)]/30 overflow-hidden">
           <div
-            className={`h-full ${color.replace('text-', 'bg-')} transition-all duration-[4500ms] linear`}
-            style={{ width: isVisible ? '0%' : '100%' }}
+            className={`h-full ${color.replace('text-', 'bg-')} transition-all linear`}
+            style={{
+              width: isVisible ? '0%' : '100%',
+              transitionDuration: isVisible ? `${activeToast?.duration || 4500}ms` : '0ms',
+            }}
           />
         </div>
       </div>

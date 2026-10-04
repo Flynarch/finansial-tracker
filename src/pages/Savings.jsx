@@ -8,6 +8,7 @@ import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import SavingsFundSheetModal from '../components/savings/SavingsFundSheetModal'
 import PageHeader from '../components/ui/PageHeader'
+import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import useTranslation from '../hooks/useTranslation'
@@ -328,10 +329,10 @@ function Savings() {
 
               <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
                 <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                  {formatCurrency(totals.current, defaultCurrency)}
+                  <AnimatedCounter value={totals.current} currency={defaultCurrency} />
                 </p>
                 <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
-                  / {formatCurrency(totals.target, defaultCurrency)}
+                  / <AnimatedCounter value={totals.target} currency={defaultCurrency} />
                 </span>
               </div>
 
@@ -340,9 +341,11 @@ function Savings() {
                 <div className="flex items-center gap-1.5">
                   <span className="text-[var(--muted)]">{t('savings.remainingShort', 'Kurang')}:</span>
                   <span className="font-black text-[var(--fg)]">
-                    {totals.remaining > 0
-                      ? formatCurrency(totals.remaining, defaultCurrency)
-                      : t('savings.completed', 'Tercapai')}
+                    {totals.remaining > 0 ? (
+                      <AnimatedCounter value={totals.remaining} currency={defaultCurrency} />
+                    ) : (
+                      t('savings.completed', 'Tercapai')
+                    )}
                   </span>
                 </div>
 
@@ -583,7 +586,7 @@ function Savings() {
         initialAction={fundActionType}
         onGoalCompleted={(completedGoal) => {
           if (completedGoal?.id) {
-            navigate(`/savings/${completedGoal.id}`)
+            navigate(`/savings/${completedGoal.id}`, { state: { celebrate: true } })
           }
         }}
       />

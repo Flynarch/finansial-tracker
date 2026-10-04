@@ -31,8 +31,21 @@ export async function hapticImpact(style = 'light') {
     // ignore
   }
 }
-
-export const triggerHaptic = hapticImpact
+/**
+ * Polymorphic haptic dispatcher routing to appropriate tactile texture:
+ * - 'success' -> hapticSuccess()
+ * - 'warning' -> hapticWarning()
+ * - 'error' -> hapticError()
+ * - 'selection' -> hapticSelection()
+ * - 'light' | 'medium' | 'heavy' -> hapticImpact(type)
+ */
+export async function triggerHaptic(type = 'light') {
+  if (type === 'success') return hapticSuccess()
+  if (type === 'warning') return hapticWarning()
+  if (type === 'error') return hapticError()
+  if (type === 'selection') return hapticSelection()
+  return hapticImpact(type)
+}
 
 /**
  * Trigger success notification haptic
@@ -110,7 +123,16 @@ export async function hapticError() {
  * Trigger selection change haptic (for pickers, sliders, segmented toggles)
  */
 export async function hapticSelection() {
-  if (!isNative) return
+  if (!isNative) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(8)
+      } catch (err) {
+        console.warn('[haptics]', err)
+      }
+    }
+    return
+  }
   try {
     await Haptics.selectionChanged()
   } catch (err){

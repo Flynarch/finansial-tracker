@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
@@ -12,6 +12,7 @@ import EmptyState from '../components/ui/EmptyState'
 import CustomDatePicker from '../components/ui/CustomDatePicker'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import PageHeader from '../components/ui/PageHeader'
+import CanvasConfettiOverlay from '../components/ui/CanvasConfettiOverlay'
 import { getCachedCurrencyRates } from '../lib/api'
 import {
   clampPercent,
@@ -95,7 +96,8 @@ export default function SavingsDetail() {
   const [isCashoutSheetOpen, setIsCashoutSheetOpen] = useState(false)
   const [cashoutWalletId, setCashoutWalletId] = useState('')
   const [cashoutWalletModalOpen, setCashoutWalletModalOpen] = useState(false)
-  const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false)
+  const location = useLocation()
+  const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(Boolean(location?.state?.celebrate))
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -869,6 +871,7 @@ export default function SavingsDetail() {
       </BottomSheet>
 
       {/* ── Celebration Certificate Modal ── */}
+      {isCelebrationModalOpen && <CanvasConfettiOverlay duration={3000} />}
       <Modal
         isOpen={isCelebrationModalOpen}
         onClose={() => setIsCelebrationModalOpen(false)}

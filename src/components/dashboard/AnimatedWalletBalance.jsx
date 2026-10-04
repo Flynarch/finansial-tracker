@@ -13,6 +13,7 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
   currency = 'IDR',
   hideBalance = false,
   className = '',
+  size = 'sm',
 }) {
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const formatted = formatCurrency(balance, currency)
@@ -30,13 +31,16 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
     }
   }, [formatted])
 
-  // Sm masked balance with 5 dots + gap is 50px
-  const maskedWidth = 50
+  const isLg = size === 'lg'
+  // Sm masked balance is 50px, Lg masked balance is 72px
+  const maskedWidth = isLg ? 72 : 50
   const targetWidth = hideBalance ? maskedWidth : (measuredWidth || 'auto')
+  const heightCls = isLg ? 'h-8 sm:h-9' : 'h-4'
+  const textCls = isLg ? 'ft-display text-xl sm:text-3xl font-black' : 'text-[13px] font-bold'
 
   return (
     <div
-      className={`relative flex items-center overflow-hidden h-4 select-none ${
+      className={`relative flex items-center overflow-hidden ${heightCls} select-none ${
         reduceMotion
           ? ''
           : 'transition-[width] duration-350 ease-[cubic-bezier(0.16,1,0.3,1)]'
@@ -49,7 +53,7 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
       <span
         ref={measureRef}
         aria-hidden="true"
-        className="invisible absolute pointer-events-none whitespace-nowrap text-[13px] font-bold tabular-nums"
+        className={`invisible absolute pointer-events-none whitespace-nowrap ${textCls} tabular-nums`}
       >
         {formatted}
       </span>
@@ -57,7 +61,7 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
       {/* Unmasked real balance */}
       <span
         aria-hidden={hideBalance}
-        className={`absolute inset-0 flex items-center whitespace-nowrap text-[13px] font-bold tabular-nums leading-none text-[var(--fg)] transform-gpu ${
+        className={`absolute inset-0 flex items-center whitespace-nowrap ${textCls} tabular-nums leading-none text-[var(--fg)] transform-gpu ${
           reduceMotion
             ? hideBalance
               ? 'hidden'
@@ -87,7 +91,7 @@ export const AnimatedWalletBalance = memo(function AnimatedWalletBalance({
               }`
         }`}
       >
-        <MaskedBalance size="sm" />
+        <MaskedBalance size={isLg ? 'lg' : 'sm'} />
       </span>
     </div>
   )

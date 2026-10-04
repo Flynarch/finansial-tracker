@@ -4,6 +4,7 @@ import { id as idLocale, enUS } from 'date-fns/locale'
 import { Calendar, ChevronLeft, ChevronRight, Check, Trash2, ChevronDown } from 'lucide-react'
 import BottomSheet from './BottomSheet'
 import useTranslation from '../../hooks/useTranslation'
+import { triggerHaptic } from '../../lib/haptics'
 
 export default function CustomDatePicker({
   value,
@@ -66,6 +67,7 @@ export default function CustomDatePicker({
   }, [isOpen, monthStart])
 
   const setQuickDate = (daysToAdd) => {
+    triggerHaptic('selection')
     const target = addDays(new Date(), daysToAdd)
     const formatted = format(target, 'yyyy-MM-dd')
     setTempDate(formatted)
@@ -73,6 +75,7 @@ export default function CustomDatePicker({
   }
 
   const setEndOfMonthDate = () => {
+    triggerHaptic('selection')
     const now = new Date()
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     const formatted = format(lastDay, 'yyyy-MM-dd')
@@ -81,10 +84,12 @@ export default function CustomDatePicker({
   }
 
   const handleClear = () => {
+    triggerHaptic('selection')
     setTempDate('')
   }
 
   const handleApply = () => {
+    triggerHaptic('light')
     onChange(tempDate)
     setIsOpen(false)
   }
@@ -186,14 +191,20 @@ export default function CustomDatePicker({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setViewDate((d) => subMonths(startOfMonth(d || new Date()), 1))}
+                onClick={() => {
+                  triggerHaptic('selection')
+                  setViewDate((d) => subMonths(startOfMonth(d || new Date()), 1))
+                }}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
-                onClick={() => setViewDate((d) => addMonths(startOfMonth(d || new Date()), 1))}
+                onClick={() => {
+                  triggerHaptic('selection')
+                  setViewDate((d) => addMonths(startOfMonth(d || new Date()), 1))
+                }}
                 className="p-1 rounded-lg border border-[var(--border)] hover:bg-[var(--field-bg)] text-[var(--fg)] cursor-pointer"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -218,6 +229,7 @@ export default function CustomDatePicker({
                     key={day.toISOString()}
                     type="button"
                     onClick={() => {
+                      triggerHaptic('selection')
                       const formatted = format(day, 'yyyy-MM-dd')
                       setTempDate(formatted)
                     }}

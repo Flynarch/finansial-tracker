@@ -38,6 +38,7 @@ import { db } from '../../lib/db'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
+  formatCurrency,
   formatMoneyInput,
   parseMoneyInput,
   toSafeNumber,
@@ -72,6 +73,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const addTransaction = useTransactionStore((state) => state.addTransaction)
+  const deleteTransaction = useTransactionStore((state) => state.deleteTransaction)
 
   const [txType, setTxType] = useState(() => 'expense')
   const [form, setForm] = useState(() => {
@@ -755,7 +757,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
         let resolvedCategory = txType === 'transfer' ? 'transfer' : form.category
 
-        await addTransaction({
+        const createdTxId = await addTransaction({
           date: form.date,
           amount: totalAmount,
           type: txType,
@@ -769,6 +771,29 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           receiptImage: form.receiptImage || undefined,
         })
         hapticSuccess()
+
+        if (typeof window !== 'undefined' && createdTxId) {
+          window.dispatchEvent(
+            new CustomEvent('ft-show-toast', {
+              detail: {
+                title: t('addTx.saved', 'Transaksi Tersimpan'),
+                message: `${formatCurrency(totalAmount, form.currency)} • ${form.notes?.trim() || resolvedCategory}`,
+                type: 'success',
+                duration: 5000,
+                action: {
+                  label: t('common.undo', 'Urungkan'),
+                  onClick: async () => {
+                    try {
+                      await deleteTransaction(createdTxId)
+                    } catch (e) {
+                      console.warn('[QuickAddTransactionModal:undo]', e)
+                    }
+                  },
+                },
+              },
+            })
+          )
+        }
       }
       onClose?.()
     } catch (err) {

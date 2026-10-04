@@ -6,6 +6,8 @@ import { Capacitor } from '@capacitor/core'
 import { syncNotificationQueue } from '../lib/notificationIngestion'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { triggerHaptic } from '../lib/haptics'
 import useTranslation from '../hooks/useTranslation'
 import useSwipeAction from '../hooks/useSwipeAction'
 import useBackButton from '../hooks/useBackButton'
@@ -890,10 +892,38 @@ function Transactions() {
         onConfirm={async () => {
           if (!singleDeleteTx?.id) return
           const txId = singleDeleteTx.id
+          const deletedTxCopy = { ...singleDeleteTx }
           setSingleDeleteTx(null)
           try {
             await deleteTransaction(txId)
             if (swipedTransactionId === txId) setSwipedTransactionId(null)
+
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('ft-show-toast', {
+                  detail: {
+                    title: t('tx.deleted', 'Transaksi Dihapus'),
+                    message: t('tx.undoHint', 'Ketuk Urungkan untuk mengembalikan transaksi'),
+                    type: 'warning',
+                    duration: 5000,
+                    action: {
+                      label: t('common.undo', 'Urungkan'),
+                      onClick: async () => {
+                        try {
+                          await db.transactions.update(txId, { deletedAt: null })
+                          if (deletedTxCopy.walletId) {
+                            await invalidateWalletBalance([deletedTxCopy.walletId, deletedTxCopy.targetWalletId].filter(Boolean))
+                          }
+                          triggerHaptic('success')
+                        } catch (e) {
+                          console.warn('[Transactions:undoDelete]', e)
+                        }
+                      },
+                    },
+                  },
+                })
+              )
+            }
           } catch (err) {
             console.error('[Transactions:singleDelete]', err)
             const offline = typeof navigator !== 'undefined' && navigator.onLine === false

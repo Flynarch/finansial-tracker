@@ -1,8 +1,9 @@
-import { memo, useId, useMemo, useState } from 'react'
+import { memo, useId, useMemo, useState, useRef } from 'react'
 import { format } from 'date-fns'
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { TrendingUp } from 'lucide-react'
 import { clampPercent } from './DashboardChartHelpers'
+import { triggerHaptic } from '../../lib/haptics'
 
 /** Compact progress bar used in MetricCard */
 export function ProgressBar({ value, className = '', tone }) {
@@ -65,6 +66,7 @@ export const MiniChartCard = memo(function MiniChartCard({
   emptyTitle, emptyDesc,
 }) {
   const [scrubbedPoint, setScrubbedPoint] = useState(null)
+  const lastScrubbedIndexRef = useRef(null)
   const reactId = useId()
   const gradientId = useMemo(() => `miniGradFade_${reactId.replace(/:/g, '')}`, [reactId])
 
@@ -79,6 +81,11 @@ export const MiniChartCard = memo(function MiniChartCard({
 
   const handleChartMove = (e) => {
     if (e?.activePayload?.[0]?.value !== undefined) {
+      const activeIdx = e.activeTooltipIndex
+      if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
+        lastScrubbedIndexRef.current = activeIdx
+        triggerHaptic('selection')
+      }
       const payload = e.activePayload[0]
       const rawVal = payload.value
       const rawTime = payload.payload?.[xKey]
@@ -96,6 +103,7 @@ export const MiniChartCard = memo(function MiniChartCard({
   }
 
   const handleChartLeave = () => {
+    lastScrubbedIndexRef.current = null
     setScrubbedPoint(null)
   }
 

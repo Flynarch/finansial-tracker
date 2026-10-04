@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
+import { triggerHaptic } from '../../lib/haptics'
 
 const ITEM_HEIGHT = 48
 const VISIBLE_ITEMS = 5
@@ -22,6 +23,7 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
   const momentum = useRef(null)
   const lastY = useRef(0)
   const lastTime = useRef(0)
+  const lastIndexScrolledRef = useRef(selectedIndex)
 
   const scrollToIndex = useCallback((idx, smooth = true) => {
     if (!containerRef.current) return
@@ -35,15 +37,19 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
   // On mount & selection change, snap to item
   useEffect(() => {
     scrollToIndex(selectedIndex, false)
+    lastIndexScrolledRef.current = selectedIndex
   }, [selectedIndex, scrollToIndex])
 
   const snapToNearest = useCallback(() => {
     if (!containerRef.current) return
     const scrollTop = containerRef.current.scrollTop
     const idx = clamp(Math.round(scrollTop / ITEM_HEIGHT), 0, items.length - 1)
+    if (idx !== selectedIndex) {
+      triggerHaptic('selection')
+    }
     onSelect(idx)
     scrollToIndex(idx, true)
-  }, [items.length, onSelect, scrollToIndex])
+  }, [items.length, onSelect, scrollToIndex, selectedIndex])
 
   const handlePointerDown = useCallback((e) => {
     isDragging.current = true
@@ -59,9 +65,14 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
     const clientY = e.clientY || e.touches?.[0]?.clientY || 0
     const delta = startY.current - clientY
     containerRef.current.scrollTop = startScroll.current + delta
+    const currentIdx = clamp(Math.round(containerRef.current.scrollTop / ITEM_HEIGHT), 0, items.length - 1)
+    if (currentIdx !== lastIndexScrolledRef.current) {
+      lastIndexScrolledRef.current = currentIdx
+      triggerHaptic('selection')
+    }
     lastY.current = clientY
     lastTime.current = Date.now()
-  }, [])
+  }, [items.length])
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false
@@ -144,7 +155,11 @@ function DrumColumn({ items, selectedIndex, onSelect, labelKey = 'label' }) {
             <button
               key={item.key ?? idx}
               type="button"
-              onClick={() => { onSelect(idx); scrollToIndex(idx) }}
+              onClick={() => {
+                triggerHaptic('selection')
+                onSelect(idx)
+                scrollToIndex(idx)
+              }}
               className="w-full select-none transition-all duration-150 cursor-pointer"
               style={{
                 height: ITEM_HEIGHT,
@@ -212,12 +227,14 @@ export default function MonthPicker({ value, onChange, className = '', compact =
   }, [parsedValue.year, parsedValue.month, openSheet])
 
   const handleApply = useCallback(() => {
+    triggerHaptic('light')
     const formattedMonth = String(selectedMonth + 1).padStart(2, '0')
     onChange?.(`${selectedYear}-${formattedMonth}`)
     closePicker()
   }, [selectedMonth, selectedYear, onChange, closePicker])
 
   const handleSelectCurrentMonth = useCallback(() => {
+    triggerHaptic('light')
     const now = new Date()
     const y = now.getFullYear()
     const m = now.getMonth()

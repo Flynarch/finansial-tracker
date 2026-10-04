@@ -9,6 +9,7 @@ import useSettingsStore from '../../store/useSettingsStore'
 import AnimatedCounter from '../ui/AnimatedCounter'
 import MaskedBalance from '../ui/MaskedBalance'
 import AnimatedWalletBalance from './AnimatedWalletBalance'
+import { triggerHaptic } from '../../lib/haptics'
 
 const STORAGE_KEY = 'dashboard_carousel_slide'
 
@@ -119,6 +120,7 @@ export default function WalletCarousel({
       activeSlideRef.current = closestIndex
       setActiveSlide(closestIndex)
       saveSlide(closestIndex)
+      triggerHaptic('selection')
     }
   }
 

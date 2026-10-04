@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, ShieldCheck, AlertTriangle, ArrowUpRight, Arr
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency, toSafeNumber } from '../../lib/utils'
+import AnimatedCounter from '../ui/AnimatedCounter'
 import {
   calculateSavingsRate,
   calculateCashflowRatio,
@@ -113,8 +114,11 @@ export default function ReportKpiCards({
                   : 'text-[var(--fg)]'
             }`}
           >
-            {healthTier === 'surplus' ? '+' : ''}
-            {formatCurrency(netSavings, defaultCurrency)}
+            <AnimatedCounter
+              value={Math.abs(netSavings)}
+              currency={defaultCurrency}
+              prefix={healthTier === 'surplus' ? '+' : netSavings < 0 ? '-' : ''}
+            />
           </p>
         </div>
 
@@ -135,7 +139,11 @@ export default function ReportKpiCards({
                       : 'text-[var(--status-expense)]'
               }`}
             >
-              {hasData ? `${savingsRate}%` : '0%'}
+              {hasData ? (
+                <AnimatedCounter value={savingsRate} suffix="%" formatter={(v) => `${Math.round(v)}`} />
+              ) : (
+                '0%'
+              )}
             </span>
           </div>
           <div className="h-9 w-16 overflow-hidden rounded-full bg-[var(--border)]/60 p-0.5">
@@ -202,7 +210,7 @@ export default function ReportKpiCards({
             className="mt-2 text-base sm:text-xl font-black tracking-tight text-[var(--status-income)] truncate"
             title={formatCurrency(income, defaultCurrency)}
           >
-            {formatCurrency(income, defaultCurrency)}
+            <AnimatedCounter value={income} currency={defaultCurrency} />
           </p>
           <p className="mt-1 text-[11px] font-semibold text-[var(--muted)] truncate">
             {isMultiMonthMode ? (
@@ -235,7 +243,7 @@ export default function ReportKpiCards({
             className="mt-2 text-base sm:text-xl font-black tracking-tight text-[var(--status-expense)] truncate"
             title={formatCurrency(expense, defaultCurrency)}
           >
-            {formatCurrency(expense, defaultCurrency)}
+            <AnimatedCounter value={expense} currency={defaultCurrency} />
           </p>
           <p className="mt-1 text-[11px] font-semibold text-[var(--muted)] truncate">
             {isMultiMonthMode ? (

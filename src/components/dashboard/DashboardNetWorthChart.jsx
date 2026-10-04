@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 import { formatGrowthPercentage } from '../../hooks/dashboard/dashboardStats'
 import { MiniChartCard } from './DashboardStatComponents'
+import AnimatedCounter from '../ui/AnimatedCounter'
 
 export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   isDbLoading = false,
@@ -54,7 +55,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
       <MiniChartCard
         t={t}
         title={t('dashboard.netWorth')}
-        value={formatCurrency(computeRevenueValue(miniRevenueRange), defaultCurrency)}
+        value={<AnimatedCounter value={computeRevenueValue(miniRevenueRange)} currency={defaultCurrency} />}
         trendBadge={
           hasGrowth ? (
             <span

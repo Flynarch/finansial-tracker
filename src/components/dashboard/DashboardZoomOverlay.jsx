@@ -11,6 +11,7 @@ import { ProgressBar } from './DashboardStatComponents'
 import { getCompactItems } from '../../hooks/useDashboardData'
 import { formatGrowthPercentage } from '../../hooks/dashboard/dashboardStats'
 import useBackButton from '../../hooks/useBackButton'
+import { triggerHaptic } from '../../lib/haptics'
 
 export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
   zoomedChart,
@@ -79,10 +80,15 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
     return zoomCombinedChartSeries.every((d) => !Number(d?.value) || Number(d?.value) === 0)
   }, [zoomCombinedChartSeries])
 
-  if (!zoomedChart || typeof document === 'undefined') return null
+  const lastScrubbedIndexRef = useRef(null)
 
-  const handleZoomChartTouchOrMove = () => {
+  const handleZoomChartTouchOrMove = (e) => {
     setZoomTooltipDismissed?.(false)
+    const activeIdx = e?.activeTooltipIndex
+    if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
+      lastScrubbedIndexRef.current = activeIdx
+      triggerHaptic('selection')
+    }
   }
 
   const rangeTitleMap = {
@@ -540,7 +546,10 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                       onMouseMove={handleZoomChartTouchOrMove}
                       onTouchStart={handleZoomChartTouchOrMove}
                       onTouchMove={handleZoomChartTouchOrMove}
-                      onMouseLeave={() => setZoomTooltipDismissed?.(true)}
+                      onMouseLeave={() => {
+                        lastScrubbedIndexRef.current = null
+                        setZoomTooltipDismissed?.(true)
+                      }}
                     >
                     <defs>
                       <linearGradient id="nwGradZoom" x1="0" y1="0" x2="0" y2="1">

@@ -34,7 +34,7 @@ import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import EmptyState from '../components/ui/EmptyState'
 import ToastBanner from '../components/ui/ToastBanner'
 import PageHeader from '../components/ui/PageHeader'
-import MaskedBalance from '../components/ui/MaskedBalance'
+import AnimatedWalletBalance from '../components/dashboard/AnimatedWalletBalance'
 import {
   formatCurrency,
   formatMoneyInput,
@@ -647,15 +647,14 @@ export default function WalletDetailPage() {
               </button>
             </div>
 
-            {/* Middle Row: Crisp Bold Balance Display */}
+            {/* Middle Row: Crisp Bold Animated Balance Display */}
             <div className="flex items-center min-h-[2rem]">
-              <div className="ft-display text-xl sm:text-3xl font-black text-[var(--fg)] tabular-nums leading-tight flex items-center">
-                {hideBalance ? (
-                  <MaskedBalance size="lg" />
-                ) : (
-                  formatCurrency(currentBalance, wallet.currency || defaultCurrency)
-                )}
-              </div>
+              <AnimatedWalletBalance
+                balance={currentBalance}
+                currency={wallet.currency || defaultCurrency}
+                hideBalance={hideBalance}
+                size="lg"
+              />
             </div>
 
             {/* Bottom Row: Timestamp & Currency Info */}

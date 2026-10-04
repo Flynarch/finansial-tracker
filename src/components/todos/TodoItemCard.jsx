@@ -178,7 +178,7 @@ export const TodoItemCard = memo(function TodoItemCard({
                     : 'border-[var(--border-strong)] bg-[var(--field-bg)] group-hover/check:border-[var(--status-income)]/60'
                 }`}
               >
-                {todo.completed && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                {todo.completed && <Check className="h-3.5 w-3.5 ft-check-animated" strokeWidth={3} />}
               </div>
             </button>
 

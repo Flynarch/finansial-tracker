@@ -25,6 +25,8 @@ import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import { getLocalDateString } from '../../lib/dateUtils'
+import { format } from 'date-fns'
+import CanvasConfettiOverlay from '../ui/CanvasConfettiOverlay'
 
 export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan = null, initialAmount = null, onSaved, onOpenForgive }) {
   const { t, locale } = useTranslation()
@@ -32,6 +34,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const recordPayment = useLoanStore((state) => state.recordPayment)
   const [sheetError, setSheetError] = useState('')
+  const [showPayoffStamp, setShowPayoffStamp] = useState(false)
   const amountInputRef = useRef(null)
 
   const [cachedLoan, setCachedLoan] = useState(incomingLoan)
@@ -152,9 +155,19 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
         currency,
         isOverpayment ? excessCategory : null
       )
-      hapticSuccess()
-      onSaved?.()
-      onClose?.()
+      if (isWillBePaidFull) {
+        setShowPayoffStamp(true)
+        hapticSuccess()
+        onSaved?.()
+        setTimeout(() => {
+          setShowPayoffStamp(false)
+          onClose?.()
+        }, 1300)
+      } else {
+        hapticSuccess()
+        onSaved?.()
+        onClose?.()
+      }
     } catch (err) {
       console.warn('[LoanPaymentModal]', err)
       hapticWarning()
@@ -170,7 +183,30 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
       onClose={onClose}
       title={isDebt ? t('loans.payment.titleDebt', 'Bayar Cicilan Hutang') : t('loans.payment.titleReceivable', 'Terima Pembayaran Piutang')}
     >
-      <div className="space-y-2.5 pt-0.5 pb-2">
+      {showPayoffStamp && <CanvasConfettiOverlay duration={2000} />}
+      <div className="relative space-y-2.5 pt-0.5 pb-2">
+        {showPayoffStamp && (
+          <div className="absolute inset-0 z-50 bg-[var(--panel-strong)]/90 backdrop-blur-xs flex flex-col items-center justify-center rounded-2xl animate-in fade-in duration-200">
+            <div
+              className={`loan-stamp ${isDebt ? 'loan-stamp-debt' : 'loan-stamp-receivable'} flex flex-col items-center justify-center text-center shadow-2xl`}
+              style={{
+                width: '6.5rem',
+                height: '6.5rem',
+                animation: 'stampPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+              }}
+            >
+              <span className="loan-stamp-text text-base sm:text-lg">
+                {isDebt ? t('loans.status.paidDebt', 'LUNAS') : t('loans.status.paidReceivable', 'DITERIMA')}
+              </span>
+              <span className="loan-stamp-sub text-[10px]">
+                {format(new Date(), 'dd/MM/yyyy')}
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-black text-[var(--fg)] tracking-tight">
+              {isDebt ? t('loans.debtSettledCongrats', 'Utang telah lunas!') : t('loans.receivableSettledCongrats', 'Piutang telah diterima penuh!')}
+            </p>
+          </div>
+        )}
         {sheetError ? <ToastBanner message={sheetError} type="error" onDismiss={() => setSheetError('')} /> : null}
 
         {/* Hero Context Header */}

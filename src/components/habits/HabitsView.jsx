@@ -129,7 +129,7 @@ const HabitItemCard = memo(function HabitItemCard({
           >
             {isDone ? (
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
+                <path d="M20 6L9 17l-5-5" className="ft-check-animated" />
               </svg>
             ) : habit.isPaused ? (
               <Pause size={14} className="text-amber-500" />

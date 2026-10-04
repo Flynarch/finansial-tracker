@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { PieChart, Target, ChevronRight, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
 import { formatCompactCurrency, convertCurrency } from '../../lib/utils'
 import useTranslation from '../../hooks/useTranslation'
+import AnimatedCounter from '../ui/AnimatedCounter'
 
 export const DashboardPulseBento = memo(function DashboardPulseBento({
   isDbLoading = false,
@@ -120,7 +121,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
             {hasBudgets ? (
               <div className="mt-2.5 flex items-baseline gap-1.5">
                 <p className="text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                  {budgetPct}%
+                  <AnimatedCounter value={budgetPct} suffix="%" formatter={(v) => `${Math.round(v)}`} />
                 </p>
                 <span className="text-[11px] font-bold text-[var(--muted)]">
                   {t('budget.used', 'terpakai')}
@@ -169,7 +170,10 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                     )}
                   </span>
                   <span className="tabular-nums font-bold text-[var(--fg)]">
-                    {formatCompactCurrency(totalBudgetSpent, defaultCurrency, locale)}
+                    <AnimatedCounter
+                      value={totalBudgetSpent}
+                      formatter={(v) => formatCompactCurrency(v, defaultCurrency, locale)}
+                    />
                   </span>
                 </div>
               </>
@@ -220,7 +224,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
             {hasGoals ? (
               <div className="mt-2.5 flex items-baseline gap-1.5">
                 <p className="text-2xl sm:text-3xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                  {goalPct}%
+                  <AnimatedCounter value={goalPct} suffix="%" formatter={(v) => `${Math.round(v)}`} />
                 </p>
                 <span className="text-[11px] font-bold text-[var(--muted)]">
                   {t('savings.collected', 'terkumpul')}

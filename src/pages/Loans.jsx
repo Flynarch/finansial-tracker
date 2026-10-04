@@ -15,6 +15,7 @@ import { convertCurrency, formatCurrency, toSafeNumber, FALLBACK_EXCHANGE_RATES 
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { triggerHaptic } from '../lib/haptics'
 import PageHeader from '../components/ui/PageHeader'
+import AnimatedCounter from '../components/ui/AnimatedCounter'
 import {
   Plus,
   HandCoins,
@@ -320,7 +321,7 @@ export default function Loans() {
                 {t('loans.myDebt', 'Utang Saya')}
               </span>
               <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-terra)]">
-                {formatCurrency(totals.totalDebt, defaultCurrency)}
+                <AnimatedCounter value={totals.totalDebt} currency={defaultCurrency} />
               </p>
             </div>
 
@@ -331,7 +332,7 @@ export default function Loans() {
                 {t('loans.myReceivable', 'Piutang Saya')}
               </span>
               <p className="mt-1 text-xl sm:text-2xl font-black tabular-nums tracking-tight text-[var(--earthy-green)]">
-                {formatCurrency(totals.totalReceivable, defaultCurrency)}
+                <AnimatedCounter value={totals.totalReceivable} currency={defaultCurrency} />
               </p>
             </div>
           </div>
@@ -377,8 +378,11 @@ export default function Loans() {
                     : 'text-[var(--fg)]'
               }`}
             >
-              {totals.netPosition > 0 ? '+' : totals.netPosition < 0 ? '-' : ''}
-              {formatCurrency(Math.abs(totals.netPosition), defaultCurrency)}
+              <AnimatedCounter
+                value={Math.abs(totals.netPosition)}
+                currency={defaultCurrency}
+                prefix={totals.netPosition > 0 ? '+' : totals.netPosition < 0 ? '-' : ''}
+              />
             </span>
           </div>
 

@@ -18,6 +18,7 @@ import { calculateBudgetSpent, getBudgetPeriodDateRange, isTxMatchingBudget, get
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import useSwipeAction from '../hooks/useSwipeAction'
 import PageHeader from '../components/ui/PageHeader'
+import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon, Edit2, Calendar } from 'lucide-react'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
 
@@ -362,10 +363,10 @@ function Budget() {
             {/* Middle Row: Inline Big Amount + Limit */}
             <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
               <p className="text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-[var(--fg)]">
-                {formatCurrency(summary.totalSpent, defaultCurrency)}
+                <AnimatedCounter value={summary.totalSpent} currency={defaultCurrency} />
               </p>
               <span className="text-sm sm:text-base font-bold text-[var(--muted-2)] tabular-nums">
-                / {formatCurrency(summary.totalLimit, defaultCurrency)}
+                / <AnimatedCounter value={summary.totalLimit} currency={defaultCurrency} />
               </span>
             </div>
 
@@ -380,9 +381,10 @@ function Budget() {
                     summary.isOver ? 'text-[var(--status-expense)]' : 'text-[var(--fg)]'
                   }`}
                 >
-                  {summary.isOver
-                    ? formatCurrency(summary.overAmount, defaultCurrency)
-                    : formatCurrency(summary.remaining, defaultCurrency)}
+                  <AnimatedCounter
+                    value={summary.isOver ? summary.overAmount : summary.remaining}
+                    currency={defaultCurrency}
+                  />
                 </span>
               </div>
 

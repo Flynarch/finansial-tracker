@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import useTranslation from '../../hooks/useTranslation'
+import { triggerHaptic } from '../../lib/haptics'
 
 export default function BottomSheet({
   isOpen,
@@ -33,6 +34,7 @@ export default function BottomSheet({
   const snapTimeoutRef = useRef(null)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+  const hasTriggeredSnapHaptic = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -45,6 +47,7 @@ export default function BottomSheet({
       clearTimeout(snapTimeoutRef.current)
       snapTimeoutRef.current = null
     }
+    hasTriggeredSnapHaptic.current = false
     touchStartY.current = e.touches[0].clientY
     touchStartTime.current = Date.now()
     setIsDragging(true)
@@ -60,6 +63,12 @@ export default function BottomSheet({
     if (deltaY > 0) {
       // Natural downward drag
       setDragOffset(deltaY)
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
     } else {
       // Elastic rubberband resistance for upward pull
       setDragOffset(deltaY * 0.15)
@@ -71,6 +80,7 @@ export default function BottomSheet({
     const elapsed = Date.now() - touchStartTime.current
     const velocity = dragOffset / (elapsed || 1) // px per ms
 
+    hasTriggeredSnapHaptic.current = false
     setIsDragging(false)
     touchStartY.current = 0
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Bar,
   BarChart,
@@ -34,6 +34,7 @@ export default function ReportBarChart({
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const [chartMode, setChartMode] = useState('inflowOutflow') // 'inflowOutflow' | 'netFlow'
+  const lastScrubbedIndexRef = useRef(null)
 
   const handleBarClick = (entry) => {
     const key = entry?.key || entry?.payload?.key
@@ -148,6 +149,19 @@ export default function ReportBarChart({
               data={chartData}
               barGap={6}
               margin={CHART_MARGIN_DEFAULTS}
+              onMouseMove={(e) => {
+                const activeIdx = e?.activeTooltipIndex
+                if (activeIdx !== undefined && activeIdx !== lastScrubbedIndexRef.current) {
+                  lastScrubbedIndexRef.current = activeIdx
+                  triggerHaptic('selection')
+                }
+              }}
+              onMouseLeave={() => {
+                lastScrubbedIndexRef.current = null
+              }}
+              onTouchEnd={() => {
+                lastScrubbedIndexRef.current = null
+              }}
               onClick={(state) => {
                 if (state?.activePayload?.[0]?.payload) {
                   handleBarClick(state.activePayload[0].payload)
