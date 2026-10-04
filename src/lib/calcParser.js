@@ -26,9 +26,13 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
   }
 
   // Detect whether the input contains any mathematical operator or shorthand suffix
-  const hasExpression = /[+\-*/kKmMbBjJrR(]/.test(trimmed)
+  const hasExpression = /[+\-*/×÷−–—kKmMbBjJrR(]/.test(trimmed)
 
   let sanitized = trimmed
+    // Normalize Unicode math symbols
+    .replace(/\u00D7|×/g, '*')
+    .replace(/\u00F7|÷/g, '/')
+    .replace(/[\u2212\u2013\u2014−–—]/g, '-')
     // Remove spaces
     .replace(/\s+/g, '')
 
@@ -42,40 +46,144 @@ export function evaluateExpression(input, currency = 'IDR', options = {}) {
     sanitized = sanitized.replace(/,(\d+)/g, '.$1')
   } else {
     // Non-IDR currencies (e.g. USD, EUR, etc.)
-    // If format is European (e.g. 1.000,50): dot is thousand separator, comma is decimal
     if (/\d+\.\d{3}.*,\d+/.test(sanitized)) {
       while (/(\d+)\.(\d{3})(?=\D|$|\.)/.test(sanitized)) {
         sanitized = sanitized.replace(/(\d+)\.(\d{3})(?=\D|$|\.)/g, '$1$2')
       }
       sanitized = sanitized.replace(/,(\d+)/g, '.$1')
     } else {
-      // Standard or mixed format (e.g. 1,000.50 or 1,000 or 50,50 or 1,50 + 2,50)
-      // Strip thousand commas (followed by 3 digits)
       while (/(\d+),(\d{3})(?=\D|$|,)/.test(sanitized)) {
         sanitized = sanitized.replace(/(\d+),(\d{3})(?=\D|$|,)/g, '$1$2')
       }
-      // Any remaining decimal comma (e.g. 50,50 or 1,50 or 2,5k) becomes decimal dot
       sanitized = sanitized.replace(/,(\d+)/g, '.$1')
     }
   }
 
-  // Expand shorthand suffixes to numbers
-  sanitized = sanitized
-    .replace(/([0-9.]+)\s*(jt|juta|m(?:illion)?)(?!\w)/gi, '($1*1000000)')
-    .replace(/([0-9.]+)\s*(k|rb|ribu)(?!\w)/gi, '($1*1000)')
-    .replace(/([0-9.]+)\s*(b|miliar|milyar|billion)(?!\w)/gi, '($1*1000000000)')
+  // Pure Tokenizer & Recursive-Descent Math Evaluator (100% CSP compliant, zero eval / zero new Function)
+  const tokens = []
+  let pos = 0
+  const len = sanitized.length
 
-  // Only allow valid numeric & math characters
-  if (!/^[0-9.+\-*/() ]+$/.test(sanitized)) {
-    return { isValid: false, result: null, hasExpression: false }
+  while (pos < len) {
+    const ch = sanitized[pos]
+
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '(' || ch === ')') {
+      tokens.push({ type: ch })
+      pos++
+      continue
+    }
+
+    if (/[0-9.]/.test(ch)) {
+      let numStr = ''
+      while (pos < len && /[0-9.]/.test(sanitized[pos])) {
+        numStr += sanitized[pos]
+        pos++
+      }
+      let mult = 1
+      const rest = sanitized.slice(pos)
+      const suffixMatch = rest.match(/^(jt|juta|million|m|k|rb|ribu|b|miliar|milyar|billion)(?!\w)/i)
+      if (suffixMatch) {
+        const s = suffixMatch[1].toLowerCase()
+        if (s === 'k' || s === 'rb' || s === 'ribu') mult = 1000
+        else if (s === 'jt' || s === 'juta' || s === 'm' || s === 'million') mult = 1000000
+        else if (s === 'b' || s === 'miliar' || s === 'milyar' || s === 'billion') mult = 1000000000
+        pos += suffixMatch[0].length
+      }
+
+      const numVal = parseFloat(numStr) * mult
+      if (Number.isNaN(numVal)) {
+        return { isValid: false, result: null, hasExpression }
+      }
+      tokens.push({ type: 'NUM', val: numVal })
+      continue
+    }
+
+    // Unrecognized character or incomplete syntax
+    return { isValid: false, result: null, hasExpression }
+  }
+
+  if (tokens.length === 0) {
+    return { isValid: false, result: null, hasExpression }
+  }
+
+  let cursor = 0
+
+  function peek() {
+    return tokens[cursor]
+  }
+
+  function consume(expectedType) {
+    const t = tokens[cursor]
+    if (expectedType && (!t || t.type !== expectedType)) return null
+    cursor++
+    return t
+  }
+
+  function parseExpression() {
+    let left = parseTerm()
+    if (left === null) return null
+
+    while (peek() && (peek().type === '+' || peek().type === '-')) {
+      const op = consume().type
+      const right = parseTerm()
+      if (right === null) return null
+      left = op === '+' ? left + right : left - right
+    }
+    return left
+  }
+
+  function parseTerm() {
+    let left = parseFactor()
+    if (left === null) return null
+
+    while (peek() && (peek().type === '*' || peek().type === '/')) {
+      const op = consume().type
+      const right = parseFactor()
+      if (right === null) return null
+      if (op === '/') {
+        if (right === 0) return null // Division by zero
+        left = left / right
+      } else {
+        left = left * right
+      }
+    }
+    return left
+  }
+
+  function parseFactor() {
+    const t = peek()
+    if (!t) return null
+
+    if (t.type === '+') {
+      consume('+')
+      return parseFactor()
+    }
+    if (t.type === '-') {
+      consume('-')
+      const res = parseFactor()
+      return res === null ? null : -res
+    }
+
+    if (t.type === 'NUM') {
+      consume('NUM')
+      return t.val
+    }
+
+    if (t.type === '(') {
+      consume('(')
+      const inner = parseExpression()
+      if (inner === null) return null
+      if (!consume(')')) return null
+      return inner
+    }
+
+    return null
   }
 
   try {
-    // Safe mathematical expression evaluator using strict mode Function constructor
-    const fn = new Function(`'use strict'; return (${sanitized});`)
-    const rawResult = fn()
+    const rawResult = parseExpression()
 
-    if (typeof rawResult === 'number' && Number.isFinite(rawResult) && !Number.isNaN(rawResult)) {
+    if (cursor === tokens.length && typeof rawResult === 'number' && Number.isFinite(rawResult) && !Number.isNaN(rawResult)) {
       const rounded = roundCurrency(rawResult)
       return {
         isValid: true,
@@ -105,9 +213,9 @@ export function resolveCalculatedAmount(input, currency = 'IDR', options = {}) {
   if (!trimmed) return ''
 
   // If input contains mathematical operators or shorthand suffixes
-  if (/[+\-*/kKmMbBjJrR(]/.test(trimmed)) {
+  if (/[+\-*/×÷−–—kKmMbBjJrR(]/.test(trimmed)) {
     // Clean up trailing operators like "50.000 + " -> "50.000"
-    const cleaned = trimmed.replace(/\s*[+\-*/]+\s*$/, '').trim()
+    const cleaned = trimmed.replace(/\s*[+\-*/×÷−–—]+\s*$/, '').trim()
     if (!cleaned) return ''
     const evalResult = evaluateExpression(cleaned, currency, options)
     if (evalResult.isValid && evalResult.result !== null) {

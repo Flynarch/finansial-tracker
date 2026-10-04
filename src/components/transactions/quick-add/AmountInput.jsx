@@ -203,7 +203,6 @@ export default function AmountInput({
             }}
             onBlur={() => {
               setIsAmountFocused(false)
-              handleCommitCalc()
             }}
             required
             placeholder="0"

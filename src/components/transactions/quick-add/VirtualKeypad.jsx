@@ -21,82 +21,149 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const longPressTimerRef = useRef(null)
   const isLongPressRef = useRef(false)
+  const [justCalculated, setJustCalculated] = useState(false)
 
-  // Handle single digit press
+  // Handle single digit press (0-9)
   const handleDigit = useCallback((digit) => {
     triggerHaptic('light')
-    const current = String(amount || '').trim()
+    if (justCalculated) {
+      setJustCalculated(false)
+      onChangeAmount(digit === '0' ? '0' : digit)
+      return
+    }
+
+    const current = String(amount || '')
     if (!current || current === '0') {
       onChangeAmount(digit === '0' ? '0' : digit)
       return
     }
 
-    if (/[+\-*/kKmMbBjJrRtTuU(]/.test(current)) {
+    // If current contains math operators, format the active operand cleanly
+    if (/[+\-*/×÷−–—]/.test(current)) {
+      const lastOpMatch = current.match(/^(.*[+\-*/×÷−–—]\s*)(.*)$/)
+      if (lastOpMatch) {
+        const prefix = lastOpMatch[1]
+        const rawOperand = lastOpMatch[2]
+        if (currency === 'IDR') {
+          const nextDigits = (rawOperand.replace(/\D/g, '') + digit).replace(/^0+/, '') || '0'
+          onChangeAmount(prefix + formatMoneyInput(nextDigits, currency))
+        } else {
+          onChangeAmount(prefix + rawOperand + digit)
+        }
+        return
+      }
+      onChangeAmount(current + digit)
+    } else if (/[kKmMbBjJrRtTuU(]/.test(current)) {
       onChangeAmount(current + digit)
     } else {
       const rawDigits = current.replace(/\D/g, '') + digit
       onChangeAmount(formatMoneyInput(rawDigits, currency))
     }
-  }, [amount, currency, onChangeAmount])
+  }, [amount, currency, justCalculated, onChangeAmount])
 
-  // Handle 000
+  // Handle 000 shortcut
   const handleTripleZero = useCallback(() => {
     triggerHaptic('light')
-    const current = String(amount || '').trim()
-    if (!current || current === '0' || /[+\-*/]$/.test(current)) return
+    if (justCalculated) return
 
-    if (/[+\-*/]/.test(current)) {
+    const current = String(amount || '')
+    if (!current || current === '0') return
+    // Prevent trailing 000 right after an operator
+    if (/[+\-*/×÷−–—]\s*$/.test(current)) return
+
+    if (/[+\-*/×÷−–—]/.test(current)) {
+      const lastOpMatch = current.match(/^(.*[+\-*/×÷−–—]\s*)(.*)$/)
+      if (lastOpMatch) {
+        const prefix = lastOpMatch[1]
+        const rawOperand = lastOpMatch[2]
+        const rawDigits = rawOperand.replace(/\D/g, '')
+        if (!rawDigits || rawDigits === '0') return
+        onChangeAmount(prefix + formatMoneyInput(rawDigits + '000', currency))
+        return
+      }
       onChangeAmount(current + '000')
     } else {
       const rawDigits = current.replace(/\D/g, '')
       if (!rawDigits || rawDigits === '0') return
       onChangeAmount(formatMoneyInput(rawDigits + '000', currency))
     }
-  }, [amount, currency, onChangeAmount])
+  }, [amount, currency, justCalculated, onChangeAmount])
 
   // Handle decimal dot
   const handleDecimal = useCallback(() => {
     triggerHaptic('light')
-    const current = String(amount || '').trim()
-    if (!current || /[+\-*/]$/.test(current)) {
+    if (justCalculated) {
+      setJustCalculated(false)
+      onChangeAmount('0.')
+      return
+    }
+
+    const current = String(amount || '')
+    if (!current || /[+\-*/×÷−–—]\s*$/.test(current)) {
       onChangeAmount(`${current}0.`)
     } else if (!/\.\d*$/.test(current)) {
       onChangeAmount(`${current}.`)
     }
-  }, [amount, onChangeAmount])
+  }, [amount, justCalculated, onChangeAmount])
 
   // Handle 'k' shortcut
   const handleK = useCallback(() => {
     triggerHaptic('light')
+    if (justCalculated) return
+
     const current = String(amount || '').trim()
-    if (!current || /[+\-*/]$/.test(current) || /[kK]$/.test(current)) return
+    if (!current || /[+\-*/×÷−–—]\s*$/.test(current) || /[kK]$/.test(current)) return
     onChangeAmount(`${current}k`)
-  }, [amount, onChangeAmount])
+  }, [amount, justCalculated, onChangeAmount])
 
   // Handle math operators (+, -, *, /)
   const handleOperator = useCallback((op) => {
     triggerHaptic('light')
+    setJustCalculated(false)
     const current = String(amount || '').trim()
     if (!current) {
-      if (op === '-') onChangeAmount('-')
+      if (op === '-' || op === '−') onChangeAmount('-')
       return
     }
 
-    const updated = /[+\-*/]$/.test(current)
-      ? current.slice(0, -1).trim() + ` ${op} `
-      : `${current} ${op} `
-    onChangeAmount(updated)
+    // Replace any trailing operator cleanly to avoid consecutive syntax errors
+    const cleaned = current.replace(/\s*[+\-*/×÷−–—]+\s*$/, '').trim()
+    onChangeAmount(`${cleaned} ${op} `)
   }, [amount, onChangeAmount])
 
   // Handle single backspace
   const handleBackspace = useCallback(() => {
     triggerHaptic('selection')
-    const current = String(amount || '').trim()
+    if (justCalculated) {
+      setJustCalculated(false)
+    }
+
+    const current = String(amount || '')
     if (!current) return
 
-    if (/\s[+\-*/]\s?$/.test(current)) {
-      onChangeAmount(current.replace(/\s[+\-*/]\s?$/, ''))
+    // If string ends with an operator and spaces (e.g. " + ")
+    if (/\s*[+\-*/×÷−–—]+\s*$/.test(current)) {
+      onChangeAmount(current.replace(/\s*[+\-*/×÷−–—]+\s*$/, ''))
       return
+    }
+
+    // If within second operand of an expression
+    if (/[+\-*/×÷−–—]/.test(current)) {
+      const lastOpMatch = current.match(/^(.*[+\-*/×÷−–—]\s*)(.*)$/)
+      if (lastOpMatch) {
+        const prefix = lastOpMatch[1]
+        const rawOperand = lastOpMatch[2]
+        const nextOperand = rawOperand.slice(0, -1)
+        if (!nextOperand) {
+          onChangeAmount(prefix)
+        } else if (currency === 'IDR' && !/[kK]/.test(nextOperand)) {
+          const raw = nextOperand.replace(/\D/g, '')
+          onChangeAmount(prefix + (raw ? formatMoneyInput(raw, currency) : ''))
+        } else {
+          onChangeAmount(prefix + nextOperand)
+        }
+        return
+      }
     }
 
     const next = current.slice(0, -1).trim()
@@ -105,25 +172,28 @@ export const VirtualKeypad = memo(function VirtualKeypad({
       return
     }
 
-    if (!/[+\-*/kKmMbBjJrRtTuU(]/.test(next)) {
+    if (!/[+\-*/×÷−–—kKmMbBjJrRtTuU(]/.test(next)) {
       const raw = next.replace(/\D/g, '')
       onChangeAmount(raw ? formatMoneyInput(raw, currency) : '')
     } else {
       onChangeAmount(next)
     }
-  }, [amount, currency, onChangeAmount])
+  }, [amount, currency, justCalculated, onChangeAmount])
 
   // Long press on backspace clears all
-  const handleBackspacePointerDown = () => {
+  const handleBackspacePointerDown = (e) => {
+    e.preventDefault()
     isLongPressRef.current = false
     longPressTimerRef.current = window.setTimeout(() => {
       isLongPressRef.current = true
       triggerHaptic('medium')
+      setJustCalculated(false)
       onChangeAmount('')
     }, 450)
   }
 
-  const handleBackspacePointerUp = () => {
+  const handleBackspacePointerUp = (e) => {
+    e.preventDefault()
     if (longPressTimerRef.current) {
       window.clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = null
@@ -136,6 +206,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
 
   const handleClear = useCallback(() => {
     triggerHaptic('medium')
+    setJustCalculated(false)
     onChangeAmount('')
   }, [onChangeAmount])
 
@@ -144,10 +215,12 @@ export const VirtualKeypad = memo(function VirtualKeypad({
     const resolved = resolveCalculatedAmount(amount, currency)
     if (resolved && resolved !== amount) {
       onChangeAmount(formatMoneyInput(resolved, currency))
+      setJustCalculated(true)
       return true
     }
     if (calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null) {
       onChangeAmount(formatMoneyInput(String(calcEvaluation.result), currency))
+      setJustCalculated(true)
       return true
     }
     return false
@@ -263,11 +336,50 @@ export const VirtualKeypad = memo(function VirtualKeypad({
         }}
       >
         {/* Subtle Sheet Grab Handle */}
-        <div className="w-10 h-1 rounded-full bg-[var(--border-strong)] mx-auto mb-2.5 opacity-60" />
+        <div className="w-10 h-1 rounded-full bg-[var(--border-strong)] mx-auto mb-2 opacity-60" />
 
-        {/* Live Calculation Result Banner / Pill */}
+        {/* Top Header Row with Calculator Badge and Action Controls */}
+        <div
+          data-testid="virtual-keypad-toolbar"
+          className="flex items-center justify-between gap-1.5 mb-2 pb-2 border-b border-[var(--border)]/50"
+        >
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <div className="w-6 h-6 rounded-lg bg-[var(--field-bg)] border border-[var(--border)] flex items-center justify-center shrink-0">
+              <Calculator className="w-3.5 h-3.5 text-[var(--accent)]" />
+            </div>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted)] truncate">
+              {t('calculator.title', 'Kalkulator')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={handleDone}
+              style={{ backgroundColor: modeAccent }}
+              className="h-8 px-3 rounded-xl text-xs font-extrabold text-white flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+              title={t('common.done', 'Selesai')}
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>{t('common.done', 'Selesai')}</span>
+            </button>
+
+            <button
+              type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={handleClose}
+              className="h-8 w-8 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-2xs"
+              aria-label={t('common.close', 'Tutup')}
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Live Calculation Result Banner / Interactive Pill */}
         {hasCalcResult && (
-          <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2.5 rounded-2xl bg-[var(--field-bg)] border border-[var(--border-strong)] shadow-2xs animate-[ft-fade-in_0.15s_ease-out]">
+          <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-2xl bg-[var(--field-bg)] border border-[var(--border-strong)] shadow-2xs animate-[ft-fade-in_0.15s_ease-out]">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Calculator className="w-4 h-4 text-[var(--accent)] shrink-0" />
               <span className="text-xs text-[var(--muted)] truncate font-mono">
@@ -276,6 +388,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             </div>
             <button
               type="button"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={handleCommit}
               aria-label={t('calculator.apply', 'Terapkan')}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-[var(--accent)] text-white shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
@@ -289,117 +402,84 @@ export const VirtualKeypad = memo(function VirtualKeypad({
           </div>
         )}
 
-        {/* Top Operator & Tool Strip */}
+        {/* 7-Column Balanced Operator Strip (Clear, +, -, *, /, k, =) */}
         <div
-          data-testid="virtual-keypad-toolbar"
-          className="flex items-center justify-between gap-1.5 pb-2.5 border-b border-[var(--border)]/60"
+          data-testid="calculator-operator-bar"
+          className="grid grid-cols-7 gap-1 mb-2.5"
         >
-          {/* Quick math operators */}
-          <div
-            data-testid="calculator-operator-bar"
-            className="flex items-center gap-1 flex-1 overflow-x-auto ft-hide-scrollbar py-0.5"
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={handleClear}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-rose-500 hover:border-rose-400 font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('common.clear', 'Bersihkan')}
           >
-            <button
-              type="button"
-              onClick={handleClear}
-              className="h-8.5 px-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-rose-500 hover:border-rose-400 font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('common.clear', 'Bersihkan')}
-            >
-              C
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOperator('+')}
-              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('calculator.add', 'Tambah (+)')}
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOperator('-')}
-              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('calculator.subtract', 'Kurang (-)')}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOperator('*')}
-              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('calculator.multiply', 'Kali (*)')}
-            >
-              ×
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOperator('/')}
-              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('calculator.divide', 'Bagi (/)')}
-            >
-              ÷
-            </button>
-            <button
-              type="button"
-              onClick={handleK}
-              className="h-8.5 px-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title={t('calculator.thousandsK', 'Ribuan (k)')}
-            >
-              k
-            </button>
-            {currency !== 'IDR' ? (
-              <button
-                type="button"
-                onClick={handleDecimal}
-                className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-                title={t('calculator.decimal', 'Desimal (.)')}
-              >
-                .
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleCommit}
-              disabled={!calcEvaluation.isValid || !calcEvaluation.hasExpression || calcEvaluation.result === null}
-              aria-label={t('calculator.calculate', 'Hitung')}
-              className={`h-8.5 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-2xs select-none touch-manipulation active:scale-95 cursor-pointer ${
-                calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
-                  ? 'bg-[var(--accent)] text-white hover:opacity-95 shadow-sm'
-                  : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted-2)] opacity-40 cursor-not-allowed'
-              }`}
-              title={t('calculator.calculate', 'Hitung (=)')}
-            >
-              =
-            </button>
-          </div>
-
-          {/* Right Action: Selesai and Close buttons */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleDone}
-              style={{ backgroundColor: modeAccent }}
-              className="h-8.5 px-3 rounded-xl text-xs font-extrabold text-white flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
-              title={t('common.done', 'Selesai')}
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>{t('common.done', 'Selesai')}</span>
-            </button>
-
-            {/* Collapse Keypad Chevron */}
-            <button
-              type="button"
-              onClick={handleClose}
-              className="h-8.5 w-8.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-2xs"
-              aria-label={t('common.close', 'Tutup')}
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
+            C
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => handleOperator('+')}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('calculator.add', 'Tambah (+)')}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => handleOperator('-')}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('calculator.subtract', 'Kurang (-)')}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => handleOperator('*')}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('calculator.multiply', 'Kali (*)')}
+          >
+            ×
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => handleOperator('/')}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('calculator.divide', 'Bagi (/)')}
+          >
+            ÷
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={handleK}
+            className="h-9 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title={t('calculator.thousandsK', 'Ribuan (k)')}
+          >
+            k
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={handleCommit}
+            disabled={!calcEvaluation.isValid || !calcEvaluation.hasExpression || calcEvaluation.result === null}
+            aria-label={t('calculator.calculate', 'Hitung')}
+            className={`h-9 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-2xs select-none touch-manipulation active:scale-95 cursor-pointer ${
+              calcEvaluation.isValid && calcEvaluation.hasExpression && calcEvaluation.result !== null
+                ? 'bg-[var(--accent)] text-white hover:opacity-95 shadow-sm'
+                : 'bg-[var(--field-bg)] border border-[var(--border)] text-[var(--muted-2)] opacity-40 cursor-not-allowed'
+            }`}
+            title={t('calculator.calculate', 'Hitung (=)')}
+          >
+            =
+          </button>
         </div>
 
         {/* 3-Column Numeric Keypad Grid */}
-        <div className="grid grid-cols-3 gap-2 pt-3">
+        <div className="grid grid-cols-3 gap-2">
           {[
             { label: '1', val: '1' },
             { label: '2', val: '2' },
@@ -414,6 +494,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
             <button
               key={item.val}
               type="button"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={() => handleDigit(item.val)}
               className="h-12 sm:h-13 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xl sm:text-2xl tabular-nums shadow-2xs hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] active:scale-[0.93] active:bg-[var(--border)] transition-transform flex items-center justify-center cursor-pointer select-none"
             >
@@ -425,6 +506,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
           {currency === 'IDR' ? (
             <button
               type="button"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={handleTripleZero}
               className="h-12 sm:h-13 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-base sm:text-lg tabular-nums shadow-2xs hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] active:scale-[0.93] active:bg-[var(--border)] transition-transform flex items-center justify-center cursor-pointer select-none"
               title={t('calculator.add000', 'Tambah 000')}
@@ -434,6 +516,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
           ) : (
             <button
               type="button"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={handleDecimal}
               className="h-12 sm:h-13 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xl sm:text-2xl tabular-nums shadow-2xs hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] active:scale-[0.93] active:bg-[var(--border)] transition-transform flex items-center justify-center cursor-pointer select-none"
               title={t('calculator.decimal', 'Desimal (.)')}
@@ -444,6 +527,7 @@ export const VirtualKeypad = memo(function VirtualKeypad({
 
           <button
             type="button"
+            onPointerDown={(e) => e.preventDefault()}
             onClick={() => handleDigit('0')}
             className="h-12 sm:h-13 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)] text-[var(--fg)] font-bold text-xl sm:text-2xl tabular-nums shadow-2xs hover:border-[var(--border-strong)] hover:bg-[var(--panel-strong)] active:scale-[0.93] active:bg-[var(--border)] transition-transform flex items-center justify-center cursor-pointer select-none"
           >
