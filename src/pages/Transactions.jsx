@@ -36,6 +36,7 @@ import PageHeader from '../components/ui/PageHeader'
 import CustomDatePickerModal from '../components/ui/CustomDatePickerModal'
 import ToastBanner from '../components/ui/ToastBanner'
 import CategoryPickerModal from '../components/transactions/CategoryPickerModal'
+import PullToRefresh from '../components/ui/PullToRefresh'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import TransactionDetailSheet from '../components/transactions/TransactionDetailSheet'
 import ReceiptPreviewModal from '../components/transactions/ReceiptPreviewModal'
@@ -154,6 +155,7 @@ function Transactions() {
   const [pendingFocusTransactionId, setPendingFocusTransactionId] = useState(null)
   const [highlightedTransactionId, setHighlightedTransactionId] = useState(null)
   const listScrollRef = useRef(null)
+  const stagingScrollRef = useRef(null)
 
   const [selectedViewTab, setSelectedViewTab] = useState(null)
   const isUrlStaging = useMemo(() => {
@@ -735,8 +737,8 @@ function Transactions() {
             aria-hidden="true"
             className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-[var(--panel-strong)] shadow-xs transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
             style={{
-              width: 'calc(50% - 2px)',
-              transform: activeViewTab === 'staging' ? 'translateX(calc(100% + 2px))' : 'translateX(0)',
+              width: 'calc(50% - 4px)',
+              transform: activeViewTab === 'staging' ? 'translateX(100%)' : 'translateX(0)',
             }}
           />
           <button
@@ -765,17 +767,28 @@ function Transactions() {
         </div>
 
         {activeViewTab === 'staging' ? (
-          <div className="flex-1 min-h-0 overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))]">
-            <StagingReviewInbox
-              pendingTransactions={pendingReviewTxs}
-              wallets={allWallets}
-              formatCurrency={formatCurrency}
-              defaultCurrency={defaultCurrency}
-              locale={locale}
-              onEditTransaction={openEditTransaction}
-              t={t}
-            />
-          </div>
+          <PullToRefresh
+            onRefresh={handleRefresh}
+            scrollContainerRef={stagingScrollRef}
+            className="flex-1 min-h-0 flex flex-col"
+            contentClassName="flex-1 min-h-0 flex flex-col"
+          >
+            <div
+              ref={stagingScrollRef}
+              className="flex-1 min-h-0 overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))]"
+            >
+              <StagingReviewInbox
+                pendingTransactions={pendingReviewTxs}
+                wallets={allWallets}
+                formatCurrency={formatCurrency}
+                defaultCurrency={defaultCurrency}
+                locale={locale}
+                onEditTransaction={openEditTransaction}
+                onSync={handleRefresh}
+                t={t}
+              />
+            </div>
+          </PullToRefresh>
         ) : (
           <>
             {/* Collapsible Search Input */}

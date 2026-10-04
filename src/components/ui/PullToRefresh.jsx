@@ -38,8 +38,9 @@ export default function PullToRefresh({
 
   const handleTouchStart = useCallback((e) => {
     if (disabled || isRefreshingRef.current || isDone) return
-    const target = scrollContainerRef?.current || innerContainerRef.current
-    const scrollTop = target ? target.scrollTop : (window.scrollY || 0)
+    const scrollTop = scrollContainerRef?.current
+      ? scrollContainerRef.current.scrollTop
+      : window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0
 
     if (scrollTop <= 1) {
       touchStartY.current = e.touches[0].clientY

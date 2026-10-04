@@ -396,8 +396,8 @@ export default function Loans() {
             aria-hidden="true"
             className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-[var(--panel-strong)] shadow-xs transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
             style={{
-              width: 'calc(50% - 2px)',
-              transform: activeTab === 'receivable' ? 'translateX(calc(100% + 2px))' : 'translateX(0)',
+              width: 'calc(50% - 4px)',
+              transform: activeTab === 'receivable' ? 'translateX(100%)' : 'translateX(0)',
             }}
           />
           <button

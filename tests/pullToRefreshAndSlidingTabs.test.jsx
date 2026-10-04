@@ -102,6 +102,29 @@ describe('PullToRefresh and Animated Sliding Tabs Suite', () => {
 
       expect(onRefreshMock).not.toHaveBeenCalled()
     })
+
+    it('prevents pull when window.scrollY > 1 and scrollContainerRef is omitted', () => {
+      const onRefreshMock = vi.fn()
+      // Simulate scrolled window
+      const origScrollY = window.scrollY
+      Object.defineProperty(window, 'scrollY', { value: 150, writable: true, configurable: true })
+
+      const { container } = render(
+        <PullToRefresh onRefresh={onRefreshMock}>
+          <div data-testid="content">Dashboard Content</div>
+        </PullToRefresh>
+      )
+
+      const wrapper = container.firstChild
+      fireEvent.touchStart(wrapper, { touches: [{ clientY: 100 }] })
+      fireEvent.touchMove(wrapper, { touches: [{ clientY: 250 }] })
+      fireEvent.touchEnd(wrapper)
+
+      expect(onRefreshMock).not.toHaveBeenCalled()
+
+      // Restore scrollY
+      Object.defineProperty(window, 'scrollY', { value: origScrollY, writable: true, configurable: true })
+    })
   })
 
   describe('SettingsSegmentControl Component (Fluid Sliding Pill)', () => {
