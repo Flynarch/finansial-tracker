@@ -21,6 +21,12 @@ describe('Version Consistency Verification', () => {
     expect(APP_DISPLAY_VERSION).toBe(`v${APP_VERSION}`)
   })
 
+  it('matches README.md version badge with APP_DISPLAY_VERSION', () => {
+    const readme = readFileSync(path.resolve(process.cwd(), 'README.md'), 'utf8')
+    expect(readme).toContain(`Version-${APP_DISPLAY_VERSION}`)
+    expect(readme).toContain(`releases/tag/${APP_DISPLAY_VERSION}`)
+  })
+
   it('matches android/app/build.gradle versionName and valid versionCode', () => {
     const gradle = readFileSync(path.resolve(process.cwd(), 'android/app/build.gradle'), 'utf8')
     const versionNameMatch = gradle.match(/versionName\s+"([^"]+)"/)
