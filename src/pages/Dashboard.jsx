@@ -186,7 +186,7 @@ export default function Dashboard() {
   }, [])
 
   return (
-    <PullToRefresh onRefresh={handleRefresh} className="min-h-full">
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-full w-full">
       <div
         className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
           isEntering ? 'opacity-100' : 'opacity-0'

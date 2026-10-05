@@ -65,7 +65,7 @@ export default function ReceiptPreviewModal({
           ) : (
             <img
               src={activeImageSrc}
-              alt="Receipt / Proof"
+              alt={t('transactions.receiptProof', 'Receipt / Proof')}
               onError={() => setFailedImageSrc(activeImageSrc)}
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl select-none"
             />

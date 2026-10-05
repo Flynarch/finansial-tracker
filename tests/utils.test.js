@@ -64,6 +64,12 @@ describe('utils - convertCurrency', () => {
     expect(convertCurrency(undefined, 'USD', 'IDR')).toBe(0)
     expect(convertCurrency('invalid', 'USD', 'IDR')).toBe(0)
   })
+
+  it('prevents floating-point drift using Decimal arithmetic', () => {
+    const rates = { BASE: 100, TARGET: 300 }
+    const res = convertCurrency(0.1, 'BASE', 'TARGET', rates)
+    expect(res).toBe(0.3)
+  })
 })
 
 describe('utils - parseMoneyInput & formatMoneyInput', () => {

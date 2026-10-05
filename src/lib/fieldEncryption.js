@@ -12,6 +12,9 @@ const ENCRYPTED_PREFIX = 'enc:v1:'
 // In-memory session key cache (cleared when app is locked)
 let _sessionEncryptionKey = null
 
+// In-memory plaintext cache for decrypted fields (cleared when app is locked)
+const _notePlaintextCache = new Map()
+
 /**
  * Sets the active session encryption key derived from user authentication.
  * @param {CryptoKey|null} key
@@ -29,10 +32,19 @@ export function getSessionEncryptionKey() {
 }
 
 /**
- * Clears the session encryption key on app lock / logout.
+ * Clears the session encryption key and note plaintext cache on app lock / logout.
  */
 export function clearSessionEncryptionKey() {
   _sessionEncryptionKey = null
+  _notePlaintextCache.clear()
+}
+
+/**
+ * Gets current size of the in-memory note decryption cache.
+ * @returns {number}
+ */
+export function getDecryptionCacheSize() {
+  return _notePlaintextCache.size
 }
 
 /**
@@ -42,6 +54,80 @@ export function clearSessionEncryptionKey() {
  */
 export function isFieldEncrypted(val) {
   return typeof val === 'string' && val.startsWith(ENCRYPTED_PREFIX)
+}
+
+/**
+ * Synchronously retrieves decrypted note text from the memory cache if available.
+ * If not yet in cache, triggers an asynchronous background decrypt so subsequent renders resolve cleanly.
+ * Returns fallback (default empty string) on cache miss for encrypted fields to avoid leaking ciphertext.
+ * @param {string|null|undefined} note
+ * @param {string} [fallback='']
+ * @returns {string} Plaintext note if available or unencrypted; returns fallback while decrypting.
+ */
+export function getDecryptedNoteSync(note, fallback = '') {
+  if (!note || typeof note !== 'string') return note || ''
+  if (!isFieldEncrypted(note)) return note
+  if (_notePlaintextCache.has(note)) {
+    return _notePlaintextCache.get(note)
+  }
+  // Schedule non-blocking async decryption to warm up cache for subsequent renders
+  decryptField(note)
+    .then((plain) => {
+      if (plain) {
+        _notePlaintextCache.set(note, plain)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ft-notes-decrypted', { detail: { note, plain } }))
+        }
+      }
+    })
+    .catch(() => {})
+  return fallback
+}
+
+/**
+ * Eagerly decrypts and warms up the cache for a list of transactions or objects with encrypted notes.
+ * @param {Array<Object>|Object} records
+ * @returns {Promise<void>}
+ */
+export async function warmupDecryptionCache(records) {
+  if (!records) return
+  const list = Array.isArray(records) ? records : [records]
+  const notesToDecrypt = new Set()
+
+  for (const item of list) {
+    if (!item) continue
+    if (typeof item.notes === 'string' && isFieldEncrypted(item.notes) && !_notePlaintextCache.has(item.notes)) {
+      notesToDecrypt.add(item.notes)
+    }
+    if (Array.isArray(item.splitItems)) {
+      for (const si of item.splitItems) {
+        if (typeof si?.notes === 'string' && isFieldEncrypted(si.notes) && !_notePlaintextCache.has(si.notes)) {
+          notesToDecrypt.add(si.notes)
+        }
+      }
+    }
+  }
+
+  if (notesToDecrypt.size === 0) return
+
+  let addedCount = 0
+  await Promise.allSettled(
+    Array.from(notesToDecrypt).map(async (cipher) => {
+      try {
+        const plain = await decryptField(cipher)
+        if (plain) {
+          _notePlaintextCache.set(cipher, plain)
+          addedCount++
+        }
+      } catch {
+        /* ignore background decryption errors */
+      }
+    })
+  )
+
+  if (addedCount > 0 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ft-notes-decrypted', { detail: { count: addedCount } }))
+  }
 }
 
 /**
@@ -55,6 +141,7 @@ export async function encryptField(value, passphrase = null) {
   const strVal = String(value)
   if (isFieldEncrypted(strVal)) return strVal
 
+  let ciphertext
   // If a custom passphrase is provided, encrypt using PBKDF2 key with passphrase
   if (passphrase) {
     const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
@@ -82,16 +169,21 @@ export async function encryptField(value, passphrase = null) {
       ['encrypt']
     )
     const iv = cryptoObj.getRandomValues(new Uint8Array(12))
-    const ciphertext = await cryptoObj.subtle.encrypt(
+    const encryptedBuf = await cryptoObj.subtle.encrypt(
       { name: 'AES-GCM', iv },
       key,
       enc.encode(strVal)
     )
-    return `${ENCRYPTED_PREFIX}${bufferToHex(iv)}:${bufferToHex(ciphertext)}`
+    ciphertext = `${ENCRYPTED_PREFIX}${bufferToHex(iv)}:${bufferToHex(encryptedBuf)}`
+  } else {
+    // Otherwise delegate to standard device-backed encryption
+    ciphertext = await encryptSecret(strVal)
   }
 
-  // Otherwise delegate to standard device-backed encryption
-  return encryptSecret(strVal)
+  if (ciphertext) {
+    _notePlaintextCache.set(ciphertext, strVal)
+  }
+  return ciphertext
 }
 
 /**
@@ -106,6 +198,11 @@ export async function decryptField(ciphertext, passphrase = null) {
     return ciphertext || ''
   }
 
+  if (_notePlaintextCache.has(ciphertext)) {
+    return _notePlaintextCache.get(ciphertext)
+  }
+
+  let plain
   if (passphrase) {
     const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
     if (!cryptoObj?.subtle) return ciphertext
@@ -141,14 +238,19 @@ export async function decryptField(ciphertext, passphrase = null) {
         data
       )
       const dec = new TextDecoder()
-      return dec.decode(decrypted)
+      plain = dec.decode(decrypted)
     } catch {
       // Fallback to standard decryptSecret
-      return decryptSecret(ciphertext)
+      plain = await decryptSecret(ciphertext)
     }
+  } else {
+    plain = await decryptSecret(ciphertext)
   }
 
-  return decryptSecret(ciphertext)
+  if (plain) {
+    _notePlaintextCache.set(ciphertext, plain)
+  }
+  return plain
 }
 
 /**

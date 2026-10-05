@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { encryptField } from '../lib/fieldEncryption'
 import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -168,6 +169,9 @@ export default function SavingsDetail() {
       const formattedDate = format(selectedDate, 'yyyy-MM-dd HH:mm:ss')
       const walletIdNum = Number(selectedWalletId)
 
+      const rawTxNotes = notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`
+      const encryptedTxNotes = rawTxNotes ? await encryptField(rawTxNotes) : ''
+
       await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
         await db.goals.update(goalId, goalUpdates)
 
@@ -188,7 +192,7 @@ export default function SavingsDetail() {
             amount: roundCurrency(walletTxAmount, walletCurrency),
             type: isWithdraw ? 'income' : 'expense',
             category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
-            notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+            notes: encryptedTxNotes,
             currency: walletCurrency,
             walletId: walletIdNum,
             goalId: goal.id,
@@ -248,6 +252,8 @@ export default function SavingsDetail() {
 
       const now = new Date()
       const formattedDate = format(now, 'yyyy-MM-dd HH:mm:ss')
+      const rawCashoutNotes = `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`
+      const encryptedCashoutNotes = await encryptField(rawCashoutNotes)
 
       await db.transaction('rw', [db.goals, db.transactions, db.goalLogs, db.wallets], async () => {
         // 1. Update Goal
@@ -268,7 +274,7 @@ export default function SavingsDetail() {
           amount: cashoutInWallet,
           type: 'income',
           category: 'cairkan_tabungan',
-          notes: `Pencairan Tabungan: ${goal.name} ke ${walletObj.name}`,
+          notes: encryptedCashoutNotes,
           currency: walletCurrency,
           walletId: walletIdNum,
           goalId: Number(goalId),
@@ -916,7 +922,7 @@ export default function SavingsDetail() {
             <button
               type="button"
               onClick={async () => {
-                await db.goals.update(goal.id, { isCompleted: true, isArchived: true })
+                await db.goals.update(goal.id, { isCompleted: true, isArchived: 1 })
                 setIsCelebrationModalOpen(false)
                 navigate('/savings?view=archive')
               }}

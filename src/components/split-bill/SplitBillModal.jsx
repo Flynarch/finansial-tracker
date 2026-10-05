@@ -278,9 +278,10 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
             if (p.isPayer) continue
             const shareAmount = splitMode === 'equal' ? friendShareEqual : parseMoneyInput(p.amount, activeCurrency)
             if (shareAmount > 0) {
+              const safePersonName = (p.name && p.name.trim()) || `Teman ${i + 1}`
               const loanId = await db.loans.add({
                 type: 'receivable', // piutang (teman berhutang pada kita)
-                personName: p.name.trim(),
+                personName: safePersonName,
                 title: `Patungan: ${billTitle}`,
                 totalAmount: shareAmount,
                 remainingAmount: shareAmount,
@@ -295,7 +296,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
               })
               receivablesCreated.push({
                 id: loanId,
-                personName: p.name.trim(),
+                personName: safePersonName,
                 amount: shareAmount,
               })
             }

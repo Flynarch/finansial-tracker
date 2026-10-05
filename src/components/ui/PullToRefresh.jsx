@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { triggerHaptic } from '../../lib/haptics'
 import useSettingsStore from '../../store/useSettingsStore'
-import { Loader2, ArrowDown, Check } from 'lucide-react'
+import { RotateCw, Check } from 'lucide-react'
 
 /**
  * PullToRefresh
  * Mobile-first elastic pull-to-refresh component with spring physics,
- * logarithmic rubber-banding, circular SVG progress ring, and haptic feedback.
+ * logarithmic rubber-banding, native circular refresh glyph, and haptic feedback.
  */
 export default function PullToRefresh({
   onRefresh,
@@ -34,7 +34,6 @@ export default function PullToRefresh({
   const isRefreshingRef = useRef(false)
 
   const progress = Math.min(1, pullDistance / pullDownThreshold)
-  const circleCircumference = 2 * Math.PI * 9 // r = 9 -> ~56.55
 
   const handleTouchStart = useCallback((e) => {
     if (disabled || isRefreshingRef.current || isDone) return
@@ -146,15 +145,15 @@ export default function PullToRefresh({
   return (
     <div
       ref={scrollContainerRef ? undefined : innerContainerRef}
-      className={`relative ${className}`}
+      className={`relative w-full ${className}`}
       style={{
         overscrollBehaviorY: 'contain',
       }}
     >
-      {/* Floating Indicator Capsule */}
+      {/* Floating Indicator Track: Centered 100% horizontally */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute left-1/2 top-2 z-40 flex -translate-x-1/2 items-center justify-center ${
+        className={`pointer-events-none absolute inset-x-0 top-2 z-40 flex items-center justify-center ${
           reduceMotion
             ? 'transition-opacity duration-150'
             : isPulling
@@ -163,57 +162,40 @@ export default function PullToRefresh({
         }`}
         style={{
           opacity: pullDistance > 8 || isRefreshing ? 1 : 0,
-          transform: `translate3d(-50%, ${Math.max(0, pullDistance - 42)}px, 0) scale(${
-            Math.min(1.05, 0.7 + progress * 0.35)
-          })`,
+          transform: `translate3d(0, ${Math.max(0, pullDistance - 42)}px, 0)`,
         }}
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-[var(--shadow-card)] backdrop-blur-md">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--fg)] shadow-md shadow-black/8 dark:shadow-black/35 backdrop-blur-md transition-transform duration-200"
+          style={{
+            transform: `scale(${
+              Math.min(1.05, (0.75 + progress * 0.25) * (hasThresholdPassed && !isRefreshing ? 1.05 : 1))
+            })`,
+          }}
+        >
           {isRefreshing ? (
             isDone ? (
-              <Check className="h-4.5 w-4.5 text-emerald-500 animate-in zoom-in-75 duration-200" strokeWidth={3} />
+              <Check className="h-4.5 w-4.5 text-emerald-500 animate-in zoom-in-75 duration-200" strokeWidth={2.5} />
             ) : (
-              <Loader2 className="h-4.5 w-4.5 animate-spin text-[var(--accent)]" strokeWidth={2.5} />
+              <RotateCw className="h-4.5 w-4.5 animate-spin text-[var(--accent)]" strokeWidth={2.25} />
             )
           ) : (
-            <div className="relative flex h-6 w-6 items-center justify-center">
-              {/* Circular Progress Ring */}
-              <svg className="h-6 w-6 -rotate-90 transform" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  className="stroke-[var(--border)]/60"
-                  strokeWidth="2.2"
-                  fill="none"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  className="stroke-[var(--accent)] transition-[stroke-dashoffset] duration-75"
-                  strokeWidth="2.2"
-                  strokeDasharray={circleCircumference}
-                  strokeDashoffset={circleCircumference * (1 - progress)}
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              </svg>
-              {/* Directional Arrow inside ring */}
-              <ArrowDown
-                className={`absolute h-3.5 w-3.5 text-[var(--fg)] transition-transform duration-200 ${
-                  hasThresholdPassed ? 'rotate-180 text-[var(--accent)]' : 'rotate-0'
-                }`}
-                strokeWidth={2.5}
-              />
-            </div>
+            <RotateCw
+              className={`h-4.5 w-4.5 transition-colors duration-150 ${
+                hasThresholdPassed ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
+              }`}
+              strokeWidth={2.25}
+              style={{
+                transform: `rotate(${progress * 280}deg)`,
+              }}
+            />
           )}
         </div>
       </div>
 
       {/* Content wrapper with elastic spring follow */}
       <div
-        className={`${
+        className={`w-full ${
           isPulling
             ? 'transition-none'
             : 'transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'

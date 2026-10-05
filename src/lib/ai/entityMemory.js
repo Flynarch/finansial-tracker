@@ -8,6 +8,7 @@
 import { formatCurrency, toSafeNumber } from '../utils'
 import { db as defaultDb } from '../db'
 import { fuzzyFindBestMatch } from './semanticSlotFiller'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
 
 const ENTITY_MEMORY_KEY = 'ft_entity_memory_v1'
 
@@ -106,7 +107,7 @@ export function preseedEntityMemoryFromDb(db = defaultDb) {
   const cache = loadEntityCache()
 
   return db.transactions
-    .filter((tx) => !tx.isArchived && tx.type !== 'transfer' && Boolean(tx.notes || tx.merchant))
+    .filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1 && tx.type !== 'transfer' && Boolean(tx.notes || tx.merchant))
     .toArray()
     .then((allTxs) => {
       if (!allTxs || allTxs.length === 0) {
@@ -123,7 +124,10 @@ export function preseedEntityMemoryFromDb(db = defaultDb) {
       const groupings = new Map()
 
       for (const tx of txs) {
-        const candidate = tx.notes || tx.merchant || ''
+        const rawNote = tx.notes || ''
+        const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+        const candidate = plainNote || tx.merchant || ''
+        if (!candidate || isFieldEncrypted(candidate)) continue
         const key = normalizeEntityKey(candidate)
         if (!key || key.length < 2) continue
 
@@ -158,8 +162,12 @@ export function preseedEntityMemoryFromDb(db = defaultDb) {
         const topWalletId = [...walletCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || latest.walletId
         const avgAmount = Math.round(totalAmt / group.length)
 
+        const latestRawNote = latest.notes || ''
+        const latestPlainNote = isFieldEncrypted(latestRawNote) ? getDecryptedNoteSync(latestRawNote) : latestRawNote
+        const entityDisplayName = latestPlainNote || latest.merchant || key
+
         cache.set(key, {
-          name: latest.notes || latest.merchant || key,
+          name: entityDisplayName,
           category: topCategory,
           lastAmount: toSafeNumber(latest.amount),
           avgAmount,

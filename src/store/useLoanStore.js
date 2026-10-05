@@ -5,6 +5,7 @@ import { getLocalDateString } from '../lib/dateUtils'
 import { convertCurrency, roundCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
 import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
+import { encryptField } from '../lib/fieldEncryption'
 import useSettingsStore from './useSettingsStore'
 
 const useLoanStore = create(() => ({
@@ -47,15 +48,15 @@ const useLoanStore = create(() => ({
       createdAt: Date.now(),
     }
 
+    const isDebt = type === 'debt'
+    const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
+    const txType = isDebt ? 'income' : 'expense'
+    const rawTxNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
+    const txNotes = rawTxNotes ? await encryptField(rawTxNotes) : rawTxNotes
+
     let loanId = null
     await db.transaction('rw', [db.loans, db.transactions, db.wallets], async () => {
       loanId = await db.loans.add(newLoan)
-
-      // Generate initial transaction in ledger for mandatory walletId (disbursement uses principal amount)
-      const isDebt = type === 'debt'
-      const txCategory = isDebt ? 'Pinjaman Diterima' : 'Pinjaman Diberikan'
-      const txType = isDebt ? 'income' : 'expense'
-      const txNotes = loanData.notes || (isDebt ? `Pinjaman Diterima: ${loanData.title}` : `Pinjaman Diberikan: ${loanData.title}`)
 
       let principalInWallet = principal
       let txCurrency = loanData.currency || 'IDR'
@@ -316,12 +317,16 @@ const useLoanStore = create(() => ({
     let generatedTxId = null
     let generatedExcessTxId = null
 
-    await db.transaction('rw', db.transactions, db.loans, db.loanPayments, async () => {
-      const isDebt = loan.type === 'debt'
-      const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
-      const txType = isDebt ? 'expense' : 'income'
-      const txNotes = effectiveNotes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
+    const isDebt = loan.type === 'debt'
+    const txCategory = isDebt ? 'Bayar Hutang' : 'Terima Piutang'
+    const txType = isDebt ? 'expense' : 'income'
+    const rawTxNotes = effectiveNotes || (isDebt ? `Cicilan Hutang: ${loan.title}` : `Penerimaan Piutang: ${loan.title}`)
+    const txNotes = rawTxNotes ? await encryptField(rawTxNotes) : rawTxNotes
 
+    const rawExcessNotes = isDebt ? `[Kelebihan Bayar] ${loan.title}` : `[Kelebihan Terima] ${loan.title}`
+    const excessNotes = rawExcessNotes ? await encryptField(rawExcessNotes) : rawExcessNotes
+
+    await db.transaction('rw', db.transactions, db.loans, db.loanPayments, async () => {
       // 1. Generate Principal Transaction if wallet connected and principalPortion > 0
       if (effectiveWalletId && principalPortion > 0) {
         const principalInWallet = roundCurrency(convertCurrency(principalPortion, loanCurrency, walletCurrency, rates))
@@ -346,7 +351,6 @@ const useLoanStore = create(() => ({
       if (effectiveWalletId && excessPortion > 0) {
         const excessInWallet = roundCurrency(convertCurrency(excessPortion, loanCurrency, walletCurrency, rates))
         const excessCat = effectiveExcessCategory || (isDebt ? 'tagihan/cicilan' : 'investasi/bunga_bank')
-        const excessNotes = isDebt ? `[Kelebihan Bayar] ${loan.title}` : `[Kelebihan Terima] ${loan.title}`
 
         generatedExcessTxId = await db.transactions.add({
           date: payDate,

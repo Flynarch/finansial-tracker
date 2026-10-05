@@ -111,7 +111,7 @@ export const TransactionListSection = memo(function TransactionListSection({
       <PullToRefresh
         onRefresh={onRefresh}
         disabled={!onRefresh}
-        className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center py-12 px-4 my-auto"
+        className="flex min-h-[46dvh] flex-1 flex-col items-center justify-center py-12 px-4 my-auto w-full"
       >
         <EmptyState
           variant="transactions"
@@ -125,13 +125,13 @@ export const TransactionListSection = memo(function TransactionListSection({
   const visibleGroups = groupedEntriesDetailed.slice(0, visibleGroupCount)
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full">
       <PullToRefresh
         onRefresh={onRefresh}
         disabled={!onRefresh}
         scrollContainerRef={listScrollRef}
-        className="flex min-h-0 flex-1 flex-col"
-        contentClassName="flex min-h-0 flex-1 flex-col"
+        className="flex min-h-0 flex-1 flex-col w-full"
+        contentClassName="flex min-h-0 flex-1 flex-col w-full"
       >
         <div
           ref={listScrollRef}

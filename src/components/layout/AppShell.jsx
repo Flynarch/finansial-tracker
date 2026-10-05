@@ -38,9 +38,6 @@ import useAuthDeepLink from '../../hooks/useAuthDeepLink'
 const AiQuickLogModal = lazy(() => import('../chat/AiQuickLogModal'))
 const QuickAddTransactionModal = lazy(() => import('../transactions/QuickAddTransactionModal'))
 import { primeThemeTransition } from '../../lib/themeTransition'
-import { ensureFirebaseAuthSynced } from '../../lib/auth'
-import { uploadLatestBackup } from '../../lib/cloudBackup'
-import { exportAllDataAsJson, exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import { getSessionMnemonicPhrase, purgeLegacyMnemonicStorage } from '../../lib/mnemonicCrypto'
 import AppBackground from './AppBackground'
 
@@ -557,7 +554,9 @@ function AppShell() {
 
   // Ensure native and web Firebase SDK authentication sessions are aligned on startup
   useEffect(() => {
-    ensureFirebaseAuthSynced().catch((err) => console.warn('[AppShell]', err))
+    import('../../lib/auth')
+      .then(({ ensureFirebaseAuthSynced }) => ensureFirebaseAuthSynced())
+      .catch((err) => console.warn('[AppShell:authSync]', err))
   }, [])
 
   // Auto-sync cloud backup when app transitions to background for authenticated users
@@ -587,6 +586,12 @@ function AppShell() {
 
       try {
         isBackingUp = true
+        const [{ exportAllDataAsJson, exportAllDataAsEncryptedEnvelope }, { uploadLatestBackup }] =
+          await Promise.all([
+            import('../../lib/backup'),
+            import('../../lib/cloudBackup'),
+          ])
+
         const backup = await exportAllDataAsJson().catch(() => null)
         if (!backup) return
 

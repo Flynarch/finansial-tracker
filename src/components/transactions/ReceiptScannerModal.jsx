@@ -243,7 +243,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
             <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-black/90 max-h-60 flex items-center justify-center">
               <img
                 src={imagePreview}
-                alt="Receipt Preview"
+                alt={t('transactions.receiptPreview', 'Receipt Preview')}
                 className="w-full h-full object-contain max-h-56 opacity-85"
               />
 

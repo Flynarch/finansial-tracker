@@ -38,7 +38,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
           {msg.image && (
             <img
               src={msg.image}
-              alt="Upload"
+              alt={translate('common.upload', locale) || 'Upload'}
               className="max-w-[200px] rounded-2xl border border-[var(--border)] shadow-xs"
             />
           )}

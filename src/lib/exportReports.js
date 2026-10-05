@@ -1,5 +1,6 @@
 import { formatCurrency, toSafeNumber, isExcludeAnalyticsTx } from './utils'
 import { getLocalDateString } from './dateUtils'
+import { getDecryptedNoteSync, warmupDecryptionCache } from './fieldEncryption'
 
 export const PRINT_THEME_COLORS = {
   borderLight: '#e2e8f0',
@@ -56,6 +57,8 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
     return false
   }
 
+  await warmupDecryptionCache(transactions)
+
   const isEn = String(locale || '').toLowerCase().startsWith('en')
 
   const walletMap = new Map()
@@ -100,7 +103,7 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
         const itemType = item.type || tx.type
         const typeLabel = getTypeLabel(itemType)
 
-        const itemNote = item.notes || tx.notes || ''
+        const itemNote = getDecryptedNoteSync(item.notes) || getDecryptedNoteSync(tx.notes) || ''
         const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}` : `[Split ${idx + 1}]`
 
         rows.push(
@@ -117,7 +120,7 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
       })
     } else {
       const typeLabel = getTypeLabel(tx.type)
-      let noteText = tx.notes || ''
+      let noteText = getDecryptedNoteSync(tx.notes) || ''
       if (tx.type === 'transfer' && tx.targetWalletId) {
         const targetWalletName = walletMap.get(String(tx.targetWalletId))
         if (targetWalletName) {
@@ -182,7 +185,7 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
  * Generates an ultra-crisp, printable & downloadable Monthly PDF Financial Statement.
  * Works seamlessly across Web and Android WebView via invisible iframe fallback.
  */
-export function generateMonthlyPdfStatement({
+export async function generateMonthlyPdfStatement({
   title = 'Laporan Keuangan Bulanan',
   periodName = '',
   profileName = '',
@@ -195,6 +198,10 @@ export function generateMonthlyPdfStatement({
   defaultCurrency = 'IDR',
   locale = 'id',
 }) {
+  if (transactions && transactions.length > 0) {
+    await warmupDecryptionCache(transactions)
+  }
+
   let printWindow = null
   let iframe = null
 
@@ -284,7 +291,7 @@ export function generateMonthlyPdfStatement({
           const typeColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textTransfer
           const sign = isInc ? '+' : isExp ? '-' : ''
           const amountColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textDark
-          const itemNote = item.notes || tx.notes || ''
+          const itemNote = getDecryptedNoteSync(item.notes) || getDecryptedNoteSync(tx.notes) || ''
           const excludeTag = isExcluded ? (isEn ? ' [Excluded]' : ' [Dikecualikan]') : ''
           const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}${excludeTag}` : `[Split ${idx + 1}]${excludeTag}`
 
@@ -314,7 +321,7 @@ export function generateMonthlyPdfStatement({
       const sign = isInc ? '+' : isExp ? '-' : ''
       const amountColor = isInc ? PRINT_THEME_COLORS.textIncome : isExp ? PRINT_THEME_COLORS.textExpense : PRINT_THEME_COLORS.textDark
 
-      let noteText = tx.notes || ''
+      let noteText = getDecryptedNoteSync(tx.notes) || ''
       if (tx.type === 'transfer' && tx.targetWalletId) {
         const targetWalletName = walletMap.get(String(tx.targetWalletId))
         if (targetWalletName) {
@@ -581,6 +588,6 @@ export function generateMonthlyPdfStatement({
 /**
  * Triggers a quick print report dialog.
  */
-export function printFinancialReport(params) {
-  return generateMonthlyPdfStatement(params)
+export async function printFinancialReport(params) {
+  return await generateMonthlyPdfStatement(params)
 }

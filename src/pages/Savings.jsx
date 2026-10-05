@@ -11,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader'
 import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
+import { encryptField } from '../lib/fieldEncryption'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import useBackButton from '../hooks/useBackButton'
@@ -598,12 +599,18 @@ function Savings() {
           if (deletingGoal) {
             const currentAmt = toSafeNumber(deletingGoal.currentAmount)
             const targetWalletIdNum = liquidationWalletId ? Number(liquidationWalletId) : null
+            let encryptedTxNotes = ''
+            if (currentAmt > 0 && targetWalletIdNum) {
+              const targetWallet = wallets?.find((w) => Number(w.id) === targetWalletIdNum)
+              const walletName = targetWallet?.name || 'Dompet'
+              const rawTxNotes = `Pencairan Tabungan: ${deletingGoal.name} ke ${walletName}`
+              encryptedTxNotes = await encryptField(rawTxNotes)
+            }
 
             await db.transaction('rw', db.goals, db.goalLogs, db.transactions, async () => {
               if (currentAmt > 0 && targetWalletIdNum) {
                 const now = new Date()
                 const targetWallet = wallets?.find((w) => Number(w.id) === targetWalletIdNum)
-                const walletName = targetWallet?.name || 'Dompet'
                 const targetCurrency = targetWallet?.currency || deletingGoal.currency || defaultCurrency
                 const effectiveAmount = roundCurrency(
                   targetCurrency !== (deletingGoal.currency || defaultCurrency)
@@ -616,7 +623,7 @@ function Savings() {
                   amount: effectiveAmount,
                   type: 'income',
                   category: 'cairkan_tabungan',
-                  notes: `Pencairan Tabungan: ${deletingGoal.name} ke ${walletName}`,
+                  notes: encryptedTxNotes,
                   currency: targetCurrency,
                   walletId: targetWalletIdNum,
                   goalId: deletingGoal.id,
@@ -627,13 +634,10 @@ function Savings() {
                   excludeFromAnalytics: true,
                 })
               }
-              await db.goals.delete(deletingGoal.id)
-              const logsToDelete = await db.goalLogs
-                .filter((l) => String(l.goalId) === String(deletingGoal.id))
-                .toArray()
-              if (logsToDelete.length > 0) {
-                await db.goalLogs.bulkDelete(logsToDelete.map((l) => l.id))
-              }
+              await db.goals.update(deletingGoal.id, {
+                isArchived: 1,
+                deletedAt: new Date().toISOString(),
+              })
               await db.transactions
                 .filter((tx) => String(tx.goalId) === String(deletingGoal.id))
                 .modify({ goalId: null })

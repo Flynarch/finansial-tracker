@@ -2,6 +2,7 @@ import { format, isValid } from 'date-fns'
 import { toSafeNumber, parseMoneyInput } from './utils'
 import { cleanMutationMerchant, matchCategoryFromDescription } from './merchantUtils'
 import { getRememberedCategory } from './ai/merchantCategorizer'
+import { getDecryptedNoteSync } from './fieldEncryption'
 
 /**
  * Configure PapaParse using dynamic import (offline capable)
@@ -384,7 +385,9 @@ export function detectDuplicateTransactions(parsedTransactions = [], existingTra
       }
 
       // 3. Text Similarity Check
-      const descA = (existing.cleanMerchant || existing.notes || existing.category || '').toLowerCase().trim()
+      const rawExistingNote = existing.notes || ''
+      const existingNote = getDecryptedNoteSync(rawExistingNote, rawExistingNote)
+      const descA = (existing.cleanMerchant || existingNote || existing.category || '').toLowerCase().trim()
       const descB = (parsed.cleanMerchant || parsed.rawDescription || parsed.notes || '').toLowerCase().trim()
 
       const hasTextMatch = Boolean(descA && descB && (descA === descB || descA.includes(descB) || descB.includes(descA)))

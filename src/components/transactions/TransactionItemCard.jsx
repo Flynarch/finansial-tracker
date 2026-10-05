@@ -3,6 +3,7 @@ import CategoryIcon from '../ui/CategoryIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { Paperclip } from 'lucide-react'
+import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -101,7 +102,8 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
   const isTransfer = transaction.type === 'transfer'
   const sub = labels.sub || null
-  const noteStr = transaction.notes ? String(transaction.notes).trim() : ''
+  const resolvedNotes = getDecryptedNoteSync(transaction.notes)
+  const noteStr = resolvedNotes ? String(resolvedNotes).trim() : ''
   const walletName = !isTransfer ? getWalletName(transaction.walletId) : null
   const isContextWalletMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))
   const displayWalletName = isContextWalletMatch ? null : walletName
@@ -214,7 +216,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
                   <span>Split ({transaction.splitItems.length})</span>
                 </span>
               ) : null}
-              {String(transaction.notes || '').includes('(Auto:') ? (
+              {String(resolvedNotes || '').includes('(Auto:') ? (
                 <span className="inline-flex items-center gap-0.5 rounded-md bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)] shrink-0" title={t('tx.autoRecurringTooltip', 'Otomatis dari jadwal berulang')}>
                   <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                   <span>Auto</span>

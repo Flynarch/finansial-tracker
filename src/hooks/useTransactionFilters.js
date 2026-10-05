@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { getDecryptedNoteSync } from '../lib/fieldEncryption'
 
 export const ALL_TYPES = ['income', 'expense', 'transfer']
 
@@ -22,9 +23,12 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
       if (item?.isPendingReview === true || item?.isPendingReview === 1) return false
       if (searchLower) {
         const tagsStr = Array.isArray(item.tags) ? item.tags.join(' ') : ''
-        let searchTarget = `${item.notes ?? ''} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`
+        const itemNoteText = getDecryptedNoteSync(item.notes) ?? ''
+        let searchTarget = `${itemNoteText} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`
         if (item.isSplit && Array.isArray(item.splitItems)) {
-          const splitText = item.splitItems.map((si) => `${si.category || ''} ${si.subcategory || ''} ${si.notes || ''}`).join(' ')
+          const splitText = item.splitItems
+            .map((si) => `${si.category || ''} ${si.subcategory || ''} ${getDecryptedNoteSync(si.notes) || ''}`)
+            .join(' ')
           searchTarget += ` ${splitText}`
         }
         if (!searchTarget.toLowerCase().includes(searchLower)) return false

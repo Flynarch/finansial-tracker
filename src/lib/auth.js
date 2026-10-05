@@ -500,7 +500,8 @@ export async function sendEmailMagicLink(email) {
 
   try {
     const auth = getFirebaseAuth()
-    const origin = typeof window !== 'undefined' && window.location.origin
+    const isNative = Capacitor.isNativePlatform()
+    const origin = !isNative && typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')
       ? window.location.origin
       : 'https://fintrack.web.app'
 

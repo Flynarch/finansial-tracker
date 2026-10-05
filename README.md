@@ -4,17 +4,17 @@
 
 **A local-first personal finance application for Android with native home screen widgets, receipt scanning, and offline storage.**
 
-[![Version](https://img.shields.io/badge/Version-v5.9.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.9.0)
+[![Version](https://img.shields.io/badge/Version-v5.9.1-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.9.1)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-6.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.2-38B2AC.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Dexie.js](https://img.shields.io/badge/Storage-IndexedDB_Local_First-FFA500.svg?style=flat-square)](https://dexie.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 *FinTrack is a personal finance tracker designed for mobile use on Android. All data is stored locally on the device using IndexedDB, allowing the app to run completely offline without mandatory accounts or remote servers. Cloud backup via Firebase and AI features via Google Gemini are optional.*
 
-[Download APK](https://github.com/Flynarch/finansial-tracker/releases/latest) • [Features](#features) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Building APK](#building-the-android-apk)
+[Download APK](https://github.com/Flynarch/finansial-tracker/releases/latest) • [Features](#features) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Building APK](#building-the-android-apk) • [Security](SECURITY.md) • [Privacy](PRIVACY.md)
 
 ---
 
@@ -187,7 +187,7 @@ flowchart TD
 | Component | Library | Version | Description |
 | :--- | :--- | :--- | :--- |
 | **Framework** | React | 19.2.5 | UI components and application state |
-| **Build Tool** | Vite | 6.0.1 | Development server and production bundling |
+| **Build Tool** | Vite | 8.0.10 | Development server and production bundling |
 | **Styling** | Tailwind CSS | 4.2.4 | CSS tokens and responsive layout |
 | **Mobile Bridge** | Capacitor | 8.4.1 | Native Android integration |
 | **Local Storage** | Dexie.js | 4.4.2 | IndexedDB database layer |
@@ -286,7 +286,7 @@ The output file is generated at `android/app/build/outputs/apk/debug/app-debug.a
 Run the project verification checks:
 
 ```bash
-# Run unit test suite (1090+ tests across 80 suites)
+# Run unit test suite (1,270+ tests across 86+ suites)
 npm test
 
 # Run linter

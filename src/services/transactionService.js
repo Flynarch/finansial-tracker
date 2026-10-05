@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import Dexie from 'dexie'
 import { db } from '../lib/db'
 import { convertCurrency, roundCurrency } from '../lib/utils'
 import { getCachedCurrencyRates } from '../lib/api'
@@ -9,8 +10,9 @@ import useSettingsStore from '../store/useSettingsStore'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 import { AppError, transformDbError } from '../lib/errors'
 import { rememberTransactionEntity, updateEntityMemory, forgetTransactionEntity } from '../lib/ai/entityMemory'
+import { encryptField, decryptField, getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
 
-export { AppError, transformDbError }
+export { AppError, transformDbError, getDecryptedNoteSync, warmupDecryptionCache }
 
 /**
  * Creates a new transaction and handles post-creation side effects (e.g. budget alerts).
@@ -93,6 +95,27 @@ export async function createTransaction(payload) {
   const cleanWalletId = Number(resolvedWalletId)
   const cleanTargetWalletId = sanitizedTargetWalletId ? Number(sanitizedTargetWalletId) : null
 
+  if (dataWithoutId.notes && typeof dataWithoutId.notes === 'string' && dataWithoutId.notes.trim()) {
+    const encP = encryptField(dataWithoutId.notes)
+    dataWithoutId.notes = Dexie.currentTransaction ? await Dexie.waitFor(encP) : await encP
+  }
+
+  if (Array.isArray(dataWithoutId.splitItems) && dataWithoutId.splitItems.length > 0) {
+    const encryptedSplitItems = []
+    for (const item of dataWithoutId.splitItems) {
+      if (item && item.notes && typeof item.notes === 'string' && item.notes.trim()) {
+        const encP = encryptField(item.notes)
+        const encNote = Dexie.currentTransaction ? await Dexie.waitFor(encP) : await encP
+        encryptedSplitItems.push({ ...item, notes: encNote })
+      } else {
+        encryptedSplitItems.push(item)
+      }
+    }
+    dataWithoutId.splitItems = encryptedSplitItems
+  }
+
+  const isTransfer = dataWithoutId.type === 'transfer'
+
   let createdId
   try {
     await db.transaction('rw', [db.transactions], async () => {
@@ -103,7 +126,9 @@ export async function createTransaction(payload) {
         date: cleanDate,
         amount: cleanAmount,
         createdAt: cleanCreatedAt,
-        targetWalletId: cleanTargetWalletId,
+        targetWalletId: isTransfer ? cleanTargetWalletId : null,
+        targetAmount: isTransfer ? dataWithoutId.targetAmount : null,
+        targetCurrency: isTransfer ? dataWithoutId.targetCurrency : null,
         deletedAt: null,
       })
     })
@@ -174,8 +199,42 @@ export async function updateTransaction(id, fields) {
   const cleanId = Number(id)
   if (!cleanId) throw new Error('Invalid transaction ID')
 
-  const existing = await db.transactions.get(cleanId)
-  if (!existing) return 0
+  const existingRaw = await db.transactions.get(cleanId)
+  if (!existingRaw) return 0
+  let decryptedExistingNotes = existingRaw.notes
+  if (existingRaw.notes && typeof existingRaw.notes === 'string') {
+    const decP = decryptField(existingRaw.notes)
+    decryptedExistingNotes = Dexie.currentTransaction ? await Dexie.waitFor(decP) : await decP
+  }
+  const existing = {
+    ...existingRaw,
+    notes: decryptedExistingNotes,
+  }
+
+  let encryptedNotes = fields?.notes
+  if (fields?.notes !== undefined && fields?.notes !== null) {
+    if (typeof fields.notes === 'string' && fields.notes.trim()) {
+      const encP = encryptField(fields.notes)
+      encryptedNotes = Dexie.currentTransaction ? await Dexie.waitFor(encP) : await encP
+    } else {
+      encryptedNotes = fields.notes
+    }
+  }
+
+  let encryptedSplitItems = fields?.splitItems
+  if (Array.isArray(fields?.splitItems) && fields.splitItems.length > 0) {
+    const encList = []
+    for (const item of fields.splitItems) {
+      if (item && item.notes && typeof item.notes === 'string' && item.notes.trim()) {
+        const encP = encryptField(item.notes)
+        const encNote = Dexie.currentTransaction ? await Dexie.waitFor(encP) : await encP
+        encList.push({ ...item, notes: encNote })
+      } else {
+        encList.push(item)
+      }
+    }
+    encryptedSplitItems = encList
+  }
 
   const effectiveType = fields?.type ?? existing.type
   if (fields?.walletId !== undefined && !fields.walletId) {
@@ -493,8 +552,15 @@ export async function updateTransaction(id, fields) {
       if (effectiveType !== 'transfer') {
         sanitizedFields.targetWalletId = null
         sanitizedFields.targetAmount = null
+        sanitizedFields.targetCurrency = null
       } else if (sanitizedFields.targetAmount !== undefined && !sanitizedFields.targetAmount) {
         sanitizedFields.targetAmount = null
+      }
+      if (sanitizedFields.notes !== undefined) {
+        sanitizedFields.notes = encryptedNotes
+      }
+      if (encryptedSplitItems !== undefined) {
+        sanitizedFields.splitItems = encryptedSplitItems
       }
 
       await db.transactions.update(cleanId, sanitizedFields)
@@ -541,8 +607,17 @@ export async function deleteTransaction(id) {
   const cleanId = Number(id)
   if (!cleanId) throw new Error('Invalid transaction ID')
 
-  const existing = await db.transactions.get(cleanId)
-  if (!existing) return
+  const existingRaw = await db.transactions.get(cleanId)
+  if (!existingRaw) return
+  let decryptedExistingNotes = existingRaw.notes
+  if (existingRaw.notes && typeof existingRaw.notes === 'string') {
+    const decP = decryptField(existingRaw.notes)
+    decryptedExistingNotes = Dexie.currentTransaction ? await Dexie.waitFor(decP) : await decP
+  }
+  const existing = {
+    ...existingRaw,
+    notes: decryptedExistingNotes,
+  }
 
   const extraAffectedWallets = []
 
@@ -862,4 +937,28 @@ export async function purgeOldSoftDeletedTransactions(retentionDays = 90) {
     console.error('[purgeOldSoftDeletedTransactions]', err)
     throw transformDbError(err, 'purgeOldSoftDeletedTransactions')
   }
+}
+
+/**
+ * Retrieves a transaction by ID and transparently decrypts its sensitive notes field.
+ *
+ * @param {number|string} id - Transaction ID
+ * @returns {Promise<object|null>} The transaction object with decrypted notes, or null if not found
+ */
+export async function getTransaction(id) {
+  const cleanId = Number(id)
+  if (!cleanId) return null
+
+  const tx = await db.transactions.get(cleanId)
+  if (!tx) return null
+
+  if (tx.notes && typeof tx.notes === 'string') {
+    const decryptedNotes = await decryptField(tx.notes)
+    return {
+      ...tx,
+      notes: decryptedNotes,
+    }
+  }
+
+  return tx
 }

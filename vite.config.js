@@ -2,10 +2,36 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+function pruneHeavyModulepreloadPlugin() {
+  return {
+    name: 'prune-heavy-modulepreload',
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        return html.replace(
+          /<link rel="modulepreload"[^>]*href="[^"]*(vendor-calendar|vendor-markdown|vendor-firebase)[^"]*"[^>]*>\s*/g,
+          ''
+        )
+      },
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), pruneHeavyModulepreloadPlugin()],
   build: {
+    modulePreload: {
+      resolveDependencies(filename, deps) {
+        return deps.filter(
+          (dep) =>
+            !dep.includes('vendor-calendar') &&
+            !dep.includes('vendor-markdown') &&
+            !dep.includes('vendor-firebase')
+        )
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -31,5 +57,20 @@ export default defineConfig({
     host: true,
     // Batasi akses host ke localhost dan domain tunnel development yang umum
     allowedHosts: ['.ngrok-free.app', '.ngrok.io', '.loca.lt', 'localhost', '127.0.0.1'],
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        'android/**',
+        'tests/**',
+        'scripts/**',
+        '**/*.config.js',
+        '**/*.config.mjs',
+      ],
+    },
   },
 })

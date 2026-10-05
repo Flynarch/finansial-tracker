@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import Decimal from 'decimal.js-light'
+import { getDecryptedNoteSync } from './fieldEncryption'
 export { getCachedCurrencyRates } from './api'
 
 /** When live FX fetch fails: 1 USD = currency rates (approximate fallback). */
@@ -230,8 +231,7 @@ export function convertCurrency(amount, fromCurrency = 'IDR', toCurrency = 'IDR'
   const toRate = toSafeNumber(effectiveRates[toCurrency])
   if (fromRate <= 0 || toRate <= 0) return numericAmount
 
-  const amountInUsd = numericAmount / fromRate
-  return amountInUsd * toRate
+  return new Decimal(numericAmount).dividedBy(fromRate).times(toRate).toNumber()
 }
 
 export function escapeCsvValue(value) {
@@ -341,9 +341,10 @@ export function isExcludeAnalyticsTx(tx) {
     ) {
       return true
     }
+    const resolvedNotes = typeof tx.notes === 'string' ? getDecryptedNoteSync(tx.notes) : ''
     if (
-      typeof tx.notes === 'string' &&
-      (tx.notes.startsWith('Sell ') || tx.notes.startsWith('Buy ')) &&
+      resolvedNotes &&
+      (resolvedNotes.startsWith('Sell ') || resolvedNotes.startsWith('Buy ')) &&
       (tx.category === 'investasi' || tx.category.startsWith('investasi/'))
     ) {
       return true

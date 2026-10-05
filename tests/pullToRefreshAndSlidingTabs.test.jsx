@@ -125,6 +125,23 @@ describe('PullToRefresh and Animated Sliding Tabs Suite', () => {
       // Restore scrollY
       Object.defineProperty(window, 'scrollY', { value: origScrollY, writable: true, configurable: true })
     })
+
+    it('centers the indicator track horizontally with inset-x-0 and justify-center', () => {
+      const { container } = render(
+        <PullToRefresh onRefresh={vi.fn()}>
+          <div data-testid="content">Centered Content</div>
+        </PullToRefresh>
+      )
+
+      const indicatorTrack = container.querySelector('[aria-hidden="true"]')
+      expect(indicatorTrack).toBeDefined()
+      expect(indicatorTrack?.className).toContain('inset-x-0')
+      expect(indicatorTrack?.className).toContain('justify-center')
+
+      // Verify the native RotateCw icon is rendered inside
+      const rotateIcon = indicatorTrack?.querySelector('.lucide-rotate-cw')
+      expect(rotateIcon).toBeDefined()
+    })
   })
 
   describe('SettingsSegmentControl Component (Fluid Sliding Pill)', () => {

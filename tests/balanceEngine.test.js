@@ -124,4 +124,25 @@ describe('balanceEngine - computeWalletBalance & computeAllWalletBalances', () =
     expect(balances.find((w) => w.id === w1Id)?.currentBalance).toBe(400000)
     expect(balances.find((w) => w.id === w2Id)?.currentBalance).toBe(250000)
   })
+
+  it('eliminates floating-point drift on fractional currency amounts with Decimal arithmetic', () => {
+    const usdWallet = {
+      id: 99,
+      name: 'USD Wallet',
+      currency: 'USD',
+      balance: 0,
+    }
+
+    // 0.1 + 0.2 in standard JS float is 0.30000000000000004
+    const transactions = [
+      { id: 901, walletId: 99, type: 'income', amount: 0.1, currency: 'USD' },
+      { id: 902, walletId: 99, type: 'income', amount: 0.2, currency: 'USD' },
+    ]
+
+    const balance = computeWalletBalance(usdWallet, transactions)
+    expect(balance).toBe(0.3)
+
+    const all = computeAllWalletBalances([usdWallet], transactions)
+    expect(all[0].currentBalance).toBe(0.3)
+  })
 })

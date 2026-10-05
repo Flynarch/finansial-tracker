@@ -6,6 +6,8 @@ import LockScreen from '../src/components/ui/LockScreen'
 import PinPadModal from '../src/components/security/PinPadModal'
 import PatternLockModal from '../src/components/security/PatternLockModal'
 import { authenticateBiometric } from '../src/lib/biometric'
+import { authenticatePasskey, getStoredPasskeys } from '../src/lib/passkeys'
+import { Capacitor } from '@capacitor/core'
 
 // Mock db for settings
 vi.mock('../src/lib/db', () => ({
@@ -23,6 +25,11 @@ vi.mock('../src/lib/biometric', () => ({
   canUseBiometric: vi.fn().mockResolvedValue(true),
 }))
 
+vi.mock('../src/lib/passkeys', () => ({
+  authenticatePasskey: vi.fn(),
+  getStoredPasskeys: vi.fn().mockReturnValue([]),
+}))
+
 vi.mock('../src/lib/haptics', () => ({
   triggerHaptic: vi.fn(),
 }))
@@ -34,6 +41,7 @@ vi.mock('../src/lib/smartNotifications', () => ({
 describe('Security & Biometrics State Guard Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(false)
     useSettingsStore.setState({
       locale: 'id',
       securityEnabled: false,
@@ -45,6 +53,7 @@ describe('Security & Biometrics State Guard Tests', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     cleanup()
   })
 
@@ -142,6 +151,7 @@ describe('Security & Biometrics State Guard Tests', () => {
   })
 
   it('calls biometric authentication once and stops when user cancels (does not loop continuously)', async () => {
+    vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true)
     vi.useFakeTimers()
     useSettingsStore.setState({
       securityEnabled: true,
@@ -223,5 +233,64 @@ describe('Security & Biometrics State Guard Tests', () => {
     const toggleBtn = screen.getByText('Buka juga via Biometrik').closest('button')
     expect(toggleBtn).toBeTruthy()
     fireEvent.click(toggleBtn)
+  })
+
+  it('calls authenticatePasskey on LockScreen when passkeys are registered on web and unlocks on success', async () => {
+    vi.useFakeTimers()
+    useSettingsStore.setState({
+      securityEnabled: true,
+      securityMethod: 'pin',
+      lockSecret: '1234',
+      biometricEnabled: true,
+    })
+
+    vi.mocked(getStoredPasskeys).mockReturnValue([{ id: 'pk-test-1', deviceName: 'MacBook Touch ID' }])
+    vi.mocked(authenticatePasskey).mockResolvedValue({ success: true, credentialId: 'pk-test-1' })
+
+    const handleUnlock = vi.fn()
+    render(<LockScreen onUnlock={handleUnlock} />)
+
+    // On web, passkey requires an explicit user gesture
+    const passkeyBtn = screen.getByLabelText(/Passkey/i)
+    await act(async () => {
+      fireEvent.click(passkeyBtn)
+    })
+
+    expect(authenticatePasskey).toHaveBeenCalledTimes(1)
+
+    // Advance for success timeout
+    await act(async () => {
+      vi.advanceTimersByTime(600)
+    })
+
+    expect(handleUnlock).toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('handles passkey failure gracefully without unlocking, allowing PIN entry', async () => {
+    vi.useFakeTimers()
+    useSettingsStore.setState({
+      securityEnabled: true,
+      securityMethod: 'pin',
+      lockSecret: '1234',
+      biometricEnabled: true,
+    })
+
+    vi.mocked(getStoredPasskeys).mockReturnValue([{ id: 'pk-test-1', deviceName: 'MacBook Touch ID' }])
+    vi.mocked(authenticatePasskey).mockRejectedValue(new Error('Autentikasi Passkey dibatalkan.'))
+
+    const handleUnlock = vi.fn()
+    render(<LockScreen onUnlock={handleUnlock} />)
+
+    // On web, passkey requires an explicit user gesture
+    const passkeyBtn = screen.getByLabelText(/Passkey/i)
+    await act(async () => {
+      fireEvent.click(passkeyBtn)
+    })
+
+    expect(authenticatePasskey).toHaveBeenCalledTimes(1)
+    expect(handleUnlock).not.toHaveBeenCalled()
+    expect(screen.getByText('Autentikasi Passkey dibatalkan.')).toBeTruthy()
+    vi.useRealTimers()
   })
 })

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { db } from '../lib/db'
 import { derivePbkdf2Pin, isPinHash, encryptSecret, decryptSecret, migrateSecretIfNeeded } from '../lib/crypto'
+import { clearSessionEncryptionKey } from '../lib/fieldEncryption'
 import { triggerHaptic } from '../lib/haptics'
 
 const SETTINGS_KEY = 'preferences'
@@ -270,7 +271,10 @@ const useSettingsStore = create((set, get) => ({
     }
   },
   unlock: () => set({ isUnlocked: true }),
-  lock: () => set({ isUnlocked: false }),
+  lock: () => {
+    clearSessionEncryptionKey()
+    set({ isUnlocked: false })
+  },
   completeOnboarding: async () => {
     set({ hasCompletedOnboarding: true })
     await get().persist({ hasCompletedOnboarding: true })

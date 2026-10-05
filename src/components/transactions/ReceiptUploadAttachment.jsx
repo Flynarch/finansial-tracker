@@ -60,7 +60,7 @@ export default function ReceiptUploadAttachment({ value, onChange, onView, input
             <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-[var(--border)] bg-black/10 dark:bg-black/40 shrink-0 flex items-center justify-center">
               <img
                 src={value}
-                alt="Receipt thumbnail"
+                alt={t('transactions.receiptThumbnail', 'Receipt thumbnail')}
                 className="h-full w-full object-cover group-hover:scale-105 transition"
                 onError={(e) => {
                   e.target.style.display = 'none'

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { calculateHabitStats } from '../src/lib/habitStats'
 import { getParentRoute } from '../src/lib/navigationHierarchy'
 import { backButtonManager } from '../src/lib/backButtonManager'
-import { subDays, setHours, setMinutes, format } from 'date-fns'
+import { subDays, subWeeks, addDays, startOfWeek, setHours, setMinutes, format } from 'date-fns'
 
 describe('Comprehensive App Audit Master Fixes Suite', () => {
   describe('Modul 3: Habit Streak & Calendar Day Boundary Calculation', () => {
@@ -66,11 +66,13 @@ describe('Comprehensive App Audit Master Fixes Suite', () => {
         createdAt: subDays(now, 35).toISOString(),
       }
 
-      // Add 2 logs per week for 4 consecutive weeks
+      // Add 2 logs per week for 4 consecutive weeks (Monday and Tuesday of each week)
       const logs = []
+      const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 })
       for (let w = 0; w < 4; w++) {
-        const d1 = subDays(now, w * 7)
-        const d2 = subDays(now, w * 7 + 1)
+        const targetWeek = subWeeks(currentWeekStart, w)
+        const d1 = targetWeek
+        const d2 = addDays(targetWeek, 1)
         logs.push({ id: `log-${w}-1`, habitId: 'habit-weekly', date: format(d1, 'yyyy-MM-dd') })
         logs.push({ id: `log-${w}-2`, habitId: 'habit-weekly', date: format(d2, 'yyyy-MM-dd') })
       }

@@ -20,6 +20,7 @@ import { detectDuplicateTransactions, detectBankPreset, extractTextFromPdf, pars
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
 import { clearCachedDashboardState } from '../../hooks/dashboard/dashboardCache'
 import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
+import { encryptField, warmupDecryptionCache } from '../../lib/fieldEncryption'
 import { format } from 'date-fns'
 
 export default function StatementImportModal({
@@ -172,6 +173,7 @@ export default function StatementImportModal({
       }
 
       // Check duplicates against existing database transactions
+      await warmupDecryptionCache(existingTransactions)
       const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions, selectedWalletId)
       setParsedItems(deduplicated)
       setStep('preview')
@@ -183,9 +185,10 @@ export default function StatementImportModal({
     }
   }
 
-  const handleApplyCsvMapping = () => {
+  const handleApplyCsvMapping = async () => {
     triggerHaptic('light')
     const rawTxs = parseGenericCsvRows(csvRows, columnMapping)
+    await warmupDecryptionCache(existingTransactions)
     const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions, selectedWalletId)
     setParsedItems(deduplicated)
     setStep('preview')
@@ -233,6 +236,12 @@ export default function StatementImportModal({
         deletedAt: null,
         createdAt: Date.now(),
       }))
+
+      for (const tx of formattedForDb) {
+        if (tx.notes && typeof tx.notes === 'string' && tx.notes.trim()) {
+          tx.notes = await encryptField(tx.notes)
+        }
+      }
 
       // Batch insert into Dexie
       await db.transactions.bulkAdd(formattedForDb)

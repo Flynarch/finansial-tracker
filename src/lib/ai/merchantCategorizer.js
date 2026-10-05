@@ -9,6 +9,7 @@ import { db } from '../db'
 import { matchCategoryFromDescription } from '../merchantUtils'
 import { sanitizeCategoryPath } from '../categorySanitizer'
 import { getApiKeysToTry, FAST_TRANSACTION_MODELS } from './client'
+import { getDecryptedNoteSync, encryptField, isFieldEncrypted } from '../fieldEncryption'
 
 const MEMORY_STORAGE_KEY = 'ft_merchant_category_memory_v1'
 
@@ -243,7 +244,10 @@ export async function preseedMerchantMemoryFromDb() {
       const cat = tx.category
       if (!cat || cat === 'lainnya_kategori/umum' || cat === 'lainnya/umum' || cat === 'Lainnya') continue
 
-      const merchant = tx.cleanMerchant || tx.merchant || tx.description || tx.notes || ''
+      const rawNote = tx.notes || ''
+      const noteCandidate = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+      const merchant = tx.cleanMerchant || tx.merchant || tx.description || noteCandidate || ''
+      if (isFieldEncrypted(merchant)) continue
       const key = normalizeMerchantKey(merchant)
       if (!key || key.length < 3) continue
 
@@ -483,20 +487,27 @@ export async function enrichPendingMutationsWithAi(transactionIds = [], options 
     const batch = unclassified.slice(0, 5)
 
     for (const tx of batch) {
-      const merchant = tx.cleanMerchant || tx.merchant || tx.description || tx.notes || ''
-      if (!merchant || merchant.length < 3) continue
+      const rawNote = tx.notes || ''
+      const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+      const merchant = tx.cleanMerchant || tx.merchant || tx.description || plainNote || ''
+      if (!merchant || merchant.length < 3 || isFieldEncrypted(merchant)) continue
 
       const type = tx.type === 'income' ? 'income' : 'expense'
       const aiCategory = await classifyMerchantWithAi(merchant, type, { ...options, apiKey })
 
       if (aiCategory && aiCategory !== 'lainnya_kategori/umum' && aiCategory !== 'lainnya/umum') {
-        const existingNotes = tx.notes || ''
-        const updatedNotes = existingNotes.toLowerCase().includes('[kategori diprediksi ai]')
-          ? existingNotes
-          : `${existingNotes ? `${existingNotes} ` : ''}[Kategori diprediksi AI]`.trim()
+        const existingPlain = plainNote || ''
+        const updatedPlainNotes = existingPlain.toLowerCase().includes('[kategori diprediksi ai]')
+          ? existingPlain
+          : `${existingPlain ? `${existingPlain} ` : ''}[Kategori diprediksi AI]`.trim()
+
+        const finalNotes = isFieldEncrypted(rawNote) && updatedPlainNotes
+          ? await encryptField(updatedPlainNotes)
+          : updatedPlainNotes
+
         await db.transactions.update(tx.id, {
           category: aiCategory,
-          notes: updatedNotes,
+          notes: finalNotes,
         })
         updatedCount++
       }

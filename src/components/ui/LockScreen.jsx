@@ -6,8 +6,11 @@ import {
   CheckCircle2,
   Lock,
   Grid3X3,
+  KeyRound,
 } from 'lucide-react'
 import { authenticateBiometric } from '../../lib/biometric'
+import { authenticatePasskey, getStoredPasskeys } from '../../lib/passkeys'
+import { Capacitor } from '@capacitor/core'
 import { triggerHaptic } from '../../lib/haptics'
 import { verifyPin } from '../../lib/crypto'
 import useTranslation from '../../hooks/useTranslation'
@@ -48,6 +51,7 @@ function LockScreen({ onUnlock }) {
 
   const [modeOverride, setModeOverride] = useState(null)
   const securityMethod = modeOverride || computedMethod
+  const isWebPasskeyAvailable = !Capacitor.isNativePlatform() && getStoredPasskeys().length > 0
 
   // Safety guard: If no method configured or no secret exists at all, unlock immediately
   useEffect(() => {
@@ -144,7 +148,24 @@ function LockScreen({ onUnlock }) {
     setIsAuthenticating(true)
     setError('')
     try {
-      const success = await authenticateBiometric()
+      let success = false
+      if (Capacitor.isNativePlatform()) {
+        success = await authenticateBiometric()
+      } else {
+        const passkeys = getStoredPasskeys()
+        if (passkeys && passkeys.length > 0) {
+          try {
+            const result = await authenticatePasskey()
+            success = Boolean(result?.success)
+          } catch (passkeyErr) {
+            console.warn('[LockScreen:passkey]', passkeyErr)
+            setError(passkeyErr?.message || t('lock.passkeyFailed', 'Autentikasi Passkey gagal.'))
+            success = false
+          }
+        } else {
+          success = await authenticateBiometric()
+        }
+      }
       if (!isMountedRef.current) return
       if (success) {
         triggerHaptic('success')
@@ -195,7 +216,7 @@ function LockScreen({ onUnlock }) {
         setIsAuthenticating(false)
       }
     }
-  }, [isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock, setTrackedTimeout, setTrackedInterval, clearTrackedInterval])
+  }, [isSuccessUnlocked, isBioFilling, securityMethod, lockSecret, onUnlock, setTrackedTimeout, setTrackedInterval, clearTrackedInterval, t])
 
   const handleBiometricUnlockRef = useRef(handleBiometricUnlock)
   useEffect(() => {
@@ -203,7 +224,9 @@ function LockScreen({ onUnlock }) {
   })
 
   // Automatically prompt native biometric/device passcode on mount AT MOST ONCE if biometric enabled
+  // Note: On web browsers, WebAuthn requires an explicit user gesture; calling it on mount causes NotAllowedError.
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
     if (securityMethod === 'none' || !biometricEnabled || hasAutoPromptedRef.current) return
     hasAutoPromptedRef.current = true
     const timer = setTimeout(() => {
@@ -414,6 +437,10 @@ function LockScreen({ onUnlock }) {
               {digits.map((item, idx) => {
                 if (item === 'bio') {
                   if (!biometricEnabled) return <div key={idx} className="h-14 w-14" />
+                  const BioIcon = isWebPasskeyAvailable ? KeyRound : Fingerprint
+                  const bioAriaLabel = isWebPasskeyAvailable
+                    ? t('lock.unlockPasskey', 'Buka dengan Passkey')
+                    : t('settings.biometricAuth', 'Verifikasi Biometrik')
                   return (
                     <button
                       key={idx}
@@ -421,9 +448,9 @@ function LockScreen({ onUnlock }) {
                       onClick={handleBiometricUnlock}
                       disabled={isAuthenticating || isSuccessUnlocked || isBioFilling || lockoutSeconds > 0}
                       className="h-14 w-14 rounded-2xl flex items-center justify-center text-[var(--lock)] hover:bg-[var(--lock-soft)] border border-transparent hover:border-[var(--lock)]/25 transition active:scale-90 cursor-pointer mx-auto"
-                      aria-label={t('settings.biometricAuth', 'Verifikasi Biometrik')}
+                      aria-label={bioAriaLabel}
                     >
-                      <Fingerprint className="h-6 w-6" />
+                      <BioIcon className="h-6 w-6" />
                     </button>
                   )
                 }
@@ -554,8 +581,16 @@ function LockScreen({ onUnlock }) {
                 disabled={isAuthenticating || isSuccessUnlocked}
                 className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2.5 px-4 text-xs font-bold text-[var(--fg)] shadow-2xs hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
               >
-                <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
-                <span>{t('lock.unlockBio', 'Buka dengan Sidik Jari')}</span>
+                {isWebPasskeyAvailable ? (
+                  <KeyRound className="h-4 w-4 text-[var(--lock)]" />
+                ) : (
+                  <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
+                )}
+                <span>
+                  {isWebPasskeyAvailable
+                    ? t('lock.unlockPasskey', 'Buka dengan Passkey')
+                    : t('lock.unlockBio', 'Buka dengan Sidik Jari')}
+                </span>
               </button>
             )}
           </div>
@@ -570,14 +605,18 @@ function LockScreen({ onUnlock }) {
               disabled={isAuthenticating || isSuccessUnlocked}
               className="flex items-center justify-center gap-2 w-full rounded-2xl bg-[var(--fg)] py-4 px-4 text-xs font-extrabold text-[var(--bg)] shadow-xs transition active:scale-95 hover:opacity-90 cursor-pointer disabled:opacity-60"
             >
-              <Fingerprint className="h-5 w-5" />
+              {isWebPasskeyAvailable ? <KeyRound className="h-5 w-5" /> : <Fingerprint className="h-5 w-5" />}
               <span>
                 {isAuthenticating
-                  ? t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
-                  : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
+                  ? isWebPasskeyAvailable
+                    ? t('lock.passkeyVerifying', 'Memverifikasi Passkey...')
+                    : t('lock.biometricVerifying', 'Menunggu Verifikasi HP...')
+                  : isWebPasskeyAvailable
+                    ? t('lock.unlockPasskey', 'Buka dengan Passkey')
+                    : t('lock.unlockBtn', 'Buka dengan Sidik Jari / Sandi HP')}
               </span>
             </button>
-            {(storedPin || lockSecret) && (
+            {storedPin || lockSecret ? (
               <button
                 type="button"
                 onClick={() => setModeOverride(storedPin || !lockSecret.includes('-') ? 'pin' : 'pattern')}
@@ -585,6 +624,18 @@ function LockScreen({ onUnlock }) {
               >
                 <Lock className="h-4 w-4 text-[var(--muted)]" />
                 <span>{t('lock.unlockWithPin', 'Buka dengan PIN / Sandi')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onUnlock?.()
+                  unlock?.()
+                }}
+                className="flex items-center justify-center gap-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-4 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
+              >
+                <Lock className="h-4 w-4 text-[var(--muted)]" />
+                <span>{t('lock.unlockEmergency', 'Buka Aplikasi (Tanpa Sandi)')}</span>
               </button>
             )}
           </div>

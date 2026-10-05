@@ -4,6 +4,7 @@ import CategoryIcon from '../ui/CategoryIcon'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
+import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { format, parseISO } from 'date-fns'
@@ -64,6 +65,7 @@ export default function TransactionDetailSheet({
   const iconKey = resolveTransactionIconKey(transaction.category, transaction.type)
   const colorClass = getCategoryColorClass(iconKey, transaction.type, transaction.category)
   const labels = getTransactionCategoryLabels(transaction.category, transaction.type, locale)
+  const resolvedNotes = getDecryptedNoteSync(transaction.notes)
 
   // Type-specific display
   let typeLabel = t('tx.type.expense', 'Pengeluaran')
@@ -196,7 +198,7 @@ export default function TransactionDetailSheet({
                 <TypeIcon className="h-3 w-3" strokeWidth={2.5} />
                 <span>{typeLabel}</span>
               </span>
-              {String(transaction.notes || '').includes('(Auto:') && (
+              {String(resolvedNotes || '').includes('(Auto:') && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)]">
                   <Repeat className="h-2.5 w-2.5" />
                   <span>Auto</span>
@@ -329,25 +331,35 @@ export default function TransactionDetailSheet({
                   </span>
                 </div>
                 <div className="space-y-1.5 pt-1">
-                  {transaction.splitItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[var(--panel)] border border-[var(--border)]/60 text-xs"
-                    >
-                      <span className="font-semibold text-[var(--fg)] truncate">
-                        {item.name || item.category || `Item ${idx + 1}`}
-                      </span>
-                      <span className="font-bold tabular-nums text-[var(--fg)] shrink-0">
-                        {formatCurrency(item.amount, txCurrency)}
-                      </span>
-                    </div>
-                  ))}
+                  {transaction.splitItems.map((item, idx) => {
+                    const itemNote = getDecryptedNoteSync(item.notes)
+                    return (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--border)]/60 text-xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-[var(--fg)] truncate">
+                            {item.name || item.category || `Item ${idx + 1}`}
+                          </span>
+                          <span className="font-bold tabular-nums text-[var(--fg)] shrink-0">
+                            {formatCurrency(item.amount, txCurrency)}
+                          </span>
+                        </div>
+                        {itemNote ? (
+                          <p className="text-[11px] text-[var(--muted)] italic truncate">
+                            &ldquo;{itemNote}&rdquo;
+                          </p>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
             {/* Notes Section with robust multiline break-words */}
-            {transaction.notes && (
+            {resolvedNotes && (
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-1.5 overflow-hidden min-w-0">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--muted)]">
                   <FileText className="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
@@ -355,7 +367,7 @@ export default function TransactionDetailSheet({
                 </div>
                 <div className="max-h-36 overflow-y-auto rounded-xl bg-[var(--panel)] p-2.5 border border-[var(--border)]/50">
                   <p className="text-xs text-[var(--fg)] leading-relaxed italic break-words [overflow-wrap:anywhere] break-all whitespace-pre-wrap select-text">
-                    &ldquo;{transaction.notes}&rdquo;
+                    &ldquo;{resolvedNotes}&rdquo;
                   </p>
                 </div>
               </div>
@@ -409,7 +421,7 @@ export default function TransactionDetailSheet({
                   >
                     <img
                       src={receiptImageSrc}
-                      alt="Receipt Attachment"
+                      alt={t('transactions.receiptAttachment', 'Receipt Attachment')}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-200 select-none"
                     />
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
@@ -433,7 +445,7 @@ export default function TransactionDetailSheet({
         imageSrc={transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null}
         amountFormatted={`${amountPrefix}${formatCurrency(Math.abs(Number(transaction.amount || 0)), txCurrency)}`}
         date={formattedFullDate}
-        notes={transaction.notes}
+        notes={resolvedNotes}
         category={labels.main}
         zIndex="z-[60]"
       />

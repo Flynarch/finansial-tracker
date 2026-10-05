@@ -5,14 +5,15 @@ const ROOT = process.cwd()
 const TARGET_DIRS = ['src/pages', 'src/components']
 const FILE_EXTENSIONS = new Set(['.jsx', '.tsx'])
 
-const ATTRIBUTE_RE = /\b(title|placeholder|aria-label)\s*=\s*"([^"{][^"]*)"/g
+const ATTRIBUTE_RE = /\b(title|placeholder|aria-label|alt)\s*=\s*"([^"{][^"]*)"/g
 
 function isIgnorableText(text) {
   const cleaned = text.replace(/\s+/g, ' ').trim()
   if (!cleaned) return true
-  if (/^[\d\s.,:%()+\-/*]+$/.test(cleaned)) return true
-  if (/^[A-Z]{1,3}$/.test(cleaned)) return true
-  if (/^(true|false|null)$/i.test(cleaned)) return true
+  if (/^[\d\s.,:%()+\-/*#@!_~|\\$?^<>=&·•›]+$/.test(cleaned)) return true
+  if (/^[A-Z]{1,4}$/.test(cleaned)) return true
+  if (/^(true|false|null|undefined|auto|inherit)$/i.test(cleaned)) return true
+  if (/^(fintrack|fintrack app)$/i.test(cleaned)) return true
   return false
 }
 

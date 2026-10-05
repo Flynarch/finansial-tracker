@@ -23,6 +23,7 @@ import { TransactionItemCard } from '../components/transactions/TransactionItemC
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import TransactionDetailSheet from '../components/transactions/TransactionDetailSheet'
 import ReceiptPreviewModal from '../components/transactions/ReceiptPreviewModal'
+import { getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
 import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService'
 import { deleteWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
@@ -117,6 +118,12 @@ export default function WalletDetailPage() {
     return txs.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
   }, [walletId])
 
+  useEffect(() => {
+    if (allTransactions && allTransactions.length > 0) {
+      warmupDecryptionCache(allTransactions)
+    }
+  }, [allTransactions])
+
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   useEffect(() => {
@@ -183,14 +190,19 @@ export default function WalletDetailPage() {
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
-      notes: transaction.notes || '',
+      notes: getDecryptedNoteSync(transaction.notes) || '',
       currency: targetCurrency,
       walletId: transaction.walletId,
       targetWalletId: transaction.targetWalletId || '',
       receiptImage: receipt,
       receipt: receipt,
       isSplit: Boolean(transaction.isSplit),
-      splitItems: Array.isArray(transaction.splitItems) ? JSON.parse(JSON.stringify(transaction.splitItems)) : [],
+      splitItems: Array.isArray(transaction.splitItems)
+        ? transaction.splitItems.map((si) => ({
+            ...si,
+            notes: getDecryptedNoteSync(si?.notes) || '',
+          }))
+        : [],
     })
   }, [wallet?.currency, defaultCurrency])
 
@@ -294,7 +306,7 @@ export default function WalletDetailPage() {
         const catLabels = getTransactionCategoryLabels(tx.category, tx.type, locale)
         const catName = (catLabels?.main || tx.category || '').toLowerCase()
         const subName = (catLabels?.sub || '').toLowerCase()
-        const notes = (tx.notes || '').toLowerCase()
+        const notes = (getDecryptedNoteSync(tx.notes) || '').toLowerCase()
         const amountStr = String(tx.amount || '')
         matchesSearch = catName.includes(query) || subName.includes(query) || notes.includes(query) || amountStr.includes(query)
 
@@ -304,7 +316,7 @@ export default function WalletDetailPage() {
             const siLabels = getTransactionCategoryLabels(si.category, si.type || tx.type, locale)
             const siCat = (siLabels?.main || si.category || '').toLowerCase()
             const siSub = (siLabels?.sub || si.subcategory || '').toLowerCase()
-            const siNotes = (si.notes || '').toLowerCase()
+            const siNotes = (getDecryptedNoteSync(si.notes) || '').toLowerCase()
             const siAmount = String(si.amount || '')
             return siCat.includes(query) || siSub.includes(query) || siNotes.includes(query) || siAmount.includes(query)
           })
@@ -977,7 +989,7 @@ export default function WalletDetailPage() {
             : ''
         }
         date={receiptPreviewTx?.date}
-        notes={receiptPreviewTx?.notes}
+        notes={getDecryptedNoteSync(receiptPreviewTx?.notes)}
         category={
           receiptPreviewTx
             ? getTransactionCategoryLabels(receiptPreviewTx.category, receiptPreviewTx.type, locale)?.main

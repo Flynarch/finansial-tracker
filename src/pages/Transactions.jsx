@@ -32,6 +32,7 @@ import {
 } from '../lib/utils'
 import { exportTransactionsToCsv } from '../lib/exportReports'
 import { getLastSeenTxTimestamp, updateLastSeenTxTimestamp } from '../lib/transactionLastSeen'
+import { getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
 
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import PageHeader from '../components/ui/PageHeader'
@@ -103,6 +104,12 @@ function Transactions() {
       if (dashboardTxs && dashboardTxs.length > 0) list = dashboardTxs
     }
     return list.filter((tx) => !tx.deletedAt)
+  }, [transactionsRaw])
+
+  useEffect(() => {
+    if (transactionsRaw && transactionsRaw.length > 0) {
+      warmupDecryptionCache(transactionsRaw)
+    }
   }, [transactionsRaw])
 
   const allWallets = useMemo(() => {
@@ -520,14 +527,19 @@ function Transactions() {
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
-      notes: transaction.notes || '',
+      notes: getDecryptedNoteSync(transaction.notes) || '',
       currency: targetCurrency,
       walletId: transaction.walletId,
       targetWalletId: transaction.targetWalletId || '',
       receiptImage: receipt,
       receipt: receipt,
       isSplit: Boolean(transaction.isSplit),
-      splitItems: Array.isArray(transaction.splitItems) ? JSON.parse(JSON.stringify(transaction.splitItems)) : [],
+      splitItems: Array.isArray(transaction.splitItems)
+        ? transaction.splitItems.map((si) => ({
+            ...si,
+            notes: getDecryptedNoteSync(si?.notes) || '',
+          }))
+        : [],
     })
   }, [allWallets, defaultCurrency])
 
@@ -772,8 +784,8 @@ function Transactions() {
           <PullToRefresh
             onRefresh={handleRefresh}
             scrollContainerRef={stagingScrollRef}
-            className="flex-1 min-h-0 flex flex-col"
-            contentClassName="flex-1 min-h-0 flex flex-col"
+            className="flex-1 min-h-0 flex flex-col w-full"
+            contentClassName="flex-1 min-h-0 flex flex-col w-full"
           >
             <div
               ref={stagingScrollRef}

@@ -8,6 +8,7 @@ import { db } from '../../lib/db'
 import { formatMoneyInput, parseMoneyInput, getMoneyInputCaret, roundCurrency, convertCurrency } from '../../lib/utils'
 import { getCachedCurrencyRates } from '../../lib/api'
 import { invalidateWalletBalance } from '../../lib/balanceEngine'
+import { encryptField } from '../../lib/fieldEncryption'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import { Plus, Minus, Calendar, FileText, Wallet, Check } from 'lucide-react'
@@ -88,6 +89,9 @@ export default function SavingsFundSheetModal({
       const formattedLogDate = format(selectedDateObj, 'yyyy-MM-dd HH:mm:ss')
       const walletIdNum = Number(selectedWalletId)
 
+      const rawTxNotes = notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`
+      const encryptedTxNotes = rawTxNotes ? await encryptField(rawTxNotes) : ''
+
       await db.transaction('rw', [db.goals, db.goalLogs, db.transactions, db.wallets], async () => {
         // 1. Update goal balance and status
         await db.goals.update(goal.id, goalUpdates)
@@ -111,7 +115,7 @@ export default function SavingsFundSheetModal({
             amount: roundCurrency(walletTxAmount, walletCurrency),
             type: isWithdraw ? 'income' : 'expense',
             category: isWithdraw ? 'cairkan_tabungan' : 'tabungan',
-            notes: notesInput.trim() || `${isWithdraw ? 'Tarik dari' : 'Setor ke'} Tabungan: ${goal.name}`,
+            notes: encryptedTxNotes,
             currency: walletCurrency,
             walletId: walletIdNum,
             goalId: goal.id,

@@ -6,6 +6,7 @@ import { isExcludeAnalyticsTx } from '../src/lib/utils'
 import { generateInstallmentSchedule, getLoanInstallmentSummary } from '../src/lib/loanUtils'
 import { deleteTransaction, updateTransaction } from '../src/services/transactionService'
 import { generateBalanceSheet } from '../src/lib/accountingEngine'
+import { decryptField } from '../src/lib/fieldEncryption'
 
 describe('Loan Overpayment Architecture', () => {
   beforeEach(async () => {
@@ -159,7 +160,7 @@ describe('Loan Overpayment Architecture', () => {
       expect(excessTx.type).toBe('expense')
       expect(excessTx.category).toBe('tagihan/cicilan')
       expect(excessTx.amount).toBe(20000)
-      expect(excessTx.notes).toContain('Kelebihan Bayar')
+      expect(await decryptField(excessTx.notes)).toContain('Kelebihan Bayar')
       expect(isExcludeAnalyticsTx(excessTx)).toBe(false)
 
       // Verify payment log
@@ -217,7 +218,7 @@ describe('Loan Overpayment Architecture', () => {
       expect(excessTx.type).toBe('income')
       expect(excessTx.category).toBe('investasi/bunga_bank')
       expect(excessTx.amount).toBe(30000)
-      expect(excessTx.notes).toContain('Kelebihan Terima')
+      expect(await decryptField(excessTx.notes)).toContain('Kelebihan Terima')
       expect(isExcludeAnalyticsTx(excessTx)).toBe(false)
 
       // Verify payment log

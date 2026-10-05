@@ -4,6 +4,7 @@ import { getCachedCurrencyRates } from './api'
 import useSettingsStore from '../store/useSettingsStore'
 import { subMonths, format } from 'date-fns'
 import { getCurrentBudgetMonthKey, getBudgetPeriodDateRange } from './budgetUtils'
+import { getDecryptedNoteSync, warmupDecryptionCache } from './fieldEncryption'
 
 /**
  * Executes a query against the local Dexie DB on behalf of the AI.
@@ -92,6 +93,9 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     }
   })
 
+  const sampleTxs = filteredTxs.slice(-10)
+  await warmupDecryptionCache(sampleTxs)
+
   // Return a structured summary to the AI
   return {
     queryParameters: { startDate, endDate, type, category },
@@ -103,13 +107,13 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     expenseByCategory,
     incomeByCategory,
     // Only return the 10 most recent sample transactions to avoid exceeding AI context window
-    recentSampleTransactions: filteredTxs.slice(-10).map((tx) => ({
+    recentSampleTransactions: sampleTxs.map((tx) => ({
       date: tx.date,
       type: tx.type,
       category: tx.category,
       amount: tx.amount,
       currency: tx.currency || defaultCurrency,
-      notes: tx.notes,
+      notes: getDecryptedNoteSync(tx.notes) || tx.notes,
     })),
   }
 }

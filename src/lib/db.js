@@ -1,5 +1,6 @@
 import Dexie from 'dexie'
-import { convertCurrency, roundCurrency } from './utils'
+import Decimal from 'decimal.js-light'
+import { convertCurrency, roundCurrency, toSafeNumber } from './utils'
 import { applyMigrations } from './db/migrations'
 
 export const db = new Dexie('fintrackDB')
@@ -25,7 +26,7 @@ applyMigrations(db)
  */
 export function computeWalletBalance(wallet, transactions = [], rates = null, allWallets = []) {
   if (!wallet) return 0
-  let bal = Number(wallet.balance) || 0
+  let bal = new Decimal(toSafeNumber(wallet.balance))
   const walletIdStr = String(wallet.id)
   const walletCurrency = wallet.currency || 'IDR'
   const txList = Array.isArray(transactions) ? transactions : []
@@ -39,7 +40,7 @@ export function computeWalletBalance(wallet, transactions = [], rates = null, al
 
   for (const tx of txList) {
     if (!tx || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1) continue
-    const amount = Number(tx.amount) || 0
+    const amount = toSafeNumber(tx.amount)
 
     if (String(tx.walletId) === walletIdStr) {
       const txCurrency = tx.currency || walletCurrency
@@ -48,10 +49,10 @@ export function computeWalletBalance(wallet, transactions = [], rates = null, al
           ? amount
           : convertCurrency(amount, txCurrency, walletCurrency, rates || {})
 
-      if (tx.type === 'income') bal += converted
-      else if (tx.type === 'expense') bal -= converted
-      else if (tx.type === 'transfer') bal -= converted
-      else if (tx.type === 'balance_adjustment') bal += converted
+      if (tx.type === 'income') bal = bal.plus(converted)
+      else if (tx.type === 'expense') bal = bal.minus(converted)
+      else if (tx.type === 'transfer') bal = bal.minus(converted)
+      else if (tx.type === 'balance_adjustment') bal = bal.plus(converted)
     }
 
     if (String(tx.targetWalletId) === walletIdStr && tx.type === 'transfer') {
@@ -59,16 +60,17 @@ export function computeWalletBalance(wallet, transactions = [], rates = null, al
         tx.currency ||
         (tx.walletId != null ? walletCurrencyMap.get(String(tx.walletId)) : null) ||
         walletCurrency
+      const targetAmt = toSafeNumber(tx.targetAmount)
       const converted =
-        tx.targetAmount != null && Number(tx.targetAmount) > 0
-          ? Number(tx.targetAmount)
+        targetAmt > 0
+          ? targetAmt
           : sourceCurrency === walletCurrency
           ? amount
           : convertCurrency(amount, sourceCurrency, walletCurrency, rates || {})
-      bal += converted
+      bal = bal.plus(converted)
     }
   }
-  return roundCurrency(bal)
+  return roundCurrency(bal.toNumber())
 }
 
 /**
@@ -90,7 +92,7 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
 
   for (const w of wallets) {
     const idKey = String(w.id)
-    balanceMap.set(idKey, Number(w.balance) || 0)
+    balanceMap.set(idKey, new Decimal(toSafeNumber(w.balance)))
     if (!currencyMap.has(idKey)) {
       currencyMap.set(idKey, w.currency || 'IDR')
     }
@@ -98,7 +100,7 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
 
   for (const tx of txList) {
     if (!tx || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1) continue
-    const amount = Number(tx.amount) || 0
+    const amount = toSafeNumber(tx.amount)
     const wId = tx.walletId != null ? String(tx.walletId) : null
     const tId = tx.targetWalletId != null ? String(tx.targetWalletId) : null
 
@@ -110,32 +112,39 @@ export function computeAllWalletBalances(wallets = [], transactions = [], rates 
           ? amount
           : convertCurrency(amount, txCurrency, sourceCurrency, rates || {})
 
+      const currentVal = balanceMap.get(wId)
       if (tx.type === 'income') {
-        balanceMap.set(wId, balanceMap.get(wId) + converted)
+        balanceMap.set(wId, currentVal.plus(converted))
       } else if (tx.type === 'expense') {
-        balanceMap.set(wId, balanceMap.get(wId) - converted)
+        balanceMap.set(wId, currentVal.minus(converted))
       } else if (tx.type === 'transfer') {
-        balanceMap.set(wId, balanceMap.get(wId) - converted)
+        balanceMap.set(wId, currentVal.minus(converted))
       } else if (tx.type === 'balance_adjustment') {
-        balanceMap.set(wId, balanceMap.get(wId) + converted)
+        balanceMap.set(wId, currentVal.plus(converted))
       }
     }
 
     if (tx.type === 'transfer' && tId && balanceMap.has(tId)) {
       const targetCurrency = currencyMap.get(tId) || 'IDR'
       const txCurrency = tx.currency || (wId ? currencyMap.get(wId) : targetCurrency) || targetCurrency
+      const targetAmt = toSafeNumber(tx.targetAmount)
       const converted =
-        tx.targetAmount != null && Number(tx.targetAmount) > 0
-          ? Number(tx.targetAmount)
+        targetAmt > 0
+          ? targetAmt
           : txCurrency === targetCurrency
           ? amount
           : convertCurrency(amount, txCurrency, targetCurrency, rates || {})
-      balanceMap.set(tId, balanceMap.get(tId) + converted)
+      const currentTargetVal = balanceMap.get(tId)
+      balanceMap.set(tId, currentTargetVal.plus(converted))
     }
   }
 
-  return wallets.map((w) => ({
-    ...w,
-    currentBalance: roundCurrency(balanceMap.get(String(w.id)) ?? (Number(w.balance) || 0)),
-  }))
+  return wallets.map((w) => {
+    const rawBal = balanceMap.get(String(w.id))
+    const num = rawBal instanceof Decimal ? rawBal.toNumber() : toSafeNumber(w.balance)
+    return {
+      ...w,
+      currentBalance: roundCurrency(num),
+    }
+  })
 }

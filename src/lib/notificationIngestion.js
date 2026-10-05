@@ -1,10 +1,46 @@
 import { WebPlugin, registerPlugin, Capacitor } from '@capacitor/core'
 import { format } from 'date-fns'
 import { db } from './db'
-import { toSafeNumber, parseMoneyInput } from './utils'
-import { matchCategoryFromDescription, cleanMutationMerchant, maskFinancialAccountNumbers } from './merchantUtils'
+import { toSafeNumber } from './utils'
+import { matchCategoryFromDescription, cleanMutationMerchant } from './merchantUtils'
 import { invalidateWalletBalance } from './balanceEngine'
 import { getRememberedCategory, enrichPendingMutationsWithAi } from './ai/merchantCategorizer'
+import { encryptField, warmupDecryptionCache, getDecryptedNoteSync } from './fieldEncryption'
+
+// Re-export decomposed parsers and guards for 100% backward compatibility
+export {
+  parseAmountFromRegexMatch,
+  parseWithBankRegex,
+  parseWithTokenBoundary,
+  extractTransactionRef,
+} from './notifications/parsers/bankParsers'
+
+export { parseWithWalletRegex } from './notifications/parsers/walletParsers'
+
+export {
+  isFinancialMutation,
+  scanSuspectPromoTransactions,
+  cleanSuspectPromoTransactions,
+} from './notifications/parsers/antiSpamGuard'
+
+export {
+  getNotificationTimestamp,
+  INSTITUTION_ALIASES,
+  findBestMatchingWallet,
+  correlateInternalTransfers,
+} from './notifications/parsers/walletMatcher'
+
+import {
+  parseWithBankRegex,
+  parseWithTokenBoundary,
+  extractTransactionRef,
+} from './notifications/parsers/bankParsers'
+import { isFinancialMutation } from './notifications/parsers/antiSpamGuard'
+import {
+  getNotificationTimestamp,
+  findBestMatchingWallet,
+  correlateInternalTransfers,
+} from './notifications/parsers/walletMatcher'
 
 export class FinTrackNotificationWeb extends WebPlugin {
   async isPermissionGranted() {
@@ -76,906 +112,9 @@ export const FinTrackNotificationPlugin = registerPlugin('FinTrackNotification',
   web: () => new FinTrackNotificationWeb(),
 })
 
-export function getNotificationTimestamp(val) {
-  if (!val) return Date.now()
-  const num = Number(val)
-  if (Number.isFinite(num) && num > 0) return num
-  const d = new Date(val).getTime()
-  return Number.isFinite(d) && d > 0 ? d : Date.now()
-}
-
-export function parseAmountFromRegexMatch(matchedStr = '') {
-  if (!matchedStr) return 0
-  return parseMoneyInput(matchedStr, 'IDR')
-}
-
-/**
- * TIER 1: Deterministic Bank-Specific Regex Parsers (0ms offline, ultra-low battery)
- */
-export function parseWithBankRegex(title = '', text = '', packageName = '') {
-  const combined = `${title} ${text}`.trim()
-  const lowerPkg = (packageName || '').toLowerCase()
-
-  // 1. BCA / myBCA / SMS BCA (excluding Blu by BCA Digital)
-  if (((lowerPkg.includes('bca') && !lowerPkg.includes('blu')) || /\b(?:62)?69888\b|d-bca|m-bca|mybca|bank\s*bca/i.test(combined) || /^(?:bank\s*)?bca\b/i.test(title.trim()) || /^bca[:\s]/i.test(text.trim())) && !/blu\b/i.test(combined)) {
-    // Expense e.g.: "m-Transfer Berhasil. Transfer Rp 50.000 ke 1234567890 Bpk Budi Santoso", "BCA: Transaksi Rp 120.000 dengan Kartu Kredit"
-    // Income e.g.: "Transfer Masuk Rp 1.500.000 dari PT ABC", "BCA: CR 123456 Rp 5.000.000", "27/09 09:15 CR 9876543210 Rp 7.500.000,00 GAJI"
-    const isIncome = /(?:masuk|cr\b|terima|(?<!kartu\s+)kredit|setoran)/i.test(combined) && !/(?:debet|db\b|keluar|kartu\s+kredit|pembayaran|transfer\s+ke|d-bca\s+db)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'BCA',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 2. Mandiri / Livin / SMS Mandiri
-  if (lowerPkg.includes('mandiri') || lowerPkg.includes('bmri') || lowerPkg.includes('livin') || /\b(?:62)?83355\b|livin|bank\s*mandiri/i.test(combined) || /^(?:bank\s*)?mandiri\b/i.test(title.trim()) || /^mandiri[:\s]/i.test(text.trim())) {
-    // "Pembayaran Berhasil Rp 45.000 di Kopi Kenangan", "Trx Kartu Mandiri berakhir 1234 sebesar IDR 75.000"
-    // "Transfer Masuk Rp 500.000", "Kredit Rek. 123456 sebesar IDR 1.000.000"
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|diterima)/i.test(combined) && !/(?:trx\s+kartu|debet\s+rek|db\b|keluar|transfer\s+ke|pembayaran)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Mandiri Livin',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 3. BRImo / BRI SMS
-  if (lowerPkg.includes('bri') || /\b(?:62)?3355\b|brimo|bank\s*bri|bri-info/i.test(combined) || /^(?:bank\s*)?bri(?:-info)?\b/i.test(title.trim()) || /^bri[:\s]/i.test(text.trim())) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|setoran|dikreditkan)/i.test(combined) && !/(?:trx\s+rekening|debet|db\b|keluar|didebet|transfer\s+ke|pembayaran)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'BRImo',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 4. BNI / Wondr / BNI SMS
-  if ((((lowerPkg.includes('bni') || lowerPkg.includes('wondr')) && !lowerPkg.includes('cimb')) || /\b(?:62)?3300\b|wondr|bank\s*bni/i.test(combined) || /^(?:bank\s*)?bni\b/i.test(title.trim()) || /^bni[:\s]/i.test(text.trim())) && !/cimb/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|dikredit)/i.test(combined) && !/(?:debet|db\b|keluar|didebet|kartu\s+kredit|transfer\s+ke|pembayaran)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'BNI',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 5. GoPay / Gojek
-  if (lowerPkg.includes('gojek') || lowerPkg.includes('gopay') || /gopay/i.test(combined)) {
-    // "Pembayaran Rp35.000 ke Solaria berhasil"
-    // "Kamu menerima transfer Rp100.000 dari Andi"
-    const isIncome = /menerima|top up|cashback|masuk|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'GoPay',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.95,
-        tier: 1,
-      }
-    }
-  }
-
-  // 6. OVO
-  if (lowerPkg.includes('ovo') || /ovo/i.test(combined)) {
-    const isIncome = /top up|menerima|cashback|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'OVO',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.95,
-        tier: 1,
-      }
-    }
-  }
-
-  // 7. DANA
-  const combinedWithoutFundPhrases = combined.replace(/(?:pengembalian|sumber|penerimaan|penarikan|pindah|tarik|sisa)\s+dana/gi, '')
-  const isDanaBrand = ((lowerPkg.includes('dana') && !lowerPkg.includes('danamon')) ||
-    /\bdana\b/i.test(combinedWithoutFundPhrases) ||
-    /dana\s*kaget/i.test(combined)) && !/danamon/i.test(combined)
-  if (isDanaBrand) {
-    const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
-    const isExplicitOutgoing = !isRefund && /(?:kirim uang(?!\s+diterima)|transfer ke|pembayaran|bayar|kamu telah membayar|telah membayar|berhasil dikirim(?:\s+ke)?|berhasil ditransfer(?:\s+ke)?|berhasil terkirim|terkirim(?:\s+ke)?|telah dikirim|uang keluar|kirim dana kaget)/i.test(combined)
-    const isExplicitIncoming = isRefund || /(?:kirim uang diterima|isi saldo|saldo bertambah|dapat kiriman|kiriman uang|kamu menerima|menerima saldo|menerima kiriman|saldo masuk|dana masuk|dana diterima|penerimaan dana|dana kaget|dapat dana kaget|terima dana kaget|masuk ke saldo(?!\s*(?:ke\s+)?penerima)|top\s*up|cashback|saldo ditambahkan)/i.test(combined) ||
-      (/(?:uang masuk)/i.test(combined) && !/(?:uang masuk ke saldo penerima|uang masuk ke rekening penerima|uang masuk ke tujuan)/i.test(combined))
-    const isIncome = isRefund || (!isExplicitOutgoing && isExplicitIncoming)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'DANA',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.95,
-        tier: 1,
-      }
-    }
-  }
-
-  // 8. ShopeePay
-  if (lowerPkg.includes('shopee') || /shopeepay/i.test(combined)) {
-    const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
-    const isIncome = isRefund || (/(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback)/i.test(combined) &&
-      !/(?:pembayaran|bayar|transfer ke|kirim ke)/i.test(combined))
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'ShopeePay',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.95,
-        tier: 1,
-      }
-    }
-  }
-
-  // 9. Seabank
-  if (lowerPkg.includes('seabank') || /seabank|sea bank/i.test(combined)) {
-    const isIncome = /(?:masuk|cr|terima|kredit|top\s*up)/i.test(combined) &&
-      !/(?:keluar|transfer keluar|pembayaran|debit)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Seabank',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 10. Bank Jago
-  if (lowerPkg.includes('jago') || /bank jago|kantong jago/i.test(combined)) {
-    const isIncome = /(?:uang masuk|masuk|menerima|terima|kredit|bertambah)/i.test(combined) &&
-      !/(?:uang\s+keluar|keluar|berkurang|pembayaran|transfer\s+ke|debit)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Bank Jago',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 11. Blu by BCA Digital
-  if (lowerPkg.includes('blu') || lowerPkg.includes('bcadigital') || /blu by bca digital|\bblu\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr|terima|kredit)/i.test(combined) &&
-      !/(?:pembayaran|transfer\s+ke|qris|keluar)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Blu',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 12. Jenius (BTPN)
-  if (lowerPkg.includes('jenius') || lowerPkg.includes('btpn') || /jenius|btpn/i.test(combined)) {
-    const isIncome = /(?:uang masuk|masuk|inflow|terima)/i.test(combined) &&
-      !/(?:money out|uang keluar|keluar|bayar|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Jenius',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 13. Bank Syariah Indonesia (BSI)
-  if (lowerPkg.includes('bsi') || /bsi\s*mobile|bank syariah indonesia/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|kredit|setoran|terima|diterima)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|kirim\s+uang(?!\s+diterima)|qris|debit)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'BSI',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: combined,
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 14. CIMB Niaga (OCTO Mobile / SMS CIMB)
-  if (lowerPkg.includes('cimb') || lowerPkg.includes('octo') || lowerPkg.includes('cimbniaga') || /\b(?:62)?3346\b|octo\s*mobile|cimb\s*niaga|\bcimb\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|diterima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit|debet|didebit|kartu\s+kredit)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'CIMB Niaga',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 15. LINE Bank (PT Bank KEB Hana)
-  if (lowerPkg.includes('linebank') || /line\s*bank|keb\s*hana/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|qris|kartu\s+kredit)/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'LINE Bank',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 16. Permata / PermataBank SMS
-  if (lowerPkg.includes('permata') || /\b(?:62)?1418\b|permatabank|bank\s*permata|\bpermata\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|debit|debet|didebit|kartu\s+kredit|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Permata',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 17. Danamon SMS
-  if (lowerPkg.includes('danamon') || /\b(?:62)?3399\b|d-bank|bank\s*danamon|\bdanamon\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|debit|debet|didebit|kartu\s+kredit|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Danamon',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 18. Bank Mega SMS
-  if (lowerPkg.includes('mega') || /\b(?:62)?3377\b|m-smile|bank\s*mega|\bmega\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|debit|debet|didebit|kartu\s+kredit|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Bank Mega',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 19. Citibank SMS
-  if (lowerPkg.includes('citi') || /citibank|\bciti\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|debit|debet|didebit|kartu\s+kredit|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Citibank',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 20. HSBC SMS
-  if (lowerPkg.includes('hsbc') || /bank\s*hsbc|\bhsbc\b/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|(?<!kartu\s+)kredit|terima|dikredit)/i.test(combined) &&
-      !/(?:keluar|pembayaran|debit|debet|didebit|kartu\s+kredit|transfer\s+ke)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'HSBC',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 21. Bank Saqu
-  if (lowerPkg.includes('banksaqu') || /bank\s*saqu/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|terima|kredit|isi saldo)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Bank Saqu',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 22. Superbank
-  if (lowerPkg.includes('superbank') || /superbank/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|terima|kredit|isi saldo)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Superbank',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  // 23. Allo Bank
-  if (lowerPkg.includes('allobank') || /allo\s*bank/i.test(combined)) {
-    const isIncome = /(?:masuk|cr\b|terima|kredit|top\s*up)/i.test(combined) &&
-      !/(?:keluar|pembayaran|transfer\s+ke|qris|debit)/i.test(combined)
-    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-    if (amtMatch) {
-      const amount = parseAmountFromRegexMatch(amtMatch[1])
-      return {
-        institution: 'Allo Bank',
-        amount,
-        type: isIncome ? 'income' : 'expense',
-        rawDescription: maskFinancialAccountNumbers(combined),
-        confidence: 0.98,
-        tier: 1,
-      }
-    }
-  }
-
-  return null
-}
-
-export const INSTITUTION_ALIASES = {
-  BCA: ['bca', 'bank bca', 'mybca', 'm-bca', 'klikbca', 'bca digital', '69888', '6269888'],
-  'Mandiri Livin': ['mandiri', 'livin', 'bank mandiri', 'livin by mandiri', '83355', '6283355'],
-  BRImo: ['bri', 'brimo', 'bank bri', 'bank rakyat indonesia', 'bri-info', '3355', '623355'],
-  BNI: ['bni', 'wondr', 'bank bni', 'bank negara indonesia', '3300', '623300'],
-  'Bank Saqu': ['saqu', 'bank saqu', 'banksaqu'],
-  Superbank: ['superbank', 'super bank'],
-  'Allo Bank': ['allo', 'allobank', 'allo bank'],
-  GoPay: ['gopay', 'gojek', 'go-pay', 'pt dompet anak bangsa'],
-  OVO: ['ovo', 'ovo cash', 'pt visionet'],
-  DANA: ['dana', 'dompet dana', 'pt espay debit indonesia'],
-  ShopeePay: ['shopee', 'shopeepay', 'spay'],
-  Seabank: ['seabank', 'sea bank', 'sea bank indonesia'],
-  'Bank Jago': ['jago', 'bank jago', 'pt bank jago'],
-  BSI: ['bsi', 'bank syariah indonesia', 'bsimobile', 'bsi mobile'],
-  'CIMB Niaga': ['cimb', 'cimb niaga', 'octo', 'octomobile', 'octo mobile', 'pt bank cimb niaga', '3346', '623346'],
-  'LINE Bank': ['line bank', 'linebank', 'hana bank', 'keb hana'],
-  Blu: ['blu', 'blu by bca digital', 'bca digital'],
-  Jenius: ['jenius', 'btpn', 'bank btpn'],
-  Permata: ['permata', 'permatabank', 'bank permata', 'permata mobile', '1418', '621418'],
-  Danamon: ['danamon', 'bank danamon', 'd-bank', 'd bank', '3399', '623399'],
-  'Bank Mega': ['mega', 'bank mega', 'm-smile', '3377', '623377'],
-  Citibank: ['citibank', 'citi'],
-  HSBC: ['hsbc', 'bank hsbc'],
-}
-
-/**
- * Deterministic Anti-Spam & Promo Guardrail
- * Accurately screens out marketing clickbaits, engagement notifications, OTPs, and discounts.
- */
-export function isFinancialMutation(title = '', text = '', packageName = '') {
-  const rawCombined = `${title} ${text} ${packageName}`
-  const combined = rawCombined.toLowerCase()
-  if (!combined.trim()) return false
-
-  // 1. Guardrail: Question Marks
-  // Legitimate banking ledger receipts are strictly factual assertions, never marketing hook questions.
-  if (title.includes('?') || text.includes('?')) {
-    return false
-  }
-
-  // 2. Guardrail: Marketing / Promo Hype Emojis
-  // Filter out marketing hype emojis while allowing common celebratory transaction emojis attached to receipts
-  if (/[\u{1F525}\u{1F449}\u{1F911}\u{1F929}\u{1F680}]/u.test(title + ' ' + text)) {
-    return false
-  }
-
-  // 3. Guardrail: Comprehensive Blacklist of Marketing, Promos, OTP, and Security Alerts
-  const promoBlacklist = [
-    'cek caranya',
-    'cek cara',
-    'cek di sini',
-    'klik di sini',
-    'klaim di sini',
-    'promo di sini',
-    'buka di sini',
-    'bisa terima',
-    'terima saldo gratis',
-    'saldo gratis',
-    'gratis saldo',
-    'mau hemat',
-    'hemat berkali-kali',
-    's/d',
-    's.d.',
-    'hingga',
-    'up to',
-    'buruan',
-    'jangan lewatkan',
-    'khusus hari ini',
-    'hanya hari ini',
-    'kesempatan emas',
-    'raih',
-    'menangkan',
-    'klaim',
-    'klaim hadiah',
-    'klaim saldo',
-    'bonus saldo',
-    'bonus ',
-    'dapatkan',
-    'ajak teman',
-    'undang teman',
-    'referral',
-    'pesta',
-    'flash sale',
-    'payday',
-    'belanja seru',
-    'pinjaman',
-    'paylater',
-    'limit kredit',
-    'aktivasi',
-    'ajukan',
-    'promo',
-    'diskon',
-    'voucher',
-    'kupon',
-    'poin reward',
-    'cashback s.d',
-    'cashback s/d',
-    'cashback hingga',
-    'koin',
-    'gratis ongkir',
-    'live stream',
-    'undian',
-    'berhadiah',
-    'kode otp',
-    'otp anda',
-    'verifikasi login',
-    'peringatan keamanan',
-    'perangkat baru terdeteksi',
-    'reset pin',
-    'ganti password',
-    'syarat & ketentuan',
-    's&k berlaku',
-    'kode rahasia',
-    'jangan berikan',
-    'kode verifikasi',
-    'kode autentikasi',
-    'verification code',
-    'secret code',
-    'one time password',
-    'security code',
-    'link berikut',
-    'tautan berikut',
-    'http://',
-    'https://',
-    'klik link',
-    'penawaran kta',
-    'kta kilat',
-    'dana tunai',
-    'pinjaman kilat',
-    'bunga ringan',
-    'butuh dana',
-  ]
-  if (promoBlacklist.some((b) => combined.includes(b))) {
-    return false
-  }
-
-  // 4. Guardrail: Reject promotional shorthand suffixes attached to currency (e.g. "Rp1 0rb", "Rp 50rb", "Rp 10k")
-  if (/(?:rp|idr)\.?\s*\d+\s*(?:0?rb|k|jt)\b/i.test(rawCombined)) {
-    return false
-  }
-
-  // 5. Must contain valid monetary pattern (e.g. Rp 10.000, IDR 50.000)
-  const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-  if (!amtMatch) return false
-
-  const rawAmount = toSafeNumber(amtMatch[1].replace(/[^0-9]/g, ''))
-  // Genuine banking/e-wallet transaction amounts in IDR are at least Rp 100
-  if (rawAmount < 100) {
-    return false
-  }
-
-  // 6. Guardrail: Reject Failed, Cancelled, Expired, Rejected Transactions or Unpaid Reminders
-  const negativeOutcomeKeywords = [
-    'gagal',
-    'tidak berhasil',
-    'belum berhasil',
-    'dibatalkan',
-    'batal',
-    'kadaluarsa',
-    'kedaluwarsa',
-    'ditolak',
-    'expired',
-    'menunggu pembayaran',
-    'selesaikan pembayaran',
-    'tagihan telah terbit',
-    'pengingat pembayaran',
-    'pengingat tagihan',
-    'jatuh tempo',
-    'segera bayar',
-    'transaksi ditolak',
-    'transaksi dibatalkan',
-    'pembayaran gagal',
-    'transfer gagal',
-  ]
-  if (negativeOutcomeKeywords.some((w) => combined.includes(w))) {
-    return false
-  }
-
-  // 7. Must contain concrete positive receipt completion confirmation
-  const receiptKeywords = [
-    'berhasil',
-    'sukses',
-    'telah berhasil',
-    'berhasil dibayar',
-    'berhasil ditransfer',
-    'berhasil dikirim',
-    'telah ditambahkan',
-    'berhasil masuk',
-    'uang masuk',
-    'transfer masuk',
-    'kamu menerima',
-    'telah menerima',
-    'kirim uang diterima',
-    'qris berhasil',
-    'pembayaran qris',
-    'debit rekening',
-    'm-transfer berhasil',
-    'transaksi berhasil',
-    'pembayaran sebesar',
-    'pembayaran rp',
-    'transfer keluar berhasil',
-    'uang keluar:',
-    'uang masuk:',
-    'top up berhasil',
-    'isi saldo berhasil',
-    'transaksi rp',
-    'transaksi idr',
-    'transaksi di',
-    'transaksi pada',
-    'transaksi kartu',
-    'trx kartu',
-    'trx rekening',
-    'transaksi rekening',
-    'telah didebit',
-    'telah di-debit',
-    'telah didebet',
-    'telah di-debet',
-    'telah dikredit',
-    'telah di-kredit',
-    'telah dikreditkan',
-    'telah di-kreditkan',
-    'dikreditkan',
-    'debet rek',
-    'kredit rek',
-    'debit rek',
-    'kredit rekening',
-    'notifikasi debet',
-    'notifikasi kredit',
-    'd-bca db',
-    'd-bca cr',
-    'gaji',
-    'setoran',
-    'kartu kredit bca',
-    'kartu mandiri',
-    'saldo akhir rp',
-    'di edc',
-    'kamu telah membayar',
-    'telah membayar',
-    'kirim uang ke',
-    'saldo masuk',
-    'masuk ke saldo',
-    'saldo bertambah',
-    'dapat kiriman',
-    'kiriman uang',
-    'transaksi selesai',
-    'telah selesai',
-    'dana kaget',
-    'dapat dana kaget',
-    'terima dana kaget',
-    'dana masuk',
-    'dana diterima',
-    'penerimaan dana',
-    'kamu menerima',
-    'berhasil kirim uang',
-    'berhasil terkirim',
-    'terkirim ke',
-    'telah dikirim',
-    'pengembalian dana',
-    'refund',
-    'uang kembali',
-    'pengembalian saldo',
-  ]
-  return receiptKeywords.some((w) => combined.includes(w)) || /\bcr\b/i.test(combined)
-}
-
-/**
- * Fuzzy Wallet Matcher
- * Finds the exact or best matching wallet for a bank/e-wallet institution.
- */
-export function findBestMatchingWallet(institution = '', availableWallets = [], rawText = '') {
-  if (!Array.isArray(availableWallets) || availableWallets.length === 0) {
-    return { wallet: null, matches: [], isAmbiguous: false }
-  }
-
-  const instClean = (institution || '').trim().toLowerCase()
-  const aliases = (INSTITUTION_ALIASES[institution] || [instClean]).map((a) => a.toLowerCase())
-
-  // Check 1: 4-digit Account Number matching if present in rawText
-  const accMatch = (rawText || '').match(/(?:rekening|rek|acc|no\.?|kartu)\s*(?:[x*]*\s*)?(\d{4})/i)
-  if (accMatch) {
-    const accSuffix = accMatch[1]
-    const accMatched = availableWallets.filter((w) => {
-      const wAcc = (w.accountNumber || '').replace(/\D/g, '')
-      return wAcc.endsWith(accSuffix)
-    })
-    if (accMatched.length === 1) {
-      return { wallet: accMatched[0], matches: accMatched, isAmbiguous: false }
-    }
-    if (accMatched.length > 1) {
-      return { wallet: null, matches: accMatched, isAmbiguous: true }
-    }
-  }
-
-  // Check 2: Fuzzy / Alias matching on wallet name & institutionName
-  const matchedWallets = availableWallets.filter((w) => {
-    const wName = (w.name || '').trim().toLowerCase()
-    const wInst = (w.institutionName || '').trim().toLowerCase()
-
-    const matchesAlias = aliases.some((alias) => {
-      if (!alias) return false
-      return (
-        (wName && (wName === alias || wName.includes(alias) || (wName.length >= 3 && alias.includes(wName)))) ||
-        (wInst && (wInst === alias || wInst.includes(alias) || (wInst.length >= 3 && alias.includes(wInst))))
-      )
-    })
-
-    return matchesAlias
-  })
-
-  if (matchedWallets.length === 1) {
-    return { wallet: matchedWallets[0], matches: matchedWallets, isAmbiguous: false }
-  }
-
-  if (matchedWallets.length > 1) {
-    return { wallet: null, matches: matchedWallets, isAmbiguous: true }
-  }
-
-  // Unmatched: do NOT guess across different institutions or e-wallet brands
-  return { wallet: null, matches: [], isAmbiguous: false }
-}
-
-/**
- * Correlates dual debit/credit mutations within 120s into a single Transfer (Pindah Dana)
- */
-export function correlateInternalTransfers(parsedMutations = [], availableWallets = [], options = {}) {
-  if (!Array.isArray(parsedMutations) || parsedMutations.length < 2) {
-    return { correlated: parsedMutations, transfersCreated: 0 }
-  }
-
-  const notificationAutoApprove =
-    typeof options === 'boolean' ? options : Boolean(options?.notificationAutoApprove)
-
-  const result = []
-  const consumedIndices = new Set()
-  let transfersCreated = 0
-
-  for (let i = 0; i < parsedMutations.length; i++) {
-    if (consumedIndices.has(i)) continue
-
-    const current = parsedMutations[i]
-    let pairedIndex = -1
-
-    for (let j = i + 1; j < parsedMutations.length; j++) {
-      if (consumedIndices.has(j)) continue
-      const candidate = parsedMutations[j]
-
-      // Criteria: Opposite types (one expense, one income), same amount
-      const isOppositeType =
-        (current.type === 'expense' && candidate.type === 'income') ||
-        (current.type === 'income' && candidate.type === 'expense')
-
-      const isSameAmount = Math.abs(toSafeNumber(current.amount) - toSafeNumber(candidate.amount)) < 0.01
-
-      // Within 120 seconds time difference
-      const timeI = getNotificationTimestamp(current.createdAt || current.timestamp)
-      const timeJ = getNotificationTimestamp(candidate.createdAt || candidate.timestamp)
-      const isWithinWindow = Math.abs(timeI - timeJ) <= 120000
-
-      if (isOppositeType && isSameAmount && isWithinWindow) {
-        pairedIndex = j
-        break
-      }
-    }
-
-    if (pairedIndex !== -1) {
-      const candidate = parsedMutations[pairedIndex]
-      consumedIndices.add(i)
-      consumedIndices.add(pairedIndex)
-      transfersCreated++
-
-      const fromMutation = current.type === 'expense' ? current : candidate
-      const toMutation = current.type === 'income' ? current : candidate
-
-      const fromMatch = findBestMatchingWallet(fromMutation.institution, availableWallets, fromMutation.rawDescription)
-      const toMatch = findBestMatchingWallet(toMutation.institution, availableWallets, toMutation.rawDescription)
-
-      const isSameResolvedWallet =
-        Boolean(fromMatch.wallet?.id) &&
-        Boolean(toMatch.wallet?.id) &&
-        String(fromMatch.wallet.id) === String(toMatch.wallet.id)
-
-      result.push({
-        type: 'transfer',
-        amount: fromMutation.amount,
-        currency: fromMutation.currency || 'IDR',
-        date: fromMutation.date,
-        createdAt: fromMutation.createdAt,
-        walletId: fromMatch.wallet?.id ? Number(fromMatch.wallet.id) : null,
-        targetWalletId: toMatch.wallet?.id ? Number(toMatch.wallet.id) : null,
-        category: 'transfer',
-        notes: `[Pindah Dana] ${fromMutation.institution} -> ${toMutation.institution}`,
-        cleanMerchant: `Pindah Dana: ${fromMutation.institution} -> ${toMutation.institution}`,
-        refNumber: fromMutation.refNumber || toMutation.refNumber || undefined,
-        sourceNotifIds: [fromMutation.sourceNotifId, toMutation.sourceNotifId].filter(Boolean),
-        isPendingReview:
-          !notificationAutoApprove ||
-          fromMatch.isAmbiguous ||
-          toMatch.isAmbiguous ||
-          !fromMatch.wallet ||
-          !toMatch.wallet ||
-          isSameResolvedWallet,
-        source: 'notification_listener_transfer',
-        deletedAt: null,
-      })
-    } else {
-      result.push(current)
-    }
-  }
-
-  return { correlated: result, transfersCreated }
-}
-
-/**
- * TIER 2: Token Boundary & General Currency Extractor (Fallback for other financial apps)
- */
-export function parseWithTokenBoundary(title = '', text = '') {
-  const combined = `${title} ${text}`.trim()
-  const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
-
-  if (!amtMatch) return null
-
-  const amount = parseAmountFromRegexMatch(amtMatch[1])
-  if (amount <= 0) return null
-
-  const isIncome = /(masuk|terima|diterima|inflow|cr|kredit|top\s*up|cashback|refund|pengembalian|uang kembali|pengembalian saldo)/i.test(combined)
-
-  return {
-    institution: 'Bank / E-Wallet',
-    amount,
-    type: isIncome ? 'income' : 'expense',
-    rawDescription: combined,
-    confidence: 0.8,
-    tier: 2,
-  }
-}
-
 /**
  * 3-TIER INGESTION PARSER PIPELINE
  */
-/**
- * Extracts reference number, Order ID, or Transaction ID from banking notification text.
- */
-export function extractTransactionRef(rawText = '') {
-  if (!rawText) return null
-  const match =
-    rawText.match(
-      /\b(?:(?:no\.?|nomor)\s*ref(?:erensi)?|ref(?:\s*no\.?)?|id\s*transaksi|transaksi\s*id|order\s*id)\s*[:#]\s*([a-zA-Z0-9_.-]+)/i
-    ) ||
-    rawText.match(
-      /\b(?:(?:no\.?|nomor)\s*ref(?:erensi)?|ref(?:\s*no\.?)?|id\s*transaksi|transaksi\s*id|order\s*id)\s+([a-zA-Z0-9_.-]{4,})/i
-    )
-  return match ? match[1].trim() : null
-}
-
 export function parseFinancialNotification(notif = {}) {
   const { title = '', text = '', packageName = '', timestamp = Date.now(), id = null } = notif
 
@@ -986,7 +125,7 @@ export function parseFinancialNotification(notif = {}) {
   const rawCombined = `${title} ${text}`.trim()
   const refNumber = extractTransactionRef(rawCombined)
 
-  // Tier 1: Deterministic Bank Regex
+  // Tier 1: Deterministic Bank / E-Wallet Regex
   const tier1 = parseWithBankRegex(title, text, packageName)
   if (tier1) {
     return formatParsedNotification(tier1, timestamp, id, refNumber)
@@ -1052,6 +191,10 @@ export async function syncNotificationQueue(options = {}) {
       .aboveOrEqual(recentDate)
       .toArray()).filter((tx) => !tx.deletedAt)
 
+    if (recentTransactions.length > 0) {
+      await warmupDecryptionCache(recentTransactions)
+    }
+
     const availableWallets = await db.wallets.toArray()
 
     // 1. Parse all valid financial mutations & deduplicate within batch
@@ -1099,7 +242,8 @@ export async function syncNotificationQueue(options = {}) {
         const isCloseInTime = hasTimeWindow && Math.abs(parsedTime - existingTime) <= 5 * 60 * 1000
 
         const parsedText = (parsed.cleanMerchant || parsed.notes || '').toLowerCase().trim()
-        const existingText = (existing.cleanMerchant || existing.notes || existing.description || '').toLowerCase().trim()
+        const existingPlainNotes = getDecryptedNoteSync(existing.notes)
+        const existingText = (existing.cleanMerchant || existingPlainNotes || existing.description || '').toLowerCase().trim()
 
         const isSameMerchant = parsedText && existingText && (
           parsedText === existingText ||
@@ -1207,6 +351,11 @@ export async function syncNotificationQueue(options = {}) {
     }
 
     if (toInsert.length > 0) {
+      for (const tx of toInsert) {
+        if (tx.notes && typeof tx.notes === 'string' && tx.notes.trim()) {
+          tx.notes = await encryptField(tx.notes)
+        }
+      }
       const insertedIds = await db.transactions.bulkAdd(toInsert, { allKeys: true })
 
       // Invalidate balance cache so dynamic computeWalletBalance immediately reflects inserted transactions
@@ -1257,64 +406,6 @@ export async function syncNotificationQueue(options = {}) {
     console.error('Error syncing notification queue:', err)
     return { syncedCount: 0, skippedDuplicates: 0, error: err.message }
   }
-}
-
-/**
- * Scans existing transactions for suspect promo/spam mutations that were previously auto-recorded.
- * Matches transactions from notification_listener or notes starting with [Auto:
- * that contain known promotional marketing keywords.
- */
-export async function scanSuspectPromoTransactions() {
-  const allTxs = await db.transactions.toArray()
-  const promoKeywords = [
-    'gratis',
-    'saldo gratis',
-    'promo',
-    'hemat',
-    's/d',
-    's.d.',
-    'hingga',
-    'cek caranya',
-    'bisa terima',
-    'voucher',
-    'diskon',
-    'cashback s',
-    'undian',
-    'hadiah',
-    'klaim',
-    'ajak teman',
-    'di sini',
-    '\u{1F525}',
-    '\u{1F449}',
-  ]
-
-  return allTxs.filter((tx) => {
-    if (tx.deletedAt) return false
-    const isAuto = tx.source === 'notification_listener' || (typeof tx.notes === 'string' && tx.notes.startsWith('[Auto:'))
-    if (!isAuto) return false
-
-    const text = `${tx.notes || ''} ${tx.category || ''}`.toLowerCase()
-    return promoKeywords.some((k) => text.includes(k))
-  })
-}
-
-/**
- * Cleans suspect promo transactions by ID, safely restoring wallet balances and ledger states.
- */
-export async function cleanSuspectPromoTransactions(txIds = []) {
-  if (!Array.isArray(txIds) || txIds.length === 0) return { deletedCount: 0 }
-  const { deleteTransaction } = await import('../services/transactionService')
-
-  let deletedCount = 0
-  for (const id of txIds) {
-    try {
-      await deleteTransaction(id)
-      deletedCount++
-    } catch (err) {
-      console.error('[cleanSuspectPromoTransactions] Failed to delete tx', id, err)
-    }
-  }
-  return { deletedCount }
 }
 
 /**
@@ -1453,5 +544,3 @@ export async function updateCustomPackages(packages = []) {
     return { success: false, error: err.message }
   }
 }
-
-

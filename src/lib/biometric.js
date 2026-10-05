@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { BiometricAuth, AndroidBiometryStrength } from '@aparajita/capacitor-biometric-auth'
+import { getStoredPasskeys, authenticatePasskey } from './passkeys'
 import useSettingsStore from '../store/useSettingsStore'
 
 export async function canUseBiometric() {
@@ -17,15 +18,15 @@ export async function canUseBiometric() {
   // Web / Desktop platform support (Windows Hello / Mac Touch ID / WebAuthn)
   if (typeof window !== 'undefined' && window.PublicKeyCredential) {
     try {
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
       return Boolean(available)
     } catch (err){
       console.warn('[biometric]', err)
-      return true // allow fallback simulation on dev
+      return false
     }
   }
 
-  return true
+  return false
 }
 
 export async function authenticateBiometric() {
@@ -57,6 +58,19 @@ export async function authenticateBiometric() {
     }
   }
 
-  // On Web / Browser: simulate instant success for development
-  return true
+  // On Web / Browser: attempt passkey authentication if registered, otherwise return false
+  if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+    try {
+      const passkeys = getStoredPasskeys()
+      if (passkeys.length > 0) {
+        const result = await authenticatePasskey()
+        return Boolean(result?.success)
+      }
+    } catch (err) {
+      console.warn('[BiometricAuth] web passkey error:', err)
+      return false
+    }
+  }
+
+  return false
 }
