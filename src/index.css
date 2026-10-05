@@ -1656,6 +1656,19 @@ img, svg, a, button {
   animation: ft-smooth-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes ft-tab-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ft-tab-fade {
+  animation: ft-tab-fade 180ms ease-out forwards;
+}
+
 @keyframes ft-spring-in {
   0% {
     opacity: 0;
@@ -1819,7 +1832,7 @@ img, svg, a, button {
   overflow-wrap: anywhere;
   max-width: 100%;
 }
-.ft-md-prose p { margin-bottom: 0.5rem; word-break: break-word; overflow-wrap: anywhere; }
+.ft-md-prose p { margin-bottom: 0.35rem; word-break: break-word; overflow-wrap: anywhere; }
 .ft-md-prose p:last-child { margin-bottom: 0; }
 .ft-md-prose strong { font-weight: 600; color: var(--fg); }
 .ft-md-prose code { 

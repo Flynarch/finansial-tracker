@@ -3,11 +3,12 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
-import { Clock, Plus, Pause } from 'lucide-react'
+import { Clock, Pause } from 'lucide-react'
 import Modal from '../ui/Modal'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import HabitStatsModal from './HabitStatsModal'
 import HabitColorPicker from './HabitColorPicker'
+import MiniHabitHeatmap from './MiniHabitHeatmap'
 import { db } from '../../lib/db'
 import useSwipeAction from '../../hooks/useSwipeAction'
 import useTranslation from '../../hooks/useTranslation'
@@ -87,13 +88,13 @@ const HabitItemCard = memo(function HabitItemCard({
   const [justToggled, setJustToggled] = useState(false)
 
   return (
-    <li key={habit.id} className="group relative overflow-hidden rounded-[1.25rem]">
+    <li key={habit.id} className="group relative overflow-hidden rounded-2xl">
       {/* Progressive Swipe Background */}
-      <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-[1.25rem] px-5 opacity-0 transition-colors duration-150 w-full" />
+      <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-2xl px-5 opacity-0 transition-colors duration-150 w-full" />
 
       {/* Foreground Card */}
       <div
-        className="relative z-10 flex touch-pan-y items-center justify-between rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_60%,transparent)] border-r-[var(--border)]/80 bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] transition-colors cursor-pointer"
+        className="relative z-10 flex touch-pan-y items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs transition-colors cursor-pointer"
         onClick={() => {
           if (ignoreNextClickRef.current) {
             ignoreNextClickRef.current = false
@@ -186,9 +187,22 @@ const HabitItemCard = memo(function HabitItemCard({
   )
 })
 
-export default function HabitsView() {
+export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange }) {
   const { t } = useTranslation()
-  const [addOpen, setAddOpen] = useState(false)
+  const [internalAddOpen, setInternalAddOpen] = useState(false)
+  const isAddControlled = typeof controlledAddOpen === 'boolean'
+  const addOpen = isAddControlled ? controlledAddOpen : internalAddOpen
+  const setAddOpen = useCallback(
+    (val) => {
+      const nextVal = typeof val === 'function' ? val(addOpen) : val
+      if (isAddControlled) {
+        onAddOpenChange?.(nextVal)
+      } else {
+        setInternalAddOpen(nextVal)
+      }
+    },
+    [isAddControlled, addOpen, onAddOpenChange]
+  )
   const [addForm, setAddForm] = useState({ title: '', notes: '', color: HABIT_COLORS[0], category: 'Lainnya', frequencyType: 'daily', frequencyValue: [], reminderEnabled: false, reminderTime: '08:00' })
 
   const [editOpen, setEditOpen] = useState(false)
@@ -356,7 +370,7 @@ export default function HabitsView() {
 
   if (!habits) {
     return (
-      <div className="space-y-3 p-1 animate-pulse ft-smooth-in">
+      <div className="space-y-3 animate-pulse ft-tab-fade">
         <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
         <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
       </div>
@@ -404,20 +418,17 @@ export default function HabitsView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-[16px] font-bold tracking-tight text-[var(--fg)]">Habit Hari Ini</h2>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--fg)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-md transition-transform active:scale-95 shrink-0 cursor-pointer"
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-          <span>Baru</span>
-        </button>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">
+          {t('habits.todayTitle', 'Habit Hari Ini')}
+        </h2>
       </div>
 
+      {/* Mini Heatmap Summary */}
+      {habits.length > 0 && <MiniHabitHeatmap habits={habits} />}
+
       {habits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] rounded-[2rem] border border-[color-mix(in_srgb,var(--border)_40%,transparent)] shadow-sm">
+        <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] rounded-2xl border border-[var(--border)] shadow-xs">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--panel-strong)] shadow-sm">
             <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
@@ -432,7 +443,7 @@ export default function HabitsView() {
       ) : (
         <>
           {todayHabits.length > 0 ? renderHabitList(todayHabits) : (
-            <div className="p-4 text-center rounded-[1.25rem] border border-dashed border-[var(--border)]">
+            <div className="p-4 text-center rounded-2xl border border-dashed border-[var(--border)]">
               <p className="text-[13px] font-medium text-[var(--muted)]">
                 {t('habits.noScheduledToday', 'Tidak ada habit yang dijadwalkan hari ini.')}
               </p>
@@ -440,8 +451,8 @@ export default function HabitsView() {
           )}
           
           {otherHabits.length > 0 && (
-            <div className="pt-6">
-              <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-3 px-1">
+            <div className="pt-5">
+              <h3 className="text-[12.5px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-3">
                 {t('habits.otherSchedules', 'Jadwal Lainnya')}
               </h3>
               <div className="opacity-60 grayscale-[30%]">

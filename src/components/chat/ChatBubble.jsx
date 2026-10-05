@@ -20,12 +20,12 @@ export const UserBubble = memo(function UserBubble({ content, timestamp, status 
   const timeStr = getCurrentTimeStr(timestamp)
   const StatusIcon = status === 'confirmed' ? CheckCheck : Check
   return (
-    <div className="ft-msg-enter flex flex-col items-end gap-0.5 max-w-[85%] sm:max-w-[80%] self-end my-1 min-w-0">
-      <div className="rounded-2xl rounded-tr-xs bg-[var(--fg)] text-[var(--bg)] px-4 py-2.5 shadow-sm text-[13.5px] font-medium leading-relaxed break-words [overflow-wrap:anywhere]">
+    <div className="ft-msg-enter flex flex-col items-end gap-0.5 max-w-[85%] sm:max-w-[80%] self-end my-0.5 min-w-0">
+      <div className="rounded-2xl rounded-tr-xs bg-[var(--fg)] text-[var(--bg)] px-3.5 py-2 shadow-xs text-[13.5px] font-medium leading-relaxed break-words [overflow-wrap:anywhere]">
         <span>{content}</span>
-        <span className="inline-flex items-center gap-1 float-right mt-1 ml-3 text-[10px] text-[var(--bg)]/50 font-mono tabular-nums select-none whitespace-nowrap">
+        <span className="inline-flex items-center gap-1 float-right mt-1 ml-2.5 text-[9.5px] text-[var(--bg)]/55 font-mono tabular-nums select-none whitespace-nowrap">
           {timeStr}
-          <StatusIcon size={12} className={status === 'confirmed' ? 'text-emerald-400' : 'opacity-50'} />
+          <StatusIcon size={11} className={status === 'confirmed' ? 'text-emerald-400' : 'opacity-50'} />
         </span>
       </div>
     </div>
@@ -105,10 +105,10 @@ export const AiBubble = memo(function AiBubble({
   const showAvatar = position === 'single' || position === 'first'
 
   return (
-    <div className={`ft-msg-enter flex items-start gap-2.5 max-w-[88%] sm:max-w-[85%] self-start ${position === 'single' || position === 'first' ? 'my-1.5' : 'my-0.5'} min-w-0 ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
+    <div className={`ft-msg-enter flex items-start gap-2 max-w-[88%] sm:max-w-[85%] self-start ${position === 'single' || position === 'first' ? 'my-1' : 'my-0.5'} min-w-0 ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
       {showAvatar ? <AiAvatarBadge /> : <div className="w-7 shrink-0" />}
       
-      <div className={`flex-1 min-w-0 overflow-hidden flex flex-col gap-2 ${radiusClass} bg-[var(--field-bg)] border border-[var(--border)] p-4 shadow-xs`}>
+      <div className={`flex-1 min-w-0 overflow-hidden flex flex-col gap-1 ${radiusClass} bg-[var(--field-bg)] border border-[var(--border)] px-3.5 py-2.25 shadow-xs`}>
         {content && (
           <div className="ft-md-prose leading-relaxed text-[13.5px] text-[var(--fg)] break-words [overflow-wrap:anywhere]">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -133,12 +133,12 @@ export const AiBubble = memo(function AiBubble({
         )}
 
         {embeddedWidget && (
-          <div className={`${content ? 'mt-1 pt-2 border-t border-[var(--border)]/40' : ''} w-full min-w-0 overflow-hidden`}>
+          <div className={`${content ? 'mt-1 pt-1.5 border-t border-[var(--border)]/40' : ''} w-full min-w-0 overflow-hidden`}>
             {embeddedWidget}
           </div>
         )}
 
-        <span className="self-end text-[10px] font-bold text-[var(--muted)]/70 tabular-nums select-none mt-0.5">
+        <span className="self-end text-[9.5px] font-medium text-[var(--muted)]/60 tabular-nums select-none -mt-0.5">
           {timeStr}
         </span>
       </div>
@@ -175,9 +175,9 @@ export const ReasoningIndicator = memo(function ReasoningIndicator() {
   }, [])
 
   return (
-    <div className="flex items-center gap-2.5 max-w-[85%] my-1.5 ft-msg-enter">
+    <div className="flex items-center gap-2 max-w-[85%] my-1 ft-msg-enter">
       <AiAvatarBadge isThinking />
-      <div className="flex items-center gap-2 rounded-2xl rounded-tl-xs border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 shadow-xs">
+      <div className="flex items-center gap-2 rounded-2xl rounded-tl-xs border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 shadow-xs">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75 animate-ping" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />

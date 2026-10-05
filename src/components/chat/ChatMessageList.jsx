@@ -43,7 +43,7 @@ export default function ChatMessageList({
     <main
       ref={chatScrollContainerRef}
       onScroll={onScroll}
-      className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-3.5 ft-hide-scrollbar"
+      className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 sm:py-4 space-y-2.5 ft-hide-scrollbar"
     >
       {isOnlyWelcome && !isLoading ? (
         <WelcomeHero

@@ -26,7 +26,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
   onUndoTransaction,
 }) {
   return (
-    <div className="flex flex-col gap-2 w-full min-w-0 max-w-full">
+    <div className="flex flex-col gap-1.5 w-full min-w-0 max-w-full">
       {msg.role === 'user' && (
         <div
           className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full cursor-pointer"

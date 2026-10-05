@@ -12,7 +12,7 @@ export default function PageHeader({
 }) {
   if (titlePosition === 'left') {
     return (
-      <header className={`flex ${subtitle ? 'items-start' : 'items-center'} gap-3 mb-4 ${className}`}>
+      <header className={`flex ${subtitle ? 'items-start' : 'items-center'} gap-3 mb-4 min-h-[44px] ${className}`}>
         {onBack && (
           <button
             type="button"

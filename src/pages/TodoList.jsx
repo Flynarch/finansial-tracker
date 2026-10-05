@@ -60,6 +60,7 @@ function TodoList() {
   const [sortOpen, setSortOpen] = useState(false)
 
   const [addOpen, setAddOpen] = useState(false)
+  const [habitAddOpen, setHabitAddOpen] = useState(false)
   const [addForm, setAddForm] = useState(() => ({
     title: '',
     description: '',
@@ -72,6 +73,7 @@ function TodoList() {
   const [deleteTodoId, setDeleteTodoId] = useState(null)
 
   useBackButton(() => setSortOpen(false), Boolean(sortOpen))
+  useBackButton(() => setHabitAddOpen(false), Boolean(habitAddOpen))
   useBackButton(() => {
     setDeleteConfirmOpen(false)
     setDeleteTodoId(null)
@@ -392,7 +394,7 @@ function TodoList() {
         <PageHeader
           title={t('todo.pageTitle')}
           titlePosition="left"
-          className="px-1 !mb-0"
+          className="!mb-0"
           rightAction={
             activeTab === 'todo' ? (
               <button
@@ -401,13 +403,23 @@ function TodoList() {
                   resetAddForm()
                   setAddOpen(true)
                 }}
-                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer ft-smooth-in"
+                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
                 aria-label={t('todo.add')}
               >
                 <Plus size={15} strokeWidth={3} />
                 <span>{t('todo.addShort', 'Tugas')}</span>
               </button>
-            ) : null
+            ) : (
+              <button
+                type="button"
+                onClick={() => setHabitAddOpen(true)}
+                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                aria-label={t('habits.addShort', 'Habit')}
+              >
+                <Plus size={15} strokeWidth={3} />
+                <span>{t('habits.addShort', 'Habit')}</span>
+              </button>
+            )
           }
         />
 
@@ -416,7 +428,7 @@ function TodoList() {
           {/* Sliding Animated Pill */}
           <div
             className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-[0.75rem] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
-              activeTab === 'todo' ? 'translate-x-0' : 'translate-x-[calc(100%+4px)]'
+              activeTab === 'todo' ? 'translate-x-0' : 'translate-x-full'
             }`}
           />
 
@@ -451,14 +463,14 @@ function TodoList() {
         </div>
 
         {activeTab === 'habits' && (
-          <div key="tab-habits" className="ft-smooth-in">
-            <HabitsView />
+          <div key="tab-habits" className="ft-tab-fade">
+            <HabitsView addOpen={habitAddOpen} onAddOpenChange={setHabitAddOpen} />
           </div>
         )}
         {activeTab === 'todo' && (
-          <div key="tab-todo" className="space-y-5 ft-smooth-in">
+          <div key="tab-todo" className="space-y-4 ft-tab-fade">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 pl-0.5 min-w-0 flex-1 whitespace-nowrap">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 min-w-0 flex-1 whitespace-nowrap">
                 <button type="button" className={pillClass(filter === 'all')} onClick={() => setFilter('all')}>
                   {t('todo.filter.all')} <span className="ml-1 opacity-60">({todoCounts.all})</span>
                 </button>
@@ -470,10 +482,10 @@ function TodoList() {
                 </button>
               </div>
 
-              <div className="relative flex-shrink-0 mt-[-4px]" data-todo-popover="sort">
+              <div className="relative flex-shrink-0" data-todo-popover="sort">
                 <button
                   type="button"
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--fg)] transition-colors active:scale-95 cursor-pointer"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--fg)] transition-colors active:scale-95 cursor-pointer"
                   onClick={() => setSortOpen((v) => !v)}
                   aria-expanded={sortOpen}
                   aria-label={t('todo.sort.title')}
