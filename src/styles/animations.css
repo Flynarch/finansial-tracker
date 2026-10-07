@@ -1,0 +1,861 @@
+@keyframes ft-view-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ft-view-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+@theme {
+  --animate-dropdown: dropdown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-collapse-in: collapse-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-sub-in: sub-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+@keyframes ft-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-5px);
+  }
+  40%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+.ft-shake {
+  animation: ft-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes dropdown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes collapse-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sub-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ft-accordion-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scaleY(0.95);
+    transform-origin: top;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: top;
+  }
+}
+
+@keyframes ft-slide-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ft-slide-in {
+  animation: ft-slide-fade-down 0.18s ease-out both;
+}
+
+@keyframes ft-sheet-slide-up {
+  0% {
+    transform: translate3d(0, 100%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ft-sheet-slide-down {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes ft-backdrop-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes ft-backdrop-fade-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ft-caret-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.ft-sheet-enter {
+  animation: ft-sheet-slide-up 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform;
+}
+
+.ft-sheet-exit {
+  animation: ft-sheet-slide-down 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  will-change: transform;
+}
+
+.ft-backdrop-enter {
+  animation: ft-backdrop-fade-in 220ms ease-out both;
+  will-change: opacity;
+}
+
+.ft-backdrop-exit {
+  animation: ft-backdrop-fade-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  will-change: opacity;
+}
+
+
+/* ── Tailwind v4 Animation Utility Fallbacks (tailwindcss-animate compatibility) ── */
+@keyframes ft-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+.animate-in {
+  animation-name: ft-enter;
+  animation-duration: var(--tw-duration, 200ms);
+  animation-timing-function: var(--tw-ease, cubic-bezier(0.16, 1, 0.3, 1));
+  animation-fill-mode: both;
+}
+
+.fade-in,
+.fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+
+.zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+
+.zoom-in-90 {
+  --tw-enter-scale: 0.9;
+}
+
+.zoom-in-75 {
+  --tw-enter-scale: 0.75;
+}
+
+.zoom-in-50 {
+  --tw-enter-scale: 0.5;
+}
+
+.slide-in-from-bottom {
+  --tw-enter-translate-y: 100%;
+}
+
+.slide-in-from-bottom-1 {
+  --tw-enter-translate-y: 0.25rem;
+}
+
+.slide-in-from-bottom-2 {
+  --tw-enter-translate-y: 0.5rem;
+}
+
+.slide-in-from-bottom-4 {
+  --tw-enter-translate-y: 1rem;
+}
+
+.slide-in-from-top-1 {
+  --tw-enter-translate-y: -0.25rem;
+}
+
+.slide-in-from-top-2 {
+  --tw-enter-translate-y: -0.5rem;
+}
+
+.slide-in-from-top-4 {
+  --tw-enter-translate-y: -1rem;
+}
+
+.duration-100 {
+  --tw-duration: 100ms;
+}
+
+.duration-150 {
+  --tw-duration: 150ms;
+}
+
+.duration-200 {
+  --tw-duration: 200ms;
+}
+
+.duration-250 {
+  --tw-duration: 250ms;
+}
+
+.duration-300 {
+  --tw-duration: 300ms;
+}
+
+.duration-500 {
+  --tw-duration: 500ms;
+}
+
+/* High-performance off-screen list rendering & GPU layer */
+.ft-content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+
+.ft-gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Voice Audio Waveform Animation */
+@keyframes ft-wave-bar {
+  0%, 100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.ft-wave-bar-1 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.1s; transform-origin: center; }
+.ft-wave-bar-2 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.3s; transform-origin: center; }
+.ft-wave-bar-3 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.5s; transform-origin: center; }
+.ft-wave-bar-4 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.2s; transform-origin: center; }
+.ft-wave-bar-5 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.4s; transform-origin: center; }
+.ft-wave-bar-6 { animation: ft-wave-bar 0.75s ease-in-out infinite 0.25s; transform-origin: center; }
+
+@keyframes ft-spring-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ft-spring-up {
+  0% {
+    opacity: 0;
+    transform: translateY(32px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ft-page-slide-up {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.ft-page-enter {
+  animation: ft-page-slide-up 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes ft-spring-dropdown {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ft-mask-dot-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.22);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes wave {
+  0% { transform: rotate(0.0deg) }
+  10% { transform: rotate(14.0deg) }
+  20% { transform: rotate(-8.0deg) }
+  30% { transform: rotate(14.0deg) }
+  40% { transform: rotate(-4.0deg) }
+  50% { transform: rotate(10.0deg) }
+  60% { transform: rotate(0.0deg) }
+  100% { transform: rotate(0.0deg) }
+}
+
+
+/* ── Keyframes ──────────────────────────────────────────────────────── */
+
+@keyframes ft-todo-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ft-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ft-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ft-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ft-skeleton-pulse {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ft-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes ft-swush-in {
+  0% {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ft-swush-in {
+  animation: ft-swush-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Chat message spring entrance - slide up with subtle scale */
+@keyframes ft-msg-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ft-msg-enter {
+  animation: ft-msg-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Expandable section grid animation for smooth height transition */
+.ft-expand {
+  display: grid;
+  transition: grid-template-rows 250ms ease-out;
+}
+.ft-expand[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+.ft-expand[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+/* Quick-log modal: staggered children fade-up */
+@keyframes ft-stagger-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ft-stagger-child {
+  opacity: 0;
+  animation: ft-stagger-up 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Quick-log modal: mode transition enter */
+@keyframes ft-mode-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ft-mode-enter {
+  animation: ft-mode-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+
+@keyframes ft-smooth-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ft-smooth-in {
+  animation: ft-smooth-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ft-tab-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ft-tab-fade {
+  animation: ft-tab-fade 180ms ease-out forwards;
+}
+
+@keyframes ft-spring-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ft-stagger-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ft-progress-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+
+@keyframes ft-ai-beam-pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes ft-ai-spin-beam {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Shimmer border animation for AI message */
+@keyframes ft-shimmer {
+  0% { border-color: var(--accent); }
+  100% { border-color: var(--border); }
+}
+
+
+/* Blinking cursor for streaming text */
+@keyframes ft-blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+
+@keyframes ft-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Audio Waveform Animation for Typing & Recording */
+@keyframes ft-waveform-bar {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+
+/* Animated Checkmark SVG */
+@keyframes ft-draw-check {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* ── Action Success Card (Habit / Todo / Budget) ────────────────────── */
+@keyframes ft-action-slide-up {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --motion-duration: 1ms;
+  }
+}
+
+:root[data-motion="reduce"] {
+  --motion-duration: 1ms;
+}
+
+:root[data-motion="full"] {
+  --motion-duration: 280ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  .ft-motion-page,
+  .ft-motion-overlay,
+  .ft-motion-panel,
+  .ft-sheet-enter,
+  .ft-sheet-exit,
+  .ft-backdrop-enter,
+  .ft-backdrop-exit,
+  .ft-page-transition,
+  .ft-page-crossfade,
+  .ft-fade-up,
+  .ft-todo-card-enter,
+  .ft-page-enter > *,
+  .ft-skeleton::after,
+  .ft-empty-state-icon,
+  .ft-hero-card::before {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+
+@keyframes stampPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.4) rotate(-25deg);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1) rotate(-12deg);
+  }
+}
+
+.loan-entry {
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+
+/* ── Infinite Scrolling Marquee for Quick Chips ──────────── */
+@keyframes ft-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+
+/* ── Live Audio Visualizer Equalizer (Consolidated) ────── */
+@keyframes ft-eq-bounce {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+/* ── AI Shimmer Scan Beam ────────────────────────────────── */
+@keyframes ft-shimmer-beam {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+
+
+@keyframes ft-receipt-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* ── High-Performance 60fps GPU Animation Engine ────────────── */
+@keyframes ft-page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+/* Silky staggered card entrance */
+@keyframes ft-card-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+
+
+@keyframes ft-sheen-sweep {
+  0% {
+    transform: translateX(-130%);
+  }
+  35% {
+    transform: translateX(130%);
+  }
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+[data-theme="light"] .ft-card-sheen::after {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(79, 111, 82, 0.02) 20%,
+    rgba(79, 111, 82, 0.09) 50%,
+    rgba(79, 111, 82, 0.02) 80%,
+    transparent 100%
+  );
+}
+
+
+
+@keyframes ft-progress-sheen-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  35% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-spring-press {
+    transition: none;
+    will-change: auto;
+  }
+  .ft-spring-press:active {
+    transform: none;
+  }
+  .ft-card-sheen::after,
+  .ft-progress-sheen::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* ── FinTrack Executive Loading Screen Bar Animation ── */
+@keyframes ft-loading-bar {
+  0% {
+    transform: translateX(-100%);
+    width: 25%;
+  }
+  50% {
+    transform: translateX(100%);
+    width: 55%;
+  }
+  100% {
+    transform: translateX(350%);
+    width: 25%;
+  }
+}
+
+
+/* ── FinTrack Cinematic Luxury Loading Keyframes ── */
+@keyframes ft-pulse-glow {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.85;
+  }
+}
+
+
+@keyframes ft-sheen-slide {
+  0% {
+    transform: translateX(-150%) skewX(-25deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-25deg);
+  }
+}
+
+
+@keyframes ft-laser-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+

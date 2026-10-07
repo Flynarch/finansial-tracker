@@ -1,0 +1,427 @@
+@layer base {
+  :root {
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent !important;
+
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
+
+    /* ── Design tokens: dark — Velvet Slate & Matte Charcoal Studio (Monochrome / Cool Slate) ── */
+    --bg: #0f1218;
+    --bg-elevated: #151a23;
+    --panel: #19202c;
+    --panel-strong: #202736;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --fg: #f8fafc;
+    --muted: #94a3b8;
+    --muted-2: #64748b;
+    --accent: #475569;
+    --accent-strong: #334155;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+    --radius-sm: 0.625rem;
+    --radius-md: 0.875rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --status-income: #10b981;
+    --status-income-soft: rgba(16, 185, 129, 0.12);
+    --status-expense: #f43f5e;
+    --status-expense-soft: rgba(244, 63, 94, 0.12);
+    --status-transfer: #3b82f6;
+    --status-transfer-soft: rgba(59, 130, 246, 0.12);
+    --income: #10b981;
+    --income-tint: rgba(16, 185, 129, 0.12);
+    --expense: #f43f5e;
+    --expense-tint: rgba(244, 63, 94, 0.12);
+    --transfer: #3b82f6;
+    --transfer-subtle: rgba(59, 130, 246, 0.12);
+    --transfer-tint: rgba(59, 130, 246, 0.12);
+    --shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.25);
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    --shadow-hover: 0 6px 20px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    --shadow-fab: 0 12px 32px rgba(0, 0, 0, 0.4);
+    --field-bg: #161c28;
+    --field-border: rgba(255, 255, 255, 0.11);
+    --field-border-hover: rgba(255, 255, 255, 0.20);
+    --ring: rgba(71, 85, 105, 0.4);
+    --motion-duration-fast: 150ms;
+    --motion-duration-normal: 220ms;
+    --motion-duration-exit: 180ms;
+    --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --motion-duration: 220ms;
+    --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-duration-spring: 220ms;
+
+    /* ── Clean solid tokens ────────────────────────────────────────────── */
+    --glass-bg: var(--panel);
+    --glass-bg-strong: var(--panel-strong);
+    --glass-blur: 0px;
+    --glass-border: var(--border);
+    --glass-highlight: transparent;
+
+    /* Chart colors */
+    --chart-ink: #f8fafc;
+    --chart-ink-fill: rgba(248, 250, 252, 0.1);
+    --chart-gold: #f59e0b;
+    --chart-gold-fill: rgba(245, 158, 11, 0.14);
+    --chart-success: #10b981;
+    --chart-success-fill: rgba(16, 185, 129, 0.14);
+
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #818cf8;
+    --chart-2: #34d399;
+    --chart-3: #fbbf24;
+    --chart-4: #fb7185;
+    --chart-5: #38bdf8;
+    --chart-6: #a78bfa;
+    --chart-7: #f472b6;
+    --chart-8: #2dd4bf;
+
+    /* Mobile bottom navigation (follows theme) */
+    --nav-shell-fill: #11151e;
+    --nav-shell-stroke: rgba(255, 255, 255, 0.08);
+    --nav-item-active: #ffffff;
+    --nav-item-inactive: #64748b;
+    --nav-item-hover: #94a3b8;
+    --nav-fab-bg: #334155;
+    --nav-fab-fg: #f8fafc;
+    --nav-fab-ring: rgba(71, 85, 105, 0.4);
+
+    /* ── Skeleton / loading (Calibrated High-Visibility Shimmer) ───── */
+    --skeleton-base: rgba(255, 255, 255, 0.08);
+    --skeleton-shine: rgba(255, 255, 255, 0.18);
+    --skeleton-border: rgba(255, 255, 255, 0.06);
+
+    /* ── Settings icon badge tokens ──────────────────────────────────── */
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-icon: #f8fafc;
+    --badge-border: rgba(255, 255, 255, 0.12);
+
+    /* ── Earthy & Vibrant tones ───────────────────────────────────────── */
+    --earthy-green: #10b981;
+    --earthy-green-soft: rgba(16, 185, 129, 0.12);
+    --earthy-terra: #f43f5e;
+    --earthy-terra-soft: rgba(244, 63, 94, 0.12);
+    --earthy-green-dark: #059669;
+    --earthy-terra-dark: #e11d48;
+    --accent-alt: #6B7C5E;
+    --accent-alt-strong: #576848;
+
+    /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
+    --wallet-logo-bg: #202736;
+    --wallet-logo-border: rgba(255, 255, 255, 0.08);
+
+    /* ── AI Chip rotating beam & glow tokens ────────────────────────── */
+    --ai-beam-color: rgba(255, 255, 255, 0.95);
+    --ai-beam-glow: rgba(255, 255, 255, 0.35);
+    --ai-beam-ambient: rgba(255, 255, 255, 0.16);
+    --ai-chip-track: rgba(255, 255, 255, 0.12);
+    --ai-chip-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.35);
+
+    /* ── Security / Lock Tokens ──────────────────────────────────────── */
+    --lock: #818cf8;
+    --lock-soft: rgba(129, 140, 248, 0.12);
+
+    /* ── Loan Forgiven Status Tokens ─────────────────────────────────── */
+    --forgiven: #a78bfa;
+    --forgiven-soft: rgba(167, 139, 250, 0.12);
+
+    /* ── Split Bill & Receipt Badges ─────────────────────────────────── */
+    --split-bill: #a78bfa;
+    --split-bill-soft: rgba(167, 139, 250, 0.12);
+    --receipt: #818cf8;
+    --receipt-soft: rgba(129, 140, 248, 0.12);
+  }
+
+  /* ── Design tokens: midnight (Obsidian Sapphire / Deep Cobalt Studio) ─── */
+  [data-theme="midnight"] {
+    --bg: #060913;
+    --bg-elevated: #0b1122;
+    --panel: #0f172a;
+    --panel-strong: #141f38;
+    --border: rgba(56, 189, 248, 0.14);
+    --border-strong: rgba(56, 189, 248, 0.26);
+    --fg: #f8fafc;
+    --muted: #94a3b8;
+    --muted-2: #64748b;
+    --accent: #38bdf8;
+    --accent-strong: #0ea5e9;
+    --danger: #fb7185;
+    --warning: #fbbf24;
+    --radius-sm: 0.625rem;
+    --radius-md: 0.875rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --status-income: #34d399;
+    --status-income-soft: rgba(52, 211, 153, 0.14);
+    --status-expense: #fb7185;
+    --status-expense-soft: rgba(251, 113, 133, 0.14);
+    --status-transfer: #38bdf8;
+    --status-transfer-soft: rgba(56, 189, 248, 0.14);
+    --income: #34d399;
+    --income-tint: rgba(52, 211, 153, 0.14);
+    --expense: #fb7185;
+    --expense-tint: rgba(251, 113, 133, 0.14);
+    --transfer: #38bdf8;
+    --transfer-subtle: rgba(56, 189, 248, 0.14);
+    --transfer-tint: rgba(56, 189, 248, 0.14);
+    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.55);
+    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(56, 189, 248, 0.1);
+    --shadow-hover: 0 12px 32px -4px rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(56, 189, 248, 0.18);
+    --shadow-fab: 0 14px 36px rgba(0, 0, 0, 0.6);
+    --field-bg: #0e162b;
+    --field-border: rgba(56, 189, 248, 0.18);
+    --field-border-hover: rgba(56, 189, 248, 0.32);
+    --ring: rgba(56, 189, 248, 0.35);
+
+    /* Clean solid */
+    --glass-bg: var(--panel);
+    --glass-bg-strong: var(--panel-strong);
+    --glass-blur: 0px;
+    --glass-border: var(--border);
+    --glass-highlight: transparent;
+
+    /* Chart colors */
+    --chart-ink: #f8fafc;
+    --chart-ink-fill: rgba(248, 250, 252, 0.12);
+    --chart-gold: #fbbf24;
+    --chart-gold-fill: rgba(251, 191, 36, 0.16);
+    --chart-success: #34d399;
+    --chart-success-fill: rgba(52, 211, 153, 0.15);
+
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #93c5fd;
+    --chart-2: #6ee7b7;
+    --chart-3: #fde68a;
+    --chart-4: #fda4af;
+    --chart-5: #67e8f9;
+    --chart-6: #c4b5fd;
+    --chart-7: #f9a8d4;
+    --chart-8: #5eead4;
+
+    /* Mobile bottom navigation */
+    --nav-shell-fill: #080d1a;
+    --nav-shell-stroke: rgba(56, 189, 248, 0.12);
+    --nav-item-active: #38bdf8;
+    --nav-item-inactive: #64748b;
+    --nav-item-hover: #94a3b8;
+    --nav-fab-bg: #38bdf8;
+    --nav-fab-fg: #060913;
+    --nav-fab-ring: rgba(56, 189, 248, 0.4);
+
+    --skeleton-base: rgba(56, 189, 248, 0.09);
+    --skeleton-shine: rgba(56, 189, 248, 0.22);
+    --skeleton-border: rgba(56, 189, 248, 0.12);
+
+    /* ── Settings icon badge tokens ──────────────────────────────────── */
+    --badge-bg: rgba(56, 189, 248, 0.1);
+    --badge-icon: #38bdf8;
+    --badge-border: rgba(56, 189, 248, 0.18);
+
+    --earthy-green: #34d399;
+    --earthy-green-soft: rgba(52, 211, 153, 0.14);
+    --earthy-terra: #fb7185;
+    --earthy-terra-soft: rgba(251, 113, 133, 0.14);
+    --earthy-green-dark: #059669;
+    --earthy-terra-dark: #e11d48;
+    --accent-alt: #6B7C5E;
+    --accent-alt-strong: #576848;
+
+    /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
+    --wallet-logo-bg: #141f38;
+    --wallet-logo-border: rgba(56, 189, 248, 0.12);
+
+    /* ── AI Chip rotating beam & glow tokens ────────────────────────── */
+    --ai-beam-color: rgba(255, 255, 255, 0.95);
+    --ai-beam-glow: rgba(56, 189, 248, 0.50);
+    --ai-beam-ambient: rgba(56, 189, 248, 0.22);
+    --ai-chip-track: rgba(56, 189, 248, 0.18);
+    --ai-chip-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.55);
+
+    /* ── Security / Lock Tokens ──────────────────────────────────────── */
+    --lock: #93c5fd;
+    --lock-soft: rgba(147, 197, 253, 0.12);
+
+    /* ── Loan Forgiven Status Tokens ─────────────────────────────────── */
+    --forgiven: #c4b5fd;
+    --forgiven-soft: rgba(196, 181, 253, 0.12);
+
+    /* ── Split Bill & Receipt Badges ─────────────────────────────────── */
+    --split-bill: #c4b5fd;
+    --split-bill-soft: rgba(196, 181, 253, 0.12);
+    --receipt: #93c5fd;
+    --receipt-soft: rgba(147, 197, 253, 0.12);
+  }
+
+  /* ── Design tokens: light (Apple Studio Alabaster / Crisp Minimalist) ─── */
+  [data-theme="light"] {
+    --bg: #f5f7fb;
+    --bg-elevated: #ffffff;
+    --panel: #ffffff;
+    --panel-strong: #ffffff;
+    --border: rgba(15, 23, 42, 0.06);
+    --border-strong: rgba(15, 23, 42, 0.12);
+    --fg: #0f172a;
+    --muted: #64748b;
+    --muted-2: #718096;
+    --accent: #0f172a;
+    --accent-strong: #1e293b;
+    --danger: #e11d48;
+    --warning: #d97706;
+    --radius-sm: 0.625rem;
+    --radius-md: 0.875rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --status-income: #059669;
+    --status-income-soft: rgba(5, 150, 105, 0.10);
+    --status-expense: #e11d48;
+    --status-expense-soft: rgba(225, 29, 72, 0.10);
+    --status-transfer: #2563eb;
+    --status-transfer-soft: rgba(37, 99, 235, 0.10);
+    --income: #059669;
+    --income-tint: rgba(5, 150, 105, 0.10);
+    --expense: #e11d48;
+    --expense-tint: rgba(225, 29, 72, 0.10);
+    --transfer: #2563eb;
+    --transfer-subtle: rgba(37, 99, 235, 0.10);
+    --transfer-tint: rgba(37, 99, 235, 0.10);
+    --shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.02);
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+    --shadow-hover: 0 6px 16px rgba(15, 23, 42, 0.06);
+    --shadow-fab: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --field-bg: #f8fafc;
+    --field-border: rgba(15, 23, 42, 0.08);
+    --field-border-hover: rgba(15, 23, 42, 0.16);
+    --ring: rgba(15, 23, 42, 0.15);
+
+    /* Clean solid — light variant */
+    --glass-bg: var(--panel);
+    --glass-bg-strong: var(--panel-strong);
+    --glass-blur: 0px;
+    --glass-border: var(--border);
+    --glass-highlight: transparent;
+
+    /* Chart colors (softer on white) */
+    --chart-ink: #0f172a;
+    --chart-ink-fill: rgba(15, 23, 42, 0.10);
+    --chart-gold: #d97706;
+    --chart-gold-fill: rgba(217, 119, 6, 0.12);
+    --chart-success: #059669;
+    --chart-success-fill: rgba(5, 150, 105, 0.12);
+
+    /* Chart palette (8-color series for pie/bar/area charts) */
+    --chart-1: #6366f1;
+    --chart-2: #059669;
+    --chart-3: #d97706;
+    --chart-4: #e11d48;
+    --chart-5: #0284c7;
+    --chart-6: #7c3aed;
+    --chart-7: #db2777;
+    --chart-8: #0d9488;
+
+    --nav-shell-fill: #ffffff;
+    --nav-shell-stroke: rgba(15, 23, 42, 0.08);
+    --nav-item-active: #0f172a;
+    --nav-item-inactive: #64748b;
+    --nav-item-hover: #1e293b;
+    --nav-fab-bg: #0f172a;
+    --nav-fab-fg: #ffffff;
+    --nav-fab-ring: rgba(15, 23, 42, 0.25);
+
+    --skeleton-base: rgba(15, 23, 42, 0.08);
+    --skeleton-shine: rgba(255, 255, 255, 0.7);
+    --skeleton-border: rgba(15, 23, 42, 0.06);
+
+    /* ── Settings icon badge tokens (light) ─────────────────────────── */
+    --badge-bg: #f1f5f9;
+    --badge-icon: #0f172a;
+    --badge-border: rgba(15, 23, 42, 0.08);
+
+    /* ── Earthy & Vibrant tones (light) ────────────────────────────── */
+    --earthy-green: #059669;
+    --earthy-green-soft: rgba(5, 150, 105, 0.10);
+    --earthy-terra: #e11d48;
+    --earthy-terra-soft: rgba(225, 29, 72, 0.10);
+    --earthy-green-dark: #047857;
+    --earthy-terra-dark: #be123c;
+    --accent-alt: #6B7C5E;
+    --accent-alt-strong: #576848;
+
+    /* ── Wallet logo badge tokens (adaptive by theme) ───────────────── */
+    --wallet-logo-bg: #ffffff;
+    --wallet-logo-border: rgba(15, 23, 42, 0.08);
+
+    /* ── AI Chip rotating beam & glow tokens ────────────────────────── */
+    --ai-beam-color: rgba(15, 23, 42, 0.85);
+    --ai-beam-glow: rgba(15, 23, 42, 0.30);
+    --ai-beam-ambient: rgba(15, 23, 42, 0.10);
+    --ai-chip-track: rgba(15, 23, 42, 0.10);
+    --ai-chip-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+
+    /* ── Security / Lock Tokens ──────────────────────────────────────── */
+    --lock: #4f46e5;
+    --lock-soft: rgba(79, 70, 229, 0.10);
+
+    /* ── Loan Forgiven Status Tokens ─────────────────────────────────── */
+    --forgiven: #7c3aed;
+    --forgiven-soft: rgba(124, 58, 237, 0.08);
+
+    /* ── Split Bill & Receipt Badges ─────────────────────────────────── */
+    --split-bill: #7c3aed;
+    --split-bill-soft: rgba(124, 58, 237, 0.08);
+    --receipt: #4f46e5;
+    --receipt-soft: rgba(79, 70, 229, 0.10);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* ── Modern App Ambient Glow & Background ──────────────────────────── */
+  .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      color-mix(in srgb, var(--panel-strong) 3%, transparent) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="midnight"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(56, 189, 248, 0.12) 0%,
+      rgba(14, 165, 233, 0.04) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="dark"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(71, 85, 105, 0.12) 0%,
+      rgba(51, 65, 85, 0.05) 45%,
+      transparent 80%
+    );
+  }
+
+  [data-theme="light"] .ft-bg-ambient-glow {
+    background: radial-gradient(
+      circle at 50% -8%,
+      rgba(255, 255, 255, 0.6) 0%,
+      transparent 80%
+    );
+  }
+}

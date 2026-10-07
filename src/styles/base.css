@@ -1,0 +1,171 @@
+/* ── 120 FPS Buttery-Smooth View Transitions ── */
+::view-transition-old(root) {
+  animation: ft-view-fade-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  mix-blend-mode: normal;
+  z-index: 1;
+}
+::view-transition-new(root) {
+  animation: ft-view-fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  mix-blend-mode: normal;
+  z-index: 99999;
+}
+
+/* ── Mobile Native APK Pure App Touch & Viewport Lockdown ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html, body, #root {
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Allow text selection strictly in inputs, textareas, and explicit selectable text */
+input, textarea, [contenteditable="true"], .selectable-text {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+img, svg, a, button {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Safe area insets for Android notch and navigation pill */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
+  }
+  *:focus {
+    outline: none !important;
+  }
+  
+  /* Hide scrollbar utility */
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    letter-spacing: 0.01em;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Dark only: solid matte charcoal background matching user reference */
+  html:not([data-theme="light"]) body {
+    background: var(--bg);
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+}
+
+/* ── Global Scrollbar Hiding (Native App Look) ────────────────────────── */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent !important;
+}
+
+/* ── Android & Mobile WebView 60 FPS Performance Optimizations ───── */
+/* Force dedicated GPU compositing layer for interactive elements & cards to prevent main-thread layout thrashing */
+.ft-interactive-card,
+.ft-todo-card,
+.ft-item-card,
+.ft-composited-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* On mobile viewports (Android WebView), disable realtime GPU backdrop-filter blurs */
+/* Realtime blurs cause heavy frame-drops during list scrolling and cold-start. Solid/opaque backgrounds keep rendering at 60/120fps. */
+@media (max-width: 768px) {
+  [class*="backdrop-blur"],
+  .ft-chat-backdrop,
+  .ft-chip-card,
+  .ft-chip,
+  .ft-chat-input-dock {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* ── Professional PDF Print Styles ─────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, nav, footer, .no-print, [role="navigation"] {
+    display: none !important;
+  }
+  .ft-motion-page {
+    transform: none !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  div, section {
+    box-shadow: none !important;
+  }
+}
+
+/* ── Hide Global Bottom Nav, FAB & AI Bar during Bulk Mode ──── */
+body.hide-bottom-nav nav,
+body.hide-bottom-nav .ft-app-shell nav,
+body.hide-bottom-nav [aria-label="Tambah Transaksi"],
+body.hide-bottom-nav .ft-ai-bar,
+body.hide-bottom-nav .ft-ai-trigger-bar,
+body.hide-bottom-nav [aria-label="Open AI Chat"] {
+  display: none !important;
+}

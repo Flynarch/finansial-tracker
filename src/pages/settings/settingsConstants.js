@@ -1,5 +1,15 @@
 export const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP']
 
+export const currencyDisplayMap = {
+  IDR: { name: 'Rupiah Indonesia', symbol: 'Rp', code: 'IDR' },
+  USD: { name: 'US Dollar', symbol: '$', code: 'USD' },
+  EUR: { name: 'Euro', symbol: '€', code: 'EUR' },
+  SGD: { name: 'Singapore Dollar', symbol: 'S$', code: 'SGD' },
+  MYR: { name: 'Malaysian Ringgit', symbol: 'RM', code: 'MYR' },
+  JPY: { name: 'Japanese Yen', symbol: '¥', code: 'JPY' },
+  GBP: { name: 'British Pound', symbol: '£', code: 'GBP' },
+}
+
 export const APP_LOCAL_STORAGE_KEYS = [
   'ft_onboarding_seen_v1',
   'ft_onboarding_progress',
