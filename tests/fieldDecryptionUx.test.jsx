@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, renderHook } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { TransactionItemCard } from '../src/components/transactions/TransactionItemCard'
+import { DashboardRecentTx } from '../src/components/dashboard/DashboardRecentTx'
+import { useDecryptedNote } from '../src/hooks/useDecryptedNote'
+import DeleteConfirmCard from '../src/components/chat/DeleteConfirmCard'
+import { computeFilteredTransactions } from '../src/hooks/useTransactionFilters'
 import {
   encryptField,
   warmupDecryptionCache,
@@ -109,6 +114,175 @@ describe('Field Decryption UX & Web LockScreen Tests', () => {
 
       render(<TransactionItemCard {...defaultCardProps} transaction={tx} />)
       expect(screen.getByText(/Kopi kenangan mantan/)).toBeDefined()
+    })
+
+    it('renders decrypted note in DashboardRecentTx and never leaks raw ciphertext for encrypted DANA transactions', async () => {
+      const plaintextNote = 'Transfer ke DANA Top Up'
+      const encryptedNote = await encryptField(plaintextNote)
+
+      // Warm up cache as done in useDashboardData
+      await warmupDecryptionCache([{ notes: encryptedNote }])
+
+      expect(getDecryptedNoteSync(encryptedNote)).toBe(plaintextNote)
+
+      const danaTx = {
+        id: 999,
+        amount: 50000,
+        type: 'expense',
+        category: 'transfer',
+        notes: encryptedNote,
+        date: '2026-10-05',
+        currency: 'IDR',
+        walletId: 1,
+        createdAt: Date.now(),
+      }
+
+      const groupedRecentEntries = [
+        ['2026-10-05', [danaTx]],
+      ]
+
+      render(
+        <MemoryRouter>
+          <DashboardRecentTx
+            groupedRecentEntries={groupedRecentEntries}
+            isDbLoading={false}
+            defaultCurrency="IDR"
+            locale="id"
+            rates={{}}
+            wallets={[{ id: 1, name: 'DANA' }]}
+            t={(k, fallback) => fallback || k}
+          />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByText(/Transfer ke DANA Top Up/)).toBeDefined()
+      expect(screen.queryByText(/enc:v1:/)).toBeNull()
+    })
+
+    it('suppresses raw ciphertext completely when cache is cold or key is missing in DashboardRecentTx', () => {
+      const encryptedNote = 'enc:v1:ac09ad0e3aa84d4410c44d78:910ce2db0d2788075a5e35bb8db0924e54d39c71234'
+
+      const coldTx = {
+        id: 998,
+        amount: 25000,
+        type: 'expense',
+        category: 'makanan',
+        notes: encryptedNote,
+        date: '2026-10-05',
+        currency: 'IDR',
+        walletId: 1,
+        createdAt: Date.now(),
+      }
+
+      const groupedRecentEntries = [
+        ['2026-10-05', [coldTx]],
+      ]
+
+      render(
+        <MemoryRouter>
+          <DashboardRecentTx
+            groupedRecentEntries={groupedRecentEntries}
+            isDbLoading={false}
+            defaultCurrency="IDR"
+            locale="id"
+            rates={{}}
+            wallets={[{ id: 1, name: 'DANA' }]}
+            t={(k, fallback) => fallback || k}
+          />
+        </MemoryRouter>
+      )
+
+      // Raw ciphertext must NEVER be rendered in the document
+      expect(screen.queryByText(/enc:v1:/)).toBeNull()
+    })
+
+    it('useDecryptedNote hook safely resolves plaintext and guards against ciphertext', async () => {
+      // 1. Non-encrypted plain text
+      const { result: plainResult } = renderHook(() => useDecryptedNote('Plain note text'))
+      expect(plainResult.current).toBe('Plain note text')
+
+      // 2. Empty / falsy note
+      const { result: emptyResult } = renderHook(() => useDecryptedNote(''))
+      expect(emptyResult.current).toBe('')
+
+      // 3. Encrypted note that is cached
+      const secret = 'Rahasia dompet'
+      const cipher = await encryptField(secret)
+      await warmupDecryptionCache([{ notes: cipher }])
+
+      const { result: cachedResult } = renderHook(() => useDecryptedNote(cipher))
+      expect(cachedResult.current).toBe(secret)
+      expect(cachedResult.current.startsWith('enc:v1:')).toBe(false)
+    })
+
+    it('suppresses raw ciphertext completely when cache is cold in TransactionItemCard', () => {
+      const encryptedNote = 'enc:v1:ac09ad0e3aa84d4410c44d78:910ce2db0d2788075a5e35bb8db0924e54d39c79999'
+      const coldTx = {
+        id: 103,
+        amount: 35000,
+        type: 'expense',
+        category: 'makanan/jajan',
+        notes: encryptedNote,
+        date: '2026-10-05',
+        currency: 'IDR',
+        walletId: 1,
+      }
+
+      render(<TransactionItemCard {...defaultCardProps} transaction={coldTx} />)
+      expect(screen.queryByText(/enc:v1:/)).toBeNull()
+    })
+
+    it('sanitizes encrypted notes in DeleteConfirmCard to prevent ciphertext leak', async () => {
+      const plainNote = 'Beli paket data Telkomsel'
+      const encryptedNote = await encryptField(plainNote)
+      await warmupDecryptionCache([{ notes: encryptedNote }])
+
+      const { unmount } = render(
+        <DeleteConfirmCard
+          msgId="msg-1"
+          data={{ id: 501, amount: 100000, notes: encryptedNote, category: 'tagihan/telepon' }}
+          locale="id"
+        />
+      )
+      expect(screen.getByText(/Beli paket data Telkomsel/)).toBeDefined()
+      expect(screen.queryByText(/enc:v1:/)).toBeNull()
+      unmount()
+
+      // Cold cache case
+      const coldEncrypted = 'enc:v1:deadbeef1234567890abcdef:1122334455667788'
+      render(
+        <DeleteConfirmCard
+          msgId="msg-2"
+          data={{ id: 502, amount: 50000, notes: coldEncrypted, category: 'tagihan/listrik' }}
+          locale="id"
+        />
+      )
+      expect(screen.queryByText(/enc:v1:/)).toBeNull()
+    })
+
+    it('computeFilteredTransactions safely searches by decrypted notes and avoids false positives on ciphertext', async () => {
+      const secretNote = 'Pembayaran DANA Merchant Kopi'
+      const encryptedNote = await encryptField(secretNote)
+      await warmupDecryptionCache([{ notes: encryptedNote }])
+
+      const txs = [
+        {
+          id: 1,
+          date: '2026-10-05',
+          amount: 25000,
+          type: 'expense',
+          category: 'makanan',
+          notes: encryptedNote,
+        },
+      ]
+
+      // Search by plaintext word
+      const matchesPlain = computeFilteredTransactions(txs, { search: 'Merchant Kopi' }, 1, 1)
+      expect(matchesPlain.length).toBe(1)
+
+      // Search by 'enc:v1' must NOT match because ciphertext is sanitized
+      const matchesCipher = computeFilteredTransactions(txs, { search: 'enc:v1' }, 1, 1)
+      expect(matchesCipher.length).toBe(0)
     })
   })
 

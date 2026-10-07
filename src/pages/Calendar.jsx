@@ -11,7 +11,7 @@ import CalendarDayModal from '../components/calendar/CalendarDayModal'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
-import { getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../lib/fieldEncryption'
 import { toSafeNumber } from '../lib/utils'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 
@@ -162,17 +162,30 @@ function Calendar() {
   )
   const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
 
+  const [decryptedTick, setDecryptedTick] = useState(0)
+
   useEffect(() => {
     if (transactions && transactions.length > 0) {
       warmupDecryptionCache(transactions)
     }
   }, [transactions])
 
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
+
   const calendarEvents = useMemo(() => {
+    void decryptedTick
     const txEvents = (transactions || [])
       .filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
       .map((tx) => {
-        const resolvedNote = getDecryptedNoteSync(tx.notes)
+        const rawNote = tx.notes
+        const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+        const resolvedNote = isFieldEncrypted(plainNote) ? '' : (plainNote || '')
         return {
           id: `tx-${tx.id}`,
           source: 'transaction',
@@ -230,7 +243,7 @@ function Calendar() {
       raw: todo,
     }))
     return [...txEvents, ...customEvents, ...loanEvents, ...todoEvents]
-  }, [importantEvents, loans, todos, transactions, t])
+  }, [importantEvents, loans, todos, transactions, t, decryptedTick])
 
   const indicators = useMemo(() => {
     const map = new Map()

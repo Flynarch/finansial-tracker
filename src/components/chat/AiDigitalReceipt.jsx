@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
@@ -23,6 +23,7 @@ import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategor
 import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
 import { evaluateExpression } from '../../lib/calcParser'
 import { getCachedCurrencyRates } from '../../lib/api'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import useSettingsStore from '../../store/useSettingsStore'
 import { deleteTransaction, updateTransaction } from '../../services/transactionService'
@@ -81,6 +82,22 @@ export default function AiDigitalReceipt({
   const singleTx = txList[0] || {}
   const engine = singleTx.engine || txList[0]?.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
   const isOnlineAi = engine === 'online_ai'
+
+  const [, setDecryptedTick] = useState(0)
+
+  useEffect(() => {
+    if (txList && txList.length > 0) {
+      warmupDecryptionCache(txList).catch(() => {})
+    }
+  }, [txList])
+
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
 
   const contextualTheme = useMemo(() => {
     if (isSingle) {
@@ -196,7 +213,7 @@ export default function AiDigitalReceipt({
       amount: formatMoneyValueForInput(tx.amount, txCurrency),
       type: tx.type || 'expense',
       category: tx.category || '',
-      notes: tx.notes || '',
+      notes: (isFieldEncrypted(tx.notes) ? getDecryptedNoteSync(tx.notes) : tx.notes) || '',
       currency: txCurrency,
       walletId: tx.walletId,
       targetWalletId: tx.targetWalletId || '',
@@ -437,16 +454,22 @@ export default function AiDigitalReceipt({
                 )}
 
                 {/* User Notes */}
-                {tx.notes ? (
-                  <div className="col-span-2 pt-1 mt-0.5 border-t border-[var(--border)]/30 min-w-0">
-                    <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
-                      {t('addTx.notes', 'Catatan')}
-                    </span>
-                    <p className="text-[11px] text-[var(--fg)] italic line-clamp-2 break-words [overflow-wrap:anywhere] mt-0.5">
-                      &ldquo;{tx.notes}&rdquo;
-                    </p>
-                  </div>
-                ) : null}
+                {(() => {
+                  const rawNote = tx.notes || ''
+                  const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                  const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+                  if (!safeNote) return null
+                  return (
+                    <div className="col-span-2 pt-1 mt-0.5 border-t border-[var(--border)]/30 min-w-0">
+                      <span className="text-[9.5px] font-bold text-[var(--muted)] block uppercase tracking-wider">
+                        {t('addTx.notes', 'Catatan')}
+                      </span>
+                      <p className="text-[11px] text-[var(--fg)] italic line-clamp-2 break-words [overflow-wrap:anywhere] mt-0.5">
+                        &ldquo;{safeNote}&rdquo;
+                      </p>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Itemized Struk Breakdown if available */}
@@ -525,7 +548,10 @@ export default function AiDigitalReceipt({
                 const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                 const walletObj = getWalletInfo(tx.walletId)
                 const walletLogo = walletObj ? getWalletLogoUrl(walletObj) : null
-                const itemName = tx.notes || labels.main || tx.category
+                const rawNote = tx.notes || ''
+                const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+                const itemName = safeNote || labels.main || tx.category
 
                 return (
                   <div

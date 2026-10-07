@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
 import { CheckCircle2, RotateCcw, ArrowRight, Wallet, Check, Sparkles, WifiOff } from 'lucide-react'
@@ -10,17 +10,33 @@ import { useNavigate } from 'react-router-dom'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 import { triggerHaptic } from '../../lib/haptics'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 export default function TransactionSuccess({ data, onUndo }) {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
-  const isArray = Array.isArray(data)
-  const txs = isArray ? data : [data]
+  const txs = useMemo(() => (Array.isArray(data) ? data : (data ? [data] : [])), [data])
   const isSingle = txs.length === 1
   const singleTx = isSingle ? txs[0] : null
   const engine = singleTx?.engine || txs[0]?.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
   const isOnlineAi = engine === 'online_ai'
+
+  const [, setDecryptedTick] = useState(0)
+
+  useEffect(() => {
+    if (txs && txs.length > 0) {
+      warmupDecryptionCache(txs).catch(() => {})
+    }
+  }, [txs])
+
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
 
   // 5-second auto-expiring undo timer
   const [undoActive, setUndoActive] = useState(Boolean(onUndo))
@@ -146,11 +162,16 @@ export default function TransactionSuccess({ data, onUndo }) {
             <span className="text-xs text-[var(--muted)] font-bold mr-1">{singleTx.currency || defaultCurrency}</span>
             <span>{isIncome ? '+' : '-'}{formatCurrency(singleTx.amount, singleTx.currency || defaultCurrency).replace(/^[^\d]+/, '')}</span>
           </div>
-          {(singleTx.notes || singleTx.category) && (
-            <p className="text-xs text-[var(--muted)] mt-1 font-medium max-w-[90%] truncate">
-              {singleTx.notes ? `"${singleTx.notes}"` : singleTx.category}
-            </p>
-          )}
+          {(() => {
+            const rawNote = singleTx.notes
+            const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+            const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
+            return (safeNote || singleTx.category) ? (
+              <p className="text-xs text-[var(--muted)] mt-1 font-medium max-w-[90%] truncate">
+                {safeNote ? `"${safeNote}"` : singleTx.category}
+              </p>
+            ) : null
+          })()}
 
           {/* Account & Date Specs */}
           <div className="flex items-center gap-3 mt-2.5 text-[10.5px] font-semibold text-[var(--muted)]">
@@ -190,11 +211,16 @@ export default function TransactionSuccess({ data, onUndo }) {
                           <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
                             {labels.main || tx.category}
                           </p>
-                          {(labels.sub || tx.notes) && (
-                            <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5 line-clamp-2 break-words">
-                              {labels.sub ? labels.sub + (tx.notes ? ` • "${tx.notes}"` : '') : `"${tx.notes}"`}
-                            </p>
-                          )}
+                          {(() => {
+                            const rawNote = tx.notes
+                            const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                            const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
+                            return (labels.sub || safeNote) ? (
+                              <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5 line-clamp-2 break-words">
+                                {labels.sub ? labels.sub + (safeNote ? ` • "${safeNote}"` : '') : `"${safeNote}"`}
+                              </p>
+                            ) : null
+                          })()}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">

@@ -3,7 +3,7 @@ import CategoryIcon from '../ui/CategoryIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { Paperclip } from 'lucide-react'
-import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
+import { useDecryptedNote } from '../../hooks/useDecryptedNote'
 
 export const TransactionItemCard = memo(function TransactionItemCard({
   transaction,
@@ -102,7 +102,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
 
   const isTransfer = transaction.type === 'transfer'
   const sub = labels.sub || null
-  const resolvedNotes = getDecryptedNoteSync(transaction.notes)
+  const resolvedNotes = useDecryptedNote(transaction.notes)
   const noteStr = resolvedNotes ? String(resolvedNotes).trim() : ''
   const walletName = !isTransfer ? getWalletName(transaction.walletId) : null
   const isContextWalletMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))

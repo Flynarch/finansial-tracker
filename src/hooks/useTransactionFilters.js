@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
-import { getDecryptedNoteSync } from '../lib/fieldEncryption'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../lib/fieldEncryption'
 
 export const ALL_TYPES = ['income', 'expense', 'transfer']
 
@@ -23,11 +23,18 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
       if (item?.isPendingReview === true || item?.isPendingReview === 1) return false
       if (searchLower) {
         const tagsStr = Array.isArray(item.tags) ? item.tags.join(' ') : ''
-        const itemNoteText = getDecryptedNoteSync(item.notes) ?? ''
+        const rawNote = item.notes
+        const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+        const itemNoteText = isFieldEncrypted(plainNote) ? '' : (plainNote ?? '')
         let searchTarget = `${itemNoteText} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`
         if (item.isSplit && Array.isArray(item.splitItems)) {
           const splitText = item.splitItems
-            .map((si) => `${si.category || ''} ${si.subcategory || ''} ${getDecryptedNoteSync(si.notes) || ''}`)
+            .map((si) => {
+              const rawSi = si?.notes
+              const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
+              const safeSi = isFieldEncrypted(plainSi) ? '' : (plainSi || '')
+              return `${si?.category || ''} ${si?.subcategory || ''} ${safeSi}`
+            })
             .join(' ')
           searchTarget += ` ${splitText}`
         }
@@ -184,9 +191,19 @@ export function useTransactionFilters(transactions = [], allWallets = []) {
     return count
   }, [filters, userWallets.length, usedCategories.length, defaultMonthStart, defaultMonthEnd])
 
+  const [decryptedTick, setDecryptedTick] = useState(0)
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
+
   const filteredTransactions = useMemo(() => {
+    void decryptedTick
     return computeFilteredTransactions(transactions, filters, userWallets.length, usedCategories.length)
-  }, [transactions, filters, userWallets.length, usedCategories.length])
+  }, [transactions, filters, userWallets.length, usedCategories.length, decryptedTick])
 
   return {
     filters,

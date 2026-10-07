@@ -23,7 +23,7 @@ import { TransactionItemCard } from '../components/transactions/TransactionItemC
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import TransactionDetailSheet from '../components/transactions/TransactionDetailSheet'
 import ReceiptPreviewModal from '../components/transactions/ReceiptPreviewModal'
-import { getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../lib/fieldEncryption'
 import { createTransaction as addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService'
 import { deleteWallet, updateWallet } from '../services/walletService'
 import useSettingsStore from '../store/useSettingsStore'
@@ -124,6 +124,15 @@ export default function WalletDetailPage() {
     }
   }, [allTransactions])
 
+  const [decryptedTick, setDecryptedTick] = useState(0)
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
+
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
 
   useEffect(() => {
@@ -185,12 +194,16 @@ export default function WalletDetailPage() {
     setEditingTransaction(transaction)
     const targetCurrency = transaction.currency || wallet?.currency || defaultCurrency
     const receipt = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
+    const rawNote = transaction.notes || ''
+    const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+    const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+
     setEditFormData({
       date: transaction.date,
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
-      notes: getDecryptedNoteSync(transaction.notes) || '',
+      notes: safeNote,
       currency: targetCurrency,
       walletId: transaction.walletId,
       targetWalletId: transaction.targetWalletId || '',
@@ -198,10 +211,15 @@ export default function WalletDetailPage() {
       receipt: receipt,
       isSplit: Boolean(transaction.isSplit),
       splitItems: Array.isArray(transaction.splitItems)
-        ? transaction.splitItems.map((si) => ({
-            ...si,
-            notes: getDecryptedNoteSync(si?.notes) || '',
-          }))
+        ? transaction.splitItems.map((si) => {
+            const rawSi = si?.notes || ''
+            const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
+            const safeSi = isFieldEncrypted(plainSi) ? '' : plainSi
+            return {
+              ...si,
+              notes: safeSi,
+            }
+          })
         : [],
     })
   }, [wallet?.currency, defaultCurrency])
@@ -278,6 +296,7 @@ export default function WalletDetailPage() {
   }
 
   const filteredTransactions = useMemo(() => {
+    void decryptedTick
     if (!allTransactions) return []
     const query = searchQuery.trim().toLowerCase()
 
@@ -306,7 +325,9 @@ export default function WalletDetailPage() {
         const catLabels = getTransactionCategoryLabels(tx.category, tx.type, locale)
         const catName = (catLabels?.main || tx.category || '').toLowerCase()
         const subName = (catLabels?.sub || '').toLowerCase()
-        const notes = (getDecryptedNoteSync(tx.notes) || '').toLowerCase()
+        const rawNote = tx.notes || ''
+        const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+        const notes = isFieldEncrypted(plainNote) ? '' : plainNote.toLowerCase()
         const amountStr = String(tx.amount || '')
         matchesSearch = catName.includes(query) || subName.includes(query) || notes.includes(query) || amountStr.includes(query)
 
@@ -316,7 +337,9 @@ export default function WalletDetailPage() {
             const siLabels = getTransactionCategoryLabels(si.category, si.type || tx.type, locale)
             const siCat = (siLabels?.main || si.category || '').toLowerCase()
             const siSub = (siLabels?.sub || si.subcategory || '').toLowerCase()
-            const siNotes = (getDecryptedNoteSync(si.notes) || '').toLowerCase()
+            const rawSi = si.notes || ''
+            const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
+            const siNotes = isFieldEncrypted(plainSi) ? '' : plainSi.toLowerCase()
             const siAmount = String(si.amount || '')
             return siCat.includes(query) || siSub.includes(query) || siNotes.includes(query) || siAmount.includes(query)
           })
@@ -325,7 +348,7 @@ export default function WalletDetailPage() {
 
       return matchesTab && matchesSearch
     })
-  }, [allTransactions, activeTab, searchQuery, walletId, locale])
+  }, [allTransactions, activeTab, searchQuery, walletId, locale, decryptedTick])
 
   const groupedTransactions = useMemo(() => {
     if (!filteredTransactions.length) return []

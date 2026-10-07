@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import CategoryIcon from '../ui/CategoryIcon'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
-import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
+import { useDecryptedNote } from '../../hooks/useDecryptedNote'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { format, parseISO } from 'date-fns'
@@ -53,6 +54,14 @@ export default function TransactionDetailSheet({
   }
   const transaction = incomingTransaction || cachedTx
 
+  useEffect(() => {
+    if (transaction) {
+      warmupDecryptionCache(transaction).catch(() => {})
+    }
+  }, [transaction])
+
+  const resolvedNotes = useDecryptedNote(transaction?.notes)
+
   const dateLocaleObj = useMemo(() => (locale === 'id' ? idLocale : enUS), [locale])
 
   if (!transaction) return null
@@ -65,7 +74,6 @@ export default function TransactionDetailSheet({
   const iconKey = resolveTransactionIconKey(transaction.category, transaction.type)
   const colorClass = getCategoryColorClass(iconKey, transaction.type, transaction.category)
   const labels = getTransactionCategoryLabels(transaction.category, transaction.type, locale)
-  const resolvedNotes = getDecryptedNoteSync(transaction.notes)
 
   // Type-specific display
   let typeLabel = t('tx.type.expense', 'Pengeluaran')
@@ -332,7 +340,9 @@ export default function TransactionDetailSheet({
                 </div>
                 <div className="space-y-1.5 pt-1">
                   {transaction.splitItems.map((item, idx) => {
-                    const itemNote = getDecryptedNoteSync(item.notes)
+                    const rawSiNote = item?.notes
+                    const plainSiNote = isFieldEncrypted(rawSiNote) ? getDecryptedNoteSync(rawSiNote) : rawSiNote
+                    const itemNote = isFieldEncrypted(plainSiNote) ? '' : (plainSiNote || '')
                     return (
                       <div
                         key={idx}

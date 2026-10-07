@@ -24,6 +24,7 @@ import TransactionEditSheet from '../components/transactions/TransactionEditShee
 import { updateTransaction } from '../services/transactionService'
 import { getTransactionCategoryLabels } from '../lib/categoryIcon'
 import { copyToClipboard } from '../lib/clipboard'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../lib/fieldEncryption'
 
 // Hooks
 import {
@@ -247,10 +248,15 @@ export default function AiFinanceChat() {
       date: tx.date || getLocalDateString(),
       walletId: tx.walletId ? String(tx.walletId) : '',
       targetWalletId: tx.targetWalletId ? String(tx.targetWalletId) : '',
-      notes: tx.notes || '',
+      notes: (isFieldEncrypted(tx.notes) ? getDecryptedNoteSync(tx.notes) : tx.notes) || '',
       currency: tx.currency || defaultCurrency,
       isSplit: Boolean(tx.isSplit),
-      splitItems: Array.isArray(tx.splitItems) ? [...tx.splitItems] : [],
+      splitItems: Array.isArray(tx.splitItems)
+        ? tx.splitItems.map((si) => ({
+            ...si,
+            notes: (isFieldEncrypted(si?.notes) ? getDecryptedNoteSync(si.notes) : si?.notes) || '',
+          }))
+        : [],
       receiptImage: tx.receiptImage || null,
       isExcludeAnalyticsTx: Boolean(tx.isExcludeAnalyticsTx),
     })
@@ -487,7 +493,10 @@ export default function AiFinanceChat() {
           if (!textToCopy && contextMenuMsg?.type === 'success' && contextMenuMsg?.data) {
             const tx = Array.isArray(contextMenuMsg.data) ? contextMenuMsg.data[0] : contextMenuMsg.data
             const catLabel = getTransactionCategoryLabels(tx.category, tx.type, locale)?.main || tx.category
-            textToCopy = `${tx.notes || catLabel || (locale === 'en' ? 'Transaction' : 'Transaksi')}: ${formatCurrency(tx.amount, tx.currency || defaultCurrency)}`
+            const rawNote = tx?.notes
+            const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+            const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
+            textToCopy = `${safeNote || catLabel || (locale === 'en' ? 'Transaction' : 'Transaksi')}: ${formatCurrency(tx.amount, tx.currency || defaultCurrency)}`
           }
           const success = await copyToClipboard(textToCopy)
           if (success) {

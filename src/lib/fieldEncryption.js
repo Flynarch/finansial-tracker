@@ -68,12 +68,16 @@ export function getDecryptedNoteSync(note, fallback = '') {
   if (!note || typeof note !== 'string') return note || ''
   if (!isFieldEncrypted(note)) return note
   if (_notePlaintextCache.has(note)) {
-    return _notePlaintextCache.get(note)
+    const cached = _notePlaintextCache.get(note)
+    if (cached && !isFieldEncrypted(cached)) {
+      return cached
+    }
+    _notePlaintextCache.delete(note)
   }
   // Schedule non-blocking async decryption to warm up cache for subsequent renders
   decryptField(note)
     .then((plain) => {
-      if (plain) {
+      if (plain && !isFieldEncrypted(plain)) {
         _notePlaintextCache.set(note, plain)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ft-notes-decrypted', { detail: { note, plain } }))
@@ -81,7 +85,7 @@ export function getDecryptedNoteSync(note, fallback = '') {
       }
     })
     .catch(() => {})
-  return fallback
+  return isFieldEncrypted(fallback) ? '' : fallback
 }
 
 /**
@@ -248,9 +252,12 @@ export async function decryptField(ciphertext, passphrase = null) {
   }
 
   if (plain) {
-    _notePlaintextCache.set(ciphertext, plain)
+    if (!isFieldEncrypted(plain)) {
+      _notePlaintextCache.set(ciphertext, plain)
+    }
+    return plain
   }
-  return plain
+  return ''
 }
 
 /**
@@ -288,3 +295,5 @@ export async function decryptSensitiveRecord(record, fieldNames = ['notes'], pas
   }
   return result
 }
+
+export { useDecryptedNote } from '../hooks/useDecryptedNote'

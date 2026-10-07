@@ -32,7 +32,7 @@ import {
 } from '../lib/utils'
 import { exportTransactionsToCsv } from '../lib/exportReports'
 import { getLastSeenTxTimestamp, updateLastSeenTxTimestamp } from '../lib/transactionLastSeen'
-import { getDecryptedNoteSync, warmupDecryptionCache } from '../lib/fieldEncryption'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../lib/fieldEncryption'
 
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import PageHeader from '../components/ui/PageHeader'
@@ -522,12 +522,16 @@ function Transactions() {
     const matchingWallet = allWallets?.find((w) => String(w.id) === String(transaction.walletId))
     const targetCurrency = transaction.currency || matchingWallet?.currency || defaultCurrency
     const receipt = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
+    const rawNote = transaction.notes || ''
+    const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+    const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+
     setEditFormData({
       date: transaction.date,
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
-      notes: getDecryptedNoteSync(transaction.notes) || '',
+      notes: safeNote,
       currency: targetCurrency,
       walletId: transaction.walletId,
       targetWalletId: transaction.targetWalletId || '',
@@ -535,10 +539,15 @@ function Transactions() {
       receipt: receipt,
       isSplit: Boolean(transaction.isSplit),
       splitItems: Array.isArray(transaction.splitItems)
-        ? transaction.splitItems.map((si) => ({
-            ...si,
-            notes: getDecryptedNoteSync(si?.notes) || '',
-          }))
+        ? transaction.splitItems.map((si) => {
+            const rawSi = si?.notes || ''
+            const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
+            const safeSi = isFieldEncrypted(plainSi) ? '' : plainSi
+            return {
+              ...si,
+              notes: safeSi,
+            }
+          })
         : [],
     })
   }, [allWallets, defaultCurrency])
@@ -567,7 +576,10 @@ function Transactions() {
 
       // If user confirms/edits a transaction from staging, learn the merchant categorization
       if (editFormData.category && editFormData.category !== 'lainnya_kategori/umum' && editFormData.category !== 'lainnya/umum') {
-        const merchant = editingTransaction.cleanMerchant || editFormData.notes || editingTransaction.notes || ''
+        const rawNote = editingTransaction.notes || ''
+        const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+        const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+        const merchant = editingTransaction.cleanMerchant || editFormData.notes || safeNote || ''
         rememberMerchantCategory(merchant, editFormData.category, editFormData.type)
       }
 
@@ -987,7 +999,7 @@ function Transactions() {
             : ''
         }
         date={receiptPreviewTx?.date}
-        notes={receiptPreviewTx?.notes}
+        notes={getDecryptedNoteSync(receiptPreviewTx?.notes)}
         category={
           receiptPreviewTx
             ? getTransactionCategoryLabels(receiptPreviewTx.category, receiptPreviewTx.type, locale)?.main

@@ -10,6 +10,7 @@ import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../lib/budge
 import useTranslation from './useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { calculateGlobalWeeklyTrend } from '../lib/habitStats'
+import { warmupDecryptionCache } from '../lib/fieldEncryption'
 import {
   buildNiceTicksForDomain,
   buildPaddedDomain,
@@ -302,6 +303,12 @@ export function useDashboardData() {
         return String(b.id || '').localeCompare(String(a.id || ''))
       })
   }, [transactions])
+
+  useEffect(() => {
+    if (recentTransactions && recentTransactions.length > 0) {
+      warmupDecryptionCache(recentTransactions.slice(0, 10))
+    }
+  }, [recentTransactions])
 
   const todayStats = useMemo(() => {
     if (transactions === null || transactions === undefined) {

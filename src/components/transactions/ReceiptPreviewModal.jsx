@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Modal from '../ui/Modal'
 import useTranslation from '../../hooks/useTranslation'
 import { FileText, Calendar, Wallet, Tag, ImageOff } from 'lucide-react'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 export default function ReceiptPreviewModal({
   isOpen,
@@ -43,7 +44,10 @@ export default function ReceiptPreviewModal({
   if (!activeImageSrc) return null
 
   const imgError = Boolean(activeImageSrc && failedImageSrc === activeImageSrc)
-  const displayNotes = activeMeta.notes || activeMeta.description
+  const rawNote = activeMeta.notes || ''
+  const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+  const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+  const displayNotes = safeNote || activeMeta.description
 
   return (
     <Modal

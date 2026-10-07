@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { convertCurrency, isExcludeAnalyticsTx, roundCurrency, toSafeNumber } from './utils'
+import { getDecryptedNoteSync } from './fieldEncryption'
 
 export { roundCurrency }
 
@@ -324,7 +325,7 @@ export function generateBalanceSheet(
         String(tx.date).slice(0, 10) > asOfDate &&
         !(tx.isPendingReview === true || tx.isPendingReview === 1) &&
         ((tx.goalId != null && String(tx.goalId) === String(goal.id)) ||
-          (!tx.goalId && goal.name && tx.notes?.includes(goal.name)) ||
+          (!tx.goalId && goal.name && getDecryptedNoteSync(tx.notes)?.includes(goal.name)) ||
           tx.category === 'tabungan' ||
           tx.category === 'cairkan_tabungan')
     )
@@ -333,7 +334,7 @@ export function generateBalanceSheet(
       const matchesGoal =
         tx.goalId != null
           ? String(tx.goalId) === String(goal.id)
-          : Boolean(goal.name && tx.notes?.includes(goal.name))
+          : Boolean(goal.name && getDecryptedNoteSync(tx.notes)?.includes(goal.name))
       if (matchesGoal) {
         const rawAmt = toSafeNumber(tx.amount)
         const amt = convertCurrency(rawAmt, tx.currency || defaultCurrency, goal.currency || defaultCurrency, rates)
@@ -584,31 +585,33 @@ export function generateCashFlowStatement(
       const cat = String(item.category || '').toLowerCase()
       const isLoanTx = !item.isLoanExcess && (cat.includes('pinjaman') || cat.includes('utang') || cat.includes('cicilan') || item.loanId != null)
 
+      const safeItemNote = getDecryptedNoteSync(item.notes)
+
       if (cat.includes('investasi') || cat.includes('tabungan') || cat.includes('reksadana') || cat.includes('saham') || cat.includes('emas')) {
         if (item.type === 'income') {
           investingInflow += normAmt
-          investingDetails.push({ name: item.notes || 'Hasil Investasi', amount: normAmt, type: 'inflow' })
+          investingDetails.push({ name: safeItemNote || 'Hasil Investasi', amount: normAmt, type: 'inflow' })
         } else if (item.type === 'expense') {
           investingOutflow += normAmt
-          investingDetails.push({ name: item.notes || 'Penempatan Investasi / Tabungan', amount: normAmt, type: 'outflow' })
+          investingDetails.push({ name: safeItemNote || 'Penempatan Investasi / Tabungan', amount: normAmt, type: 'outflow' })
         }
       } else if (isLoanTx) {
         if (item.type === 'income') {
           financingInflow += normAmt
-          financingDetails.push({ name: item.notes || 'Penerimaan Pinjaman', amount: normAmt, type: 'inflow' })
+          financingDetails.push({ name: safeItemNote || 'Penerimaan Pinjaman', amount: normAmt, type: 'inflow' })
         } else if (item.type === 'expense') {
           financingOutflow += normAmt
-          financingDetails.push({ name: item.notes || 'Pembayaran Pokok Utang / Pinjaman', amount: normAmt, type: 'outflow' })
+          financingDetails.push({ name: safeItemNote || 'Pembayaran Pokok Utang / Pinjaman', amount: normAmt, type: 'outflow' })
         }
       } else {
         // Standard Operating
         if (item.isOperatingExcluded) return
         if (item.type === 'income') {
           operatingInflow += normAmt
-          operatingDetails.push({ name: item.notes || item.category || 'Penerimaan Operasional', amount: normAmt, type: 'inflow' })
+          operatingDetails.push({ name: safeItemNote || item.category || 'Penerimaan Operasional', amount: normAmt, type: 'inflow' })
         } else if (item.type === 'expense') {
           operatingOutflow += normAmt
-          operatingDetails.push({ name: item.notes || item.category || 'Pengeluaran Operasional', amount: normAmt, type: 'outflow' })
+          operatingDetails.push({ name: safeItemNote || item.category || 'Pengeluaran Operasional', amount: normAmt, type: 'outflow' })
         }
       }
     })

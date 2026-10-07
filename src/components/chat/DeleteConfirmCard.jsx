@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 export default function DeleteConfirmCard({
   msgId,
@@ -10,12 +11,16 @@ export default function DeleteConfirmCard({
 }) {
   if (!data) return null
 
+  const rawNote = data.notes
+  const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+  const safeNote = isFieldEncrypted(plainNote) ? '' : (plainNote || '')
+
   return (
     <div className="mt-2 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3.5 space-y-3">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold text-[var(--fg)] truncate">
-            {data.title || data.notes || data.category || (locale === 'en' ? 'Item' : 'Data')}
+            {data.title || safeNote || data.category || (locale === 'en' ? 'Item' : 'Data')}
           </p>
           <p className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 mt-0.5">
             {data.entityType === 'loan' ? (

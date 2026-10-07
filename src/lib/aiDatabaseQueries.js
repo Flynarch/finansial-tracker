@@ -4,7 +4,7 @@ import { getCachedCurrencyRates } from './api'
 import useSettingsStore from '../store/useSettingsStore'
 import { subMonths, format } from 'date-fns'
 import { getCurrentBudgetMonthKey, getBudgetPeriodDateRange } from './budgetUtils'
-import { getDecryptedNoteSync, warmupDecryptionCache } from './fieldEncryption'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from './fieldEncryption'
 
 /**
  * Executes a query against the local Dexie DB on behalf of the AI.
@@ -106,15 +106,19 @@ export async function queryTransactions({ startDate, endDate, type, category }) 
     netBalance: totalIncome - totalExpense,
     expenseByCategory,
     incomeByCategory,
-    // Only return the 10 most recent sample transactions to avoid exceeding AI context window
-    recentSampleTransactions: sampleTxs.map((tx) => ({
-      date: tx.date,
-      type: tx.type,
-      category: tx.category,
-      amount: tx.amount,
-      currency: tx.currency || defaultCurrency,
-      notes: getDecryptedNoteSync(tx.notes) || tx.notes,
-    })),
+    recentSampleTransactions: sampleTxs.map((tx) => {
+      const rawNote = tx.notes
+      const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+      const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
+      return {
+        date: tx.date,
+        type: tx.type,
+        category: tx.category,
+        amount: tx.amount,
+        currency: tx.currency || defaultCurrency,
+        notes: safeNote,
+      }
+    }),
   }
 }
 

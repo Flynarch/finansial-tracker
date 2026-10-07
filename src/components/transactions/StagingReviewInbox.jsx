@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, CheckCheck, Trash2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, ArrowRight, Edit2, Sparkles, RefreshCw } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 import { syncNotificationQueue } from '../../lib/notificationIngestion'
@@ -10,6 +10,7 @@ import { deleteTransaction } from '../../services/transactionService'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import { rememberMerchantCategory, classifyMerchantWithAi } from '../../lib/ai/merchantCategorizer'
+import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 export default function StagingReviewInbox({
   pendingTransactions = [],
@@ -28,6 +29,18 @@ export default function StagingReviewInbox({
   const [isProcessingAiId, setIsProcessingAiId] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState(null)
+
+  useEffect(() => {
+    if (pendingTransactions && pendingTransactions.length > 0) {
+      warmupDecryptionCache(pendingTransactions)
+    }
+  }, [pendingTransactions])
+
+  const getSafeNote = (raw) => {
+    if (!raw || typeof raw !== 'string') return ''
+    const plain = isFieldEncrypted(raw) ? getDecryptedNoteSync(raw) : raw
+    return isFieldEncrypted(plain) ? '' : plain
+  }
 
   const handleManualScan = async () => {
     setIsSyncing(true)
@@ -136,7 +149,7 @@ export default function StagingReviewInbox({
 
       // Automatically learn user's merchant categorization
       if (tx.category && tx.category !== 'lainnya_kategori/umum' && tx.category !== 'lainnya/umum') {
-        const merchant = tx.cleanMerchant || tx.notes || ''
+        const merchant = tx.cleanMerchant || getSafeNote(tx.notes) || ''
         rememberMerchantCategory(merchant, tx.category, tx.type)
       }
 
@@ -208,7 +221,7 @@ export default function StagingReviewInbox({
 
         // Automatically learn user's merchant categorization in bulk
         if (tx.category && tx.category !== 'lainnya_kategori/umum' && tx.category !== 'lainnya/umum') {
-          const merchant = tx.cleanMerchant || tx.notes || ''
+          const merchant = tx.cleanMerchant || getSafeNote(tx.notes) || ''
           rememberMerchantCategory(merchant, tx.category, tx.type)
         }
       }
@@ -241,7 +254,7 @@ export default function StagingReviewInbox({
   }
 
   const handleAiClassify = async (tx) => {
-    const merchant = tx.cleanMerchant || tx.notes || ''
+    const merchant = tx.cleanMerchant || getSafeNote(tx.notes) || ''
     if (!merchant) return
 
     setIsProcessingAiId(tx.id)
@@ -339,7 +352,7 @@ export default function StagingReviewInbox({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs font-bold text-[var(--fg)] truncate">
-                      {tx.cleanMerchant || tx.notes || tx.category || 'Mutasi Bank'}
+                      {tx.cleanMerchant || getSafeNote(tx.notes) || tx.category || 'Mutasi Bank'}
                     </span>
                     {tx.suggestedInstitution && (
                       <span className="rounded-md bg-[var(--accent)]/15 px-1.5 py-0.5 text-[9px] font-extrabold text-[var(--accent)] shrink-0">

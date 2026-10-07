@@ -25,6 +25,7 @@ import {
   syncDailyReminderSchedule,
   sendTestNotification,
 } from '../../lib/smartNotifications'
+import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
 import {
   FinTrackNotificationPlugin,
   syncNotificationQueue,
@@ -251,6 +252,9 @@ export default function SettingsNotifications() {
     try {
       const found = await scanSuspectPromoTransactions()
       setSuspectTxs(found)
+      if (found.length > 0) {
+        warmupDecryptionCache(found)
+      }
       if (found.length === 0) {
         setCleanFeedback(t('notif.scanClean', 'Tidak ada mutasi promosi yang terdeteksi. Data Anda bersih.'))
       }
@@ -730,7 +734,14 @@ export default function SettingsNotifications() {
                     className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--panel)] border border-[var(--border)] text-xs"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-[var(--fg)] truncate">{tx.notes || tx.category}</p>
+                      <p className="font-bold text-[var(--fg)] truncate">
+                        {(() => {
+                          const rawNote = tx.notes || ''
+                          const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                          const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+                          return safeNote || tx.category
+                        })()}
+                      </p>
                       <p className="text-[10px] text-[var(--muted)]">{tx.date}</p>
                     </div>
                     <span className="font-bold text-rose-500 shrink-0">

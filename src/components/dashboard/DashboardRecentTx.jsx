@@ -8,6 +8,7 @@ import { db } from '../../lib/db'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import { convertCurrency, formatCurrency, toSafeNumber } from '../../lib/utils'
 import { getCategoryColorClass, getTransactionCategoryLabels, resolveTransactionIconKey } from '../../lib/categoryIcon'
+import { useDecryptedNote } from '../../hooks/useDecryptedNote'
 import CategoryIcon from '../ui/CategoryIcon'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 
@@ -23,6 +24,10 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
   const navigate = useNavigate()
   const dbWallets = useLiveQuery(() => (walletsProp && walletsProp.length > 0 ? null : db.wallets.toArray()), [walletsProp])
   const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : (dbWallets || [])
+
+  const latestTx = groupedRecentEntries?.[0]?.[1]?.[0] || null
+  const decryptedNote = useDecryptedNote(latestTx?.notes)
+  const noteStr = decryptedNote ? String(decryptedNote).trim() : ''
 
   const formatDateHeader = useCallback(
     (dateKey) => {
@@ -105,7 +110,6 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
           }
 
           const sub = labels.sub || null
-          const noteStr = latestTx?.notes ? String(latestTx.notes).trim() : ''
 
           return (
             <div className="flex flex-col gap-2 ft-smooth-in">

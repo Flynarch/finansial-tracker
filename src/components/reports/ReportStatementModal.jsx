@@ -23,6 +23,7 @@ import {
   filterTransactionsByDateRange,
 } from '../../lib/accountingEngine'
 import { downloadExecutiveReportPdf, shareExecutiveReportPdf } from '../../lib/pdfReportGenerator'
+import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 import { exportTransactionsToCsv } from '../../lib/exportReports'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
@@ -223,6 +224,21 @@ export default function ReportStatementModal({
       .filter((tx) => tx.isPendingReview !== true && tx.isPendingReview !== 1)
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
   }, [isOpen, transactions, startDate, endDate])
+
+  useEffect(() => {
+    if (filteredTxs && filteredTxs.length > 0) {
+      warmupDecryptionCache(filteredTxs)
+    }
+  }, [filteredTxs])
+
+  const [, setDecryptedTick] = useState(0)
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
 
   // Calculate live SHA-256 Checksum on data changes
   useEffect(() => {
@@ -702,7 +718,14 @@ export default function ReportStatementModal({
                         <div className="min-w-0 flex-1 pr-3">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-mono text-[var(--muted)]">{tx.date}</span>
-                            <span className="font-bold text-[var(--fg)] truncate">{tx.notes || tx.category || 'Transaksi'}</span>
+                            <span className="font-bold text-[var(--fg)] truncate">
+                              {(() => {
+                                const rawNote = tx.notes || ''
+                                const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                                const safeNote = isFieldEncrypted(plainNote) ? '' : plainNote
+                                return safeNote || tx.category || 'Transaksi'
+                              })()}
+                            </span>
                           </div>
                           <span className="text-[10.5px] text-[var(--muted)] block truncate">{tx.category}</span>
                         </div>
