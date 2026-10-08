@@ -3,6 +3,8 @@ import { Copy, DollarSign, Pencil, Trash2 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { triggerHaptic } from '../../lib/haptics'
 import useBottomSheet from '../../hooks/useBottomSheet'
+import { formatCurrency } from '../../lib/utils'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 const MessageContextMenu = memo(function MessageContextMenu({
   isOpen,
@@ -16,21 +18,32 @@ const MessageContextMenu = memo(function MessageContextMenu({
   onDeleteMessage,
 }) {
   const locale = useSettingsStore((s) => s.locale)
+  const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
   const { isMounted, isVisible, closeSheet } = useBottomSheet({
     isOpen,
     onClose,
   })
 
-  const extractedAmount = useMemo(() => {
-    if (messageData?.amount != null) {
-      return String(messageData.amount)
+  const txList = useMemo(() => {
+    if (Array.isArray(messageData)) return messageData
+    if (messageData && typeof messageData === 'object' && messageData.id) return [messageData]
+    return []
+  }, [messageData])
+
+  const totalAmount = useMemo(() => {
+    if (txList.length > 0) {
+      return txList.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
     }
-    if (Array.isArray(messageData) && messageData[0]?.amount != null) {
-      return String(messageData[0].amount)
+    return null
+  }, [txList])
+
+  const extractedAmount = useMemo(() => {
+    if (totalAmount !== null) {
+      return String(totalAmount)
     }
     const match = (messageContent || '').match(/(?:Rp\.?\s*|IDR\s*|\$)?(\d[\d.,]*(?:\s*(?:k|rb|ribu|jt|juta))?)/i)
     return match ? match[0].trim() : null
-  }, [messageContent, messageData])
+  }, [messageContent, totalAmount])
 
   const hasAmount = Boolean(extractedAmount)
 
@@ -51,12 +64,12 @@ const MessageContextMenu = memo(function MessageContextMenu({
         onClick={closeSheet}
       />
       
-      <div className={`fixed bottom-0 left-0 right-0 z-[61] rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] pb-[max(env(safe-area-inset-bottom,0px),1rem)] transform-gpu ${
+      <div className={`fixed bottom-0 left-0 right-0 z-[61] rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] pb-[max(env(safe-area-inset-bottom,0px),1rem)] max-h-[75vh] flex flex-col transform-gpu ${
         isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit pointer-events-none'
       }`}>
-        <div className="w-10 h-1 rounded-full bg-[var(--muted)]/30 mx-auto mt-3 mb-2" />
+        <div className="w-10 h-1 rounded-full bg-[var(--muted)]/30 mx-auto mt-3 mb-2 shrink-0" />
         
-        <div className="flex flex-col">
+        <div className="flex flex-col overflow-y-auto ft-hide-scrollbar flex-1">
           <button 
             type="button"
             className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
@@ -76,16 +89,50 @@ const MessageContextMenu = memo(function MessageContextMenu({
             >
               <DollarSign size={18} className="text-[var(--muted)]" />
               <span className="text-sm font-bold text-[var(--fg)]">
-                {locale === 'en' ? 'Copy Amount' : 'Salin Nominal'}
+                {txList.length > 1
+                  ? (locale === 'en' ? `Copy Total (${formatCurrency(totalAmount, txList[0]?.currency || defaultCurrency)})` : `Salin Total Nominal (${formatCurrency(totalAmount, txList[0]?.currency || defaultCurrency)})`)
+                  : (locale === 'en' ? 'Copy Amount' : 'Salin Nominal')}
               </span>
             </button>
           )}
 
-          {messageType === 'transaction' && (
+          {messageType === 'transaction' && txList.length > 1 && (
+            <div className="border-y border-[var(--border)]/40 my-1 py-1">
+              <p className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
+                {locale === 'en' ? 'Edit Individual Transaction' : 'Edit Transaksi Tertentu'}
+              </p>
+              {txList.map((tx, idx) => {
+                const rawNote = tx.notes
+                const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                const safeNote = isFieldEncrypted(plainNote) ? '' : (plainNote || '')
+                const label = safeNote || tx.category || (locale === 'en' ? `Item #${idx + 1}` : `Item #${idx + 1}`)
+                return (
+                  <button
+                    key={tx.id || idx}
+                    type="button"
+                    className="w-full flex items-center justify-between text-left gap-2 px-4 py-2.5 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
+                    onClick={() => handleAction(onEditTransaction, tx)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Pencil size={15} className="text-[var(--accent)] shrink-0" />
+                      <span className="text-xs font-bold text-[var(--fg)] truncate">
+                        #{idx + 1}: {label}
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-[var(--muted)] tabular-nums shrink-0">
+                      {formatCurrency(tx.amount, tx.currency || defaultCurrency)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {messageType === 'transaction' && txList.length <= 1 && (
             <button 
               type="button"
               className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
-              onClick={() => handleAction(onEditTransaction, messageData)}
+              onClick={() => handleAction(onEditTransaction, txList[0] || messageData)}
             >
               <Pencil size={18} className="text-[var(--muted)]" />
               <span className="text-sm font-bold text-[var(--fg)]">

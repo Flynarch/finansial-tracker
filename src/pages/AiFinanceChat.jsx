@@ -459,6 +459,8 @@ export default function AiFinanceChat() {
         onConfirmDelete={handleConfirmDelete}
         onCancelDelete={handleCancelDelete}
         onUndoTransaction={handleUndoTransaction}
+        onEditItem={handleStartEdit}
+        wallets={wallets}
       />
 
       <ScrollToBottomFAB

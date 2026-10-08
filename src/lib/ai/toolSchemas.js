@@ -94,11 +94,16 @@ export const getTools = () => [
       {
         name: 'update_transaction',
         description:
-          "Ubah/edit transaksi masa lalu. Panggil ini JIKA user minta mengubah data transaksi (misal: 'ubah transaksi tadi yang ke dana kategorinya jadi makanan', 'ganti nominal kopi tadi jadi 30rb', 'pindahkan transaksi indomaret ke BCA').",
+          "Ubah/edit satu atau beberapa transaksi masa lalu. Panggil ini JIKA user minta mengubah data transaksi (misal: 'ubah transaksi tadi yang ke dana kategorinya jadi makanan', 'edit 2 transaksi tadi jadi langganan', 'ganti nominal kopi tadi jadi 30rb', 'pindahkan transaksi sebelumnya ke BCA'). Bisa mengubah satu transaksi via transactionId atau banyak transaksi via transactionIds.",
         parameters: {
           type: 'OBJECT',
           properties: {
-            transactionId: { type: 'NUMBER', description: 'ID transaksi dari daftar transaksi jika diketahui.' },
+            transactionId: { type: 'NUMBER', description: 'ID transaksi tunggal dari daftar transaksi jika diketahui.' },
+            transactionIds: {
+              type: 'ARRAY',
+              items: { type: 'NUMBER' },
+              description: 'Daftar ID transaksi jika user meminta mengubah lebih dari satu transaksi sekaligus (batch update, misal: [90, 89]).',
+            },
             searchQuery: {
               type: 'STRING',
               description: "Kata kunci untuk mencari transaksi yang dimaksud (misal: 'dana', 'kopi', 'terakhir').",
@@ -147,6 +152,11 @@ export const getTools = () => [
           type: 'OBJECT',
           properties: {
             transactionId: { type: 'NUMBER', description: 'ID transaksi jika diketahui.' },
+            transactionIds: {
+              type: 'ARRAY',
+              items: { type: 'NUMBER' },
+              description: 'Daftar ID transaksi jika user meminta menghapus lebih dari satu transaksi sekaligus (batch delete, misal: [90, 89]).',
+            },
             searchQuery: { type: 'STRING', description: "Kata kunci transaksi (misal: 'makan siang', 'terakhir')." },
             date: { type: 'STRING', description: 'Tanggal transaksi jika disebutkan (YYYY-MM-DD).' },
             replyMessage: { type: 'STRING' },

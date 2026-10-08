@@ -1,6 +1,7 @@
 import { getMergedExpenseTree } from '../expenseCategories'
 import { getMergedIncomeTree } from '../incomeCategories'
 import { getFrequentUserEntities } from './entityMemory'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
 
 export function buildCategoryContext(locale = 'id') {
   const isEn = locale === 'en'
@@ -154,21 +155,26 @@ export function buildSystemPrompt({
     .map((tx) => {
       const wName = walletMap.get(tx.walletId) || (tx.walletId ? `Wallet #${tx.walletId}` : 'Tanpa Dompet')
       const targetWName = tx.targetWalletId ? ` -> ${walletMap.get(tx.targetWalletId) || `Wallet #${tx.targetWalletId}`}` : ''
-      const safeNotes = String(tx.notes || '-').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 60)
+      const rawNotes = tx.notes || ''
+      const plainNotes = isFieldEncrypted(rawNotes) ? getDecryptedNoteSync(rawNotes) : rawNotes
+      const safeNotes = String(plainNotes || '-').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 60)
       const safeCategory = String(tx.category || 'Lainnya').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 40)
       let splitDetails = ''
       if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
         const itemsStr = tx.splitItems
           .map((si) => {
             const siCat = String(si.category || tx.category || 'Lainnya').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 30)
-            const siNotes = String(si.notes || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 30)
+            const rawSiNotes = si.notes || ''
+            const plainSiNotes = isFieldEncrypted(rawSiNotes) ? getDecryptedNoteSync(rawSiNotes) : rawSiNotes
+            const siNotes = String(plainSiNotes || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 30)
             const notePart = siNotes ? ` (${siNotes})` : ''
             return `${siCat}: ${Number(si.amount || 0).toLocaleString('id-ID')}${notePart}`
           })
           .join(', ')
         splitDetails = ` [Split: ${itemsStr}]`
       }
-      return `- [ID: ${tx.id}] ${tx.date} | ${tx.type === 'income' ? 'Pemasukan' : tx.type === 'expense' ? 'Pengeluaran' : 'Transfer'} ${tx.currency || currency} ${Number(tx.amount || 0).toLocaleString('id-ID')} | Kategori: ${safeCategory} | Dompet: ${wName}${targetWName} | Catatan: "${safeNotes}"${splitDetails}`
+      const timeStr = tx.time ? ` ${tx.time}` : ''
+      return `- [ID: ${tx.id}] ${tx.date}${timeStr} | ${tx.type === 'income' ? 'Pemasukan' : tx.type === 'expense' ? 'Pengeluaran' : 'Transfer'} ${tx.currency || currency} ${Number(tx.amount || 0).toLocaleString('id-ID')} | Kategori: ${safeCategory} | Dompet: ${wName}${targetWName} | Catatan: "${safeNotes}"${splitDetails}`
     })
     .join('\n')
 
@@ -246,10 +252,28 @@ PEDOMAN NLP, SLANG FINANSIAL & NOMINAL INDONESIA:
     - Panggil 'record_transactions' LANGSUNG jika nama/kategori & nominal sudah ada!
 
 4. KETENTUAN PENGELOLAAN & EDIT TRANSAKSI (update_transaction & delete_transaction):
+   - RESOLUSI REFERENSI URUTAN TRANSAKSI (ORDINAL RESOLUTION):
+     * JIKA user merujuk ke transaksi dengan urutan nomor (misal: "transaksi pertama", "transaksi kedua", "transaksi ketiga", "transaksi ke-4", "transaksi terakhir"):
+       - Cocokkan nomor urutan tersebut dengan daftar bernomor (1., 2., 3., dst.) pada pesan balasan asisten sebelumnya atau daftar 15 transaksi terakhir.
+       - Contoh: "transaksi kedua ganti jadi 50rb" -> ambil ID transaksi pada item nomor 2, panggil 'update_transaction' dengan transactionId tersebut.
+       - Contoh: "transaksi ketiga tolong hapus" -> ambil ID transaksi pada item nomor 3, panggil 'delete_transaction' dengan transactionId tersebut.
+       - Contoh: "ubah transaksi kedua dan ketiga..." -> kumpulkan kedua ID transaksi, panggil 'update_transaction' dengan parameter 'transactionIds: [id2, id3]'.
+       - Contoh: "hapus 2 transaksi terakhir" -> panggil 'delete_transaction' dengan 'transactionIds: [id_terakhir, id_sebelumnya]'.
    - JIKA user meminta mengedit, mengubah kategori, mengubah nominal, atau memindahkan dompet transaksi yang baru saja terjadi atau transaksi sebelumnya (misal: "transaksi tadi yang masuk ke dana tolong di edit kategori nya jadi makanan", "ubah transaksi kopi tadi jadi 30rb", "ganti dompet transaksi indomaret ke BCA"):
      * Temukan ID transaksi yang sesuai dari DAFTAR 15 TRANSAKSI TERAKHIR di bawah.
      * Panggil tool 'update_transaction' dengan 'transactionId' tersebut, serta isi 'updatedFields' yang diubah (seperti 'category', 'amount', 'walletId', 'notes', 'date').
-   - JIKA user meminta menghapus transaksi (misal: "hapus transaksi makan siang tadi"), panggil 'delete_transaction' dengan 'transactionId' yang sesuai.
+   - PENTING - ALUR EDIT BERKELANJUTAN (MULTI-TURN EDIT):
+     * JIKA dalam percakapan asisten baru saja bertanya tentang transaksi mana yang ingin diubah atau menyebutkan daftar transaksi, lalu user memberikan arahan pembaruan (misal: "nah iya tolong edit agar kategorinya jadi langganan, note nya juga karena itu buat beli Gemini pro" atau "ya itu yang dua itu"):
+       - INI ADALAH OPERASI EDIT TRANSAKSI (update_transaction), BUKAN PENCATATAN TRANSAKSI BARU!
+       - DILARANG KERAS menanyakan nominal baru jika user tidak meminta mengubah nominal. Pertahankan nominal transaksi yang sedang diedit!
+       - Langsung panggil 'update_transaction' dengan ID transaksi terkait dan 'updatedFields' yang diminta (misal: category: "tagihan/langganan", notes: "Gemini Pro").
+   - PENTING - EDIT BANYAK TRANSAKSI SEKALIGUS (BATCH EDIT):
+     * JIKA user meminta mengubah 2 atau lebih transaksi (misal: "edit kategori 2 transaksi ini", "ubah 2 transaksi sebelumnya juga pakai wallet dana", "ganti kategori kedua transaksi tadi"):
+       - Kumpulkan semua ID transaksi yang dimaksud (misal ID 90 dan 89).
+       - WAJIB panggil 'update_transaction' dengan parameter 'transactionIds': [90, 89] serta 'updatedFields' (misal: walletId: <id dana> atau category: <id kategori>). JANGAN hanya mengubah satu transaksi!
+   - JIKA user meminta menghapus transaksi tunggal (misal: "hapus transaksi makan siang tadi"), panggil 'delete_transaction' dengan 'transactionId' yang sesuai.
+   - JIKA user meminta menghapus banyak transaksi (misal: "hapus transaksi kopi dan bensin tadi", "hapus kedua transaksi ini"):
+     * Kumpulkan semua ID transaksi yang dimaksud, panggil 'delete_transaction' dengan parameter 'transactionIds': [id1, id2].
 
 5. INTENT TRIGGER QUICK CHIPS:
    - JIKA user mengirim kalimat intent umum seperti "Aku mau catat transaksi" / "Catat transaksi" / "Saya ingin mencatat transaksi baru" / "I want to record a transaction" / "I want to record a new expense", JANGAN PANGGIL FUNGSI! Berikan balasan ramah menanyakan detail: "Transaksi apa yang ingin Anda catat? Sebutkan nama transaksi (pengeluaran atau pemasukan), nominal, dan dompet yang digunakan." Lalu WAJIB sertakan format: <chips>Catat Pengeluaran|Catat Pemasukan|Transfer Dompet</chips> (atau <chips>Record Expense|Record Income|Transfer Wallets</chips> jika bahasa Inggris).

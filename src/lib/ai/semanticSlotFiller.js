@@ -511,7 +511,13 @@ export function extractCleanSubjectEntity(rawText, options = {}) {
     }
   }
 
-  // 11. Strip filler prepositions, conjunctions, and connective words
+  // 11. Strip conversational fillers, interjections, and personal pronouns
+  text = text.replace(/\b(?:oh\s+iya|oh\s+ya|tadi\s+tuh|jadi\s+tuh|lah\s+ya)\b/gi, ' ')
+  text = text.replace(/\b(?:oh|iya|nah|eh|dong|sih|tuh|kan|lah|deh|kok|nih|terus|gitu)\b/gi, ' ')
+  text = text.replace(/\b(?:aku|saya|gue|gw|lu|lo|kamu|dia|kita|kami)\b/gi, ' ')
+  text = text.replace(/\b(?:tolong|mau|pengen|ingin|coba)\b/gi, ' ')
+
+  // 12. Strip filler prepositions, conjunctions, and connective words
   text = text.replace(/\b(?:buat|untuk|sebesar|seharga|dengan|guna|dan|plus|juga|serta|sama|pakai|pake|via|lewat)\b/gi, ' ')
 
   // Clean excess punctuation & spaces

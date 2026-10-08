@@ -138,6 +138,40 @@ describe('AI Chat General Quick Chips & Intent Invariants', () => {
       expect(aiMsg.content).toContain('hapus transaksi makan siang')
       expect(aiMsg.content).not.toContain('hapus transaksi kopi 30rb')
     })
+
+    it('successfully batch-updates multiple transactions when transactionIds array is provided', async () => {
+      await db.wallets.clear()
+      await db.wallets.add({ id: 1, name: 'DANA', currency: 'IDR' })
+      await db.transactions.clear()
+      await db.transactions.bulkAdd([
+        { id: 90, amount: 14431, category: 'tagihan/langganan', walletId: 1, type: 'expense', notes: 'Old 90' },
+        { id: 89, amount: 11303, category: 'lainnya_kategori/umum', walletId: 1, type: 'expense', notes: 'Old 89' },
+      ])
+
+      const { handleTransactionAction } = await import('../src/lib/ai/chatActions/transactionActions')
+      const result = await handleTransactionAction(
+        {
+          action: 'update',
+          transactionIds: [90, 89],
+          updatedFields: { category: 'tagihan/langganan', notes: 'Gemini Pro' },
+        },
+        { locale: 'id', defaultCurrency: 'IDR', wallets: [{ id: 1, name: 'DANA' }] }
+      )
+
+      expect(Array.isArray(result)).toBe(true)
+      const successMsg = result.find((m) => m.type === 'success')
+      expect(successMsg).toBeDefined()
+      expect(successMsg.isUpdate).toBe(true)
+      expect(Array.isArray(successMsg.data)).toBe(true)
+      expect(successMsg.data).toHaveLength(2)
+
+      const { getDecryptedNoteSync } = await import('../src/lib/fieldEncryption')
+      const tx90 = await db.transactions.get(90)
+      const tx89 = await db.transactions.get(89)
+      expect(getDecryptedNoteSync(tx90.notes)).toBe('Gemini Pro')
+      expect(getDecryptedNoteSync(tx89.notes)).toBe('Gemini Pro')
+      expect(tx89.category).toBe('tagihan/langganan')
+    })
   })
 
   describe('AiQuickLogModal sample chips click behavior', () => {

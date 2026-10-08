@@ -185,5 +185,25 @@ describe('AI Clean Notes & Semantic Slot-Filling Enhancement', () => {
       expect(resLusa).not.toBeNull()
       expect(resLusa.transactions[0].date).toBe('2026-09-16')
     })
+
+    it('strips conversational fillers and pronouns from notes, e.g. "oh iya kemarin malam aku beli paketan Telkomsel pakai dana, 20k"', () => {
+      const danaWallets = [
+        ...mockWallets,
+        { id: 4, name: 'DANA', currency: 'IDR' },
+      ]
+      const res = parseIndonesianFinancialText(
+        'oh iya kemarin malam aku beli paketan Telkomsel pakai dana, 20k',
+        danaWallets,
+        'IDR',
+        refDate
+      )
+      expect(res).not.toBeNull()
+      expect(res.transactions).toHaveLength(1)
+      const tx = res.transactions[0]
+      expect(tx.notes).toBe('Paketan Telkomsel')
+      expect(tx.amount).toBe(20000)
+      expect(tx.walletId).toBe(4)
+      expect(tx.type).toBe('expense')
+    })
   })
 })

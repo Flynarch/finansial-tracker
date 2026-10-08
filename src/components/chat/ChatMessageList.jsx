@@ -21,6 +21,8 @@ export default function ChatMessageList({
   onConfirmDelete,
   onCancelDelete,
   onUndoTransaction,
+  onEditItem,
+  wallets = [],
 }) {
   const visibleMessages = messages.filter((m) => m.type !== 'hidden')
   const isOnlyWelcome = visibleMessages.length <= 1 && (visibleMessages.length === 0 || visibleMessages[0]?.type === 'welcome')
@@ -76,6 +78,8 @@ export default function ChatMessageList({
               onConfirmDelete={onConfirmDelete}
               onCancelDelete={onCancelDelete}
               onUndoTransaction={onUndoTransaction}
+              onEditItem={onEditItem}
+              wallets={wallets}
             />
           )
         })

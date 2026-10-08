@@ -24,6 +24,8 @@ const ChatMessageItem = memo(function ChatMessageItem({
   onConfirmDelete,
   onCancelDelete,
   onUndoTransaction,
+  onEditItem,
+  wallets = [],
 }) {
   return (
     <div className="flex flex-col gap-1.5 w-full min-w-0 max-w-full">
@@ -107,7 +109,10 @@ const ChatMessageItem = memo(function ChatMessageItem({
                   <TransactionSuccess
                     data={msg.data}
                     embedded={true}
-                    onUndo={() => onUndoTransaction?.(msg.data, msg.id)}
+                    isUpdate={Boolean(msg.isUpdate || msg.action === 'update')}
+                    onUndo={() => onUndoTransaction?.(msg.data, msg.id, Boolean(msg.isUpdate || msg.action === 'update'), msg.previousData)}
+                    onEditItem={onEditItem}
+                    wallets={wallets}
                     contextMsg={msg.customMsg || translate(locale, 'aiChat.more')}
                   />
                 ) : msg.type === 'action_success' && msg.data ? (

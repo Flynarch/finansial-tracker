@@ -90,16 +90,131 @@ export async function handleTransactionAction(result, {
     }
   }
 
-  if (result.action === 'update' || result.action === 'delete') {
+  if (result.action === 'update') {
     const rawFreshTxs = await db.transactions.toArray()
     const allFreshTxs = rawFreshTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
-    allFreshTxs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0))
+    allFreshTxs.sort((a, b) => {
+      const dateDiff = (b.date || '').localeCompare(a.date || '')
+      if (dateDiff !== 0) return dateDiff
+      const timeDiff = (b.time || '').localeCompare(a.time || '')
+      if (timeDiff !== 0) return timeDiff
+      return (b.id || 0) - (a.id || 0)
+    })
 
-    const matchedTx = findMatchingTransactionForAction(allFreshTxs, result)
+    const rawTargetIds = Array.isArray(result.transactionIds)
+      ? result.transactionIds.map(Number).filter(Number.isFinite)
+      : []
+
+    let targetTxs = []
+    if (rawTargetIds.length > 0) {
+      targetTxs = allFreshTxs.filter((tx) => rawTargetIds.includes(tx.id))
+    } else {
+      const matchedTx = findMatchingTransactionForAction(allFreshTxs, result)
+      if (matchedTx) {
+        targetTxs = [matchedTx]
+      }
+    }
+
+    if (targetTxs.length === 0) {
+      const notFoundMsg = locale === 'en'
+        ? 'Sorry, the requested transaction was not found in your history.'
+        : 'Maaf, transaksi yang dimaksud tidak ditemukan di riwayat Anda.'
+      newMsgs.push({
+        id: Date.now() + 3,
+        role: 'ai',
+        type: 'text',
+        content: notFoundMsg,
+      })
+    } else {
+      const previousSnapshots = targetTxs.map((t) => ({ ...t }))
+      const updatedList = []
+      for (const tx of targetTxs) {
+        const updatedPayload = { ...result.updatedFields }
+        if (updatedPayload.amount !== undefined) {
+          updatedPayload.amount = Number(updatedPayload.amount)
+        }
+        if (updatedPayload.walletId !== undefined) {
+          if (typeof updatedPayload.walletId === 'string' && isNaN(Number(updatedPayload.walletId))) {
+            const term = updatedPayload.walletId.toLowerCase().trim()
+            const matchedW = wallets.find((w) => (w.name || '').toLowerCase().includes(term))
+            updatedPayload.walletId = matchedW ? matchedW.id : undefined
+          } else {
+            updatedPayload.walletId = updatedPayload.walletId ? Number(updatedPayload.walletId) : undefined
+          }
+        } else if (updatedPayload.wallet && typeof updatedPayload.wallet === 'string') {
+          const term = updatedPayload.wallet.toLowerCase().trim()
+          const matchedW = wallets.find((w) => (w.name || '').toLowerCase().includes(term))
+          if (matchedW) updatedPayload.walletId = matchedW.id
+        }
+        if (updatedPayload.targetWalletId !== undefined) {
+          updatedPayload.targetWalletId = updatedPayload.targetWalletId ? Number(updatedPayload.targetWalletId) : undefined
+        }
+        if (updatedPayload.category) {
+          updatedPayload.category = sanitizeCategoryPath(updatedPayload.category, tx.type || 'expense')
+        }
+        if (updatedPayload.isSplit !== undefined) {
+          updatedPayload.isSplit = Boolean(updatedPayload.isSplit)
+        }
+        if (Array.isArray(updatedPayload.splitItems)) {
+          updatedPayload.splitItems = updatedPayload.splitItems.map((si) => ({
+            ...si,
+            category: sanitizeCategoryPath(si.category, tx.type || 'expense'),
+            amount: Number(si.amount) || 0,
+            notes: si.notes || '',
+            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
+          }))
+        }
+
+        await updateTransaction(tx.id, updatedPayload)
+        updatedList.push({ ...tx, ...updatedPayload })
+      }
+
+      triggerHaptic('success')
+      const isMulti = updatedList.length > 1
+      const defaultSuccessMsg = isMulti
+        ? (locale === 'en' ? `${updatedList.length} transactions updated successfully` : `${updatedList.length} transaksi berhasil diperbarui`)
+        : (locale === 'en' ? 'Transaction updated successfully' : 'Transaksi berhasil diperbarui')
+
+      newMsgs.push({
+        id: Date.now() + 3,
+        role: 'ai',
+        type: 'success',
+        action: 'update',
+        isUpdate: true,
+        previousData: previousSnapshots,
+        data: isMulti ? updatedList : updatedList[0],
+        customMsg: result.text || defaultSuccessMsg,
+      })
+    }
+  }
+
+  if (result.action === 'delete') {
+    const rawFreshTxs = await db.transactions.toArray()
+    const allFreshTxs = rawFreshTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
+    allFreshTxs.sort((a, b) => {
+      const dateDiff = (b.date || '').localeCompare(a.date || '')
+      if (dateDiff !== 0) return dateDiff
+      const timeDiff = (b.time || '').localeCompare(a.time || '')
+      if (timeDiff !== 0) return timeDiff
+      return (b.id || 0) - (a.id || 0)
+    })
+
+    const rawTargetIds = Array.isArray(result.transactionIds)
+      ? result.transactionIds.map(Number).filter(Number.isFinite)
+      : []
+
+    let matchedTxs = []
+    if (rawTargetIds.length > 0) {
+      matchedTxs = allFreshTxs.filter((t) => rawTargetIds.includes(t.id))
+    } else {
+      const singleMatched = findMatchingTransactionForAction(allFreshTxs, result)
+      if (singleMatched) matchedTxs = [singleMatched]
+    }
+
     const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
 
-    if (!matchedTx) {
-      const isVagueDelete = result.action === 'delete' && !result.transactionId && !sq
+    if (matchedTxs.length === 0) {
+      const isVagueDelete = !result.transactionId && rawTargetIds.length === 0 && !sq
       const vagueMsg = locale === 'en'
         ? 'Please specify which transaction you would like to delete (for example: "delete transaction lunch" or "delete latest transaction").'
         : 'Mohon sebutkan transaksi mana yang ingin Anda hapus (contoh: "hapus transaksi makan siang" atau "hapus transaksi terakhir").'
@@ -113,62 +228,47 @@ export async function handleTransactionAction(result, {
         type: 'text',
         content: isVagueDelete ? vagueMsg : notFoundMsg,
       })
+    } else if (matchedTxs.length === 1) {
+      const matchedTx = matchedTxs[0]
+      newMsgs.push({
+        id: Date.now() + 3,
+        role: 'ai',
+        type: 'delete_confirm',
+        data: {
+          id: matchedTx.id,
+          amount: matchedTx.amount,
+          category: matchedTx.category,
+          date: matchedTx.date,
+          notes: matchedTx.notes,
+          type: matchedTx.type,
+          currency: matchedTx.currency || defaultCurrency,
+        },
+        content: locale === 'en'
+          ? 'Are you sure you want to delete this transaction?'
+          : 'Apakah Anda yakin ingin menghapus transaksi ini?',
+      })
     } else {
-      if (result.action === 'update') {
-        const updatedPayload = { ...result.updatedFields }
-        if (updatedPayload.amount !== undefined) {
-          updatedPayload.amount = Number(updatedPayload.amount)
-        }
-        if (updatedPayload.walletId !== undefined) {
-          updatedPayload.walletId = updatedPayload.walletId ? Number(updatedPayload.walletId) : undefined
-        }
-        if (updatedPayload.targetWalletId !== undefined) {
-          updatedPayload.targetWalletId = updatedPayload.targetWalletId ? Number(updatedPayload.targetWalletId) : undefined
-        }
-        if (updatedPayload.category) {
-          updatedPayload.category = sanitizeCategoryPath(updatedPayload.category, matchedTx.type || 'expense')
-        }
-        if (updatedPayload.isSplit !== undefined) {
-          updatedPayload.isSplit = Boolean(updatedPayload.isSplit)
-        }
-        if (Array.isArray(updatedPayload.splitItems)) {
-          updatedPayload.splitItems = updatedPayload.splitItems.map((si) => ({
-            ...si,
-            category: sanitizeCategoryPath(si.category, matchedTx.type || 'expense'),
-            amount: Number(si.amount) || 0,
-            notes: si.notes || '',
-            isExcludeAnalyticsTx: Boolean(si.isExcludeAnalyticsTx),
-          }))
-        }
-
-        await updateTransaction(matchedTx.id, updatedPayload)
-        const updatedTx = { ...matchedTx, ...updatedPayload }
-        newMsgs.push({
-          id: Date.now() + 3,
-          role: 'ai',
-          type: 'success',
-          data: updatedTx,
-          customMsg: locale === 'en' ? 'Transaction updated successfully' : 'Transaksi berhasil diperbarui',
-        })
-      } else {
-        newMsgs.push({
-          id: Date.now() + 3,
-          role: 'ai',
-          type: 'delete_confirm',
-          data: {
-            id: matchedTx.id,
-            amount: matchedTx.amount,
-            category: matchedTx.category,
-            date: matchedTx.date,
-            notes: matchedTx.notes,
-            type: matchedTx.type,
-            currency: matchedTx.currency || defaultCurrency,
-          },
-          content: locale === 'en'
-            ? 'Are you sure you want to delete this transaction?'
-            : 'Apakah Anda yakin ingin menghapus transaksi ini?',
-        })
-      }
+      newMsgs.push({
+        id: Date.now() + 3,
+        role: 'ai',
+        type: 'delete_confirm',
+        data: {
+          isBatch: true,
+          ids: matchedTxs.map((t) => t.id),
+          items: matchedTxs.map((t) => ({
+            id: t.id,
+            amount: t.amount,
+            category: t.category,
+            date: t.date,
+            notes: t.notes,
+            type: t.type,
+            currency: t.currency || defaultCurrency,
+          })),
+        },
+        content: locale === 'en'
+          ? `Are you sure you want to delete ${matchedTxs.length} transactions?`
+          : `Apakah Anda yakin ingin menghapus ${matchedTxs.length} transaksi ini?`,
+      })
     }
   }
 

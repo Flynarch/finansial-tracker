@@ -339,9 +339,6 @@ export default function AiDigitalReceipt({
                     <span>{t('ai.engine.offline', 'NLP Lokal (Offline)')}</span>
                   </span>
                 )}
-                <span className="block text-[9px] font-semibold text-[var(--muted)] truncate">
-                  {t('ai.digitalReceiptHeader', 'Struk Digital FinTrack')}
-                </span>
               </div>
             </div>
           </div>

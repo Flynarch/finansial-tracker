@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
-import { CheckCircle2, RotateCcw, ArrowRight, Wallet, Check, Sparkles, WifiOff } from 'lucide-react'
+import { CheckCircle2, RotateCcw, ArrowRight, Wallet, Check, Sparkles, WifiOff, Pencil } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { format, parseISO } from 'date-fns'
@@ -12,13 +12,22 @@ import useTranslation from '../../hooks/useTranslation'
 import { triggerHaptic } from '../../lib/haptics'
 import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
 
-export default function TransactionSuccess({ data, onUndo }) {
+export default function TransactionSuccess({ data, onUndo, isUpdate = false, action, onEditItem, wallets = [] }) {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
   const txs = useMemo(() => (Array.isArray(data) ? data : (data ? [data] : [])), [data])
   const isSingle = txs.length === 1
   const singleTx = isSingle ? txs[0] : null
+  const walletMap = useMemo(() => new Map((wallets || []).map((w) => [w.id, w.name])), [wallets])
+  const getWalletName = (tx) => tx.walletName || walletMap.get(tx.walletId) || (tx.walletId ? `Dompet #${tx.walletId}` : null)
+  const effectiveIsUpdate = Boolean(
+    isUpdate ||
+    action === 'update' ||
+    singleTx?.isUpdate ||
+    singleTx?.action === 'update' ||
+    (txs.length > 0 && txs[0]?.isUpdate)
+  )
   const engine = singleTx?.engine || txs[0]?.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
   const isOnlineAi = engine === 'online_ai'
 
@@ -87,7 +96,7 @@ export default function TransactionSuccess({ data, onUndo }) {
 
   const handleViewAll = () => {
     triggerHaptic('light')
-    navigate('/transactions')
+    navigate('/transactions', { state: { focusTransactionId: singleTx?.id || txs[0]?.id } })
     setIsOpen(false)
   }
 
@@ -125,9 +134,13 @@ export default function TransactionSuccess({ data, onUndo }) {
           </div>
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
-              {txs.length > 1
-                ? t('ai.multipleTxLogged', '{{count}} Transaksi Dicatat', { count: txs.length })
-                : t('ai.txLogged', 'Transaksi Berhasil Dicatat')}
+              {effectiveIsUpdate
+                ? (txs.length > 1
+                    ? t('ai.multipleTxUpdated', '{{count}} Transaksi Diperbarui', { count: txs.length })
+                    : t('ai.txUpdated', 'Transaksi Diperbarui'))
+                : (txs.length > 1
+                    ? t('ai.multipleTxLogged', '{{count}} Transaksi Dicatat', { count: txs.length })
+                    : t('ai.txLogged', 'Transaksi Berhasil Dicatat'))}
             </span>
             {isOnlineAi ? (
               <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-500 shrink-0">
@@ -142,14 +155,30 @@ export default function TransactionSuccess({ data, onUndo }) {
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleViewAll}
-          className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer active:scale-95"
-        >
-          <span>{t('common.view', 'Lihat')}</span>
-          <ArrowRight className="h-3 w-3" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onEditItem && singleTx && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light')
+                onEditItem(singleTx)
+              }}
+              className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--accent)] hover:underline transition cursor-pointer active:scale-95"
+              title={locale === 'en' ? 'Edit' : 'Edit'}
+            >
+              <Pencil className="h-3 w-3" />
+              <span>Edit</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleViewAll}
+            className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer active:scale-95"
+          >
+            <span>{t('common.view', 'Lihat')}</span>
+            <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
       </div>
 
       {/* Single Transaction Hero Section */}
@@ -160,7 +189,7 @@ export default function TransactionSuccess({ data, onUndo }) {
           </span>
           <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight text-[var(--fg)]">
             <span className="text-xs text-[var(--muted)] font-bold mr-1">{singleTx.currency || defaultCurrency}</span>
-            <span>{isIncome ? '+' : '-'}{formatCurrency(singleTx.amount, singleTx.currency || defaultCurrency).replace(/^[^\d]+/, '')}</span>
+            <span>{isIncome ? '+' : isTransfer ? '' : '-'}{formatCurrency(singleTx.amount, singleTx.currency || defaultCurrency).replace(/^[^\d]+/, '')}</span>
           </div>
           {(() => {
             const rawNote = singleTx.notes
@@ -188,7 +217,7 @@ export default function TransactionSuccess({ data, onUndo }) {
 
       {/* Multi-transaction Items List */}
       {!isSingle && (
-        <div className="p-3 space-y-3">
+        <div className={`p-3 space-y-3 ${txs.length >= 4 ? 'max-h-72 overflow-y-auto ft-hide-scrollbar pr-0.5' : ''}`}>
           {Object.entries(grouped).map(([dateStr, items]) => (
             <div key={dateStr} className="space-y-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
@@ -200,33 +229,75 @@ export default function TransactionSuccess({ data, onUndo }) {
                   const colorClass = getCategoryColorClass(iconKey, tx.type, tx.category)
                   const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                   const txIsIncome = tx.type === 'income'
+                  const txIsTransfer = tx.type === 'transfer'
+                  const wName = getWalletName(tx)
+                  const rawNote = tx.notes
+                  const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+                  const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
 
                   return (
-                    <div key={tx.id || i} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/40">
-                      <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                        <div className={`grid h-8 w-8 place-items-center rounded-xl ${colorClass} shrink-0`}>
+                    <div
+                      key={tx.id || i}
+                      onClick={() => onEditItem?.(tx)}
+                      className="flex items-start justify-between gap-2.5 p-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/40 hover:border-[var(--accent)]/40 transition cursor-pointer group active:scale-[0.99]"
+                    >
+                      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                        <div className={`grid h-8 w-8 place-items-center rounded-xl ${colorClass} shrink-0 mt-0.5`}>
                           <CategoryIcon icon={iconKey} className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
-                            {labels.main || tx.category}
-                          </p>
-                          {(() => {
-                            const rawNote = tx.notes
-                            const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
-                            const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
-                            return (labels.sub || safeNote) ? (
-                              <p className="text-[10.5px] font-medium text-[var(--muted)] mt-0.5 line-clamp-2 break-words">
-                                {labels.sub ? labels.sub + (safeNote ? ` • "${safeNote}"` : '') : `"${safeNote}"`}
-                              </p>
-                            ) : null
-                          })()}
+                          {/* Baris 1: Kategori Utama & Urutan */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-[var(--muted)] shrink-0">#{i + 1}</span>
+                            <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
+                              {labels.main || tx.category}
+                            </p>
+                          </div>
+
+                          {/* Baris 2: Nama Wallet (kontras bold) • Subkategori • Jam */}
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10.5px] mt-1 text-[var(--muted)]">
+                            {wName && (
+                              <span className="font-bold text-[var(--fg)] inline-flex items-center gap-0.5">
+                                <Wallet size={10} className="text-[var(--accent)] shrink-0" />
+                                <span>{wName}</span>
+                              </span>
+                            )}
+                            {labels.sub && (
+                              <span>• {labels.sub}</span>
+                            )}
+                            {tx.time && (
+                              <span>• {tx.time}</span>
+                            )}
+                          </div>
+
+                          {/* Baris 3: Catatan pengguna di baris baru (italic dengan tanda kutip, line-clamp-2) */}
+                          {safeNote && (
+                            <p className="text-[11px] font-normal italic text-[var(--fg)]/80 mt-1 line-clamp-2 break-words">
+                              &quot;{safeNote}&quot;
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <span className={`text-xs font-black tabular-nums ${txIsIncome ? 'ft-income-text' : 'ft-expense-text'}`}>
-                          {txIsIncome ? '+' : '-'}{formatCurrency(tx.amount, tx.currency || defaultCurrency)}
+
+                      <div className="shrink-0 flex flex-col items-end gap-1.5 pl-1">
+                        <span className={`text-xs font-black tabular-nums ${txIsIncome ? 'ft-income-text' : txIsTransfer ? 'text-sky-500' : 'ft-expense-text'}`}>
+                          {txIsIncome ? '+' : txIsTransfer ? '' : '-'}{formatCurrency(tx.amount, tx.currency || defaultCurrency)}
                         </span>
+                        {onEditItem && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              triggerHaptic('light')
+                              onEditItem(tx)
+                            }}
+                            className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--panel-strong)] transition cursor-pointer"
+                            title={locale === 'en' ? `Edit #${i + 1}` : `Edit #${i + 1}`}
+                            aria-label={`Edit ${labels.main || tx.category}`}
+                          >
+                            <Pencil size={12} strokeWidth={2} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -265,7 +336,7 @@ export default function TransactionSuccess({ data, onUndo }) {
         ) : (
           <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-500">
             <Check size={13} className="stroke-[2.5]" />
-            <span>{locale === 'en' ? 'Saved' : 'Tersimpan'}</span>
+            <span>{effectiveIsUpdate ? t('ai.updatedBadge', 'Diperbarui') : (locale === 'en' ? 'Saved' : 'Tersimpan')}</span>
           </div>
         )}
 

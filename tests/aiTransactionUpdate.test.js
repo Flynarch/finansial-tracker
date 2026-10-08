@@ -64,4 +64,31 @@ describe('AI Financial Chat - Context & Mutation Masterplan', () => {
     expect(prompt).toContain('update_transaction')
     expect(prompt).toContain('delete_transaction')
   })
+
+  it('declares transactionIds in update_transaction tool schemas for batch editing', async () => {
+    const { getTools } = await import('../src/lib/ai/toolSchemas')
+    const tools = getTools()
+    const updateTool = tools[0].functionDeclarations.find((fn) => fn.name === 'update_transaction')
+    expect(updateTool).toBeDefined()
+    expect(updateTool.parameters.properties.transactionIds).toBeDefined()
+    expect(updateTool.parameters.properties.transactionIds.type).toBe('ARRAY')
+  })
+
+  it('guides model against asking new nominal during multi-turn continuation and mandates transactionIds for batch edits', () => {
+    const prompt = buildSystemPrompt({
+      todayStr: '2026-08-30',
+      currency: 'IDR',
+      locale: 'id',
+      wallets: [{ id: 1, name: 'Cash', currency: 'IDR' }],
+      recentTransactions: [
+        { id: 90, amount: 14431, category: 'tagihan/langganan', walletId: 1, type: 'expense', notes: 'Gemini Pro' },
+        { id: 89, amount: 11303, category: 'lainnya_kategori/umum', walletId: 1, type: 'expense', notes: 'Misc' },
+      ],
+    })
+
+    expect(prompt).toContain('ALUR EDIT BERKELANJUTAN (MULTI-TURN EDIT)')
+    expect(prompt).toContain('DILARANG KERAS menanyakan nominal baru jika user tidak meminta mengubah nominal')
+    expect(prompt).toContain('EDIT BANYAK TRANSAKSI SEKALIGUS (BATCH EDIT)')
+    expect(prompt).toContain('transactionIds')
+  })
 })

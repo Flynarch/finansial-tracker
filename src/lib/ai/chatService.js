@@ -16,6 +16,7 @@ import { wrapUserTurn, sanitizeGeminiContents } from './sanitizer'
 import { parseShortTransactionFast } from './fastNlp'
 import { calculateDirectFinancialHealth } from './financialHealth'
 import { callApiStreamWithFallback } from './client'
+import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
 
 /**
  * Main chat extractor. Routes keyword shortcuts, offline checks, streaming Gemini model fallback,
@@ -223,11 +224,21 @@ export async function parseTransactionFromText(userMessage, context = {}) {
     let recentTxs = []
     try {
       monthSummary = await getMonthSummaryForPrompt()
-      recentTxs = await db.transactions
+      const rawTxs = await db.transactions
         .orderBy('date')
         .reverse()
-        .limit(15)
+        .limit(40)
         .toArray()
+      const activeTxs = rawTxs.filter((t) => !t.deletedAt && !t.isPendingReview)
+      activeTxs.sort((a, b) => {
+        const dateDiff = (b.date || '').localeCompare(a.date || '')
+        if (dateDiff !== 0) return dateDiff
+        const timeDiff = (b.time || '').localeCompare(a.time || '')
+        if (timeDiff !== 0) return timeDiff
+        return (b.id || 0) - (a.id || 0)
+      })
+      recentTxs = activeTxs.slice(0, 15)
+      await warmupDecryptionCache(recentTxs)
     } catch {
       // Defensive fallback if IndexedDB is unavailable or throws
     }
@@ -256,9 +267,25 @@ export async function parseTransactionFromText(userMessage, context = {}) {
 
     // Fallbacks for non-text messages to keep context flow
     if (!text) {
-      if (msg.type === 'success') text = 'Transaksi berhasil dicatat.'
-      else if (msg.type === 'chart') text = 'Berikut grafiknya.'
-      else text = '...'
+      if (msg.type === 'success' && msg.data) {
+        const txList = Array.isArray(msg.data) ? msg.data : [msg.data]
+        const formattedItems = txList
+          .map((t, idx) => {
+            const rawNote = t.notes
+            const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
+            const cleanNote = isFieldEncrypted(plainNote) ? '' : (plainNote || '')
+            const label = cleanNote || t.category || 'Transaksi'
+            return `${idx + 1}. [ID: ${t.id}] ${label} (${t.currency || 'IDR'} ${t.amount})`
+          })
+          .join('\n')
+        text = msg.customMsg
+          ? `${msg.customMsg}\n${formattedItems}`
+          : (msg.isUpdate ? `Transaksi diperbarui:\n${formattedItems}` : `Transaksi dicatat:\n${formattedItems}`)
+      } else if (msg.type === 'chart') {
+        text = 'Berikut grafiknya.'
+      } else {
+        text = msg.customMsg || '...'
+      }
     }
 
     if (role === lastRole && contents.length > 0) {
@@ -498,10 +525,13 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       }
 
       if (fnName === 'update_transaction') {
+        const rawIds = fnCall.args.transactionIds
+        const validIds = Array.isArray(rawIds) ? rawIds.map((id) => Number(id)).filter(Number.isFinite) : undefined
         return {
           type: 'transactions',
           action: 'update',
-          transactionId: fnCall.args.transactionId,
+          transactionId: fnCall.args.transactionId ? Number(fnCall.args.transactionId) : undefined,
+          transactionIds: validIds && validIds.length > 0 ? validIds : undefined,
           searchQuery: fnCall.args.searchQuery,
           updatedFields: fnCall.args.updatedFields,
           text: fnCall.args.replyMessage || "Transaksi berhasil diperbarui.",
@@ -510,10 +540,13 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       }
 
       if (fnName === 'delete_transaction') {
+        const rawIds = fnCall.args.transactionIds
+        const validIds = Array.isArray(rawIds) ? rawIds.map((id) => Number(id)).filter(Number.isFinite) : undefined
         return {
           type: 'transactions',
           action: 'delete',
-          transactionId: fnCall.args.transactionId,
+          transactionId: fnCall.args.transactionId ? Number(fnCall.args.transactionId) : undefined,
+          transactionIds: validIds && validIds.length > 0 ? validIds : undefined,
           searchQuery: fnCall.args.searchQuery,
           date: fnCall.args.date,
           text: fnCall.args.replyMessage || "Transaksi telah dihapus.",

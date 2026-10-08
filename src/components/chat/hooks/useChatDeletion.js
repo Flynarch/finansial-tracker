@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
 import { db } from '../../../lib/db'
-import { deleteTransaction } from '../../../services/transactionService'
+import { deleteTransaction, updateTransaction } from '../../../services/transactionService'
 import useLoanStore from '../../../store/useLoanStore'
 import { triggerHaptic } from '../../../lib/haptics'
 
@@ -36,6 +36,22 @@ export function useChatDeletion({ setMessages, locale = 'id' }) {
                   ...m,
                   type: 'text',
                   content: locale === 'en' ? 'Recurring subscription cancelled.' : 'Langganan berulang berhasil dibatalkan.',
+                  deleted: true,
+                }
+              : m,
+          ),
+        )
+      } else if (Array.isArray(id)) {
+        await Promise.all(id.map((singleId) => deleteTransaction(singleId)))
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  type: 'text',
+                  content: locale === 'en'
+                    ? `${id.length} transactions have been deleted.`
+                    : `${id.length} transaksi telah berhasil dihapus.`,
                   deleted: true,
                 }
               : m,
@@ -96,12 +112,19 @@ export function useChatDeletion({ setMessages, locale = 'id' }) {
     )
   }, [setMessages, locale])
 
-  const handleUndoTransaction = useCallback(async (data, msgId) => {
+  const handleUndoTransaction = useCallback(async (data, msgId, isUpdate = false, previousData = null) => {
     try {
-      if (Array.isArray(data)) {
-        await Promise.all(data.map((tx) => deleteTransaction(tx.id)))
-      } else if (data?.id) {
-        await deleteTransaction(data.id)
+      if (isUpdate && Array.isArray(previousData) && previousData.length > 0) {
+        for (const prevTx of previousData) {
+          const { id, ...fieldsToRevert } = prevTx
+          await updateTransaction(id, fieldsToRevert)
+        }
+      } else {
+        if (Array.isArray(data)) {
+          await Promise.all(data.map((tx) => deleteTransaction(tx.id)))
+        } else if (data?.id) {
+          await deleteTransaction(data.id)
+        }
       }
       setMessages((prev) => prev.filter((m) => m.id !== msgId))
     } catch (err) {
@@ -110,7 +133,7 @@ export function useChatDeletion({ setMessages, locale = 'id' }) {
         new CustomEvent('ft-show-toast', {
           detail: {
             title: locale === 'en' ? 'Undo Failed' : 'Gagal Membatalkan',
-            message: err.message || (locale === 'en' ? 'Could not delete transaction' : 'Gagal menghapus transaksi'),
+            message: err.message || (locale === 'en' ? 'Could not undo transaction' : 'Gagal membatalkan transaksi'),
             type: 'error',
           },
         }),

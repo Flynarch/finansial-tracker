@@ -1,3 +1,5 @@
+import { getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
+
 /**
  * Resolves and validates source and target wallets for a transfer action.
  * Returns { isValid, fromWallet, toWallet, errorMessageKey }.
@@ -39,7 +41,8 @@ export function validateTransferWallets(fromWalletId, toWalletId, wallets = []) 
 
 /**
  * Matches a transaction for update or delete actions using transactionId,
- * relative keyword ("terakhir", "latest"), or date AND search query constraints.
+ * relative keyword ("terakhir", "latest"), numeric/word ordinals ("kedua", "ke-3"),
+ * or date AND search query constraints.
  * 
  * @param {Array} allFreshTxs
  * @param {object} result
@@ -51,8 +54,38 @@ export function findMatchingTransactionForAction(allFreshTxs = [], result = {}) 
   }
   const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
   if (!sq) return null
-  if (sq === 'terakhir' || sq === 'latest' || sq === 'tadi' || sq === 'barusan') {
+
+  // 1. Cek referensi relatif terbaru
+  if (/^(?:terakhir|latest|last|tadi|barusan)$/i.test(sq)) {
     return allFreshTxs[0] || null
+  }
+
+  // 2. Cek format numerik "ke-1", "ke 2", "transaksi ke-3", "2nd", "3rd", dll.
+  const numOrdinalMatch = sq.match(/(?:transaksi\s+)?(?:ke[- ]?(\d+)|(\d+)(?:st|nd|rd|th))/i)
+  if (numOrdinalMatch) {
+    const idx = parseInt(numOrdinalMatch[1] || numOrdinalMatch[2], 10) - 1
+    if (idx >= 0 && idx < allFreshTxs.length) {
+      return allFreshTxs[idx]
+    }
+  }
+
+  // 3. Cek format kata ordinal "pertama", "kedua", "ketiga", dst.
+  const wordOrdinals = {
+    pertama: 0, kesatu: 0, first: 0,
+    kedua: 1, second: 1,
+    ketiga: 2, third: 2,
+    keempat: 3, fourth: 3,
+    kelima: 4, fifth: 4,
+    keenam: 5, sixth: 5,
+    ketujuh: 6, seventh: 6,
+    kedelapan: 7, eighth: 7,
+    kesembilan: 8, ninth: 8,
+    kesepuluh: 9, tenth: 9,
+  }
+  for (const [word, idx] of Object.entries(wordOrdinals)) {
+    if (new RegExp(`\\b${word}\\b`, 'i').test(sq)) {
+      if (idx < allFreshTxs.length) return allFreshTxs[idx]
+    }
   }
 
   const tokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
@@ -60,7 +93,9 @@ export function findMatchingTransactionForAction(allFreshTxs = [], result = {}) 
   return (
     allFreshTxs.find((t) => {
       const matchesDate = !result.date || t.date === result.date
-      const notesLower = (t.notes || '').toLowerCase()
+      const rawNotes = t.notes || ''
+      const plainNotes = isFieldEncrypted(rawNotes) ? getDecryptedNoteSync(rawNotes) : rawNotes
+      const notesLower = (plainNotes || '').toLowerCase()
       const merchantLower = (t.merchant || '').toLowerCase()
       const categoryLower = (t.category || '').toLowerCase()
 
