@@ -219,7 +219,12 @@ export default function AiDigitalReceipt({
       targetWalletId: tx.targetWalletId || '',
       receiptImage: tx.receiptImage || null,
       isSplit: tx.isSplit || false,
-      splitItems: tx.splitItems || [],
+      splitItems: Array.isArray(tx.splitItems)
+        ? tx.splitItems.map((si) => ({
+            ...si,
+            notes: (isFieldEncrypted(si?.notes) ? getDecryptedNoteSync(si.notes) : si?.notes) || '',
+          }))
+        : [],
     })
   }
 

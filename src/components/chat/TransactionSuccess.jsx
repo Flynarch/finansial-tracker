@@ -20,7 +20,15 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
   const isSingle = txs.length === 1
   const singleTx = isSingle ? txs[0] : null
   const walletMap = useMemo(() => new Map((wallets || []).map((w) => [w.id, w.name])), [wallets])
-  const getWalletName = (tx) => tx.walletName || walletMap.get(tx.walletId) || (tx.walletId ? `Dompet #${tx.walletId}` : null)
+  const getWalletName = (tx) => {
+    if (!tx) return null
+    const sName = tx.walletName || walletMap.get(Number(tx.walletId)) || (tx.walletId ? `Dompet #${tx.walletId}` : null)
+    if (tx.type === 'transfer' && tx.targetWalletId) {
+      const tName = tx.targetWalletName || walletMap.get(Number(tx.targetWalletId)) || `Dompet #${tx.targetWalletId}`
+      return sName ? `${sName} -> ${tName}` : tName
+    }
+    return sName
+  }
   const effectiveIsUpdate = Boolean(
     isUpdate ||
     action === 'update' ||

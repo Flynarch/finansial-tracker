@@ -99,6 +99,8 @@ describe('AI Ordinal Resolution, Decryption & Tool Schemas', () => {
 
     expect(prompt).toContain('Catatan: "Kopi Susu"')
     expect(prompt).toContain('Catatan: "Bensin Pertamax"')
+    expect(prompt).toContain('1. [ID: 91]')
+    expect(prompt).toContain('2. [ID: 92]')
     expect(prompt).not.toContain('enc:v1:')
     expect(prompt).toContain('2026-10-08 14:00')
     expect(prompt).toContain('RESOLUSI REFERENSI URUTAN TRANSAKSI (ORDINAL RESOLUTION)')

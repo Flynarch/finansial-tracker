@@ -28,6 +28,7 @@ import {
   Layers,
   Repeat,
   Tag,
+  Receipt,
 } from 'lucide-react'
 
 export default function TransactionDetailSheet({
@@ -364,6 +365,63 @@ export default function TransactionDetailSheet({
                       </div>
                     )
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Itemized Receipt OCR Breakdown if any */}
+            {Array.isArray(transaction.items) && transaction.items.length > 0 && (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--accent)]">
+                  <Receipt className="h-3.5 w-3.5" />
+                  <span>
+                    {t('transactions.ocr.itemsList', 'Rincian Item Struk ({{count}})', {
+                      count: transaction.items.length,
+                    })}
+                  </span>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-0.5 ft-hide-scrollbar">
+                    {transaction.items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--border)]/60 text-xs flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0 flex-1 truncate">
+                          <span className="font-semibold text-[var(--fg)]">{item.name || `Item ${idx + 1}`}</span>
+                          {item.qty && item.qty > 1 ? (
+                            <span className="text-[10px] text-[var(--muted)] font-bold ml-1.5">x{item.qty}</span>
+                          ) : null}
+                        </div>
+                        <span className="font-bold tabular-nums text-[var(--fg)] shrink-0">
+                          {formatCurrency(Number(item.price || 0), txCurrency)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(transaction.subtotal || transaction.tax || transaction.discount) ? (
+                    <div className="pt-2 mt-1 border-t border-[var(--border)]/40 space-y-1 text-xs">
+                      {transaction.subtotal ? (
+                        <div className="flex justify-between text-[var(--muted)] font-medium">
+                          <span>{t('tx.subtotal', 'Subtotal')}</span>
+                          <span className="tabular-nums font-semibold">{formatCurrency(Number(transaction.subtotal), txCurrency)}</span>
+                        </div>
+                      ) : null}
+                      {transaction.tax ? (
+                        <div className="flex justify-between text-amber-500 font-medium">
+                          <span>{t('tx.tax', 'Pajak (PPN/PB1)')}</span>
+                          <span className="tabular-nums font-bold">+{formatCurrency(Number(transaction.tax), txCurrency)}</span>
+                        </div>
+                      ) : null}
+                      {transaction.discount ? (
+                        <div className="flex justify-between text-emerald-500 font-medium">
+                          <span>{t('tx.discount', 'Diskon')}</span>
+                          <span className="tabular-nums font-bold">-{formatCurrency(Number(transaction.discount), txCurrency)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}

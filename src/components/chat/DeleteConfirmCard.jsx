@@ -1,6 +1,7 @@
+import { useState, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
-import { getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
+import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 
 export default function DeleteConfirmCard({
   msgId,
@@ -9,6 +10,24 @@ export default function DeleteConfirmCard({
   onConfirm,
   onCancel,
 }) {
+  const [, setDecryptedTick] = useState(0)
+
+  useEffect(() => {
+    if (!data) return
+    const txsToWarm = [data, ...(Array.isArray(data.items) ? data.items : [])].filter(Boolean)
+    if (txsToWarm.length > 0) {
+      warmupDecryptionCache(txsToWarm).catch(() => {})
+    }
+  }, [data])
+
+  useEffect(() => {
+    const handleDecrypted = () => setDecryptedTick((t) => t + 1)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ft-notes-decrypted', handleDecrypted)
+      return () => window.removeEventListener('ft-notes-decrypted', handleDecrypted)
+    }
+  }, [])
+
   if (!data) return null
 
   const isBatch = Boolean(data.isBatch || (Array.isArray(data.items) && data.items.length > 1))

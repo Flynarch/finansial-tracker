@@ -7,6 +7,7 @@ import { distributeReceiptTransactions } from '../receiptDistributor'
 import { findMatchingTransactionsForAction } from '../aiChatHelpers'
 import { rememberTransactionEntity } from '../entityMemory'
 import { triggerHaptic } from '../../haptics'
+import { convertCurrency } from '../../utils'
 
 export async function handleTransactionAction(result, {
   locale,
@@ -14,6 +15,8 @@ export async function handleTransactionAction(result, {
   wallets = [],
   scanMode = 'all',
   targetWalletId = null,
+  receiptImage = null,
+  rates = null,
 }) {
   const newMsgs = []
 
@@ -49,6 +52,7 @@ export async function handleTransactionAction(result, {
 
       const txToSave = {
         ...tx,
+        receiptImage: tx.receiptImage || receiptImage || null,
         merchant: tx.merchant || result.merchant || undefined,
         engine: txEngine,
         engineLabel: txEngineLabel,
@@ -65,7 +69,17 @@ export async function handleTransactionAction(result, {
 
       if (tx.type === 'transfer' && tx.targetWalletId) {
         const twId = Number(tx.targetWalletId)
-        if (wallets.find((w) => w.id === twId)) txToSave.targetWalletId = twId
+        if (wallets.find((w) => w.id === twId)) {
+          txToSave.targetWalletId = twId
+          const sourceWallet = wallets.find((w) => w.id === finalWalletId)
+          const targetWallet = wallets.find((w) => w.id === twId)
+          const sCurr = sourceWallet?.currency || txCurrency
+          const tCurr = targetWallet?.currency || sCurr
+          if (sCurr !== tCurr) {
+            txToSave.targetCurrency = tCurr
+            txToSave.targetAmount = tx.targetAmount ? Number(tx.targetAmount) : convertCurrency(numericAmount, sCurr, tCurr, rates || {})
+          }
+        }
       }
 
       const newTxId = await addTransaction(txToSave)

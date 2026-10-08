@@ -152,7 +152,7 @@ export function buildSystemPrompt({
   const walletMap = new Map(wallets.map((w) => [w.id, String(w.name || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 40)]))
   const recentTxsContext = (recentTransactions || [])
     .slice(0, 15)
-    .map((tx) => {
+    .map((tx, idx) => {
       const wName = walletMap.get(tx.walletId) || (tx.walletId ? `Wallet #${tx.walletId}` : 'Tanpa Dompet')
       const targetWName = tx.targetWalletId ? ` -> ${walletMap.get(tx.targetWalletId) || `Wallet #${tx.targetWalletId}`}` : ''
       const rawNotes = tx.notes || ''
@@ -174,7 +174,7 @@ export function buildSystemPrompt({
         splitDetails = ` [Split: ${itemsStr}]`
       }
       const timeStr = tx.time ? ` ${tx.time}` : ''
-      return `- [ID: ${tx.id}] ${tx.date}${timeStr} | ${tx.type === 'income' ? 'Pemasukan' : tx.type === 'expense' ? 'Pengeluaran' : 'Transfer'} ${tx.currency || currency} ${Number(tx.amount || 0).toLocaleString('id-ID')} | Kategori: ${safeCategory} | Dompet: ${wName}${targetWName} | Catatan: "${safeNotes}"${splitDetails}`
+      return `${idx + 1}. [ID: ${tx.id}] ${tx.date}${timeStr} | ${tx.type === 'income' ? 'Pemasukan' : tx.type === 'expense' ? 'Pengeluaran' : 'Transfer'} ${tx.currency || currency} ${Number(tx.amount || 0).toLocaleString('id-ID')} | Kategori: ${safeCategory} | Dompet: ${wName}${targetWName} | Catatan: "${safeNotes}"${splitDetails}`
     })
     .join('\n')
 

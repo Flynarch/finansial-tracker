@@ -141,6 +141,8 @@ export function useChatEngine({
           wallets,
           scanMode,
           targetWalletId,
+          receiptImage: imageToSend,
+          rates: activeRates,
           aiMsgId,
           addLoan,
           recordPayment,
