@@ -114,14 +114,19 @@ export function useChatDeletion({ setMessages, locale = 'id' }) {
 
   const handleUndoTransaction = useCallback(async (data, msgId, isUpdate = false, previousData = null) => {
     try {
-      if (isUpdate && Array.isArray(previousData) && previousData.length > 0) {
-        for (const prevTx of previousData) {
-          const { id, ...fieldsToRevert } = prevTx
-          await updateTransaction(id, fieldsToRevert)
+      if (isUpdate) {
+        const revertList = Array.isArray(previousData)
+          ? previousData
+          : (previousData ? [previousData] : [])
+        for (const prevTx of revertList) {
+          if (prevTx?.id) {
+            const { id, ...fieldsToRevert } = prevTx
+            await updateTransaction(id, fieldsToRevert)
+          }
         }
       } else {
         if (Array.isArray(data)) {
-          await Promise.all(data.map((tx) => deleteTransaction(tx.id)))
+          await Promise.all(data.map((tx) => (tx?.id ? deleteTransaction(tx.id) : Promise.resolve())))
         } else if (data?.id) {
           await deleteTransaction(data.id)
         }

@@ -96,4 +96,46 @@ describe('AI Chat Deletion Hook - Atomic Rollback & Batch Delete', () => {
     expect(deleteTransaction).toHaveBeenCalledWith(403)
     expect(setMessagesMock).toHaveBeenCalled()
   })
+
+  it('safely handles single-object previousData without deleting transaction on undo update', async () => {
+    const { result } = renderHook(() =>
+      useChatDeletion({ setMessages: setMessagesMock, locale: 'id' })
+    )
+
+    const updatedData = { id: 501, amount: 99000, category: 'tagihan/listrik' }
+    const singleSnapshot = { id: 501, amount: 45000, category: 'tagihan/air' }
+
+    await act(async () => {
+      await result.current.handleUndoTransaction(
+        updatedData,
+        'msg-4',
+        true,
+        singleSnapshot
+      )
+    })
+
+    expect(deleteTransaction).not.toHaveBeenCalled()
+    expect(updateTransaction).toHaveBeenCalledWith(501, { amount: 45000, category: 'tagihan/air' })
+  })
+
+  it('never deletes transactions when isUpdate is true even if previousData is null or empty', async () => {
+    const { result } = renderHook(() =>
+      useChatDeletion({ setMessages: setMessagesMock, locale: 'id' })
+    )
+
+    const updatedData = { id: 601, amount: 75000 }
+
+    await act(async () => {
+      await result.current.handleUndoTransaction(
+        updatedData,
+        'msg-5',
+        true,
+        null
+      )
+    })
+
+    expect(deleteTransaction).not.toHaveBeenCalled()
+    expect(updateTransaction).not.toHaveBeenCalled()
+    expect(setMessagesMock).toHaveBeenCalled()
+  })
 })

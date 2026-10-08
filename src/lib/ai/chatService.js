@@ -275,7 +275,7 @@ export async function parseTransactionFromText(userMessage, context = {}) {
             const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
             const cleanNote = isFieldEncrypted(plainNote) ? '' : (plainNote || '')
             const label = cleanNote || t.category || 'Transaksi'
-            return `${idx + 1}. [ID: ${t.id}] ${label} (${t.currency || 'IDR'} ${t.amount})`
+            return `${idx + 1}. [ID: ${t.id}] ${label} (${formatCurrency(t.amount, t.currency || defaultCurrency)})`
           })
           .join('\n')
         text = msg.customMsg

@@ -39,6 +39,196 @@ export function validateTransferWallets(fromWalletId, toWalletId, wallets = []) 
   }
 }
 
+const WORD_ORDINALS = {
+  pertama: 0, kesatu: 0, first: 0,
+  kedua: 1, second: 1,
+  ketiga: 2, third: 2,
+  keempat: 3, fourth: 3,
+  kelima: 4, fifth: 4,
+  keenam: 5, sixth: 5,
+  ketujuh: 6, seventh: 6,
+  kedelapan: 7, eighth: 7,
+  kesembilan: 8, ninth: 8,
+  kesepuluh: 9, tenth: 9,
+}
+
+const INDO_NUMBER_WORDS = {
+  satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5,
+  enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10,
+}
+
+/**
+ * Parses a single token or short phrase to a 0-based ordinal index, or null.
+ * 
+ * @param {string} text
+ * @returns {number|null}
+ */
+export function parseOrdinalNumber(text) {
+  if (!text || typeof text !== 'string') return null
+  const clean = text.toLowerCase().trim()
+
+  if (clean in WORD_ORDINALS) {
+    return WORD_ORDINALS[clean]
+  }
+
+  const numMatch = clean.match(/^(?:transaksi|item|nomor|no\.?|ke[- ]?)?\s*#?(\d+)(?:st|nd|rd|th)?$/i)
+  if (numMatch) {
+    const val = parseInt(numMatch[1], 10)
+    return val > 0 ? val - 1 : null
+  }
+
+  return null
+}
+
+/**
+ * Resolves all 0-based ordinal indices mentioned in a natural language string.
+ * Supports:
+ * - "2 transaksi terakhir", "dua transaksi terakhir", "kedua transaksi tadi" -> [0, 1]
+ * - "transaksi terakhir", "yang terakhir", "tadi", "barusan" -> [0]
+ * - "transaksi pertama dan kedua", "transaksi ke-1 dan ke-2", "transaksi #1 dan #3" -> [0, 1] / [0, 2]
+ * - "item #1, #2, #3", "transaksi 1 dan 2" -> [0, 1, 2] / [0, 1]
+ * 
+ * @param {string} text
+ * @returns {number[]} Array of sorted unique 0-based indices
+ */
+export function resolveOrdinalIndices(text) {
+  if (!text || typeof text !== 'string') return []
+  const norm = text.toLowerCase().trim()
+  const indices = new Set()
+
+  // 1. Check expressions like "2 transaksi terakhir", "dua transaksi terakhir", "kedua transaksi tadi"
+  const countRecentMatch = norm.match(/(?:(?:hapus|ubah|ganti|edit)\s+)?(?:(\d+)|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+(?:transaksi\s+)?(?:terakhir|tadi|barusan|latest|last)/i)
+  if (countRecentMatch) {
+    const rawCount = countRecentMatch[1]
+    const count = rawCount ? parseInt(rawCount, 10) : INDO_NUMBER_WORDS[countRecentMatch[0].match(/dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh/i)?.[0]] || 2
+    for (let i = 0; i < count; i++) {
+      indices.add(i)
+    }
+    return Array.from(indices).sort((a, b) => a - b)
+  }
+
+  // 2. Check "kedua transaksi tadi" / "kedua transaksi ini"
+  if (/(?:kedua|2)\s+transaksi\s+(?:tadi|ini|tersebut)/i.test(norm)) {
+    indices.add(0)
+    indices.add(1)
+    return Array.from(indices).sort((a, b) => a - b)
+  }
+
+  // 3. Check relative single latest: "transaksi terakhir", "yang terakhir", "terakhir", "latest", "last", "barusan", "tadi", "transaksi tadi"
+  if (/(?:^|\b)(?:transaksi\s+)?(?:terakhir|latest|last|barusan|tadi)(?:\b|$)/i.test(norm)) {
+    indices.add(0)
+  }
+
+  // 4. Handle "transaksi 1 dan 2", "transaksi 1, 2, dan 3", "transaksi ke-1 dan ke-3", etc.
+  const transListMatch = norm.match(/(?:transaksi|item)\s+((?:(?:ke[- ]?)?\d+|pertama|kedua|ketiga|keempat|kelima|keenam|ketujuh|kedelapan|kesembilan|kesepuluh)(?:\s*(?:,|dan|and|&|-)\s*(?:(?:ke[- ]?)?\d+|pertama|kedua|ketiga|keempat|kelima|keenam|ketujuh|kedelapan|kesembilan|kesepuluh))*)/i)
+  if (transListMatch) {
+    const tokens = transListMatch[1].split(/[\s,dan&]+/i).filter(Boolean)
+    for (const tok of tokens) {
+      const idx = parseOrdinalNumber(tok)
+      if (idx !== null && idx >= 0) {
+        indices.add(idx)
+      }
+    }
+  }
+
+  // 5. Extract word ordinals: "pertama", "kedua", "ketiga", dst.
+  for (const [word, idx] of Object.entries(WORD_ORDINALS)) {
+    if (new RegExp(`\\b${word}\\b`, 'i').test(norm)) {
+      indices.add(idx)
+    }
+  }
+
+  // 6. Extract numeric ordinals: "ke-1", "ke 2", "1st", "2nd", "#1", "#2", "no 1", "nomor 2", "transaksi 1", "item 2"
+  const regexPatterns = [
+    /(?:transaksi|item)?\s*ke[- ]?(\d+)/gi,
+    /(\d+)(?:st|nd|rd|th)/gi,
+    /#(\d+)/gi,
+    /(?:nomor|no\.?)\s*(\d+)/gi,
+    /(?:transaksi|item)\s+(\d+)/gi,
+  ]
+
+  for (const reg of regexPatterns) {
+    let match
+    while ((match = reg.exec(norm)) !== null) {
+      const idx = parseInt(match[1], 10) - 1
+      if (idx >= 0) indices.add(idx)
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b)
+}
+
+/**
+ * Resolves the first 0-based ordinal index from a text string, or null.
+ * 
+ * @param {string} text
+ * @returns {number|null}
+ */
+export function resolveOrdinalIndex(text) {
+  const indices = resolveOrdinalIndices(text)
+  return indices.length > 0 ? indices[0] : null
+}
+
+/**
+ * Matches transactions for update or delete actions, supporting multiple transactions
+ * via explicit transactionIds, ordinal Indonesian/English matching ("transaksi 1 dan 2",
+ * "pertama dan kedua", "2 transaksi terakhir", "#1", "#2"), or text/token matching.
+ * 
+ * @param {Array} allFreshTxs
+ * @param {object} result
+ * @returns {Array<object>}
+ */
+export function findMatchingTransactionsForAction(allFreshTxs = [], result = {}) {
+  if (Array.isArray(result.transactionIds) && result.transactionIds.length > 0) {
+    const idSet = new Set(result.transactionIds.map(Number).filter(Number.isFinite))
+    return allFreshTxs.filter((t) => idSet.has(t.id))
+  }
+
+  if (result.transactionId) {
+    const single = allFreshTxs.find((t) => t.id === Number(result.transactionId))
+    return single ? [single] : []
+  }
+
+  const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
+  if (!sq) return []
+
+  // Check ordinal matches first
+  const ordinalIndices = resolveOrdinalIndices(sq)
+  if (ordinalIndices.length > 0) {
+    const matched = []
+    for (const idx of ordinalIndices) {
+      if (idx >= 0 && idx < allFreshTxs.length) {
+        matched.push(allFreshTxs[idx])
+      }
+    }
+    if (matched.length > 0) return matched
+  }
+
+  // Fallback to text / token search
+  const tokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
+  const matchedTx = allFreshTxs.find((t) => {
+    const matchesDate = !result.date || t.date === result.date
+    const rawNotes = t.notes || ''
+    const plainNotes = isFieldEncrypted(rawNotes) ? getDecryptedNoteSync(rawNotes) : rawNotes
+    const notesLower = (plainNotes || '').toLowerCase()
+    const merchantLower = (t.merchant || '').toLowerCase()
+    const categoryLower = (t.category || '').toLowerCase()
+
+    const directMatch =
+      (notesLower && notesLower.includes(sq)) ||
+      (merchantLower && merchantLower.includes(sq)) ||
+      (categoryLower && categoryLower.includes(sq))
+
+    const tokenMatch =
+      tokens.length > 0 &&
+      tokens.some((token) => notesLower.includes(token) || merchantLower.includes(token))
+
+    return matchesDate && (directMatch || tokenMatch)
+  })
+
+  return matchedTx ? [matchedTx] : []
+}
+
 /**
  * Matches a transaction for update or delete actions using transactionId,
  * relative keyword ("terakhir", "latest"), numeric/word ordinals ("kedua", "ke-3"),
@@ -49,68 +239,8 @@ export function validateTransferWallets(fromWalletId, toWalletId, wallets = []) 
  * @returns {object|null}
  */
 export function findMatchingTransactionForAction(allFreshTxs = [], result = {}) {
-  if (result.transactionId) {
-    return allFreshTxs.find((t) => t.id === Number(result.transactionId)) || null
-  }
-  const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
-  if (!sq) return null
-
-  // 1. Cek referensi relatif terbaru
-  if (/^(?:terakhir|latest|last|tadi|barusan)$/i.test(sq)) {
-    return allFreshTxs[0] || null
-  }
-
-  // 2. Cek format numerik "ke-1", "ke 2", "transaksi ke-3", "2nd", "3rd", dll.
-  const numOrdinalMatch = sq.match(/(?:transaksi\s+)?(?:ke[- ]?(\d+)|(\d+)(?:st|nd|rd|th))/i)
-  if (numOrdinalMatch) {
-    const idx = parseInt(numOrdinalMatch[1] || numOrdinalMatch[2], 10) - 1
-    if (idx >= 0 && idx < allFreshTxs.length) {
-      return allFreshTxs[idx]
-    }
-  }
-
-  // 3. Cek format kata ordinal "pertama", "kedua", "ketiga", dst.
-  const wordOrdinals = {
-    pertama: 0, kesatu: 0, first: 0,
-    kedua: 1, second: 1,
-    ketiga: 2, third: 2,
-    keempat: 3, fourth: 3,
-    kelima: 4, fifth: 4,
-    keenam: 5, sixth: 5,
-    ketujuh: 6, seventh: 6,
-    kedelapan: 7, eighth: 7,
-    kesembilan: 8, ninth: 8,
-    kesepuluh: 9, tenth: 9,
-  }
-  for (const [word, idx] of Object.entries(wordOrdinals)) {
-    if (new RegExp(`\\b${word}\\b`, 'i').test(sq)) {
-      if (idx < allFreshTxs.length) return allFreshTxs[idx]
-    }
-  }
-
-  const tokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
-
-  return (
-    allFreshTxs.find((t) => {
-      const matchesDate = !result.date || t.date === result.date
-      const rawNotes = t.notes || ''
-      const plainNotes = isFieldEncrypted(rawNotes) ? getDecryptedNoteSync(rawNotes) : rawNotes
-      const notesLower = (plainNotes || '').toLowerCase()
-      const merchantLower = (t.merchant || '').toLowerCase()
-      const categoryLower = (t.category || '').toLowerCase()
-
-      const directMatch =
-        (notesLower && notesLower.includes(sq)) ||
-        (merchantLower && merchantLower.includes(sq)) ||
-        (categoryLower && categoryLower.includes(sq))
-
-      const tokenMatch =
-        tokens.length > 0 &&
-        tokens.some((token) => notesLower.includes(token) || merchantLower.includes(token))
-
-      return matchesDate && (directMatch || tokenMatch)
-    }) || null
-  )
+  const matches = findMatchingTransactionsForAction(allFreshTxs, result)
+  return matches.length > 0 ? matches[0] : null
 }
 
 /**

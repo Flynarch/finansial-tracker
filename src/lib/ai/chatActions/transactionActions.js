@@ -4,7 +4,7 @@ import { createTransaction as addTransaction, updateTransaction } from '../../..
 import useSettingsStore from '../../../store/useSettingsStore'
 import { sanitizeCategoryPath } from '../../categorySanitizer'
 import { distributeReceiptTransactions } from '../receiptDistributor'
-import { findMatchingTransactionForAction } from '../aiChatHelpers'
+import { findMatchingTransactionsForAction } from '../aiChatHelpers'
 import { rememberTransactionEntity } from '../entityMemory'
 import { triggerHaptic } from '../../haptics'
 
@@ -105,15 +105,9 @@ export async function handleTransactionAction(result, {
       ? result.transactionIds.map(Number).filter(Number.isFinite)
       : []
 
-    let targetTxs = []
-    if (rawTargetIds.length > 0) {
-      targetTxs = allFreshTxs.filter((tx) => rawTargetIds.includes(tx.id))
-    } else {
-      const matchedTx = findMatchingTransactionForAction(allFreshTxs, result)
-      if (matchedTx) {
-        targetTxs = [matchedTx]
-      }
-    }
+    const targetTxs = rawTargetIds.length > 0
+      ? allFreshTxs.filter((tx) => rawTargetIds.includes(tx.id))
+      : findMatchingTransactionsForAction(allFreshTxs, result)
 
     if (targetTxs.length === 0) {
       const notFoundMsg = locale === 'en'
@@ -203,13 +197,9 @@ export async function handleTransactionAction(result, {
       ? result.transactionIds.map(Number).filter(Number.isFinite)
       : []
 
-    let matchedTxs = []
-    if (rawTargetIds.length > 0) {
-      matchedTxs = allFreshTxs.filter((t) => rawTargetIds.includes(t.id))
-    } else {
-      const singleMatched = findMatchingTransactionForAction(allFreshTxs, result)
-      if (singleMatched) matchedTxs = [singleMatched]
-    }
+    const matchedTxs = rawTargetIds.length > 0
+      ? allFreshTxs.filter((t) => rawTargetIds.includes(t.id))
+      : findMatchingTransactionsForAction(allFreshTxs, result)
 
     const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
 

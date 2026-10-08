@@ -88,17 +88,32 @@ describe('N-Item Batch Editing, In-Card Edit & Context Menu Unpacking', () => {
     expect(onEditMock).toHaveBeenCalledWith(expect.objectContaining({ id: 503 }))
   })
 
-  it('renders edit button on single transaction hero card', () => {
+  it('renders edit button on single transaction hero card and resolves wallet name from wallets list', () => {
     const onEditMock = vi.fn()
+    // Transaction with only walletId (no walletName property)
+    const txWithoutWalletName = {
+      id: 501,
+      amount: 25000,
+      type: 'expense',
+      category: 'makanan/kopi',
+      notes: 'Kopi Susu Gula Aren',
+      date: '2026-10-08',
+      time: '09:00',
+      walletId: 1, // matches BCA Utama in sampleWallets
+    }
+
     render(
       <MemoryRouter>
         <TransactionSuccess
-          data={multiTxs[0]}
+          data={txWithoutWalletName}
           onEditItem={onEditMock}
           wallets={sampleWallets}
         />
       </MemoryRouter>
     )
+
+    // Wallet name must be resolved from sampleWallets
+    expect(screen.getByText('BCA Utama')).toBeDefined()
 
     const editBtn = screen.getByRole('button', { name: /Edit/i })
     expect(editBtn).toBeDefined()

@@ -282,10 +282,11 @@ export default function AiFinanceChat() {
             if (Array.isArray(msg.data)) {
               return {
                 ...msg,
+                isUpdate: true,
                 data: msg.data.map((t) => (t.id === updatedTx.id ? updatedTx : t)),
               }
             } else if (msg.data.id === updatedTx.id) {
-              return { ...msg, data: updatedTx }
+              return { ...msg, isUpdate: true, data: updatedTx }
             }
           }
           return msg

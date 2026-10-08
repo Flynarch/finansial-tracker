@@ -100,4 +100,50 @@ describe('AI Chat Actions - Batch Mutations, String Wallet Resolution & Snapshot
     expect(msg.data.ids).toEqual([102, 101])
     expect(msg.data.items.length).toBe(2)
   })
+
+  it('triggers batch delete confirmation from multi-ordinal searchQuery "hapus transaksi ke-1 dan ke-2"', async () => {
+    const result = {
+      action: 'delete',
+      searchQuery: 'hapus transaksi ke-1 dan ke-2',
+    }
+
+    const msgs = await handleTransactionAction(result, {
+      locale: 'id',
+      defaultCurrency: 'IDR',
+      wallets,
+    })
+
+    expect(msgs.length).toBe(1)
+    const msg = msgs[0]
+    expect(msg.type).toBe('delete_confirm')
+    expect(msg.data.isBatch).toBe(true)
+    // mockDbTxs sorted desc: 103 (12:00), 102 (11:00), 101 (10:00)
+    // index 0 -> 103, index 1 -> 102
+    expect(msg.data.ids).toEqual([103, 102])
+    expect(msg.data.items.length).toBe(2)
+  })
+
+  it('triggers batch update from searchQuery "2 transaksi terakhir"', async () => {
+    const result = {
+      action: 'update',
+      searchQuery: '2 transaksi terakhir',
+      updatedFields: {
+        category: 'makanan/makan_siang',
+      },
+    }
+
+    const msgs = await handleTransactionAction(result, {
+      locale: 'id',
+      defaultCurrency: 'IDR',
+      wallets,
+    })
+
+    expect(msgs.length).toBe(1)
+    const msg = msgs[0]
+    expect(msg.type).toBe('success')
+    expect(msg.isUpdate).toBe(true)
+    expect(updateTransaction).toHaveBeenCalledTimes(2)
+    expect(updateTransaction).toHaveBeenCalledWith(103, expect.objectContaining({ category: 'makanan/makan_siang' }))
+    expect(updateTransaction).toHaveBeenCalledWith(102, expect.objectContaining({ category: 'makanan/makan_siang' }))
+  })
 })

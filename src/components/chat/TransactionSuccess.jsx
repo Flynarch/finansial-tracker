@@ -183,7 +183,10 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
 
       {/* Single Transaction Hero Section */}
       {isSingle && singleTx ? (
-        <div className="p-4 flex flex-col items-center justify-center text-center bg-[var(--field-bg)]/40 border-b border-[var(--border)]/30">
+        <div
+          onClick={() => onEditItem?.(singleTx)}
+          className={`p-4 flex flex-col items-center justify-center text-center bg-[var(--field-bg)]/40 border-b border-[var(--border)]/30 ${onEditItem ? 'cursor-pointer hover:bg-[var(--field-bg)]/60 transition active:scale-[0.99]' : ''}`}
+        >
           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border mb-1.5 ${typeColorClass}`}>
             {typeLabel}
           </span>
@@ -195,22 +198,36 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
             const rawNote = singleTx.notes
             const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
             const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
-            return (safeNote || singleTx.category) ? (
-              <p className="text-xs text-[var(--muted)] mt-1 font-medium max-w-[90%] truncate">
-                {safeNote ? `"${safeNote}"` : singleTx.category}
-              </p>
-            ) : null
+            const labels = getTransactionCategoryLabels(singleTx.category, singleTx.type, locale)
+            const catDisplay = labels.main ? `${labels.main}${labels.sub ? ` • ${labels.sub}` : ''}` : singleTx.category
+            return (
+              <div className="mt-1 flex flex-col items-center gap-0.5 max-w-[90%]">
+                {catDisplay && (
+                  <p className="text-xs font-bold text-[var(--fg)] truncate">
+                    {catDisplay}
+                  </p>
+                )}
+                {safeNote && (
+                  <p className="text-[11px] text-[var(--muted)] italic font-normal truncate">
+                    &quot;{safeNote}&quot;
+                  </p>
+                )}
+              </div>
+            )
           })()}
 
           {/* Account & Date Specs */}
-          <div className="flex items-center gap-3 mt-2.5 text-[10.5px] font-semibold text-[var(--muted)]">
-            {singleTx.walletName && (
+          <div className="flex items-center gap-3 mt-2 text-[10.5px] font-semibold text-[var(--muted)]">
+            {getWalletName(singleTx) && (
               <span className="inline-flex items-center gap-1">
                 <Wallet size={11} className="text-[var(--accent)]" />
-                <span className="text-[var(--fg)] font-bold">{singleTx.walletName}</span>
+                <span className="text-[var(--fg)] font-bold">{getWalletName(singleTx)}</span>
               </span>
             )}
             <span>{formatDate(singleTx.date || new Date().toISOString().slice(0, 10))}</span>
+            {singleTx.time && (
+              <span>• {singleTx.time}</span>
+            )}
           </div>
         </div>
       ) : null}
