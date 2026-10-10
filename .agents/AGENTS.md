@@ -183,9 +183,17 @@ When requested to **Debug**, **Audit**, or **Improve** a feature (or when trigge
 - **Safe Area Insets**: Protect content from notch cutouts and navigation gesture bars with `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`.
 - **Virtual Keyboard Resizing**: Forms and bottom sheets must support mobile virtual keyboards without occluding submit buttons (`interactive-widget=resizes-content`).
 
-### D. Android APK Assembly Workflow
-- Whenever building an APK, run `npx cap sync android`, execute `gradlew.bat assembleDebug` in `android/`, and copy the output APK to `FinTrack-v<version>.apk` in the repository root. Ensure only the single latest versioned APK exists in root.
-- **Explicit User Confirmation Required**: Always ask for explicit user confirmation before building the APK and before handling its upload/placement into Google Drive. Do not run APK assembly or cloud distribution automatically without permission.
+### D. Android APK Assembly & Version Release Protocol
+- **Atomic Version Bumping**: Saat menaikkan versi aplikasi (misalnya dari `v5.11.1` ke `v5.12.0`), perubahan wajib disinkronkan secara atomik pada 5 berkas:
+  1. `package.json` (`version`)
+  2. `src/lib/version.js` (`APP_VERSION`, `APP_DISPLAY_VERSION`, `APP_BUILD_NUMBER`)
+  3. `android/app/build.gradle` (`versionName`, `versionCode`)
+  4. `README.md` (Badge shields.io versi dan tautan rilis)
+  5. `package-lock.json` via perintah resmi package manager (`npm install --package-lock-only`)
+- **Mandatory Pre-Release Consistency Gate**: Sebelum melakukan commit atau rilis, selalu jalankan `npx vitest run tests/versionConsistency.test.js` untuk menjamin tidak ada inkonsistensi versi yang memicu kegagalan GitHub Actions CI (tanda silang merah).
+- **APK Assembly Command**: Jalankan `npx cap sync android`, jalankan `cmd.exe /c "cd android && gradlew.bat assembleDebug"`, lalu salin APK keluaran ke `FinTrack-v<version>.apk` di root repositori. Pastikan hanya ada 1 berkas APK versi terbaru di root.
+- **Explicit User Confirmation Required**: Selalu minta konfirmasi eksplisit pengguna sebelum merakit APK dan sebelum mengunggah/mendistribusikannya ke Google Drive atau GitHub Release. Jangan menjalankan perakitan atau rilis otomatis tanpa persetujuan.
+- **Structured Bulletin Release Notes**: Catatan rilis pada GitHub Release dan pesan rangkuman ke pengguna wajib diformat sebagai buletin terstruktur (*Changelog Bulletin*) yang membagi poin perbaikan per subsistem/kategori (Keamanan/Biometrik, Otomasi, Akuntansi, AI Chat, Portofolio/Pinjaman, Impor/Ekspor, Kebiasaan), mudah dibaca, serta mematuhi kebijakan bebas emoji (*Zero Emoji*).
 
 ---
 
