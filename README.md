@@ -4,7 +4,7 @@
 
 **A local-first personal finance application for Android with native home screen widgets, receipt scanning, and offline storage.**
 
-[![Version](https://img.shields.io/badge/Version-v5.11.1-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.11.1)
+[![Version](https://img.shields.io/badge/Version-v5.12.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v5.12.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
