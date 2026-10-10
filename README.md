@@ -6,6 +6,8 @@
 
 [![Version](https://img.shields.io/badge/Version-v6.0.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.0.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
+[![Tests](https://img.shields.io/badge/Tests-1%2C748%20Passed%20(120%20Suites)-brightgreen.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker)
+[![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20E2EE-blueviolet.svg?style=flat-square)](SECURITY.md)
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.2-38B2AC.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
@@ -286,7 +288,7 @@ The output file is generated at `android/app/build/outputs/apk/debug/app-debug.a
 Run the project verification checks:
 
 ```bash
-# Run unit test suite (1,270+ tests across 86+ suites)
+# Run unit test suite (1,748+ tests across 120 suites)
 npm test
 
 # Run linter
