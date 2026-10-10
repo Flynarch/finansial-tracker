@@ -1,4 +1,11 @@
 import { memo } from 'react'
+import { format as defaultFormat } from 'date-fns'
+import { formatCurrency as defaultFormatCurrency, convertCurrency as defaultConvertCurrency } from '../../lib/utils'
+import {
+  getCategoryColorClass as defaultGetCategoryColorClass,
+  resolveTransactionIconKey as defaultResolveTransactionIconKey,
+  getTransactionCategoryLabels as defaultGetTransactionCategoryLabels,
+} from '../../lib/categoryIcon'
 import CategoryIcon from '../ui/CategoryIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
@@ -16,16 +23,16 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   onPreviewReceipt,
   setSwipedTransactionId,
   getSwipeHandlers,
-  getCategoryColorClass,
-  resolveTransactionIconKey,
-  getTransactionCategoryLabels,
-  format,
-  t,
-  locale,
-  defaultCurrency,
-  formatCurrency,
-  convertCurrency,
-  rates,
+  getCategoryColorClass = defaultGetCategoryColorClass,
+  resolveTransactionIconKey = defaultResolveTransactionIconKey,
+  getTransactionCategoryLabels = defaultGetTransactionCategoryLabels,
+  format = defaultFormat,
+  t = (key, fallback) => (typeof fallback === 'string' ? fallback : key),
+  locale = 'id',
+  defaultCurrency = 'IDR',
+  formatCurrency = defaultFormatCurrency,
+  convertCurrency = defaultConvertCurrency,
+  rates = {},
   contextWalletId,
   wallets: walletsProp,
   isNew: isNewProp,
@@ -97,10 +104,33 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   let createdTime = null
   if (transaction?.time && typeof transaction.time === 'string' && transaction.time.trim()) {
     createdTime = transaction.time.trim()
-  } else {
-    const createdAtMs = Number(transaction?.createdAt)
-    if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
-      createdTime = format(new Date(createdAtMs), 'HH:mm')
+  } else if (transaction?.createdAt) {
+    try {
+      const formatFn = typeof format === 'function' ? format : defaultFormat
+      const rawCreatedAt = transaction.createdAt
+      let dateObj = null
+
+      if (rawCreatedAt instanceof Date) {
+        dateObj = rawCreatedAt
+      } else if (typeof rawCreatedAt === 'number' || (typeof rawCreatedAt === 'string' && rawCreatedAt.trim())) {
+        const createdAtMs = Number(rawCreatedAt)
+        if (Number.isFinite(createdAtMs)) {
+          if (createdAtMs > 0) {
+            dateObj = new Date(createdAtMs)
+          }
+        } else {
+          const parsed = new Date(rawCreatedAt)
+          if (!isNaN(parsed.getTime())) {
+            dateObj = parsed
+          }
+        }
+      }
+
+      if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+        createdTime = formatFn(dateObj, 'HH:mm')
+      }
+    } catch {
+      createdTime = null
     }
   }
 

@@ -19,7 +19,7 @@ import { formatMoneyInput, parseMoneyInput, formatMoneyValueForInput, convertCur
 import { evaluateExpression } from '../../lib/calcParser'
 import { updateTransaction } from '../../services/transactionService'
 import { getLocalDateString } from '../../lib/dateUtils'
-import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
+import { getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 import { getCachedCurrencyRates, FALLBACK_EXCHANGE_RATES } from '../../lib/api'
 import { LayoutGrid, ChevronDown, Sliders, Pencil } from 'lucide-react'
 import TransactionEditSplitSection from './TransactionEditSplitSection'
@@ -43,6 +43,12 @@ export default function TransactionEditSheet({
   if (currentTxKey !== prevTxKey) {
     setPrevTxKey(currentTxKey)
     if (currentTxKey) {
+      const resolveSafeNote = (val) => {
+        if (!val) return ''
+        const raw = String(val)
+        const plain = isFieldEncrypted(raw) ? getDecryptedNoteSync(raw) : raw
+        return isFieldEncrypted(plain) ? '' : plain
+      }
       const tgtWallet = wallets?.find((w) => String(w.id) === String(transaction.targetWalletId))
       const tgtCurr = tgtWallet?.currency || 'IDR'
       setInternalFormData({
@@ -55,7 +61,7 @@ export default function TransactionEditSheet({
         walletId: transaction.walletId ? String(transaction.walletId) : '',
         targetWalletId: transaction.targetWalletId ? String(transaction.targetWalletId) : '',
         targetAmount: transaction.targetAmount ? formatMoneyValueForInput(transaction.targetAmount, tgtCurr) : '',
-        notes: getDecryptedNoteSync(transaction.notes) || '',
+        notes: resolveSafeNote(transaction.notes),
         currency: transaction.currency || 'IDR',
         items: transaction.items || undefined,
         subtotal: transaction.subtotal !== undefined ? transaction.subtotal : undefined,
@@ -66,7 +72,7 @@ export default function TransactionEditSheet({
         splitItems: Array.isArray(transaction.splitItems)
           ? transaction.splitItems.map((si) => ({
               ...si,
-              notes: getDecryptedNoteSync(si?.notes) || '',
+              notes: resolveSafeNote(si?.notes),
             }))
           : [],
         receiptImage: transaction.receiptImage || null,
@@ -356,7 +362,7 @@ export default function TransactionEditSheet({
       setWalletError(false)
       setAmountError(false)
       if (typeof propOnSubmit === 'function') {
-        propOnSubmit(event, { amount: totalAmount, targetAmount: evaluatedTargetAmount })
+        await propOnSubmit(event, { amount: totalAmount, targetAmount: evaluatedTargetAmount })
       } else if (transaction?.id) {
         await updateTransaction(transaction.id, {
           ...formData,

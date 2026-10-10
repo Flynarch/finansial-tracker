@@ -166,12 +166,21 @@ export function aggregateMonthlyIncomeExpense(
     if (!tx?.date) return
     let key
     try {
-      key = format(parseISO(String(tx.date)), 'yyyy-MM')
+      const rawDateStr = String(tx.date).trim()
+      if (/^\d{4}-\d{2}/.test(rawDateStr)) {
+        key = rawDateStr.slice(0, 7)
+      } else {
+        const num = Number(tx.date)
+        const d = Number.isFinite(num) && num > 0 ? new Date(num) : parseISO(rawDateStr)
+        if (!isNaN(d.getTime())) {
+          key = format(d, 'yyyy-MM')
+        }
+      }
     } catch (err){
       console.warn('[reportAnalytics]', err)
       return
     }
-    if (!monthMap.has(key)) return
+    if (!key || !monthMap.has(key)) return
     const row = monthMap.get(key)
 
     if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {

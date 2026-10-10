@@ -261,8 +261,9 @@ export function toTransactionsCsv(rows) {
     if (row.isSplit && Array.isArray(row.splitItems) && row.splitItems.length > 0) {
       row.splitItems.forEach((item, idx) => {
         const itemType = item.type || row.type
-        const itemNote = item.notes || row.notes || ''
-        const splitNote = itemNote ? `[Split ${idx + 1}] ${itemNote}` : `[Split ${idx + 1}]`
+        const rawItemNote = item.notes || row.notes || ''
+        const decryptedItemNote = getDecryptedNoteSync(rawItemNote)
+        const splitNote = decryptedItemNote ? `[Split ${idx + 1}] ${decryptedItemNote}` : `[Split ${idx + 1}]`
         body.push(
           [
             `${row.id}-${idx + 1}`,
@@ -292,7 +293,7 @@ export function toTransactionsCsv(rows) {
           row.category,
           row.amount,
           row.currency,
-          row.notes,
+          getDecryptedNoteSync(row.notes),
           row.walletId ?? '',
           row.walletName ?? '',
           row.targetWalletId ?? '',

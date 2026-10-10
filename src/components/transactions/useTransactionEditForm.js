@@ -149,6 +149,12 @@ export function useTransactionEditForm({
           isPendingReview: false,
         }
         delete payload.id
+        delete payload.splitBillId
+        delete payload.loanId
+        delete payload.initialTransactionId
+        delete payload.deletedAt
+        delete payload.sourceNotifId
+        delete payload.sourceNotifIds
         await addTransaction(payload)
         setApiError(t('tx.duplicateSuccess', 'Transaksi berhasil diduplikasi ke hari ini.'))
         setApiErrorTone('success')

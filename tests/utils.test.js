@@ -204,6 +204,23 @@ describe('utils - toTransactionsCsv & numeric helpers', () => {
     expect(csv).toContain('Soap & shampoo')
   })
 
+  it('does not leak ciphertext in toTransactionsCsv when notes are encrypted and cache is cold', () => {
+    const encryptedRows = [
+      {
+        id: 4,
+        date: '2026-08-28',
+        type: 'expense',
+        category: 'makanan',
+        amount: 30000,
+        currency: 'IDR',
+        notes: 'enc:v1:deadbeef12345678',
+        walletId: 1,
+      },
+    ]
+    const csv = toTransactionsCsv(encryptedRows)
+    expect(csv).not.toContain('enc:v1:deadbeef12345678')
+  })
+
   it('clampPercent bounds values between 0 and 100', () => {
     expect(clampPercent(-10)).toBe(0)
     expect(clampPercent(50)).toBe(50)

@@ -94,13 +94,49 @@ export function groupTransactionsDetailed(
       }
     }
 
-    const sortedItems = [...items].sort((a, b) => {
-      const timeA = String(a.time || '')
-      const timeB = String(b.time || '')
-      if (timeA && timeB && timeA !== timeB) {
-        return timeB.localeCompare(timeA)
+function getTxSafeTimestamp(tx) {
+  if (!tx?.createdAt) return 0
+  const num = Number(tx.createdAt)
+  if (Number.isFinite(num)) return num
+  if (typeof tx.createdAt === 'string') {
+    const parsed = Date.parse(tx.createdAt)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function getIntradaySortKey(tx) {
+  if (tx?.time && typeof tx.time === 'string' && tx.time.trim()) {
+    return tx.time.trim().slice(0, 5)
+  }
+  const ts = getTxSafeTimestamp(tx)
+  if (ts > 0) {
+    try {
+      const d = new Date(ts)
+      if (!isNaN(d.getTime())) {
+        const hh = String(d.getHours()).padStart(2, '0')
+        const mm = String(d.getMinutes()).padStart(2, '0')
+        return `${hh}:${mm}`
       }
-      return Number(b.createdAt || 0) - Number(a.createdAt || 0)
+    } catch {
+      // fallback
+    }
+  }
+  return ''
+}
+
+    const sortedItems = [...items].sort((a, b) => {
+      const timeKeyA = getIntradaySortKey(a)
+      const timeKeyB = getIntradaySortKey(b)
+      if (timeKeyA && timeKeyB && timeKeyA !== timeKeyB) {
+        return timeKeyB.localeCompare(timeKeyA)
+      }
+      if (timeKeyA && !timeKeyB) return -1
+      if (!timeKeyA && timeKeyB) return 1
+      const tsA = getTxSafeTimestamp(a)
+      const tsB = getTxSafeTimestamp(b)
+      if (tsA !== tsB) return tsB - tsA
+      return String(b.id || '').localeCompare(String(a.id || ''))
     })
 
     const net = totalIncome - totalExpense

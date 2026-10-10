@@ -1,4 +1,5 @@
 import { memo, useState } from 'react'
+import { format as defaultFormat } from 'date-fns'
 import EmptyState from '../ui/EmptyState'
 import PullToRefresh from '../ui/PullToRefresh'
 import { TransactionItemCard } from './TransactionItemCard'
@@ -44,8 +45,8 @@ export function TransactionListSkeleton() {
 
 export const TransactionListSection = memo(function TransactionListSection({
   isLoading = false,
-  filteredTransactions,
-  groupedEntriesDetailed,
+  filteredTransactions = [],
+  groupedEntriesDetailed = [],
   listScrollRef,
   showTopFade,
   showBottomFade,
@@ -68,7 +69,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   getCategoryColorClass,
   resolveTransactionIconKey,
   getTransactionCategoryLabels,
-  format,
+  format = defaultFormat,
   t,
   locale,
   defaultCurrency,
@@ -80,16 +81,17 @@ export const TransactionListSection = memo(function TransactionListSection({
   newestTransactionId,
 }) {
   const PAGE_CHUNK = 25
-  const [prevLength, setPrevLength] = useState(filteredTransactions.length)
+  const currentCount = filteredTransactions?.length || 0
+  const [prevLength, setPrevLength] = useState(currentCount)
   const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_CHUNK)
 
   // Reset pagination only when list size changes significantly (e.g. filter/search changed),
   // not on single-item mutations (delete/edit/undo) so user does not lose scroll position.
-  if (Math.abs(prevLength - filteredTransactions.length) > 2) {
-    setPrevLength(filteredTransactions.length)
+  if (Math.abs(prevLength - currentCount) > 2) {
+    setPrevLength(currentCount)
     setVisibleGroupCount(PAGE_CHUNK)
-  } else if (prevLength !== filteredTransactions.length) {
-    setPrevLength(filteredTransactions.length)
+  } else if (prevLength !== currentCount) {
+    setPrevLength(currentCount)
   }
 
   const handleScrollInternal = (event) => {
@@ -165,8 +167,8 @@ export const TransactionListSection = memo(function TransactionListSection({
                       <div className="pl-3 pr-1 py-3 bg-[var(--panel-strong)]">
                         <input
                           type="checkbox"
-                          checked={selectedTxIds.has(transaction.id)}
-                          onChange={() => toggleSelectTx(transaction.id)}
+                          checked={Boolean(selectedTxIds?.has?.(transaction.id))}
+                          onChange={() => toggleSelectTx?.(transaction.id)}
                           className="h-5 w-5 shrink-0 rounded-md border-[var(--border)] text-[var(--accent)] accent-[var(--accent)] cursor-pointer"
                         />
                       </div>
@@ -199,8 +201,8 @@ export const TransactionListSection = memo(function TransactionListSection({
                         isNew={sessionLastSeenTimestamp ? isTransactionNew(transaction, sessionLastSeenTimestamp) : (newestTransactionId && String(transaction.id) === String(newestTransactionId))}
                         newestTransactionId={newestTransactionId}
                         isBulkMode={isBulkMode}
-                        isSelected={selectedTxIds.has(transaction.id)}
-                        onToggleSelect={() => toggleSelectTx(transaction.id)}
+                        isSelected={Boolean(selectedTxIds?.has?.(transaction.id))}
+                        onToggleSelect={() => toggleSelectTx?.(transaction.id)}
                       />
                     </div>
                   </div>

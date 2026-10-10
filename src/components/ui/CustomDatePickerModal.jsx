@@ -42,6 +42,21 @@ export default function CustomDatePickerModal({
   const [tempStart, setTempStart] = useState(startDate || '')
   const [tempEnd, setTempEnd] = useState(endDate || '')
 
+  const [prevOpenState, setPrevOpenState] = useState(isOpen)
+  if (isOpen !== prevOpenState) {
+    setPrevOpenState(isOpen)
+    if (isOpen) {
+      setTempStart(startDate || '')
+      setTempEnd(endDate || '')
+      setSelectingTarget('start')
+      if (startDate && isValid(parseISO(startDate))) {
+        setCurrentMonth(parseISO(startDate))
+      } else {
+        setCurrentMonth(new Date())
+      }
+    }
+  }
+
   const dateLocale = activeLocale === 'en' ? enUS : idLocale
 
   const monthStart = startOfMonth(currentMonth)

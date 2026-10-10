@@ -24,6 +24,7 @@ import {
 import { exportTransactionsToCsv } from '../lib/exportReports'
 import { updateLastSeenTxTimestamp } from '../lib/transactionLastSeen'
 import { warmupDecryptionCache } from '../lib/fieldEncryption'
+import { format } from 'date-fns'
 
 import ToastBanner from '../components/ui/ToastBanner'
 import { TransactionListSection } from '../components/transactions/TransactionListSection'
@@ -405,6 +406,7 @@ function Transactions() {
               getCategoryColorClass={getCategoryColorClass}
               resolveTransactionIconKey={resolveTransactionIconKey}
               getTransactionCategoryLabels={getTransactionCategoryLabels}
+              format={format}
               t={t}
               locale={locale}
               defaultCurrency={defaultCurrency}
@@ -430,6 +432,7 @@ function Transactions() {
         onCloseDetail={() => setDetailTransaction(null)}
         onOpenEditFromDetail={openEditTransaction}
         onDeleteFromDetail={setSingleDeleteTx}
+        onDuplicate={handleDuplicateTransaction}
         editingTransaction={editingTransaction}
         onCloseEdit={() => setEditingTransaction(null)}
         editFormData={editFormData}

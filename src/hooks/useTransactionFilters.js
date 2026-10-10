@@ -3,6 +3,17 @@ import { getDecryptedNoteSync, isFieldEncrypted } from '../lib/fieldEncryption'
 
 export const ALL_TYPES = ['income', 'expense', 'transfer']
 
+function getTxSafeTimestamp(tx) {
+  if (!tx?.createdAt) return 0
+  const num = Number(tx.createdAt)
+  if (Number.isFinite(num)) return num
+  if (typeof tx.createdAt === 'string') {
+    const parsed = Date.parse(tx.createdAt)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
 export function computeFilteredTransactions(transactions, filters, userWalletsCount, usedCategoriesCount) {
   const activeTypes = filters?.types
   const isAllTypes = !activeTypes || (Array.isArray(activeTypes) && activeTypes.length === ALL_TYPES.length)
@@ -99,8 +110,9 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
     .sort((a, b) => {
       const byDate = String(b.date || '').localeCompare(String(a.date || ''))
       if (byDate !== 0) return byDate
-      const byCreatedAt = Number(b.createdAt || 0) - Number(a.createdAt || 0)
-      if (byCreatedAt !== 0) return byCreatedAt
+      const tsA = getTxSafeTimestamp(a)
+      const tsB = getTxSafeTimestamp(b)
+      if (tsA !== tsB) return tsB - tsA
       return String(b.id || '').localeCompare(String(a.id || ''))
     })
 }

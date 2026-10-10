@@ -275,6 +275,20 @@ export async function encryptSensitiveRecord(record, fieldNames = ['notes'], pas
       result[field] = await encryptField(result[field], passphrase)
     }
   }
+  if (Array.isArray(result.splitItems)) {
+    result.splitItems = await Promise.all(
+      result.splitItems.map(async (item) => {
+        if (!item || typeof item !== 'object') return item
+        const itemClone = { ...item }
+        for (const field of fieldNames) {
+          if (itemClone[field] != null && itemClone[field] !== '') {
+            itemClone[field] = await encryptField(itemClone[field], passphrase)
+          }
+        }
+        return itemClone
+      })
+    )
+  }
   return result
 }
 
@@ -292,6 +306,20 @@ export async function decryptSensitiveRecord(record, fieldNames = ['notes'], pas
     if (result[field] != null && typeof result[field] === 'string' && isFieldEncrypted(result[field])) {
       result[field] = await decryptField(result[field], passphrase)
     }
+  }
+  if (Array.isArray(result.splitItems)) {
+    result.splitItems = await Promise.all(
+      result.splitItems.map(async (item) => {
+        if (!item || typeof item !== 'object') return item
+        const itemClone = { ...item }
+        for (const field of fieldNames) {
+          if (itemClone[field] != null && typeof itemClone[field] === 'string' && isFieldEncrypted(itemClone[field])) {
+            itemClone[field] = await decryptField(itemClone[field], passphrase)
+          }
+        }
+        return itemClone
+      })
+    )
   }
   return result
 }

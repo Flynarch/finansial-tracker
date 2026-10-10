@@ -29,6 +29,7 @@ import {
   Repeat,
   Tag,
   Receipt,
+  Copy,
 } from 'lucide-react'
 
 export default function TransactionDetailSheet({
@@ -37,6 +38,7 @@ export default function TransactionDetailSheet({
   transaction: incomingTransaction,
   openEditTransaction,
   deleteTransaction,
+  onDuplicate,
   wallets = [],
   defaultCurrency = 'IDR',
   rates,
@@ -115,11 +117,29 @@ export default function TransactionDetailSheet({
   }
 
   // Format time
-  let formattedTime = transaction.time || null
-  if (!formattedTime && transaction.createdAt) {
-    const createdAtMs = Number(transaction.createdAt)
-    if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
-      formattedTime = format(new Date(createdAtMs), 'HH:mm')
+  let formattedTime = null
+  if (transaction.time && typeof transaction.time === 'string' && transaction.time.trim()) {
+    formattedTime = transaction.time.trim()
+  } else if (transaction.createdAt) {
+    try {
+      const rawCreatedAt = transaction.createdAt
+      let dateObj = null
+      if (rawCreatedAt instanceof Date) {
+        dateObj = rawCreatedAt
+      } else if (typeof rawCreatedAt === 'number' || (typeof rawCreatedAt === 'string' && rawCreatedAt.trim())) {
+        const createdAtMs = Number(rawCreatedAt)
+        if (Number.isFinite(createdAtMs)) {
+          if (createdAtMs > 0) dateObj = new Date(createdAtMs)
+        } else {
+          const parsed = new Date(rawCreatedAt)
+          if (!isNaN(parsed.getTime())) dateObj = parsed
+        }
+      }
+      if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+        formattedTime = format(dateObj, 'HH:mm')
+      }
+    } catch {
+      formattedTime = null
     }
   }
 
@@ -183,6 +203,21 @@ export default function TransactionDetailSheet({
               <Trash2 className="h-4 w-4" />
               <span>{t('common.delete', 'Hapus')}</span>
             </button>
+
+            {typeof onDuplicate === 'function' && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose?.()
+                  onDuplicate(transaction)
+                }}
+                className="h-11 px-3.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--panel)] font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs"
+                title={t('common.duplicate', 'Duplikasi')}
+              >
+                <Copy className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('common.duplicate', 'Duplikasi')}</span>
+              </button>
+            )}
 
             <button
               type="button"

@@ -104,9 +104,29 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
           }
 
           let createdTime = null
-          const createdAtMs = Number(latestTx?.createdAt)
-          if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
-            createdTime = format(new Date(createdAtMs), 'HH:mm')
+          if (latestTx?.time && typeof latestTx.time === 'string' && latestTx.time.trim()) {
+            createdTime = latestTx.time.trim()
+          } else if (latestTx?.createdAt) {
+            try {
+              const rawCreatedAt = latestTx.createdAt
+              let dateObj = null
+              if (rawCreatedAt instanceof Date) {
+                dateObj = rawCreatedAt
+              } else if (typeof rawCreatedAt === 'number' || (typeof rawCreatedAt === 'string' && rawCreatedAt.trim())) {
+                const createdAtMs = Number(rawCreatedAt)
+                if (Number.isFinite(createdAtMs)) {
+                  if (createdAtMs > 0) dateObj = new Date(createdAtMs)
+                } else {
+                  const parsed = new Date(rawCreatedAt)
+                  if (!isNaN(parsed.getTime())) dateObj = parsed
+                }
+              }
+              if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+                createdTime = format(dateObj, 'HH:mm')
+              }
+            } catch {
+              createdTime = null
+            }
           }
 
           const sub = labels.sub || null

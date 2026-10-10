@@ -44,7 +44,15 @@ export function updateLastSeenTxTimestamp(timestamp = Date.now()) {
  */
 export function isTransactionNew(transaction, lastSeenTimestamp) {
   if (!transaction || !lastSeenTimestamp || !Number.isFinite(lastSeenTimestamp)) return false
-  const txCreatedAt = Number(transaction.createdAt)
+  let txCreatedAt = Number(transaction.createdAt)
+  if (!Number.isFinite(txCreatedAt) || txCreatedAt <= 0) {
+    if (typeof transaction.createdAt === 'string') {
+      const parsed = Date.parse(transaction.createdAt)
+      if (Number.isFinite(parsed) && parsed > 0) {
+        txCreatedAt = parsed
+      }
+    }
+  }
   if (!Number.isFinite(txCreatedAt) || txCreatedAt <= 0) return false
   return txCreatedAt > lastSeenTimestamp
 }

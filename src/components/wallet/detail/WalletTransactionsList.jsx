@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { format, subDays } from 'date-fns'
+import { id as idLocale, enUS } from 'date-fns/locale'
 import { Search, X } from 'lucide-react'
 import { TransactionItemCard } from '../../transactions/TransactionItemCard'
 import TransactionEditSheet from '../../transactions/TransactionEditSheet'
@@ -230,8 +231,11 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
   const groupedTransactions = useMemo(() => {
     if (!filteredTransactions.length) return []
     const groups = {}
+    const activeLocale = locale === 'en' ? enUS : idLocale
+
     filteredTransactions.forEach((tx) => {
-      const dateKey = tx.date
+      const dateKey = String(tx.date || '').slice(0, 10)
+      if (!dateKey) return
       if (!groups[dateKey]) groups[dateKey] = []
       groups[dateKey].push(tx)
     })
@@ -246,14 +250,31 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
         if (!dateLabel) {
           try {
             const rawDate = typeof dateKey === 'string' && dateKey.length === 10 ? `${dateKey}T12:00:00` : dateKey
-            dateLabel = format(new Date(rawDate), 'dd MMMM yyyy')
+            const d = new Date(rawDate)
+            if (!isNaN(d.getTime())) {
+              dateLabel = format(d, 'dd MMMM yyyy', { locale: activeLocale })
+            } else {
+              dateLabel = dateKey
+            }
           } catch (err) {
             console.error('[WalletTransactionsList:formatDate]', err)
             dateLabel = dateKey
           }
         }
 
-        const items = groups[dateKey]
+        const items = [...groups[dateKey]].sort((a, b) => {
+          const timeA = String(a.time || '').trim().slice(0, 5)
+          const timeB = String(b.time || '').trim().slice(0, 5)
+          if (timeA && timeB && timeA !== timeB) {
+            return timeB.localeCompare(timeA)
+          }
+          if (timeA && !timeB) return -1
+          if (!timeA && timeB) return 1
+          const tsA = Number(a.createdAt) || (typeof a.createdAt === 'string' ? Date.parse(a.createdAt) || 0 : 0)
+          const tsB = Number(b.createdAt) || (typeof b.createdAt === 'string' ? Date.parse(b.createdAt) || 0 : 0)
+          if (tsA !== tsB) return tsB - tsA
+          return String(b.id || '').localeCompare(String(a.id || ''))
+        })
         let net = 0
         const walletCurrency = wallet?.currency || defaultCurrency
 
@@ -279,7 +300,7 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
         const dailySummaryText = net !== 0 ? `${net > 0 ? '+' : ''}${formatCurrency(net, wallet?.currency || defaultCurrency)}` : null
         return { dateKey, dateLabel, items, dailySummaryText, isPositive: net > 0 }
       })
-  }, [filteredTransactions, t, defaultCurrency, wallet?.currency, rates, walletId, activeWallets])
+  }, [filteredTransactions, t, locale, defaultCurrency, wallet?.currency, rates, walletId, activeWallets])
 
   // Pagination / Batching state
   const currentFilterKey = `${activeTab}-${searchQuery}-${walletId}`

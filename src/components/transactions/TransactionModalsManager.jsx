@@ -32,6 +32,7 @@ export default function TransactionModalsManager({
   onCloseDetail,
   onOpenEditFromDetail,
   onDeleteFromDetail,
+  onDuplicate,
 
   // Transaction edit sheet
   editingTransaction,
@@ -145,6 +146,7 @@ export default function TransactionModalsManager({
           onCloseDetail()
           onDeleteFromDetail(targetTx)
         }}
+        onDuplicate={onDuplicate}
         wallets={allWallets}
         defaultCurrency={defaultCurrency}
         rates={rates}
@@ -196,8 +198,8 @@ export default function TransactionModalsManager({
         title={t('tx.bulk.deleteTitle', 'Hapus Transaksi Terpilih')}
         message={t(
           'tx.bulk.deleteMessage',
-          { count: selectedTxIds.size },
-          `Apakah Anda yakin ingin menghapus ${selectedTxIds.size} transaksi yang dipilih? Tindakan ini tidak dapat dibatalkan.`
+          `Apakah Anda yakin ingin menghapus ${selectedTxIds.size} transaksi yang dipilih? Tindakan ini tidak dapat dibatalkan.`,
+          { count: selectedTxIds.size }
         )}
       />
 

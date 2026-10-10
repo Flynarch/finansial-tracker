@@ -82,6 +82,28 @@ describe('fieldEncryption - Transparent IndexedDB Field Protection', () => {
     expect(decryptedRecord.id).toBe(42)
   })
 
+  it('encrypts and decrypts sensitive fields inside splitItems array', async () => {
+    const splitTx = {
+      id: 99,
+      isSplit: true,
+      notes: 'Parent secret receipt',
+      splitItems: [
+        { category: 'makanan', amount: 50000, notes: 'Secret lunch' },
+        { category: 'transport', amount: 20000, notes: 'Confidential taxi' },
+      ],
+    }
+
+    const encrypted = await encryptSensitiveRecord(splitTx, ['notes'])
+    expect(isFieldEncrypted(encrypted.notes)).toBe(true)
+    expect(isFieldEncrypted(encrypted.splitItems[0].notes)).toBe(true)
+    expect(isFieldEncrypted(encrypted.splitItems[1].notes)).toBe(true)
+
+    const decrypted = await decryptSensitiveRecord(encrypted, ['notes'])
+    expect(decrypted.notes).toBe('Parent secret receipt')
+    expect(decrypted.splitItems[0].notes).toBe('Secret lunch')
+    expect(decrypted.splitItems[1].notes).toBe('Confidential taxi')
+  })
+
   it('manages in-memory session encryption key lifecycle', () => {
     expect(getSessionEncryptionKey()).toBeNull()
     const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } }

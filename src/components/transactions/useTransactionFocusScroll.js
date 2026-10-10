@@ -25,9 +25,13 @@ export function useTransactionFocusScroll({
       setFilters({
         search: '',
         types: ['income', 'expense', 'transfer'],
-        categories: [],
+        categories: null,
+        walletIds: null,
         startDate: '',
         endDate: '',
+        tag: '',
+        minAmount: '',
+        maxAmount: '',
       })
       navigate(location.pathname, { replace: true, state: null })
     }, 0)

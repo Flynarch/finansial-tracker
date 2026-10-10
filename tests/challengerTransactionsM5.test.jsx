@@ -256,6 +256,10 @@ describe('Challenger M5 - Deep Stress & Adversarial Edge Cases', () => {
         amount: 25000,
         type: 'expense',
         notes: 'Coffee',
+        splitBillId: 'SPLIT-1234',
+        loanId: 'LOAN-999',
+        initialTransactionId: 'old-tx-id',
+        deletedAt: null,
       }
 
       await act(async () => {
@@ -265,6 +269,10 @@ describe('Challenger M5 - Deep Stress & Adversarial Edge Cases', () => {
       expect(addTransaction).toHaveBeenCalledTimes(1)
       const payload = addTransaction.mock.calls[0][0]
       expect(payload.id).toBeUndefined()
+      expect(payload.splitBillId).toBeUndefined()
+      expect(payload.loanId).toBeUndefined()
+      expect(payload.initialTransactionId).toBeUndefined()
+      expect(payload.deletedAt).toBeUndefined()
       expect(payload.date).toBe(format(new Date(), 'yyyy-MM-dd'))
       expect(payload.isPendingReview).toBe(false)
       expect(setApiErrorTone).toHaveBeenCalledWith('success')
