@@ -12,7 +12,7 @@ export async function handleHabitAction(result) {
       color: result.color || 'indigo',
       category: 'Lainnya',
       frequencyType: result.frequencyType || 'daily',
-      frequencyValue: null,
+      frequencyValue: result.frequencyValue || (result.frequencyType === 'weekly' ? 3 : null),
       reminderEnabled: Boolean(result.reminderTime),
       reminderTime: result.reminderTime || null,
       createdAt: Date.now(),
@@ -31,6 +31,7 @@ export async function handleHabitAction(result) {
           title: result.title,
           color: result.color || 'indigo',
           frequencyType: result.frequencyType || 'daily',
+          frequencyValue: result.frequencyValue || (result.frequencyType === 'weekly' ? 3 : null),
         },
       },
     })

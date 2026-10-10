@@ -128,7 +128,9 @@ export function useDashboardData() {
   const [miniRevenueRange, setMiniRevenueRangeState] = useState(() => getSavedNetWorthRange())
 
   const isAllRange = zoomRevenueRange === 'all' || miniRevenueRange === 'all'
-  const txCutoffDate = format(subMonths(startOfMonth(new Date()), 12), 'yyyy-MM-dd')
+  const isMultiYear = zoomRevenueRange === '1y' || miniRevenueRange === '1y'
+  const cutoffMonths = isMultiYear ? 24 : 12
+  const txCutoffDate = format(subMonths(startOfMonth(new Date()), cutoffMonths), 'yyyy-MM-dd')
   const transactions = useLiveQuery(
     async () => {
       const list = isAllRange

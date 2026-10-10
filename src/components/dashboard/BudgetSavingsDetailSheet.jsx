@@ -323,7 +323,12 @@ export default function BudgetSavingsDetailSheet({
       totalLimit = convertCurrency(overallBudget.limit || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
     } else {
       const topLevelRows = categoryRows.filter((r) => {
-        return !categoryRows.some((other) => other.id !== r.id && r.category?.startsWith(`${other.category}/`))
+        const rCat = (r.category || '').toLowerCase()
+        return !categoryRows.some((other) => {
+          if (other.id === r.id) return false
+          const otherCat = (other.category || '').toLowerCase()
+          return rCat.startsWith(`${otherCat}/`)
+        })
       })
 
       topLevelRows.forEach((r) => {

@@ -205,8 +205,14 @@ export function findMatchingTransactionsForAction(allFreshTxs = [], result = {})
   }
 
   // Fallback to text / token search
-  const tokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
-  const matchedTx = allFreshTxs.find((t) => {
+  const isBatch = /\b(semua|all|semuanya|seluruh|seluruhnya|every)\b/i.test(sq) || Boolean(result.isBatch)
+  const allTokens = sq.split(/\s+/).filter((tok) => tok.length >= 2)
+  const filterTokens = allTokens.filter(
+    (tok) => !['semua', 'all', 'semuanya', 'seluruh', 'seluruhnya', 'every'].includes(tok.toLowerCase())
+  )
+  const tokens = filterTokens.length > 0 ? filterTokens : (isBatch ? [] : allTokens)
+
+  const checkTxMatch = (t) => {
     const matchesDate = !result.date || t.date === result.date
     const rawNotes = t.notes || ''
     const plainNotes = isFieldEncrypted(rawNotes) ? getDecryptedNoteSync(rawNotes) : rawNotes
@@ -214,18 +220,46 @@ export function findMatchingTransactionsForAction(allFreshTxs = [], result = {})
     const merchantLower = (t.merchant || '').toLowerCase()
     const categoryLower = (t.category || '').toLowerCase()
 
+    let splitNotesLower = ''
+    if (Array.isArray(t.splitItems) && t.splitItems.length > 0) {
+      splitNotesLower = t.splitItems
+        .map((si) => {
+          const rawSi = si?.notes || ''
+          const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
+          return `${plainSi || ''} ${si?.category || ''}`
+        })
+        .join(' ')
+        .toLowerCase()
+    }
+
+    if (isBatch && tokens.length === 0) {
+      return matchesDate
+    }
+
     const directMatch =
       (notesLower && notesLower.includes(sq)) ||
       (merchantLower && merchantLower.includes(sq)) ||
-      (categoryLower && categoryLower.includes(sq))
+      (categoryLower && categoryLower.includes(sq)) ||
+      (splitNotesLower && splitNotesLower.includes(sq))
 
     const tokenMatch =
       tokens.length > 0 &&
-      tokens.some((token) => notesLower.includes(token) || merchantLower.includes(token))
+      tokens.some(
+        (token) =>
+          notesLower.includes(token) ||
+          merchantLower.includes(token) ||
+          categoryLower.includes(token) ||
+          splitNotesLower.includes(token)
+      )
 
     return matchesDate && (directMatch || tokenMatch)
-  })
+  }
 
+  if (isBatch) {
+    return allFreshTxs.filter(checkTxMatch)
+  }
+
+  const matchedTx = allFreshTxs.find(checkTxMatch)
   return matchedTx ? [matchedTx] : []
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { format, startOfMonth, subMonths, addMonths, isSameMonth } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
 import { Printer, Sparkles, FileSpreadsheet, Check, ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
@@ -105,32 +106,38 @@ export default function ReportHeader({
     navigate('/ai-chat')
   }
 
-  const handleCsvClick = () => {
+  const handleCsvClick = async () => {
     triggerHaptic('medium')
     if (onExportCsv) {
-      const ok = onExportCsv()
-      if (ok) {
-        setCsvExported(true)
-        window.dispatchEvent(
-          new CustomEvent('ft-show-toast', {
-            detail: {
-              title: t('reports.csvExportSuccess', 'Ekspor CSV Berhasil'),
-              message: t('reports.csvExportSuccessDesc', 'Laporan data transaksi berhasil diunduh.'),
-              type: 'success',
-            },
-          })
-        )
-        setTimeout(() => setCsvExported(false), 2500)
-      } else {
-        window.dispatchEvent(
-          new CustomEvent('ft-show-toast', {
-            detail: {
-              title: t('reports.csvExportEmpty', 'Tidak Ada Transaksi'),
-              message: t('reports.csvExportEmptyDesc', 'Tidak ada data transaksi pada rentang waktu ini untuk diekspor.'),
-              type: 'warning',
-            },
-          })
-        )
+      try {
+        const ok = await onExportCsv()
+        if (ok) {
+          setCsvExported(true)
+          if (!Capacitor.isNativePlatform()) {
+            window.dispatchEvent(
+              new CustomEvent('ft-show-toast', {
+                detail: {
+                  title: t('reports.csvExportSuccess', 'Ekspor CSV Berhasil'),
+                  message: t('reports.csvExportSuccessDesc', 'Laporan data transaksi berhasil diunduh.'),
+                  type: 'success',
+                },
+              })
+            )
+          }
+          setTimeout(() => setCsvExported(false), 2500)
+        } else {
+          window.dispatchEvent(
+            new CustomEvent('ft-show-toast', {
+              detail: {
+                title: t('reports.csvExportEmpty', 'Tidak Ada Transaksi'),
+                message: t('reports.csvExportEmptyDesc', 'Tidak ada data transaksi pada rentang waktu ini untuk diekspor.'),
+                type: 'warning',
+              },
+            })
+          )
+        }
+      } catch (err) {
+        console.error('[ReportHeader:handleCsvClick]', err)
       }
     }
   }

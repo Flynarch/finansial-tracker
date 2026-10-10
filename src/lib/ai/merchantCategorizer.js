@@ -44,7 +44,7 @@ export function normalizeMerchantKey(rawName = '') {
     .replace(/\b(?:inv|order|ref|trx|tx)[a-z0-9/_.-]*\b/gi, '')
     .replace(/#[a-z0-9_-]+/gi, '')
     .replace(/\b(?:\d{4}[/-]\d{2}[/-]\d{2}|\d{2}[/-]\d{2}[/-]\d{4})\b/g, '')
-    .replace(/\b\d{5,}\b/g, '')
+    .replace(/\b\d+\b/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

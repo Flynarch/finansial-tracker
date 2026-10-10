@@ -9,6 +9,7 @@ import { getCachedCurrencyRates } from '../lib/api'
 import { getLocalDateString } from '../lib/dateUtils'
 import { triggerHaptic } from '../lib/haptics'
 import { FALLBACK_EXCHANGE_RATES, isExcludeAnalyticsTx, convertCurrency, formatCurrency, formatMoneyInput, parseMoneyInput } from '../lib/utils'
+import { evaluateExpression } from '../lib/calcParser'
 
 // UI & Subcomponents
 import Modal from '../components/ui/Modal'
@@ -44,7 +45,8 @@ export default function AiFinanceChat() {
   const backgroundTexture = useChatStore((s) => s.backgroundTexture) || 'paper'
   const setBackgroundTexture = useChatStore((s) => s.setBackgroundTexture)
 
-  const wallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), []) || []
+  const liveWallets = useLiveQuery(() => db.wallets.filter((w) => !w.isArchived).toArray(), [])
+  const wallets = useMemo(() => liveWallets || [], [liveWallets])
 
   // Today's total expense for WelcomeHero live snapshot
   const todayStr = useMemo(() => getLocalDateString(), [])
@@ -240,16 +242,25 @@ export default function AiFinanceChat() {
   const handleStartEdit = useCallback((tx) => {
     if (!tx) return
     setEditingTransaction(tx)
+    const tgtWallet = wallets?.find((w) => String(w.id) === String(tx.targetWalletId))
+    const tgtCurr = tgtWallet?.currency || defaultCurrency
     setEditFormData({
       id: tx.id,
       amount: formatMoneyInput(String(tx.amount || 0), tx.currency || defaultCurrency),
       type: tx.type || 'expense',
       category: tx.category || '',
       date: tx.date || getLocalDateString(),
+      time: tx.time || '',
       walletId: tx.walletId ? String(tx.walletId) : '',
       targetWalletId: tx.targetWalletId ? String(tx.targetWalletId) : '',
+      targetAmount: tx.targetAmount ? formatMoneyInput(String(tx.targetAmount), tgtCurr) : '',
       notes: (isFieldEncrypted(tx.notes) ? getDecryptedNoteSync(tx.notes) : tx.notes) || '',
       currency: tx.currency || defaultCurrency,
+      items: tx.items || undefined,
+      subtotal: tx.subtotal !== undefined ? tx.subtotal : undefined,
+      tax: tx.tax !== undefined ? tx.tax : undefined,
+      discount: tx.discount !== undefined ? tx.discount : undefined,
+      merchant: tx.merchant || undefined,
       isSplit: Boolean(tx.isSplit),
       splitItems: Array.isArray(tx.splitItems)
         ? tx.splitItems.map((si) => ({
@@ -260,17 +271,39 @@ export default function AiFinanceChat() {
       receiptImage: tx.receiptImage || null,
       isExcludeAnalyticsTx: Boolean(tx.isExcludeAnalyticsTx),
     })
-  }, [defaultCurrency])
+  }, [defaultCurrency, wallets])
 
-  const handleSaveEdit = useCallback(async () => {
+  const handleSaveEdit = useCallback(async (event, overrides = {}) => {
     if (!editFormData || !editingTransaction) return
-    const rawAmt = parseMoneyInput(editFormData.amount, editFormData.currency)
+    let rawAmt = overrides?.amount
+    if (rawAmt === undefined) {
+      const evalRes = evaluateExpression(editFormData.amount, editFormData.currency)
+      rawAmt =
+        evalRes.isValid && evalRes.result !== null
+          ? evalRes.result
+          : parseMoneyInput(editFormData.amount, editFormData.currency)
+    }
     if (rawAmt <= 0) return
+
+    const isTransfer = editFormData.type === 'transfer'
+    let resolvedTargetAmount = overrides?.targetAmount
+    if (resolvedTargetAmount === undefined && isTransfer && editFormData.targetAmount) {
+      const tgtWallet = wallets?.find((w) => String(w.id) === String(editFormData.targetWalletId))
+      const tgtCurr = tgtWallet?.currency || defaultCurrency
+      const evalTgt = evaluateExpression(editFormData.targetAmount, tgtCurr)
+      resolvedTargetAmount =
+        evalTgt.isValid && evalTgt.result !== null
+          ? evalTgt.result
+          : parseMoneyInput(editFormData.targetAmount, tgtCurr)
+    }
 
     const updatedTx = {
       ...editingTransaction,
       ...editFormData,
       amount: rawAmt,
+      targetAmount: isTransfer
+        ? (resolvedTargetAmount !== undefined ? resolvedTargetAmount : editFormData.targetAmount)
+        : null,
       updatedAt: new Date().toISOString(),
     }
 
@@ -296,8 +329,18 @@ export default function AiFinanceChat() {
       setEditFormData(null)
     } catch (err) {
       console.warn('[AiFinanceChat] handleSaveEdit error:', err)
+      triggerHaptic('warning')
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: locale === 'en' ? 'Update Failed' : 'Gagal Memperbarui',
+            message: err?.message || (locale === 'en' ? 'Failed to save changes' : 'Gagal menyimpan perubahan transaksi'),
+            type: 'error',
+          },
+        })
+      )
     }
-  }, [editFormData, editingTransaction, setMessages])
+  }, [editFormData, editingTransaction, setMessages, wallets, defaultCurrency, locale])
 
   // Android Hardware Back Button Handlers
   useBackButton(() => {

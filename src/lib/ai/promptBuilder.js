@@ -2,6 +2,7 @@ import { getMergedExpenseTree } from '../expenseCategories'
 import { getMergedIncomeTree } from '../incomeCategories'
 import { getFrequentUserEntities } from './entityMemory'
 import { getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
+import { getLocalDateString } from '../dateUtils'
 
 export function buildCategoryContext(locale = 'id') {
   const isEn = locale === 'en'
@@ -122,7 +123,7 @@ FORMAT OUTPUT HARUS PERSIS BERUPA JSON MURNI:
 }
 
 export function buildSystemPrompt({
-  todayStr = new Date().toISOString().slice(0, 10),
+  todayStr = getLocalDateString(),
   currentTime = '12:00',
   currency = 'IDR',
   locale = 'id',

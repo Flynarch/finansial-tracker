@@ -143,7 +143,7 @@ describe('automation - Recurring Transactions Logic', () => {
     expect(failedNotifs[0].message).toMatch(/archived or deleted|diarsip atau dihapus/)
   })
 
-  it('advances nextDate for reminder-only rules (autoExecute: false) when due today in notifyTodayEvents', async () => {
+  it('preserves earliest overdue nextDate for reminder-only rules (autoExecute: false) until logged or dismissed', async () => {
     await db.recurringTransactions.clear()
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     const marker = `fintrack-notified-${todayStr}`
@@ -169,8 +169,8 @@ describe('automation - Recurring Transactions Logic', () => {
     await notifyTodayEvents()
 
     const updated = await db.recurringTransactions.get(777)
-    expect(updated.nextDate).not.toBe(todayStr)
-    expect(updated.lastRun).toBe(todayStr)
+    expect(updated.nextDate).toBe(todayStr)
+    expect(updated.anchorDay).toBe(item.anchorDay)
   })
 
   it('prevents concurrent executions via in-memory mutex lock', async () => {

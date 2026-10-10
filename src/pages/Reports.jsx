@@ -611,7 +611,7 @@ export default function Reports() {
               </div>
 
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/80 p-4 shadow-2xs">
-                <div className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20 mb-3">
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)] border border-[var(--accent)]/20 mb-3">
                   <PieChart className="h-4 w-4" />
                 </div>
                 <h3 className="text-xs font-black text-[var(--fg)]">
@@ -704,7 +704,7 @@ export default function Reports() {
           <ReportStatementModal
             isOpen={isStatementModalOpen}
             onClose={() => setIsStatementModalOpen(false)}
-            wallets={wallets || []}
+            wallets={computedWallets || []}
             savings={savings || []}
             loans={loans || []}
             investments={investments || []}

@@ -11,6 +11,7 @@ import {
   Edit2,
   Power,
   Tag,
+  Check,
 } from 'lucide-react'
 import CustomDatePicker from '../../components/ui/CustomDatePicker'
 import Modal from '../../components/ui/Modal'
@@ -18,6 +19,8 @@ import ConfirmDeleteModal from '../../components/ui/ConfirmDeleteModal'
 import WalletSelectModal, { WalletSelectTrigger } from '../../components/ui/WalletSelectModal'
 import CategoryPickerModal from '../../components/transactions/CategoryPickerModal'
 import { db } from '../../lib/db'
+import { createTransaction } from '../../services/transactionService'
+import { nextDateByFrequency } from '../../lib/automation'
 import {
   formatCurrency,
   formatCompactCurrency,
@@ -25,7 +28,10 @@ import {
   formatMoneyInput,
   parseMoneyInput,
   formatMoneyValueForInput,
+  convertCurrency,
+  roundCurrency,
 } from '../../lib/utils'
+import { getCachedCurrencyRates } from '../../lib/api'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
 import useTranslation from '../../hooks/useTranslation'
@@ -150,6 +156,7 @@ export default function SettingsRecurring() {
       title: item.title || '',
       type: item.type || 'expense',
       category: item.category || '',
+      subcategory: item.subcategory || null,
       amount: formatMoneyValueForInput(item.amount, item.currency || defaultCurrency),
       currency: item.currency || defaultCurrency,
       notes: item.notes || '',
@@ -171,8 +178,12 @@ export default function SettingsRecurring() {
     const dayChanged = Boolean(editingItem.nextDate && prevDay !== newDay)
     const finalAnchorDay = (editingItem.anchorDay && !dayChanged) ? editingItem.anchorDay : newDay
 
+    const parentChanged = (editingItem.category || '') !== (editForm.category || '')
+    const finalSubcategory = parentChanged ? null : (editForm.subcategory || null)
+
     await db.recurringTransactions.update(editingItem.id, {
       ...editForm,
+      subcategory: finalSubcategory,
       amount: numericAmount,
       anchorDay: finalAnchorDay,
       autoExecute: editForm.autoExecute !== false,
@@ -187,6 +198,112 @@ export default function SettingsRecurring() {
     await db.recurringTransactions.update(item.id, {
       enabled: isCurrentlyEnabled ? 0 : 1,
     })
+  }
+
+  const [loggingId, setLoggingId] = useState(null)
+
+  const handleLogNow = async (item, e) => {
+    e?.stopPropagation()
+    if (loggingId) return
+    try {
+      setLoggingId(item.id)
+      let resolvedWalletId = item.walletId
+      if (!resolvedWalletId) {
+        resolvedWalletId = defaultWalletId
+        if (!resolvedWalletId) {
+          const firstActive = (wallets || []).find((w) => !w.isArchived)
+          resolvedWalletId = firstActive?.id
+        }
+      }
+      if (!resolvedWalletId) {
+        alert(t('settings.recurring.noWallet', 'Silakan pilih akun dompet terlebih dahulu.'))
+        return
+      }
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      const timeStr = format(new Date(), 'HH:mm')
+      const srcWallet = (wallets || []).find((w) => String(w.id) === String(resolvedWalletId))
+      const srcCurrency = item.currency || srcWallet?.currency || defaultCurrency || 'IDR'
+
+      const txPayload = {
+        date: todayStr,
+        time: item.time || timeStr,
+        amount: item.amount,
+        type: item.type,
+        category: item.category,
+        subcategory: item.subcategory,
+        walletId: Number(resolvedWalletId),
+        notes: item.notes ? `${item.notes} (${item.title})` : item.title,
+        currency: srcCurrency,
+        tags: Array.isArray(item.tags) ? item.tags : undefined,
+        isSplit: item.isSplit === true || item.isSplit === 1,
+        splitItems: Array.isArray(item.splitItems) ? item.splitItems : undefined,
+      }
+
+      if (item.type === 'transfer') {
+        const targetWallet = (wallets || []).find((w) => String(w.id) === String(item.targetWalletId))
+        if (!item.targetWalletId || !targetWallet || targetWallet.isArchived) {
+          throw new Error(t('settings.recurring.invalidTargetWallet', 'Dompet tujuan transfer tidak valid atau sudah diarsipkan.'))
+        }
+        if (String(item.targetWalletId) === String(resolvedWalletId)) {
+          throw new Error(t('settings.recurring.sameWalletTransfer', 'Dompet tujuan transfer harus berbeda dengan dompet asal.'))
+        }
+        const tgtCurrency = item.targetCurrency || targetWallet.currency || srcCurrency
+        let tgtAmount = item.targetAmount
+        if (!tgtAmount) {
+          if (srcCurrency !== tgtCurrency) {
+            const rates = getCachedCurrencyRates('USD')
+            tgtAmount = roundCurrency(convertCurrency(item.amount, srcCurrency, tgtCurrency, rates), tgtCurrency)
+          } else {
+            tgtAmount = item.amount
+          }
+        }
+        txPayload.targetWalletId = Number(item.targetWalletId)
+        txPayload.targetCurrency = tgtCurrency
+        txPayload.targetAmount = tgtAmount
+      }
+
+      await createTransaction(txPayload)
+
+      const anchorDay = item.anchorDay || parseInt(String(item.nextDate || todayStr).split('-')[2], 10) || new Date().getDate()
+      let nextDateStr = item.nextDate || todayStr
+      while (nextDateStr <= todayStr) {
+        const baseDate = new Date(`${nextDateStr}T12:00:00`)
+        const nextPointer = nextDateByFrequency(baseDate, item.frequency, anchorDay)
+        nextDateStr = format(nextPointer, 'yyyy-MM-dd')
+      }
+
+      await db.recurringTransactions.update(item.id, {
+        nextDate: nextDateStr,
+        anchorDay,
+        lastRun: todayStr,
+      })
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              type: 'success',
+              message: t('settings.recurring.loggedSuccess', 'Transaksi rutin berhasil dicatat.'),
+            },
+          })
+        )
+      }
+    } catch (err) {
+      console.error('[SettingsRecurring:handleLogNow]', err)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              type: 'error',
+              message: err?.message || t('common.error.saveFailed', 'Gagal mencatat transaksi rutin.'),
+            },
+          })
+        )
+      }
+    } finally {
+      setLoggingId(null)
+    }
   }
 
   const activeItems = (recurringTransactions || []).filter(
@@ -518,6 +635,19 @@ export default function SettingsRecurring() {
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {isEnabled && (
+                        <button
+                          type="button"
+                          disabled={loggingId === item.id}
+                          onClick={(e) => handleLogNow(item, e)}
+                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title={t('settings.recurring.logNow', 'Catat Sekarang')}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-bold">{t('settings.recurring.logNow', 'Catat')}</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={(e) => handleToggleEnabled(item, e)}
@@ -564,7 +694,13 @@ export default function SettingsRecurring() {
         onClose={() => setIsCategoryPickerOpen(false)}
         txType={recurringForm.type}
         selectedCategory={recurringForm.category}
-        onSelectCategory={(cat) => setRecurringForm((prev) => ({ ...prev, category: cat }))}
+        onSelectCategory={(cat) =>
+          setRecurringForm((prev) => ({
+            ...prev,
+            category: cat,
+            subcategory: prev.category !== cat ? null : prev.subcategory,
+          }))
+        }
       />
 
       {/* Wallet Picker for Add Form */}
@@ -585,7 +721,13 @@ export default function SettingsRecurring() {
         onClose={() => setIsEditCategoryPickerOpen(false)}
         txType={editForm.type}
         selectedCategory={editForm.category}
-        onSelectCategory={(cat) => setEditForm((prev) => ({ ...prev, category: cat }))}
+        onSelectCategory={(cat) =>
+          setEditForm((prev) => ({
+            ...prev,
+            category: cat,
+            subcategory: prev.category !== cat ? null : prev.subcategory,
+          }))
+        }
       />
 
       <WalletSelectModal

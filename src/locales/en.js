@@ -576,6 +576,7 @@ export default {
     'habits.notes': 'Notes (Optional)',
     'habits.notesPlaceholder': 'Goal or details on how to complete this habit...',
     'habits.otherSchedules': 'Other Schedules',
+    'habits.pausedSection': 'Paused Habits',
     'habits.reminder': 'Reminder Time',
     'habits.reminderTime': 'Notification Time',
     'habits.save': 'Save Habit',

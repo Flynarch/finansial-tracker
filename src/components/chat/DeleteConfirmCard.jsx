@@ -63,6 +63,9 @@ export default function DeleteConfirmCard({
               const itemRaw = item.notes
               const itemPlain = isFieldEncrypted(itemRaw) ? getDecryptedNoteSync(itemRaw) : itemRaw
               const itemSafeNote = isFieldEncrypted(itemPlain) ? '' : (itemPlain || '')
+              const itemRoute = item.type === 'transfer'
+                ? (item.walletName && item.targetWalletName ? `${item.walletName} → ${item.targetWalletName}` : item.walletName || '')
+                : (item.walletName || '')
               return (
                 <div key={item.id || idx} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-[var(--field-bg)]">
                   <div className="min-w-0 flex-1 pr-2">
@@ -70,10 +73,16 @@ export default function DeleteConfirmCard({
                       {itemSafeNote || item.category || (locale === 'en' ? `Item #${idx + 1}` : `Item #${idx + 1}`)}
                     </p>
                     <p className="text-[10px] text-[var(--muted)] truncate">
-                      {item.date} {item.category ? `• ${item.category}` : ''}
+                      {item.date} {item.time ? `• ${item.time}` : ''} {itemRoute ? `• ${itemRoute}` : ''} {item.category && item.type !== 'transfer' ? `• ${item.category}` : ''}
                     </p>
                   </div>
-                  <span className="font-bold shrink-0 text-[var(--fg)]">
+                  <span className={`font-bold shrink-0 ${
+                    item.type === 'income'
+                      ? 'text-[var(--income)]'
+                      : item.type === 'transfer'
+                      ? 'text-[var(--transfer)]'
+                      : 'text-[var(--expense)]'
+                  }`}>
                     {formatCurrency(item.amount, item.currency || data.currency)}
                   </span>
                 </div>
@@ -101,13 +110,29 @@ export default function DeleteConfirmCard({
               ) : (
                 <>
                   <span>{data.date}</span>
-                  {data.category && <span>{`• ${data.category}`}</span>}
+                  {data.time && <span>{`• ${data.time}`}</span>}
+                  {data.type === 'transfer' ? (
+                    (data.walletName && data.targetWalletName) ? (
+                      <span>{`• ${data.walletName} → ${data.targetWalletName}`}</span>
+                    ) : data.walletName ? (
+                      <span>{`• ${data.walletName}`}</span>
+                    ) : null
+                  ) : data.walletName ? (
+                    <span>{`• ${data.walletName}`}</span>
+                  ) : null}
+                  {data.category && data.type !== 'transfer' && <span>{`• ${data.category}`}</span>}
                 </>
               )}
             </p>
           </div>
           {data.amount != null && (
-            <span className={`text-xs font-black shrink-0 ${data.type === 'income' ? 'text-[var(--income)]' : 'text-[var(--expense)]'}`}>
+            <span className={`text-xs font-black shrink-0 ${
+              data.type === 'income'
+                ? 'text-[var(--income)]'
+                : data.type === 'transfer'
+                ? 'text-[var(--transfer)]'
+                : 'text-[var(--expense)]'
+            }`}>
               {formatCurrency(data.amount, data.currency)}
             </span>
           )}

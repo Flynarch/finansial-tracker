@@ -20,6 +20,7 @@ import {
   importAllDataFromJsonPayload,
   exportAllDataAsEncryptedEnvelope,
   importAllDataFromEncryptedEnvelope,
+  isLocalDataEmpty,
 } from '../../lib/backup'
 import { uploadLatestBackup, downloadLatestBackupJson, getLatestBackupMeta } from '../../lib/cloudBackup'
 import { getSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
@@ -219,13 +220,26 @@ export default function AuthModal({
       const cloudData = await downloadLatestBackupJson(userObj.uid).catch(() => null)
 
       if (cloudData) {
+        const isEmpty = await isLocalDataEmpty()
+        if (!isEmpty) {
+          const confirmed = window.confirm(
+            t(
+              'auth.confirmRestoreOverwrite',
+              'Data lokal terdeteksi di perangkat ini. Memulihkan cadangan cloud akan menimpa data saat ini. Lanjutkan pemulihan?'
+            )
+          )
+          if (!confirmed) {
+            return { success: true, skippedRestore: true }
+          }
+        }
+
         if (cloudData.format === 'fintrack_encrypted_envelope') {
           const e2eePhrase = getSessionMnemonicPhrase()
           if (e2eePhrase && e2eePhrase.trim().split(/\s+/).length === 12) {
             try {
               await importAllDataFromEncryptedEnvelope(cloudData, e2eePhrase.trim())
               return { success: true }
-            } catch (err){
+            } catch (err) {
               console.warn('[AuthModal]', err)
               return { needsRecoveryPhrase: true, cloudData }
             }

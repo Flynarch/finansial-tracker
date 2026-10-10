@@ -64,7 +64,12 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
     totalBudgetLimit = convertCurrency(overallBudget.limit || 0, overallBudget.currency || defaultCurrency, defaultCurrency, rates)
   } else {
     const topLevelRows = categoryBudgetRows.filter((r) => {
-      return !categoryBudgetRows.some((other) => other.id !== r.id && r.category?.startsWith(`${other.category}/`))
+      const rCat = (r.category || '').toLowerCase()
+      return !categoryBudgetRows.some((other) => {
+        if (other.id === r.id) return false
+        const otherCat = (other.category || '').toLowerCase()
+        return rCat.startsWith(`${otherCat}/`)
+      })
     })
 
     topLevelRows.forEach((r) => {
@@ -113,7 +118,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
             {/* Top Row: Icon + Title on left, Chevron on right */}
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="grid h-7 w-7 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20 shrink-0">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
                   <PieChart className="h-3.5 w-3.5" />
                 </div>
                 <p className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
@@ -159,7 +164,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                         ? 'bg-[var(--status-expense)]'
                         : budgetPct >= 80
                         ? 'bg-[var(--warning)]'
-                        : 'bg-indigo-500'
+                        : 'bg-[var(--accent)]'
                     }`}
                     style={{ width: `${Math.min(100, Math.max(budgetPct, totalBudgetSpent > 0 ? 4 : 0))}%` }}
                   />
@@ -192,7 +197,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                 <div className="h-1.5 w-full rounded-full bg-[var(--field-bg)] border border-dashed border-[var(--border)]" />
 
                 {/* Sub-row below bar */}
-                <div className="flex items-center justify-between text-[10px] font-bold text-indigo-500 tabular-nums">
+                <div className="flex items-center justify-between text-[10px] font-bold text-[var(--accent)] tabular-nums">
                   <span className="flex items-center gap-1">
                     <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                     {t('budget.createQuick', 'Buat Anggaran')}

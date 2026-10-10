@@ -13,15 +13,25 @@ export async function handleRecurringAction(result, {
   if (result.action === 'create') {
     const recAmt = Number(result.amount) || 0
     const recCategory = sanitizeCategoryPath(result.category, 'expense') || 'kebutuhan_harian/umum'
+    let resolvedWalletId = result.walletId
+    if (!resolvedWalletId) {
+      const activeWallets = await db.wallets.filter((w) => !w.isArchived).toArray()
+      resolvedWalletId = activeWallets[0]?.id || 1
+    }
+    const today = new Date()
+    const anchorDay = today.getDate()
     await db.recurringTransactions.add({
       title: result.title,
       type: 'expense',
       category: recCategory,
       amount: recAmt,
       currency: defaultCurrency,
+      walletId: resolvedWalletId,
       frequency: result.frequency || 'monthly',
-      nextDate: format(new Date(), 'yyyy-MM-dd'),
+      nextDate: format(today, 'yyyy-MM-dd'),
+      anchorDay,
       enabled: true,
+      autoExecute: true,
     })
     newMsgs.push({
       id: Date.now() + 3,

@@ -30,6 +30,7 @@ import { deleteTransaction, updateTransaction } from '../../services/transaction
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 import { copyToClipboard } from '../../lib/clipboard'
+import { triggerHaptic } from '../../lib/haptics'
 
 function generateReceiptRef() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -180,7 +181,16 @@ export default function AiDigitalReceipt({
       setIsUndone(true)
     } catch (err){
       console.warn('[AiDigitalReceipt]', err)
-      // ignore
+      triggerHaptic('warning')
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: locale === 'en' ? 'Undo Failed' : 'Gagal Membatalkan',
+            message: err?.message || (locale === 'en' ? 'Failed to undo transaction' : 'Gagal membatalkan transaksi'),
+            type: 'error',
+          },
+        })
+      )
     } finally {
       setIsUndoing(false)
     }
@@ -208,8 +218,11 @@ export default function AiDigitalReceipt({
   const handleStartEdit = (tx) => {
     setEditingTx(tx)
     const txCurrency = tx.currency || defaultCurrency
+    const tgtWallet = wallets?.find((w) => String(w.id) === String(tx.targetWalletId))
+    const tgtCurr = tgtWallet?.currency || defaultCurrency
     setEditFormData({
       date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+      time: tx.time || '',
       amount: formatMoneyValueForInput(tx.amount, txCurrency),
       type: tx.type || 'expense',
       category: tx.category || '',
@@ -217,7 +230,14 @@ export default function AiDigitalReceipt({
       currency: txCurrency,
       walletId: tx.walletId,
       targetWalletId: tx.targetWalletId || '',
+      targetAmount: tx.targetAmount ? formatMoneyValueForInput(tx.targetAmount, tgtCurr) : '',
       receiptImage: tx.receiptImage || null,
+      items: tx.items || undefined,
+      subtotal: tx.subtotal !== undefined ? tx.subtotal : undefined,
+      tax: tx.tax !== undefined ? tx.tax : undefined,
+      discount: tx.discount !== undefined ? tx.discount : undefined,
+      merchant: tx.merchant || undefined,
+      isExcludeAnalyticsTx: Boolean(tx.isExcludeAnalyticsTx),
       isSplit: tx.isSplit || false,
       splitItems: Array.isArray(tx.splitItems)
         ? tx.splitItems.map((si) => ({
@@ -228,24 +248,47 @@ export default function AiDigitalReceipt({
     })
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (event, overrides = {}) => {
     if (!editingTx?.id) return
-    const evalResult = evaluateExpression(editFormData.amount, editFormData.currency)
-    const numericAmt =
-      evalResult?.isValid && evalResult?.result !== null
-        ? evalResult.result
-        : parseMoneyInput(editFormData.amount, editFormData.currency)
+    let numericAmt = overrides?.amount
+    if (numericAmt === undefined) {
+      const evalResult = evaluateExpression(editFormData.amount, editFormData.currency)
+      numericAmt =
+        evalResult?.isValid && evalResult?.result !== null
+          ? evalResult.result
+          : parseMoneyInput(editFormData.amount, editFormData.currency)
+    }
+
+    const isTransfer = editFormData.type === 'transfer'
+    let targetAmt = overrides?.targetAmount
+    if (targetAmt === undefined && isTransfer && editFormData.targetAmount) {
+      const tgtWallet = wallets?.find((w) => String(w.id) === String(editFormData.targetWalletId))
+      const tgtCurr = tgtWallet?.currency || defaultCurrency
+      const evalTgt = evaluateExpression(editFormData.targetAmount, tgtCurr)
+      targetAmt =
+        evalTgt?.isValid && evalTgt?.result !== null
+          ? evalTgt.result
+          : parseMoneyInput(editFormData.targetAmount, tgtCurr)
+    }
 
     const updated = {
       date: editFormData.date,
+      time: editFormData.time || editingTx.time || '',
       amount: numericAmt,
+      targetAmount: isTransfer ? targetAmt : null,
       type: editFormData.type,
       category: editFormData.category,
       notes: editFormData.notes,
       currency: editFormData.currency,
       walletId: editFormData.walletId,
-      targetWalletId: editFormData.targetWalletId || '',
+      targetWalletId: isTransfer && editFormData.targetWalletId ? editFormData.targetWalletId : '',
       receiptImage: editFormData.receiptImage || null,
+      items: editFormData.items || editingTx.items || undefined,
+      subtotal: editFormData.subtotal !== undefined ? editFormData.subtotal : editingTx.subtotal,
+      tax: editFormData.tax !== undefined ? editFormData.tax : editingTx.tax,
+      discount: editFormData.discount !== undefined ? editFormData.discount : editingTx.discount,
+      merchant: editFormData.merchant || editingTx.merchant || undefined,
+      isExcludeAnalyticsTx: Boolean(editFormData.isExcludeAnalyticsTx),
       isSplit: editFormData.isSplit || false,
       splitItems: editFormData.splitItems || [],
     }
@@ -258,7 +301,16 @@ export default function AiDigitalReceipt({
       setEditingTx(null)
     } catch (err){
       console.warn('[AiDigitalReceipt]', err)
-      // ignore
+      triggerHaptic('warning')
+      window.dispatchEvent(
+        new CustomEvent('ft-show-toast', {
+          detail: {
+            title: locale === 'en' ? 'Update Failed' : 'Gagal Memperbarui',
+            message: err?.message || (locale === 'en' ? 'Failed to update transaction' : 'Gagal menyimpan perubahan transaksi'),
+            type: 'error',
+          },
+        })
+      )
     }
   }
 

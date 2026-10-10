@@ -13,6 +13,7 @@ import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../lib/fieldEncryption'
 import { toSafeNumber } from '../lib/utils'
+import { generateInstallmentSchedule } from '../lib/loanUtils'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 
 const localizer = dateFnsLocalizer({
@@ -150,10 +151,33 @@ function Calendar() {
     [calStart, calEnd],
     []
   )
-  const loans = useLiveQuery(
-    () => db.loans.where('dueDate').between(calStart, calEnd, true, true).toArray(),
+  const loansData = useLiveQuery(
+    async () => {
+      const inRangeLoans = await db.loans.where('dueDate').between(calStart, calEnd, true, true).toArray()
+      const installmentLoans = await db.loans
+        .filter((l) => (l.status === 'active' || l.status === 'partially_paid') && Number(l.tenorMonths) > 1)
+        .toArray()
+
+      const loanMap = new Map()
+      inRangeLoans.forEach((l) => loanMap.set(l.id, l))
+      installmentLoans.forEach((l) => loanMap.set(l.id, l))
+      const allLoans = Array.from(loanMap.values())
+
+      const loanIds = allLoans.map((l) => l.id)
+      const payments = loanIds.length > 0
+        ? await db.loanPayments.where('loanId').anyOf(loanIds).toArray()
+        : []
+
+      const paymentsByLoan = new Map()
+      payments.forEach((p) => {
+        if (!paymentsByLoan.has(p.loanId)) paymentsByLoan.set(p.loanId, [])
+        paymentsByLoan.get(p.loanId).push(p)
+      })
+
+      return { loans: allLoans, paymentsByLoan }
+    },
     [calStart, calEnd],
-    []
+    { loans: [], paymentsByLoan: new Map() }
   )
   const todos = useLiveQuery(
     () => db.todos.where('dueDate').between(calStart, calEnd, true, true).toArray(),
@@ -216,20 +240,52 @@ function Calendar() {
       color: event.color || 'var(--accent)',
       raw: event,
     }))
-    const loanEvents = (loans || [])
-      .filter((loan) => loan.status !== 'paid' && loan.status !== 'forgiven' && toSafeNumber(loan.remainingAmount ?? loan.totalAmount) > 0)
-      .map((loan) => ({
-        id: `loan-${loan.id}`,
-        source: 'loan',
-        sourceId: loan.id,
-        title: `${loan.type === 'debt' ? t('loans.debtDueDate', 'Jatuh Tempo Hutang') : t('loans.receivableDueDate', 'Jatuh Tempo Piutang')}: ${loan.title || loan.personName}`,
-        start: toLocalDate(loan.dueDate),
-        end: toLocalDate(loan.dueDate),
-        allDay: true,
-        type: 'loan',
-        color: loan.type === 'debt' ? 'var(--status-expense)' : 'var(--accent)',
-        raw: loan,
-      }))
+    const loanEvents = []
+    const rawLoans = loansData?.loans || []
+    const paymentsByLoan = loansData?.paymentsByLoan || new Map()
+
+    for (const loan of rawLoans) {
+      if (loan.status === 'paid' || loan.status === 'forgiven' || toSafeNumber(loan.remainingAmount ?? loan.totalAmount) <= 0) {
+        continue
+      }
+      const tenor = parseInt(loan.tenorMonths, 10) || 0
+      if (tenor > 1) {
+        const pmts = paymentsByLoan.get(loan.id) || []
+        const schedule = generateInstallmentSchedule(loan, pmts)
+        const relevantInstallments = schedule.filter(
+          (inst) => inst.status !== 'paid' && inst.dueDate >= calStart && inst.dueDate <= calEnd
+        )
+        for (const inst of relevantInstallments) {
+          loanEvents.push({
+            id: `loan-${loan.id}-inst-${inst.installmentNumber}`,
+            source: 'loan',
+            sourceId: loan.id,
+            title: `${loan.type === 'debt' ? t('loans.debtDueDate', 'Jatuh Tempo Hutang') : t('loans.receivableDueDate', 'Jatuh Tempo Piutang')}: ${loan.title || loan.personName} (#${inst.installmentNumber})`,
+            start: toLocalDate(inst.dueDate),
+            end: toLocalDate(inst.dueDate),
+            allDay: true,
+            type: 'loan',
+            color: loan.type === 'debt' ? 'var(--status-expense)' : 'var(--accent)',
+            raw: { ...loan, installment: inst },
+          })
+        }
+      } else {
+        if (loan.dueDate && loan.dueDate >= calStart && loan.dueDate <= calEnd) {
+          loanEvents.push({
+            id: `loan-${loan.id}`,
+            source: 'loan',
+            sourceId: loan.id,
+            title: `${loan.type === 'debt' ? t('loans.debtDueDate', 'Jatuh Tempo Hutang') : t('loans.receivableDueDate', 'Jatuh Tempo Piutang')}: ${loan.title || loan.personName}`,
+            start: toLocalDate(loan.dueDate),
+            end: toLocalDate(loan.dueDate),
+            allDay: true,
+            type: 'loan',
+            color: loan.type === 'debt' ? 'var(--status-expense)' : 'var(--accent)',
+            raw: loan,
+          })
+        }
+      }
+    }
     const todoEvents = (todos || []).map((todo) => ({
       id: `todo-${todo.id}`,
       source: 'todo',
@@ -243,7 +299,7 @@ function Calendar() {
       raw: todo,
     }))
     return [...txEvents, ...customEvents, ...loanEvents, ...todoEvents]
-  }, [importantEvents, loans, todos, transactions, t, decryptedTick])
+  }, [importantEvents, loansData, todos, transactions, t, decryptedTick, calStart, calEnd])
 
   const indicators = useMemo(() => {
     const map = new Map()
@@ -279,13 +335,25 @@ function Calendar() {
       const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
       map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
     })
-    ;(loans || []).forEach((l) => {
-      if (!l?.dueDate) return
-      if (l.status === 'paid' || l.status === 'forgiven' || toSafeNumber(l.remainingAmount ?? l.totalAmount) <= 0) return
-      const dateKey = String(l.dueDate).slice(0, 10)
-      const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-      map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
-    })
+    for (const l of (loansData?.loans || [])) {
+      if (l.status === 'paid' || l.status === 'forgiven' || toSafeNumber(l.remainingAmount ?? l.totalAmount) <= 0) continue
+      const tenor = parseInt(l.tenorMonths, 10) || 0
+      if (tenor > 1) {
+        const pmts = loansData?.paymentsByLoan?.get(l.id) || []
+        const schedule = generateInstallmentSchedule(l, pmts)
+        schedule.forEach((inst) => {
+          if (inst.status !== 'paid' && inst.dueDate) {
+            const dateKey = String(inst.dueDate).slice(0, 10)
+            const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
+            map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
+          }
+        })
+      } else if (l.dueDate) {
+        const dateKey = String(l.dueDate).slice(0, 10)
+        const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
+        map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
+      }
+    }
     ;(todos || []).forEach((td) => {
       if (!td?.dueDate) return
       const dateKey = String(td.dueDate).slice(0, 10)
@@ -294,24 +362,43 @@ function Calendar() {
     })
     bump(toDateOnlyString(selectedDate), {})
     return map
-  }, [importantEvents, loans, todos, selectedDate, transactions])
+  }, [importantEvents, loansData, todos, selectedDate, transactions])
 
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)
     return {
       transactions: (transactions || []).filter((tx) => (tx.date ? String(tx.date).slice(0, 10) === target : false)),
       events: (importantEvents || []).filter((event) => (event.date ? String(event.date).slice(0, 10) === target : false)),
-      loans: (loans || []).filter((loan) =>
-        loan.dueDate &&
-        loan.status !== 'paid' &&
-        loan.status !== 'forgiven' &&
-        toSafeNumber(loan.remainingAmount ?? loan.totalAmount) > 0
-          ? String(loan.dueDate).slice(0, 10) === target
-          : false
-      ),
+      loans: (() => {
+        const result = []
+        for (const loan of (loansData?.loans || [])) {
+          if (loan.status === 'paid' || loan.status === 'forgiven' || toSafeNumber(loan.remainingAmount ?? loan.totalAmount) <= 0) {
+            continue
+          }
+          const tenor = parseInt(loan.tenorMonths, 10) || 0
+          if (tenor > 1) {
+            const pmts = loansData?.paymentsByLoan?.get(loan.id) || []
+            const schedule = generateInstallmentSchedule(loan, pmts)
+            const matchedInst = schedule.find((inst) => inst.status !== 'paid' && inst.dueDate === target)
+            if (matchedInst) {
+              result.push({
+                ...loan,
+                installment: matchedInst,
+                remainingAmount: matchedInst.remainingAmount ?? matchedInst.amount,
+                title: `${loan.title || loan.personName} (#${matchedInst.installmentNumber})`,
+              })
+            }
+          } else {
+            if (loan.dueDate && String(loan.dueDate).slice(0, 10) === target) {
+              result.push(loan)
+            }
+          }
+        }
+        return result
+      })(),
       todos: (todos || []).filter((todo) => (todo.dueDate ? String(todo.dueDate).slice(0, 10) === target : false)),
     }
-  }, [importantEvents, loans, todos, selectedDate, transactions])
+  }, [importantEvents, loansData, todos, selectedDate, transactions])
 
   const eventStyleGetter = () => ({ style: { display: 'none' } }) // Handled in dots instead of chips
 

@@ -13,6 +13,9 @@ import useSettingsStore from '../../store/useSettingsStore'
 import useBackButton from '../../hooks/useBackButton'
 import { formatGroupedIntegerInput, getMoneyInputCaret, toSafeNumber } from '../../lib/utils'
 import { getMergedExpenseTree, parseExpenseCategoryPath } from '../../lib/expenseCategories'
+import { clearCachedDashboardState } from '../../hooks/useDashboardData'
+import { scheduleNativeWidgetSync } from '../../lib/nativeWidgetSync'
+import { evaluateExpression } from '../../lib/calcParser'
 
 const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
   child,
@@ -235,12 +238,23 @@ export default function BudgetSheetModal({
     return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [isOpen, isCategoryOpen])
 
+  const targetCurrency = editingBudget?.currency || defaultCurrency
+  const currentLimitValue = useMemo(() => {
+    const evalRes = evaluateExpression(limitInput || form.limit, targetCurrency)
+    return evalRes.isValid && evalRes.result !== null ? evalRes.result : toSafeNumber(form.limit)
+  }, [limitInput, form.limit, targetCurrency])
+
   const save = async () => {
+    const evalRes = evaluateExpression(limitInput || form.limit, targetCurrency)
+    const parsedLimit = evalRes.isValid && evalRes.result !== null
+      ? evalRes.result
+      : (toSafeNumber(form.limit) || 0)
+
     const payload = {
       month: form.month,
       category: String(form.categoryPath || '').trim(),
-      limit: toSafeNumber(form.limit),
-      currency: editingBudget?.currency || defaultCurrency,
+      limit: parsedLimit,
+      currency: targetCurrency,
     }
     if (!payload.category) {
       setSheetError(t('budget.validation.category'))
@@ -276,6 +290,8 @@ export default function BudgetSheetModal({
           await db.budgets.add(payload)
         }
       }
+      clearCachedDashboardState()
+      scheduleNativeWidgetSync(100)
       onSaved?.()
       onClose()
     } catch (err){
@@ -373,16 +389,31 @@ export default function BudgetSheetModal({
             value={limitInput}
             onChange={(e) => {
               const rawValue = e.target.value
-              const formatted = formatGroupedIntegerInput(rawValue)
-              const caret = getMoneyInputCaret(rawValue, formatted, e.target.selectionStart)
-              const numericOnly = formatted.replace(/[^0-9]/g, '')
-              setForm((p) => ({ ...p, limit: numericOnly }))
-              setLimitInput(formatted)
-              window.requestAnimationFrame(() => {
-                const el = limitInputRef.current
-                if (!el) return
-                el.setSelectionRange(caret, caret)
-              })
+              const sanitized = rawValue.replace(/[^0-9+\-*/()., kKmMbBjJrRtTuU]/g, '')
+              const isTypingExpression = /[+\-*/kKmMbBjJrRtTuU(]/.test(sanitized)
+              if (isTypingExpression) {
+                setForm((p) => ({ ...p, limit: sanitized }))
+                setLimitInput(sanitized)
+              } else {
+                const formatted = formatGroupedIntegerInput(sanitized)
+                const caret = getMoneyInputCaret(sanitized, formatted, e.target.selectionStart)
+                const numericOnly = formatted.replace(/[^0-9]/g, '')
+                setForm((p) => ({ ...p, limit: numericOnly }))
+                setLimitInput(formatted)
+                window.requestAnimationFrame(() => {
+                  const el = limitInputRef.current
+                  if (!el) return
+                  el.setSelectionRange(caret, caret)
+                })
+              }
+            }}
+            onBlur={() => {
+              const evalRes = evaluateExpression(limitInput, targetCurrency)
+              if (evalRes.isValid && evalRes.result !== null) {
+                const resVal = String(Math.round(evalRes.result))
+                setForm((p) => ({ ...p, limit: resVal }))
+                setLimitInput(formatGroupedIntegerInput(resVal))
+              }
             }}
             className="ft-field mt-1 w-full font-semibold tabular-nums"
             placeholder={t('budget.limit.placeholder')}
@@ -412,7 +443,7 @@ export default function BudgetSheetModal({
               type="button"
               onClick={save}
               className="min-h-[40px] px-5 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-              disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || toSafeNumber(form.limit) <= 0}
+              disabled={!String(form.categoryPath || '').trim() || !String(form.month || '').trim() || currentLimitValue <= 0}
             >
               {t('budget.save', 'Simpan')}
             </Button>

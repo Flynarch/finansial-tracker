@@ -55,9 +55,9 @@ export default function SettingsActionModals({
 
       const backup = await exportAllDataAsJson().catch(() => null)
       if (backup && authUserId) {
-        const hasData =
-          (backup.transactions && backup.transactions.length > 0) ||
-          (backup.wallets && backup.wallets.length > 0)
+        const txList = backup?.data?.transactions || backup?.transactions || []
+        const walletList = backup?.data?.wallets || backup?.wallets || []
+        const hasData = txList.length > 0 || walletList.length > 0
 
         if (hasData && isE2eeActive) {
           let uploadPayload = null
@@ -123,7 +123,6 @@ export default function SettingsActionModals({
       }
 
       // Safely clear financial and feature data tables only if user has an active E2EE cloud backup
-      // If user does not have E2EE, preserve local data on this device so records are not lost
       if (isE2eeActive) {
         const dataTables = [
           db.transactions,
@@ -146,7 +145,8 @@ export default function SettingsActionModals({
           db.loanPayments,
           db.walletBalanceCache,
           db.chatMessages,
-        ]
+        ].filter(Boolean)
+
         await Promise.all(
           dataTables.map((tbl) => tbl?.clear?.().catch((err) => console.warn('[SettingsActionModals]', err)))
         )

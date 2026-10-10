@@ -400,8 +400,8 @@ function parseExpenseCategoryPathWithTree(value, tree) {
   const parent = tree.find((p) => p.id === parentId)
   if (!parent) return null
   if (!childId) return { parentId: parent.id, childId: null, parent, child: null }
-  const child = parent.children.find((c) => c.id === childId)
-  if (!child) return null
+  const child = parent.children?.find((c) => c.id === childId)
+  if (!child) return { parentId: parent.id, childId, parent, child: null }
   return { parentId, childId: child.id, parent, child }
 }
 

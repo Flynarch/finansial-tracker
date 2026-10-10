@@ -23,6 +23,9 @@ import MediaSourcePickerModal from './MediaSourcePickerModal'
 import { triggerHaptic } from '../../lib/haptics'
 import { compressImage } from '../../lib/imageCompression'
 import { getLocalDateString } from '../../lib/dateUtils'
+import { convertCurrency, FALLBACK_EXCHANGE_RATES, parseMoneyInput } from '../../lib/utils'
+import { evaluateExpression } from '../../lib/calcParser'
+import { getCachedCurrencyRates } from '../../lib/api'
 import {
   generateSampleChips,
   getInputPlaceholder,
@@ -506,9 +509,6 @@ export default function AiQuickLogModal() {
 
         const savedTxs = []
         for (const tx of transactionsToProcess) {
-          const numericAmount = Number(tx.amount || 0)
-          if (!Number.isFinite(numericAmount) || numericAmount <= 0) continue
-
           const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
           const primaryDefaultWalletId = wallets.find((w) => w.id === configuredDefaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
           let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : primaryDefaultWalletId)
@@ -518,6 +518,13 @@ export default function AiQuickLogModal() {
 
           const matchedWallet = wallets.find((w) => w.id === finalWalletId)
           const txCurrency = tx.currency || matchedWallet?.currency || defaultCurrency
+
+          let numericAmount = Number(tx.amount || 0)
+          if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+            const evalAmt = evaluateExpression(String(tx.amount || ''), txCurrency)
+            numericAmount = evalAmt.isValid && evalAmt.result !== null ? evalAmt.result : parseMoneyInput(tx.amount, txCurrency)
+          }
+          if (!Number.isFinite(numericAmount) || numericAmount <= 0) continue
 
           // Resolve individual item category if per_item
           const itemCategory = modeToUse === 'per_item'
@@ -562,7 +569,24 @@ export default function AiQuickLogModal() {
 
           if (tx.type === 'transfer' && tx.targetWalletId) {
             const twId = Number(tx.targetWalletId)
-            if (wallets.find((w) => w.id === twId)) txToSave.targetWalletId = twId
+            const tw = wallets.find((w) => w.id === twId)
+            if (tw) {
+              txToSave.targetWalletId = twId
+              const sCurr = txCurrency
+              const tCurr = tw.currency || defaultCurrency
+              txToSave.targetCurrency = tCurr
+              if (sCurr !== tCurr) {
+                const rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+                let parsedTgt = null
+                if (tx.targetAmount) {
+                  const evalTgt = evaluateExpression(String(tx.targetAmount), tCurr)
+                  parsedTgt = evalTgt.isValid && evalTgt.result !== null ? evalTgt.result : parseMoneyInput(tx.targetAmount, tCurr)
+                }
+                txToSave.targetAmount = parsedTgt && Number.isFinite(parsedTgt) && parsedTgt > 0
+                  ? parsedTgt
+                  : convertCurrency(numericAmount, sCurr, tCurr, rates)
+              }
+            }
           }
 
           const createdId = await addTransaction(txToSave)

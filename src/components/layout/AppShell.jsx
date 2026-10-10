@@ -90,6 +90,7 @@ function AppShell() {
   const backgroundTimeRef = useRef(null)
   const isMediaPickerActiveRef = useRef(false)
   const mediaPickerActivatedAtRef = useRef(0)
+  const authPromptDismissedAtRef = useRef(0)
   const lastBackPressRef = useRef(0)
 
   // Hide global navigation & AI trigger bar on dedicated sub-detail pages
@@ -462,11 +463,30 @@ function AppShell() {
       }
     }
 
+    const onAuthPromptActiveEvent = (e) => {
+      const isActive = Boolean(e.detail)
+      if (typeof window !== 'undefined') {
+        window.__ft_isAuthPromptActive = isActive
+      }
+      if (!isActive) {
+        authPromptDismissedAtRef.current = Date.now()
+      }
+    }
+
     window.addEventListener('click', onFileInputClick, true)
     window.addEventListener('ft-media-picker-active', onMediaActiveEvent)
+    window.addEventListener('ft-auth-prompt-active', onAuthPromptActiveEvent)
     window.addEventListener('focus', onWindowFocus)
 
     const checkAndLock = () => {
+      const isAuthPromptActive = typeof window !== 'undefined' && Boolean(window.__ft_isAuthPromptActive)
+      const authPromptAgeSec = authPromptDismissedAtRef.current ? (Date.now() - authPromptDismissedAtRef.current) / 1000 : Infinity
+      if (isAuthPromptActive || authPromptAgeSec <= 5) {
+        backgroundTimeRef.current = null
+        authPromptDismissedAtRef.current = 0
+        return
+      }
+
       const isMediaActive = isMediaPickerActiveRef.current || (typeof window !== 'undefined' && window.__ft_isMediaPickerActive)
       const mediaAgeSec = mediaPickerActivatedAtRef.current ? (Date.now() - mediaPickerActivatedAtRef.current) / 1000 : Infinity
       if (isMediaActive && mediaAgeSec <= 90) {
@@ -491,7 +511,11 @@ function AppShell() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        backgroundTimeRef.current = Date.now()
+        if (typeof window !== 'undefined' && window.__ft_isAuthPromptActive) {
+          backgroundTimeRef.current = null
+        } else {
+          backgroundTimeRef.current = Date.now()
+        }
       } else if (document.visibilityState === 'visible') {
         checkAndLock()
       }
@@ -499,9 +523,15 @@ function AppShell() {
 
     const handleAppStateChange = (state) => {
       if (!state.isActive) {
-        backgroundTimeRef.current = Date.now()
+        if (typeof window !== 'undefined' && window.__ft_isAuthPromptActive) {
+          backgroundTimeRef.current = null
+        } else {
+          backgroundTimeRef.current = Date.now()
+        }
       } else {
         checkAndLock()
+        processRecurringTransactions().catch((err) => console.warn('[AppShell] processRecurringTransactions on resume error:', err))
+        notifyTodayEvents().catch((err) => console.warn('[AppShell] notifyTodayEvents on resume error:', err))
       }
     }
 
@@ -511,6 +541,7 @@ function AppShell() {
     return () => {
       window.removeEventListener('click', onFileInputClick, true)
       window.removeEventListener('ft-media-picker-active', onMediaActiveEvent)
+      window.removeEventListener('ft-auth-prompt-active', onAuthPromptActiveEvent)
       window.removeEventListener('focus', onWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       appListenerPromise.then((l) => l.remove?.())
@@ -531,15 +562,23 @@ function AppShell() {
     // Immediately drain native notification queue on cold start mount
     handleForegroundSync()
 
+    const syncAuth = () => {
+      import('../../lib/auth')
+        .then(({ ensureFirebaseAuthSynced }) => ensureFirebaseAuthSynced())
+        .catch((err) => console.warn('[AppShell:authSync]', err))
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         handleForegroundSync()
+        syncAuth()
       }
     }
 
     const handleAppStateChange = (state) => {
       if (state.isActive) {
         handleForegroundSync()
+        syncAuth()
       }
     }
 
@@ -595,9 +634,9 @@ function AppShell() {
         const backup = await exportAllDataAsJson().catch(() => null)
         if (!backup) return
 
-        const hasData =
-          (backup.transactions && backup.transactions.length > 0) ||
-          (backup.wallets && backup.wallets.length > 0)
+        const txList = backup?.data?.transactions || backup?.transactions || []
+        const walletList = backup?.data?.wallets || backup?.wallets || []
+        const hasData = txList.length > 0 || walletList.length > 0
         if (!hasData) return
 
         const e2eePhrase = getSessionMnemonicPhrase()

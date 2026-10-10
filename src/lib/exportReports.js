@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { formatCurrency, toSafeNumber, isExcludeAnalyticsTx } from './utils'
 import { getLocalDateString } from './dateUtils'
 import { getDecryptedNoteSync, warmupDecryptionCache } from './fieldEncryption'
@@ -148,6 +150,44 @@ export async function exportTransactionsToCsv(transactions = [], wallets = [], d
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const dateStr = getLocalDateString()
   const filename = isEn ? `fintrack-transaction-report-${dateStr}.csv` : `fintrack-laporan-transaksi-${dateStr}.csv`
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const bytes = new TextEncoder().encode(csvContent)
+      let binary = ''
+      const len = bytes.byteLength
+      const chunkSize = 8192
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = bytes.subarray(i, Math.min(i + chunkSize, len))
+        binary += String.fromCharCode.apply(null, chunk)
+      }
+      const base64Data = btoa(binary)
+
+      await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      })
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: isEn ? 'CSV Report Saved' : 'Laporan CSV Berhasil Disimpan',
+              message: isEn
+                ? `File successfully saved to Documents: ${filename}`
+                : `File berhasil disimpan di Dokumen: ${filename}`,
+              type: 'success',
+            },
+          })
+        )
+      }
+      return true
+    } catch (fsErr) {
+      console.warn('[exportReports] Filesystem write failed, falling back to Web Share / download link:', fsErr)
+    }
+  }
 
   // On mobile/Android WebView, try Web Share API with File
   if (typeof navigator !== 'undefined' && navigator.canShare) {
@@ -498,7 +538,7 @@ export async function generateMonthlyPdfStatement({
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Arus Kas Bersih</div>
-          <div class="kpi-value" style="color: ${netSavings >= 0 ? '${PRINT_THEME_COLORS.textIncome}' : '${PRINT_THEME_COLORS.textExpense}'};">${formattedSavings}</div>
+          <div class="kpi-value" style="color: ${netSavings >= 0 ? PRINT_THEME_COLORS.textIncome : PRINT_THEME_COLORS.textExpense};">${formattedSavings}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Rasio Tabungan</div>

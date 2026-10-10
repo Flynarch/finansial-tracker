@@ -128,6 +128,17 @@ export default function StatementImportModal({
         const foundAmount = parsed.headers.find((h) => /amount|nominal|jumlah|mutasi/i.test(h) && !/debet|credit|kredit/i.test(h)) || ''
         const fallbackAmount = (!foundDebit && !foundCredit) ? (parsed.headers[2] || '') : ''
 
+        const foundTypeCol = parsed.headers.find((h) => /type|tipe|d\/c|d\/k|\bdk\b|cr\/db|jenis/i.test(h)) || ''
+        let defIncomeInd = 'CR'
+        let defExpenseInd = 'DB'
+        if (foundTypeCol && parsed.rows && parsed.rows.length > 0) {
+          const sampleTypes = parsed.rows.slice(0, 20).map((r) => String(r[foundTypeCol] || '').trim().toUpperCase())
+          if (sampleTypes.some((v) => v === 'K' || v === 'KREDIT')) {
+            defIncomeInd = 'K'
+            defExpenseInd = 'D'
+          }
+        }
+
         // Try auto mapping columns from header names
         const autoMap = {
           dateCol: parsed.headers.find((h) => /date|tgl|tanggal/i.test(h)) || parsed.headers[0] || '',
@@ -135,9 +146,9 @@ export default function StatementImportModal({
           amountCol: foundAmount || fallbackAmount,
           debitCol: foundDebit,
           creditCol: foundCredit,
-          typeCol: parsed.headers.find((h) => /type|tipe|d\/c|cr\/db|jenis/i.test(h)) || '',
-          incomeIndicator: 'CR',
-          expenseIndicator: 'DB',
+          typeCol: foundTypeCol,
+          incomeIndicator: defIncomeInd,
+          expenseIndicator: defExpenseInd,
         }
         setColumnMapping(autoMap)
         setStep('mapper')
@@ -187,7 +198,9 @@ export default function StatementImportModal({
 
   const handleApplyCsvMapping = async () => {
     triggerHaptic('light')
-    const rawTxs = parseGenericCsvRows(csvRows, columnMapping)
+    const targetWallet = wallets.find((w) => w.id === Number(selectedWalletId))
+    const walletCurrency = targetWallet?.currency || defaultCurrency
+    const rawTxs = parseGenericCsvRows(csvRows, columnMapping, walletCurrency)
     await warmupDecryptionCache(existingTransactions)
     const deduplicated = detectDuplicateTransactions(rawTxs, existingTransactions, selectedWalletId)
     setParsedItems(deduplicated)
@@ -223,8 +236,9 @@ export default function StatementImportModal({
       const selectedTxs = parsedItems.filter((i) => i.selected)
       const targetWallet = wallets.find((w) => w.id === Number(selectedWalletId))
       const txCurrency = targetWallet?.currency || defaultCurrency
-      const formattedForDb = selectedTxs.map((tx) => ({
+      const formattedForDb = selectedTxs.map((tx, index) => ({
         date: tx.date || format(new Date(), 'yyyy-MM-dd'),
+        time: tx.time || undefined,
         type: tx.type || 'expense',
         category: tx.category || (tx.type === 'income' ? 'lainnya/umum' : 'lainnya_kategori/umum'),
         amount: toSafeNumber(tx.amount),
@@ -234,7 +248,8 @@ export default function StatementImportModal({
         cleanMerchant: tx.cleanMerchant || tx.merchant || '',
         source: 'e_statement_import',
         deletedAt: null,
-        createdAt: Date.now(),
+        // Stagger createdAt slightly based on index to preserve statement sequence in intra-day descending sort
+        createdAt: Date.now() - (selectedTxs.length - index) * 1000,
       }))
 
       for (const tx of formattedForDb) {

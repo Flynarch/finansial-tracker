@@ -404,8 +404,7 @@ export default function TodoDetailPage() {
         wasAllDone = allDone
         await db.todos.update(todoId, { completed: allDone })
       } else {
-        // If all subtasks were deleted, re-evaluate parent status based on todo itself
-        await db.todos.update(todoId, { completed: false })
+        // If all subtasks were deleted, retain the parent todo's existing completion status
       }
     })
     if (hasSubs) {
@@ -419,7 +418,9 @@ export default function TodoDetailPage() {
       }
     } else {
       const effectiveTodo = todo || (await db.todos.get(todoId))
-      if (effectiveTodo?.dueDate) {
+      if (effectiveTodo?.completed) {
+        void cancelNotificationForTodo(todoId)
+      } else if (effectiveTodo?.dueDate) {
         void scheduleNotificationForTodo(todoId, effectiveTodo)
       }
     }

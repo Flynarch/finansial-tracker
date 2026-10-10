@@ -175,7 +175,13 @@ export function calculate1DHourlyFlow(
     }
 
     let h = 12
-    if (tx?.createdAt) {
+    if (tx?.time && typeof tx.time === 'string') {
+      const match = tx.time.match(/^(\d{1,2}):/)
+      if (match) {
+        const parsedH = parseInt(match[1], 10)
+        if (parsedH >= 0 && parsedH < 24) h = parsedH
+      }
+    } else if (tx?.createdAt) {
       const dt = new Date(tx.createdAt)
       if (!Number.isNaN(dt.getTime())) h = dt.getHours()
     }

@@ -256,6 +256,7 @@ export function generateBalanceSheet(
     transactions = [],
     loanPayments = [],
     investments = [],
+    investmentOrders = [],
   } = {}
 ) {
   // 1. Current Assets (Kas & Bank as of asOfDate)
@@ -433,22 +434,108 @@ export function generateBalanceSheet(
   const investmentItems = []
   let totalInvestments = 0
 
-  ;(investments || []).forEach((inv) => {
-    const purchaseDate = inv.purchaseDate || (inv.createdAt ? format(new Date(inv.createdAt), 'yyyy-MM-dd') : null)
-    if (purchaseDate && purchaseDate > asOfDate) return
-    const qty = toSafeNumber(inv.quantity)
-    const price = toSafeNumber(inv.purchasePrice || inv.currentPrice)
-    const val = qty * price
-    if (val > 0) {
-      const norm = convertCurrency(val, inv.purchaseCurrency || inv.currency || defaultCurrency, defaultCurrency, rates)
-      investmentItems.push({
-        id: inv.id,
-        name: inv.name || inv.assetName || inv.symbol || 'Investasi',
-        amount: norm,
-      })
-      totalInvestments += norm
+  if (Array.isArray(investmentOrders) && investmentOrders.length > 0) {
+    const holdingsMap = new Map()
+
+    ;(investments || []).forEach((inv) => {
+      const key = String(inv.name || inv.assetName || inv.symbol || inv.id).trim().toLowerCase()
+      const purchaseDate = inv.purchaseDate || (inv.createdAt ? format(new Date(inv.createdAt), 'yyyy-MM-dd') : null)
+      const hasOrders = investmentOrders.some((o) => String(o?.name || '').trim().toLowerCase() === key)
+      if (!hasOrders && purchaseDate && purchaseDate > asOfDate) {
+        return
+      }
+
+      const qty = toSafeNumber(inv.quantity)
+      const price = toSafeNumber(inv.purchasePrice || inv.currentPrice)
+      const curr = inv.purchaseCurrency || inv.currency || defaultCurrency
+      const existing = holdingsMap.get(key)
+      if (existing) {
+        existing.quantity += qty
+        const costInHoldingCurr = convertCurrency(qty * price, curr, existing.currency, rates)
+        existing.totalCost += costInHoldingCurr
+      } else {
+        holdingsMap.set(key, {
+          id: inv.id,
+          name: inv.name || inv.assetName || inv.symbol || 'Investasi',
+          currency: curr,
+          quantity: qty,
+          totalCost: qty * price,
+          purchaseDate,
+        })
+      }
+    })
+
+    const postDateOrders = investmentOrders
+      .filter((o) => o?.date && !o.deletedAt && String(o.date).slice(0, 10) > asOfDate)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || Number(b.id || 0) - Number(a.id || 0))
+
+    for (const order of postDateOrders) {
+      const key = String(order.name || '').trim().toLowerCase()
+      const side = order.side || (order.type === 'buy' || order.type === 'sell' ? order.type : 'buy')
+      const qty = toSafeNumber(order.quantity)
+      const costBasis = toSafeNumber(order.costBasis || order.unitPrice || order.purchasePrice)
+      const orderCurrency = order.currency || defaultCurrency
+
+      let holding = holdingsMap.get(key)
+      if (!holding) {
+        holding = {
+          id: order.investmentId || order.id,
+          name: order.name || 'Investasi',
+          currency: orderCurrency,
+          quantity: 0,
+          totalCost: 0,
+          purchaseDate: null,
+        }
+        holdingsMap.set(key, holding)
+      }
+
+      if (side === 'sell') {
+        // Sold post-date: add back quantity and costBasis
+        holding.quantity += qty
+        const costToAdd = convertCurrency(qty * costBasis, orderCurrency, holding.currency, rates)
+        holding.totalCost += costToAdd
+      } else if (side === 'buy') {
+        // Bought post-date: subtract quantity and cost
+        holding.quantity -= qty
+        const costToSubtract = convertCurrency(
+          toSafeNumber(order.totalAmount || qty * costBasis),
+          orderCurrency,
+          holding.currency,
+          rates
+        )
+        holding.totalCost = Math.max(0, holding.totalCost - costToSubtract)
+      }
     }
-  })
+
+    holdingsMap.forEach((holding) => {
+      if (holding.quantity > 0.000001 && holding.totalCost > 0.000001) {
+        const norm = convertCurrency(holding.totalCost, holding.currency, defaultCurrency, rates)
+        investmentItems.push({
+          id: holding.id,
+          name: holding.name,
+          amount: norm,
+        })
+        totalInvestments += norm
+      }
+    })
+  } else {
+    ;(investments || []).forEach((inv) => {
+      const purchaseDate = inv.purchaseDate || (inv.createdAt ? format(new Date(inv.createdAt), 'yyyy-MM-dd') : null)
+      if (purchaseDate && purchaseDate > asOfDate) return
+      const qty = toSafeNumber(inv.quantity)
+      const price = toSafeNumber(inv.purchasePrice || inv.currentPrice)
+      const val = qty * price
+      if (val > 0) {
+        const norm = convertCurrency(val, inv.purchaseCurrency || inv.currency || defaultCurrency, defaultCurrency, rates)
+        investmentItems.push({
+          id: inv.id,
+          name: inv.name || inv.assetName || inv.symbol || 'Investasi',
+          amount: norm,
+        })
+        totalInvestments += norm
+      }
+    })
+  }
 
   totalCash = roundCurrency(totalCash)
   totalSavings = roundCurrency(totalSavings)
@@ -503,7 +590,7 @@ export function generateBalanceSheet(
  */
 export function generateCashFlowStatement(
   transactions = [],
-  { startDate, endDate, defaultCurrency = 'IDR', rates = {} } = {}
+  { startDate, endDate, defaultCurrency = 'IDR', rates = {}, includeNonAnalyticInCashFlow = false } = {}
 ) {
   const filteredTxs = filterTransactionsByDateRange(transactions, startDate, endDate)
 
@@ -536,14 +623,17 @@ export function generateCashFlowStatement(
             isExcludeFromAnalytics: Boolean(si.isExcludeFromAnalytics || si.excludeFromAnalytics),
             excludeFromAnalytics: Boolean(si.excludeFromAnalytics || si.isExcludeFromAnalytics),
           }
-          const isExplicitExcluded = Boolean(
-            si.isExcluded ||
-            si.isExcludeAnalyticsTx ||
-            si.isExcludeFromAnalytics ||
-            si.excludeFromAnalytics ||
-            si.isPendingReview ||
-            tx.isPendingReview
-          )
+          const isExplicitExcluded = includeNonAnalyticInCashFlow
+            ? Boolean(si.isExcluded || si.isPendingReview || tx.isExcluded || tx.isPendingReview)
+            : Boolean(
+                si.isExcluded ||
+                si.isExcludeAnalyticsTx ||
+                si.isExcludeFromAnalytics ||
+                si.excludeFromAnalytics ||
+                si.isPendingReview ||
+                tx.isExcluded ||
+                tx.isPendingReview
+              )
           return {
             amount: toSafeNumber(si.amount),
             category: si.category || tx.category,
@@ -553,7 +643,16 @@ export function generateCashFlowStatement(
             loanId: si.loanId || tx.loanId,
             isLoanExcess: si.isLoanExcess || tx.isLoanExcess,
             isExplicitExcluded,
-            isOperatingExcluded: isExcludeAnalyticsTx(itemTx) || isExplicitExcluded,
+            isOperatingExcluded:
+              isExcludeAnalyticsTx(itemTx) ||
+              Boolean(
+                si.isExcluded ||
+                si.isExcludeAnalyticsTx ||
+                si.isExcludeFromAnalytics ||
+                si.excludeFromAnalytics ||
+                si.isPendingReview ||
+                tx.isPendingReview
+              ),
           }
         })
       : [
@@ -565,14 +664,24 @@ export function generateCashFlowStatement(
             notes: tx.notes,
             loanId: tx.loanId,
             isLoanExcess: tx.isLoanExcess,
-            isExplicitExcluded: Boolean(
-              tx.isExcluded ||
-              tx.isExcludeAnalyticsTx ||
-              tx.isExcludeFromAnalytics ||
-              tx.excludeFromAnalytics ||
-              tx.isPendingReview
-            ),
-            isOperatingExcluded: isExcludeAnalyticsTx(tx) || Boolean(tx.isExcluded),
+            isExplicitExcluded: includeNonAnalyticInCashFlow
+              ? Boolean(tx.isExcluded || tx.isPendingReview)
+              : Boolean(
+                  tx.isExcluded ||
+                  tx.isExcludeAnalyticsTx ||
+                  tx.isExcludeFromAnalytics ||
+                  tx.excludeFromAnalytics ||
+                  tx.isPendingReview
+                ),
+            isOperatingExcluded:
+              isExcludeAnalyticsTx(tx) ||
+              Boolean(
+                tx.isExcluded ||
+                tx.isExcludeAnalyticsTx ||
+                tx.isExcludeFromAnalytics ||
+                tx.excludeFromAnalytics ||
+                tx.isPendingReview
+              ),
           },
         ]
 

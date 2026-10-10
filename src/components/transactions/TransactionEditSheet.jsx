@@ -15,11 +15,12 @@ import useTranslation from '../../hooks/useTranslation'
 import { resolveTransactionIconKey } from '../../lib/categoryIcon'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import { formatIncomeCategory } from '../../lib/incomeCategories'
-import { formatMoneyInput, parseMoneyInput, formatMoneyValueForInput } from '../../lib/utils'
+import { formatMoneyInput, parseMoneyInput, formatMoneyValueForInput, convertCurrency } from '../../lib/utils'
 import { evaluateExpression } from '../../lib/calcParser'
 import { updateTransaction } from '../../services/transactionService'
 import { getLocalDateString } from '../../lib/dateUtils'
 import { getDecryptedNoteSync } from '../../lib/fieldEncryption'
+import { getCachedCurrencyRates, FALLBACK_EXCHANGE_RATES } from '../../lib/api'
 import { LayoutGrid, ChevronDown, Sliders, Pencil } from 'lucide-react'
 import TransactionEditSplitSection from './TransactionEditSplitSection'
 
@@ -50,11 +51,17 @@ export default function TransactionEditSheet({
         type: transaction.type || 'expense',
         category: transaction.category || '',
         date: transaction.date || getLocalDateString(),
+        time: transaction.time || '',
         walletId: transaction.walletId ? String(transaction.walletId) : '',
         targetWalletId: transaction.targetWalletId ? String(transaction.targetWalletId) : '',
         targetAmount: transaction.targetAmount ? formatMoneyValueForInput(transaction.targetAmount, tgtCurr) : '',
         notes: getDecryptedNoteSync(transaction.notes) || '',
         currency: transaction.currency || 'IDR',
+        items: transaction.items || undefined,
+        subtotal: transaction.subtotal !== undefined ? transaction.subtotal : undefined,
+        tax: transaction.tax !== undefined ? transaction.tax : undefined,
+        discount: transaction.discount !== undefined ? transaction.discount : undefined,
+        merchant: transaction.merchant || undefined,
         isSplit: Boolean(transaction.isSplit),
         splitItems: Array.isArray(transaction.splitItems)
           ? transaction.splitItems.map((si) => ({
@@ -100,6 +107,11 @@ export default function TransactionEditSheet({
         notes: nextNotes,
         category: nextCat,
         receiptImage: imagePreview || prev.receiptImage,
+        items: scanResult.items || prev.items,
+        subtotal: scanResult.subtotal !== undefined ? scanResult.subtotal : prev.subtotal,
+        tax: scanResult.tax !== undefined ? scanResult.tax : prev.tax,
+        discount: scanResult.discount !== undefined ? scanResult.discount : prev.discount,
+        merchant: scanResult.merchant || prev.merchant,
       }
     })
   }, [setFormData])
@@ -325,17 +337,31 @@ export default function TransactionEditSheet({
         }
       }
 
+      let evaluatedTargetAmount = null
+      if (isCrossCurrencyTransfer) {
+        if (formData.targetAmount) {
+          const targetEval = evaluateExpression(formData.targetAmount, targetCurrency)
+          evaluatedTargetAmount =
+            targetEval.isValid && targetEval.result !== null
+              ? targetEval.result
+              : parseMoneyInput(formData.targetAmount, targetCurrency)
+        } else {
+          const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+          evaluatedTargetAmount = convertCurrency(totalAmount, formData.currency || transaction?.currency, targetCurrency, activeRates)
+        }
+      }
+
       setSubmitError('')
       setCategoryError(false)
       setWalletError(false)
       setAmountError(false)
       if (typeof propOnSubmit === 'function') {
-        propOnSubmit(event)
+        propOnSubmit(event, { amount: totalAmount, targetAmount: evaluatedTargetAmount })
       } else if (transaction?.id) {
         await updateTransaction(transaction.id, {
           ...formData,
           amount: totalAmount,
-          targetAmount: isCrossCurrencyTransfer && formData.targetAmount ? parseMoneyInput(formData.targetAmount, targetCurrency) : null,
+          targetAmount: evaluatedTargetAmount,
           updatedAt: new Date().toISOString(),
         })
         onSaved?.()
@@ -554,10 +580,16 @@ export default function TransactionEditSheet({
                     <input
                       type="text"
                       inputMode="numeric"
+                      data-testid="target-amount-input"
+                      aria-label={t('tx.targetAmount', 'Nominal Diterima')}
                       value={formData.targetAmount || ''}
                       onChange={(e) => {
                         const val = e.target.value
-                        setFormData((prev) => ({ ...prev, targetAmount: formatMoneyInput(val, targetCurrency) }))
+                        const isTypingExpression = /[+\-*/kKmMbBjJrRtTuU(]/.test(val)
+                        setFormData((prev) => ({
+                          ...prev,
+                          targetAmount: isTypingExpression ? val : formatMoneyInput(val, targetCurrency),
+                        }))
                       }}
                       placeholder={formatMoneyInput('0', targetCurrency)}
                       className="w-full h-9 px-3 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-black text-[var(--fg)] tracking-wide focus:outline-none focus:border-[var(--accent)]"

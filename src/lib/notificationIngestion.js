@@ -6,6 +6,8 @@ import { matchCategoryFromDescription, cleanMutationMerchant } from './merchantU
 import { invalidateWalletBalance } from './balanceEngine'
 import { getRememberedCategory, enrichPendingMutationsWithAi } from './ai/merchantCategorizer'
 import { encryptField, warmupDecryptionCache, getDecryptedNoteSync } from './fieldEncryption'
+import { clearCachedDashboardState } from '../hooks/useDashboardData'
+import { scheduleNativeWidgetSync } from './nativeWidgetSync'
 
 // Re-export decomposed parsers and guards for 100% backward compatibility
 export {
@@ -363,6 +365,8 @@ export async function syncNotificationQueue(options = {}) {
       if (affectedWalletIds.length > 0) {
         await invalidateWalletBalance(affectedWalletIds)
       }
+      clearCachedDashboardState()
+      scheduleNativeWidgetSync()
 
       if (typeof window !== 'undefined') {
         import('../store/useSettingsStore').then((m) => {

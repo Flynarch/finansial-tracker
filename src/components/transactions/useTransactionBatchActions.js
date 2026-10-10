@@ -65,19 +65,22 @@ export function useTransactionBatchActions({
     try {
       const selectedTxs = (await db.transactions.where('id').anyOf(ids).toArray()).filter((tx) => !tx.deletedAt)
 
-      const nonSplitIds = []
+      const eligibleIds = []
       let skippedSplitCount = 0
+      let skippedSpecialCount = 0
 
       for (const tx of selectedTxs) {
         if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
           skippedSplitCount++
+        } else if (tx.type === 'transfer' || tx.type === 'balance_adjustment') {
+          skippedSpecialCount++
         } else {
-          nonSplitIds.push(tx.id)
+          eligibleIds.push(tx.id)
         }
       }
 
-      if (nonSplitIds.length > 0) {
-        await db.transactions.where('id').anyOf(nonSplitIds).modify({
+      if (eligibleIds.length > 0) {
+        await db.transactions.where('id').anyOf(eligibleIds).modify({
           category: newCategory,
           updatedAt: new Date().toISOString(),
         })
@@ -85,9 +88,13 @@ export function useTransactionBatchActions({
         scheduleNativeWidgetSync()
       }
 
-      if (skippedSplitCount > 0) {
+      if (skippedSplitCount > 0 || skippedSpecialCount > 0) {
         setApiError(
-          t('tx.batch.splitSkipped', 'Transaksi split dilewati karena memiliki rincian multi-kategori.')
+          skippedSplitCount > 0 && skippedSpecialCount > 0
+            ? t('tx.batch.skippedBoth', 'Transaksi split, transfer, dan penyesuaian saldo dilewati.')
+            : skippedSplitCount > 0
+            ? t('tx.batch.splitSkipped', 'Transaksi split dilewati karena memiliki rincian multi-kategori.')
+            : t('tx.batch.specialSkipped', 'Transaksi transfer dan penyesuaian saldo dilewati.')
         )
         setApiErrorTone('warning')
       }

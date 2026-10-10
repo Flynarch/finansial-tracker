@@ -1,4 +1,4 @@
-import { addMonths, differenceInDays, format, parseISO, startOfMonth } from 'date-fns'
+import { addMonths, subMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from 'date-fns'
 
 /**
  * Generate installment schedule breakdown for a loan.
@@ -41,16 +41,38 @@ export function generateInstallmentSchedule(loan, payments = []) {
       console.warn('[loanUtils]', err)
       baseDate = new Date()
     }
+  } else if (loan.dueDate && tenor > 1) {
+    try {
+      const parsedDue = parseISO(loan.dueDate)
+      if (!isNaN(parsedDue.getTime())) {
+        baseDate = subMonths(parsedDue, tenor)
+      }
+    } catch {
+      baseDate = new Date()
+    }
+  } else if (loan.createdAt) {
+    try {
+      baseDate = new Date(loan.createdAt)
+      if (isNaN(baseDate.getTime())) baseDate = new Date()
+    } catch {
+      baseDate = new Date()
+    }
   }
 
   let targetDueDay = null
-  let firstDueBaseDate = null
+  let isFirstDueExplicit = false
   if (loan.dueDate) {
     try {
       const parsedDue = parseISO(loan.dueDate)
       if (!isNaN(parsedDue.getTime())) {
         targetDueDay = parsedDue.getDate()
-        firstDueBaseDate = parsedDue
+        if (loan.startDate && tenor > 1) {
+          const parsedStart = parseISO(loan.startDate)
+          const diffDays = differenceInCalendarDays(parsedDue, parsedStart)
+          if (diffDays >= 0 && diffDays <= 35) {
+            isFirstDueExplicit = true
+          }
+        }
       }
     } catch (err){
       console.warn('[loanUtils]', err)
@@ -68,14 +90,14 @@ export function generateInstallmentSchedule(loan, payments = []) {
     let dueDateStr
     if (tenor === 1 && loan.dueDate) {
       dueDateStr = loan.dueDate
-    } else if (targetDueDay !== null && firstDueBaseDate) {
-      const targetMonthDate = addMonths(startOfMonth(firstDueBaseDate), i - 1)
+    } else {
+      const monthOffset = isFirstDueExplicit ? i - 1 : i
+      const targetMonthDate = addMonths(startOfMonth(baseDate), monthOffset)
+      const day = targetDueDay !== null ? targetDueDay : baseDate.getDate()
       const maxDays = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() + 1, 0).getDate()
-      const clampedDay = Math.min(targetDueDay, maxDays)
+      const clampedDay = Math.min(day, maxDays)
       const stepDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), clampedDay)
       dueDateStr = format(stepDate, 'yyyy-MM-dd')
-    } else {
-      dueDateStr = format(addMonths(baseDate, i), 'yyyy-MM-dd')
     }
 
     let instAmount
@@ -109,7 +131,7 @@ export function generateInstallmentSchedule(loan, payments = []) {
     let daysRemaining
     try {
       const parsedDue = parseISO(dueDateStr)
-      daysRemaining = differenceInDays(parsedDue, new Date())
+      daysRemaining = differenceInCalendarDays(parsedDue, new Date())
     } catch (err){
       console.warn('[loanUtils]', err)
       daysRemaining = 0
@@ -195,7 +217,7 @@ export function formatInstallmentRelativeDate(dueDateStr, locale = 'id') {
   try {
     const targetDate = parseISO(dueDateStr)
     const today = new Date()
-    const days = differenceInDays(targetDate, today)
+    const days = differenceInCalendarDays(targetDate, today)
 
     if (days === 0) {
       return locale === 'id' ? 'Hari ini' : 'Today'

@@ -46,7 +46,7 @@ import {
   ArrowUpRight,
   PartyPopper,
 } from 'lucide-react'
-import { format, differenceInDays, differenceInMonths } from 'date-fns'
+import { format, differenceInCalendarDays, differenceInMonths, parseISO } from 'date-fns'
 import { getSavingsPrediction } from '../lib/gemini'
 
 export default function SavingsDetail() {
@@ -398,9 +398,9 @@ export default function SavingsDetail() {
   let isOverdue = false
   if (goal.deadline) {
     try {
-      const dObj = new Date(goal.deadline)
+      const dObj = typeof goal.deadline === 'string' ? parseISO(goal.deadline) : new Date(goal.deadline)
       if (!isNaN(dObj.getTime())) {
-        daysLeft = differenceInDays(dObj, new Date())
+        daysLeft = differenceInCalendarDays(dObj, new Date())
         if (daysLeft < 0) {
           deadlineText = t('savings.overdue', 'Lewat Tenggat')
           isOverdue = true

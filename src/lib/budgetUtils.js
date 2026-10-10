@@ -27,23 +27,48 @@ export function getCurrentBudgetMonthKey(date = new Date(), startDay = 1) {
 }
 
 export function normalizeCategoryKey(value) {
+  if (value && typeof value === 'object') {
+    const parent = value.category || value.parentId || value.parent?.id || value.id || ''
+    const child = value.childId || value.subcategory || value.child?.id || ''
+    if (parent && child) return `${parent}/${child}`.trim().toLowerCase()
+    return String(parent || child || '').trim().toLowerCase()
+  }
   return String(value ?? '').trim().toLowerCase()
 }
 
 export function isTxMatchingBudget(budgetCategory, txCategory) {
   const b = normalizeCategoryKey(budgetCategory)
   const raw = normalizeCategoryKey(txCategory)
-  if (b === 'all' || b === 'semua' || raw === b) return true
+  if (b === 'all' || b === 'semua') return true
+  if (raw === b) return true
 
-  // Parent / Child path matching (e.g. "makanan_minuman" matches "makanan_minuman/restoran")
-  if (raw.startsWith(`${b}/`)) return true
+  // Parent / Child path matching
+  const [bParent, bChild] = b.split('/')
+  const [txParent, txChild] = raw.split('/')
 
-  const parsedTx = parseExpenseCategoryPath(txCategory)
-  const parsedB = parseExpenseCategoryPath(budgetCategory)
+  // If budget explicitly specifies a subcategory (e.g. 'makanan/cafe')
+  if (bChild) {
+    return txParent === bParent && txChild === bChild
+  }
+
+  // If budget is at the parent level without child (e.g. 'makanan')
+  if (bParent && !bChild) {
+    if (txParent === bParent) return true
+  }
+
+  // Also support tree parsed paths (in case IDs or category tree aliases differ)
+  const parsedTx = parseExpenseCategoryPath(raw)
+  const parsedB = parseExpenseCategoryPath(b)
 
   if (parsedTx && parsedB) {
     if (parsedTx.parent?.id && parsedB.parent?.id && parsedTx.parent.id.toLowerCase() === parsedB.parent.id.toLowerCase()) {
-      if (!parsedB.child || (parsedTx.child?.id && parsedTx.child.id.toLowerCase() === parsedB.child.id.toLowerCase())) {
+      const targetChildId = parsedB.childId || parsedB.child?.id
+      if (!targetChildId) {
+        // Parent-level budget: matches all transactions under this parent
+        return true
+      }
+      const txChildId = parsedTx.childId || parsedTx.child?.id
+      if (txChildId && txChildId.toLowerCase() === targetChildId.toLowerCase()) {
         return true
       }
     }

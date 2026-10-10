@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { getAllWalletBalances } from '../../lib/balanceEngine'
-import { Wallet, Check, Search, X, Plus, ChevronDown } from 'lucide-react'
+import { unarchiveWallet } from '../../services/walletService'
+import { Wallet, Check, Search, X, Plus, ChevronDown, Archive, RotateCcw } from 'lucide-react'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
 import MoneyBagIcon from './MoneyBagIcon'
 import { formatCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
@@ -173,6 +174,12 @@ export default function WalletSelectModal({
   const activeWallets = useMemo(() => {
     return (enrichedWallets || []).filter((w) => !w.isArchived)
   }, [enrichedWallets])
+
+  const archivedWallets = useMemo(() => {
+    return (enrichedWallets || []).filter((w) => Boolean(w.isArchived))
+  }, [enrichedWallets])
+
+  const [showArchived, setShowArchived] = useState(false)
 
   const filteredWallets = useMemo(() => {
     if (!search.trim()) return activeWallets
@@ -427,6 +434,61 @@ export default function WalletSelectModal({
                 </button>
               )
             })
+          )}
+
+          {archivedWallets.length > 0 && (
+            <div className="pt-3 border-t border-[var(--border)]/60 space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowArchived(!showArchived)}
+                className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Archive className="h-3.5 w-3.5" />
+                  {t('wallets.archivedWallets', 'Dompet Diarsipkan')} ({archivedWallets.length})
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showArchived ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showArchived && (
+                <div className="space-y-1.5 pl-1">
+                  {archivedWallets.map((w) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/60 text-xs opacity-75"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-[var(--fg)] truncate">{w.name}</p>
+                        <p className="text-[10px] text-[var(--muted)]">
+                          {formatCurrency(Number(w.currentBalance ?? w.balance ?? 0), w.currency || defaultCurrency)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          await unarchiveWallet(w.id)
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(
+                              new CustomEvent('ft-show-toast', {
+                                detail: {
+                                  type: 'success',
+                                  message: t('wallets.unarchivedSuccess', 'Akun dompet berhasil dipulihkan.'),
+                                },
+                              })
+                            )
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--field-bg)] text-[10px] font-bold text-[var(--fg)] transition active:scale-95 cursor-pointer shadow-2xs"
+                      >
+                        <RotateCcw className="h-3 w-3 text-[var(--accent)]" />
+                        <span>{t('wallets.unarchive', 'Pulihkan')}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

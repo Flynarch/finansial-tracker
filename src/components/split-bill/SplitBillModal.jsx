@@ -111,26 +111,26 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
   const parsedTotal = parseMoneyInput(totalAmountInput, activeCurrency)
 
   // Equal split calculation per person with exact rounding sum
-  const isIdr = activeCurrency === 'IDR'
+  const isZeroDecimal = ['IDR', 'JPY', 'KRW', 'VND'].includes(activeCurrency)
   const friendShareEqual = useMemo(() => {
     if (participants.length <= 1 || parsedTotal <= 0) return 0
-    return isIdr
+    return isZeroDecimal
       ? Math.floor(parsedTotal / participants.length)
-      : roundCurrency(parsedTotal / participants.length)
-  }, [parsedTotal, participants.length, isIdr])
+      : roundCurrency(parsedTotal / participants.length, activeCurrency)
+  }, [parsedTotal, participants.length, isZeroDecimal, activeCurrency])
 
   const payerShareEqual = useMemo(() => {
     if (participants.length <= 1 || parsedTotal <= 0) return 0
     const nonPayerCount = participants.length - 1
-    return roundCurrency(parsedTotal - (friendShareEqual * nonPayerCount))
-  }, [parsedTotal, participants.length, friendShareEqual])
+    return roundCurrency(parsedTotal - (friendShareEqual * nonPayerCount), activeCurrency)
+  }, [parsedTotal, participants.length, friendShareEqual, activeCurrency])
 
   // Custom split sum and remainder
   const customSum = useMemo(() => {
-    return roundCurrency(participants.reduce((sum, p) => sum + parseMoneyInput(p.amount, activeCurrency), 0))
+    return roundCurrency(participants.reduce((sum, p) => sum + parseMoneyInput(p.amount, activeCurrency), 0), activeCurrency)
   }, [participants, activeCurrency])
 
-  const remainingCustom = roundCurrency(parsedTotal - customSum)
+  const remainingCustom = roundCurrency(parsedTotal - customSum, activeCurrency)
 
   const handleAutoFillRemaining = () => {
     if (remainingCustom <= 0) return
@@ -153,10 +153,10 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
       }
 
       const count = targetIndices.length
-      const share = isIdr
+      const share = isZeroDecimal
         ? Math.floor(remainingCustom / count)
-        : roundCurrency(remainingCustom / count)
-      const remainder = roundCurrency(remainingCustom - share * count)
+        : roundCurrency(remainingCustom / count, activeCurrency)
+      const remainder = roundCurrency(remainingCustom - share * count, activeCurrency)
 
       const targetSet = new Set(targetIndices)
       let remainderAssigned = false
@@ -167,11 +167,11 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
         const currentVal = parseMoneyInput(p.amount, activeCurrency)
         let addAmount = share
         if (!remainderAssigned && remainder > 0) {
-          addAmount = roundCurrency(addAmount + remainder)
+          addAmount = roundCurrency(addAmount + remainder, activeCurrency)
           remainderAssigned = true
         }
 
-        const newVal = roundCurrency(currentVal + addAmount)
+        const newVal = roundCurrency(currentVal + addAmount, activeCurrency)
         return {
           ...p,
           amount: formatMoneyInput(String(newVal), activeCurrency),
@@ -228,7 +228,7 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
       const userShare = splitMode === 'equal'
         ? payerShareEqual
         : parseMoneyInput(payer?.amount || 0, activeCurrency)
-      const friendsShare = roundCurrency(parsedTotal - userShare)
+      const friendsShare = roundCurrency(parsedTotal - userShare, activeCurrency)
 
       // 1. Record transactions and loans atomically inside a Dexie transaction
       let personalTxId = null
@@ -283,6 +283,8 @@ export default function SplitBillModal({ isOpen, onClose, onSuccess }) {
                 type: 'receivable', // piutang (teman berhutang pada kita)
                 personName: safePersonName,
                 title: `Patungan: ${billTitle}`,
+                amount: shareAmount,
+                principalAmount: shareAmount,
                 totalAmount: shareAmount,
                 remainingAmount: shareAmount,
                 currency: activeCurrency,

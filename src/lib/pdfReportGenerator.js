@@ -63,6 +63,18 @@ export async function generateExecutiveReportPdf({
   const positiveGreen = [16, 185, 129] // Emerald 500
   const negativeRed = [239, 68, 68] // Red 500
 
+  const targetLocale = isId ? 'id-ID' : 'en-US'
+  const formatPdfMoney = (amount) => {
+    let formatted = formatCurrency(amount, currency, targetLocale)
+    // Replace non-WinAnsi currency symbols with ISO codes to avoid corrupt rendering in standard PDF fonts
+    formatted = formatted
+      .replace(/[\u20A9\uFFE6]/g, 'KRW ')
+      .replace(/[\u20AB]/g, 'VND ')
+      .replace(/[\u0E3F]/g, 'THB ')
+      .replace(/[\u20B9]/g, 'INR ')
+    return formatted
+  }
+
   let currentY = 18
 
   /* ── 1. Corporate Header ───────────────────────────────────────── */
@@ -116,22 +128,22 @@ export async function generateExecutiveReportPdf({
   const badges = [
     {
       title: isId ? 'Laba Bersih (Surplus)' : 'Net Income',
-      value: formatCurrency(netIncomeVal, currency),
+      value: formatPdfMoney(netIncomeVal),
       isPositive: netIncomeVal >= 0,
     },
     {
       title: isId ? 'Kekayaan Bersih (Equity)' : 'Net Worth',
-      value: formatCurrency(netWorthVal, currency),
+      value: formatPdfMoney(netWorthVal),
       isPositive: netWorthVal >= 0,
     },
     {
       title: isId ? 'Total Aset' : 'Total Assets',
-      value: formatCurrency(totalAssetsVal, currency),
+      value: formatPdfMoney(totalAssetsVal),
       isPositive: true,
     },
     {
       title: isId ? 'Total Kewajiban (Utang)' : 'Total Liabilities',
-      value: formatCurrency(totalLiabilitiesVal, currency),
+      value: formatPdfMoney(totalLiabilitiesVal),
       isPositive: totalLiabilitiesVal === 0,
     },
   ]
@@ -168,15 +180,15 @@ export async function generateExecutiveReportPdf({
   ])
   const revItems = incomeStatement?.operatingRevenue?.items || []
   if (revItems.length === 0) {
-    incomeTableBody.push([isId ? '  (Tidak ada pendapatan operasional tercatat)' : '  (No operating revenue recorded)', formatCurrency(0, currency)])
+    incomeTableBody.push([isId ? '  (Tidak ada pendapatan operasional tercatat)' : '  (No operating revenue recorded)', formatPdfMoney(0)])
   } else {
     revItems.forEach((item) => {
-      incomeTableBody.push([`  ${item.category}`, formatCurrency(item.amount, currency)])
+      incomeTableBody.push([`  ${item.category}`, formatPdfMoney(item.amount)])
     })
   }
   incomeTableBody.push([
     { content: isId ? 'Total Pendapatan Operasional' : 'Total Operating Revenue', styles: { fontStyle: 'bold' } },
-    { content: formatCurrency(incomeStatement?.operatingRevenue?.total || 0, currency), styles: { fontStyle: 'bold', halign: 'right' } },
+    { content: formatPdfMoney(incomeStatement?.operatingRevenue?.total || 0), styles: { fontStyle: 'bold', halign: 'right' } },
   ])
 
   // Operating Expenses
@@ -185,32 +197,32 @@ export async function generateExecutiveReportPdf({
   ])
   const expItems = incomeStatement?.operatingExpenses?.items || []
   if (expItems.length === 0) {
-    incomeTableBody.push([isId ? '  (Tidak ada beban operasional tercatat)' : '  (No operating expenses recorded)', formatCurrency(0, currency)])
+    incomeTableBody.push([isId ? '  (Tidak ada beban operasional tercatat)' : '  (No operating expenses recorded)', formatPdfMoney(0)])
   } else {
     expItems.forEach((item) => {
-      incomeTableBody.push([`  ${item.category}`, `(${formatCurrency(item.amount, currency)})`])
+      incomeTableBody.push([`  ${item.category}`, `(${formatPdfMoney(item.amount)})`])
     })
   }
   incomeTableBody.push([
     { content: isId ? 'Total Beban Operasional' : 'Total Operating Expenses', styles: { fontStyle: 'bold' } },
-    { content: `(${formatCurrency(incomeStatement?.operatingExpenses?.total || 0, currency)})`, styles: { fontStyle: 'bold', halign: 'right' } },
+    { content: `(${formatPdfMoney(incomeStatement?.operatingExpenses?.total || 0)})`, styles: { fontStyle: 'bold', halign: 'right' } },
   ])
 
   // Net Operating Profit
   incomeTableBody.push([
     { content: isId ? 'LABA OPERASI (EBIT)' : 'OPERATING PROFIT (EBIT)', styles: { fontStyle: 'bold', fillColor: [248, 250, 252] } },
-    { content: formatCurrency(incomeStatement?.operatingProfit || 0, currency), styles: { fontStyle: 'bold', halign: 'right', fillColor: [248, 250, 252] } },
+    { content: formatPdfMoney(incomeStatement?.operatingProfit || 0), styles: { fontStyle: 'bold', halign: 'right', fillColor: [248, 250, 252] } },
   ])
 
   // Net Income Final
   incomeTableBody.push([
     { content: isId ? 'LABA BERSIH PERIODE (NET INCOME)' : 'NET INCOME FOR PERIOD', styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } },
-    { content: formatCurrency(incomeStatement?.netIncome || 0, currency), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
+    { content: formatPdfMoney(incomeStatement?.netIncome || 0), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
   ])
 
   autoTable(doc, {
     startY: currentY,
-    margin: { left: 14, right: 14 },
+    margin: { top: 18, bottom: 16, left: 14, right: 14 },
     head: [[isId ? 'URAIAN LABA RUGI' : 'INCOME STATEMENT LINE ITEMS', isId ? 'NOMINAL' : 'AMOUNT']],
     body: incomeTableBody,
     theme: 'grid',
@@ -239,11 +251,11 @@ export async function generateExecutiveReportPdf({
   ])
   const cashList = balanceSheet?.assets?.currentAssets?.items || []
   cashList.forEach((c) => {
-    balanceTableBody.push([`  ${c.name} (${c.type})`, formatCurrency(c.balance, currency)])
+    balanceTableBody.push([`  ${c.name} (${c.type})`, formatPdfMoney(c.balance)])
   })
   balanceTableBody.push([
     { content: isId ? 'Total Aset Lancar' : 'Total Current Assets', styles: { fontStyle: 'bold' } },
-    { content: formatCurrency(balanceSheet?.assets?.currentAssets?.total || 0, currency), styles: { fontStyle: 'bold', halign: 'right' } },
+    { content: formatPdfMoney(balanceSheet?.assets?.currentAssets?.total || 0), styles: { fontStyle: 'bold', halign: 'right' } },
   ])
 
   // Non-Current Assets
@@ -252,19 +264,19 @@ export async function generateExecutiveReportPdf({
   ])
   const savingsList = balanceSheet?.assets?.nonCurrentAssets?.savings?.items || []
   savingsList.forEach((s) => {
-    balanceTableBody.push([`  Tabungan: ${s.name}`, formatCurrency(s.currentAmount, currency)])
+    balanceTableBody.push([`  Tabungan: ${s.name}`, formatPdfMoney(s.currentAmount)])
   })
   const invList = balanceSheet?.assets?.nonCurrentAssets?.investments?.items || []
   invList.forEach((inv) => {
-    balanceTableBody.push([`  Investasi: ${inv.name}`, formatCurrency(inv.amount, currency)])
+    balanceTableBody.push([`  Investasi: ${inv.name}`, formatPdfMoney(inv.amount)])
   })
   const recList = balanceSheet?.assets?.nonCurrentAssets?.receivables?.items || []
   recList.forEach((r) => {
-    balanceTableBody.push([`  Piutang: ${r.personName}`, formatCurrency(r.amount, currency)])
+    balanceTableBody.push([`  Piutang: ${r.personName}`, formatPdfMoney(r.amount)])
   })
   balanceTableBody.push([
     { content: isId ? 'TOTAL ASET' : 'TOTAL ASSETS', styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } },
-    { content: formatCurrency(balanceSheet?.assets?.totalAssets || 0, currency), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
+    { content: formatPdfMoney(balanceSheet?.assets?.totalAssets || 0), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
   ])
 
   // Liabilities
@@ -273,26 +285,26 @@ export async function generateExecutiveReportPdf({
   ])
   const debtList = balanceSheet?.liabilities?.items || []
   if (debtList.length === 0) {
-    balanceTableBody.push([isId ? '  (Nihil - Tidak memiliki utang aktif)' : '  (None - No active debt)', formatCurrency(0, currency)])
+    balanceTableBody.push([isId ? '  (Nihil - Tidak memiliki utang aktif)' : '  (None - No active debt)', formatPdfMoney(0)])
   } else {
     debtList.forEach((d) => {
-      balanceTableBody.push([`  Utang: ${d.personName}`, `(${formatCurrency(d.amount, currency)})`])
+      balanceTableBody.push([`  Utang: ${d.personName}`, `(${formatPdfMoney(d.amount)})`])
     })
   }
   balanceTableBody.push([
     { content: isId ? 'TOTAL KEWAJIBAN' : 'TOTAL LIABILITIES', styles: { fontStyle: 'bold' } },
-    { content: formatCurrency(balanceSheet?.liabilities?.total || 0, currency), styles: { fontStyle: 'bold', halign: 'right' } },
+    { content: formatPdfMoney(balanceSheet?.liabilities?.total || 0), styles: { fontStyle: 'bold', halign: 'right' } },
   ])
 
   // Equity
   balanceTableBody.push([
     { content: isId ? 'EKUITAS BERSIH (NET WORTH)' : 'TOTAL NET WORTH (EQUITY)', styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } },
-    { content: formatCurrency(balanceSheet?.equity?.netWorth || 0, currency), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
+    { content: formatPdfMoney(balanceSheet?.equity?.netWorth || 0), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
   ])
 
   autoTable(doc, {
     startY: currentY,
-    margin: { left: 14, right: 14 },
+    margin: { top: 18, bottom: 16, left: 14, right: 14 },
     head: [[isId ? 'NERACA KEUANGAN (ASSETS, LIABILITIES & EQUITY)' : 'BALANCE SHEET (ASSETS, LIABILITIES & EQUITY)', isId ? 'NILAI BUKU' : 'BOOK VALUE']],
     body: balanceTableBody,
     theme: 'grid',
@@ -315,25 +327,25 @@ export async function generateExecutiveReportPdf({
   const cashFlowBody = [
     [
       isId ? 'Arus Kas Bersih dari Aktivitas Operasi' : 'Net Cash from Operating Activities',
-      formatCurrency(cashFlowStatement?.operatingActivities?.net || 0, currency),
+      formatPdfMoney(cashFlowStatement?.operatingActivities?.net || 0),
     ],
     [
       isId ? 'Arus Kas Bersih dari Aktivitas Investasi' : 'Net Cash from Investing Activities',
-      formatCurrency(cashFlowStatement?.investingActivities?.net || 0, currency),
+      formatPdfMoney(cashFlowStatement?.investingActivities?.net || 0),
     ],
     [
       isId ? 'Arus Kas Bersih dari Aktivitas Pendanaan' : 'Net Cash from Financing Activities',
-      formatCurrency(cashFlowStatement?.financingActivities?.net || 0, currency),
+      formatPdfMoney(cashFlowStatement?.financingActivities?.net || 0),
     ],
     [
       { content: isId ? 'KENAIKAN / PENURUNAN BERSIH KAS' : 'NET CHANGE IN CASH', styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } },
-      { content: formatCurrency(cashFlowStatement?.netChangeInCash || 0, currency), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
+      { content: formatPdfMoney(cashFlowStatement?.netChangeInCash || 0), styles: { fontStyle: 'bold', halign: 'right', fillColor: [226, 232, 240] } },
     ],
   ]
 
   autoTable(doc, {
     startY: currentY,
-    margin: { left: 14, right: 14 },
+    margin: { top: 18, bottom: 16, left: 14, right: 14 },
     head: [[isId ? 'LAPORAN ARUS KAS (CASH FLOW STATEMENT)' : 'CASH FLOW STATEMENT', isId ? 'ARUS KAS' : 'NET CASH']],
     body: cashFlowBody,
     theme: 'grid',
@@ -382,6 +394,34 @@ export async function generateExecutiveReportPdf({
     20,
     currentY + 20
   )
+
+  /* ── 8. Corporate Running Header & Dynamic Page Footers ──────────── */
+  const totalPages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+
+    // Corporate footer on every page
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(brandMuted[0], brandMuted[1], brandMuted[2])
+    const pageText = isId ? `Halaman ${i} dari ${totalPages}` : `Page ${i} of ${totalPages}`
+    doc.text(pageText, 196, 290, { align: 'right' })
+    doc.text(`FinTrack Enterprise • ${docId}`, 14, 290)
+
+    // Running corporate header on pages > 1
+    if (i > 1) {
+      doc.setFillColor(brandDark[0], brandDark[1], brandDark[2])
+      doc.rect(14, 8, 182, 0.8, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(brandDark[0], brandDark[1], brandDark[2])
+      doc.text('FINTRACK ENTERPRISE', 14, 13)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(brandMuted[0], brandMuted[1], brandMuted[2])
+      doc.text(`${periodName} • ${profileName}`, 196, 13, { align: 'right' })
+    }
+  }
 
   const filename = `FinTrack_Laporan_Eksekutif_${dateSlug}.pdf`
 

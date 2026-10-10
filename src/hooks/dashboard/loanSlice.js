@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, startOfDay } from 'date-fns'
+import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { convertCurrency, toSafeNumber } from '../../lib/utils'
 
 /**
@@ -22,7 +22,7 @@ export function calculateLoanSummary(loans = [], defaultCurrency = 'IDR', rates 
       let isOverdue = false
       let daysLeft = null
       if (l.dueDate && !isPaid) {
-        daysLeft = differenceInCalendarDays(startOfDay(new Date(l.dueDate)), startOfDay(new Date()))
+        daysLeft = differenceInCalendarDays(startOfDay(typeof l.dueDate === 'string' ? parseISO(l.dueDate) : new Date(l.dueDate)), startOfDay(new Date()))
         if (daysLeft < 0) isOverdue = true
       }
 

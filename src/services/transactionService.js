@@ -278,26 +278,37 @@ export async function updateTransaction(id, fields) {
     const newCurrency = fields.currency || existing.currency || defaultCurrency
 
     // 1. Guard: Parent Split Bill Transaction Update (talangan / fronted transaction only)
-    if (existing.splitBillId) {
-      const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
-      const isTalanganTx =
-        linkedLoans.some((l) => Number(l.initialTransactionId) === cleanId || l.initialTransactionId === cleanId || Number(l.initialTransactionId) === Number(existing.id)) ||
-        Boolean(existing.isExcludeAnalyticsTx) ||
-        existing.category === 'Pinjaman Diberikan'
+    const isTalanganTx = Boolean(
+      existing.splitBillId &&
+      existing.type === 'expense' &&
+      (existing.category === 'Pinjaman Diberikan' ||
+       existing.category === 'Talangan' ||
+       existing.subCategory === 'Talangan' ||
+       Boolean(existing.isTalangan))
+    )
 
-      if (isTalanganTx) {
-        const activeParticipantLoans = linkedLoans.filter(
-          (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
-        )
-        const loanCurrency = activeParticipantLoans[0]?.currency || existing.currency || defaultCurrency
-        const activeLoansSum = activeParticipantLoans.reduce(
-          (sum, l) => sum + convertCurrency(Number(l.remainingAmount) || 0, l.currency || loanCurrency, loanCurrency, rates),
-          0,
-        )
-        const newAmtInLoanCurrency = convertCurrency(newAmt, newCurrency, loanCurrency, rates)
-        if (newAmtInLoanCurrency < activeLoansSum) {
-          throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari sisa pinjaman aktif partisipan.')
-        }
+    if (isTalanganTx) {
+      const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
+      const activeParticipantLoans = linkedLoans.filter(
+        (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
+      )
+      const loanCurrency = activeParticipantLoans[0]?.currency || existing.currency || defaultCurrency
+      const activeLoansSum = activeParticipantLoans.reduce(
+        (sum, l) => sum + convertCurrency(Number(l.remainingAmount) || 0, l.currency || loanCurrency, loanCurrency, rates),
+        0,
+      )
+      const totalPaidSum = linkedLoans.reduce((sum, l) => {
+        const total = Number(l.totalAmount) || 0
+        const rem = Number(l.remainingAmount) || 0
+        const paid = Math.max(0, total - rem)
+        return sum + convertCurrency(paid, l.currency || loanCurrency, loanCurrency, rates)
+      }, 0)
+      const newAmtInLoanCurrency = convertCurrency(newAmt, newCurrency, loanCurrency, rates)
+      if (newAmtInLoanCurrency < activeLoansSum) {
+        throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari sisa pinjaman aktif partisipan.')
+      }
+      if (newAmtInLoanCurrency < totalPaidSum) {
+        throw new Error('Nominal transaksi talangan tidak boleh lebih kecil dari total cicilan yang telah dibayarkan partisipan.')
       }
     }
 
@@ -307,12 +318,14 @@ export async function updateTransaction(id, fields) {
       loan = await db.loans.get(existing.loanId)
     }
     if (!loan) {
-      loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
-      if (!loan && typeof cleanId === 'number') {
-        loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+      if (!existing.splitBillId || isTalanganTx) {
+        loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+        if (!loan && typeof cleanId === 'number') {
+          loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+        }
       }
     }
-    if (!loan && existing.splitBillId) {
+    if (!loan && existing.splitBillId && isTalanganTx) {
       loan = await db.loans.where('splitBillId').equals(existing.splitBillId).first()
     }
     if (loan) {
@@ -396,15 +409,14 @@ export async function updateTransaction(id, fields) {
             }
           }
         } else if (
-          Number(loan.initialTransactionId) === cleanId ||
-          loan.initialTransactionId === cleanId ||
-          Boolean(existing.splitBillId)
+          (!existing.splitBillId && (Number(loan.initialTransactionId) === cleanId || loan.initialTransactionId === cleanId)) ||
+          (Boolean(existing.splitBillId) && isTalanganTx)
         ) {
           let linkedLoans = await db.loans.where('initialTransactionId').equals(cleanId).toArray()
           if (linkedLoans.length === 0 && typeof cleanId === 'number') {
             linkedLoans = await db.loans.where('initialTransactionId').equals(String(cleanId)).toArray()
           }
-          if (linkedLoans.length === 0 && existing.splitBillId) {
+          if (linkedLoans.length === 0 && existing.splitBillId && isTalanganTx) {
             linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
           }
           const eligibleLoans = linkedLoans.filter((l) => l.status === 'active' || l.status === 'partially_paid')
@@ -432,8 +444,16 @@ export async function updateTransaction(id, fields) {
                 convertCurrency(deltaPartInLoanCur, loanCurrency, l.currency || loanCurrency, rates),
                 l.currency || loanCurrency,
               )
-              const newTotal = Math.max(0, (Number(l.totalAmount) || 0) + deltaPart)
-              const newRemaining = Math.max(0, (Number(l.remainingAmount) || 0) + deltaPart)
+              const oldTotal = Number(l.totalAmount) || 0
+              const oldRemaining = Number(l.remainingAmount) || 0
+              const isTalangan = Boolean(existing.splitBillId && isTalanganTx)
+              const paidSoFar = Math.max(0, oldTotal - oldRemaining)
+              const newTotal = isTalangan
+                ? Math.max(paidSoFar, oldTotal + deltaPart)
+                : Math.max(0, oldTotal + deltaPart)
+              const newRemaining = isTalangan
+                ? Math.max(0, newTotal - paidSoFar)
+                : Math.max(0, oldRemaining + deltaPart)
               const newStatus = newRemaining <= 0 ? 'paid' : (newRemaining < newTotal ? 'partially_paid' : 'active')
               await db.loans.update(l.id, {
                 totalAmount: newTotal,
@@ -449,16 +469,49 @@ export async function updateTransaction(id, fields) {
       }
 
     // Synchronize linked investment & investment orders if applicable
-    if (existing.investmentId) {
-      const investment = await db.investments.get(Number(existing.investmentId))
-      if (investment) {
-        const orderCandidates = await db.investmentOrders
-          .filter((o) => Number(o.transactionId) === cleanId || o.transactionId === cleanId || (existing.investmentOrderId && Number(o.id) === Number(existing.investmentOrderId)))
-          .toArray()
-        for (const order of orderCandidates) {
+    let investmentId = existing.investmentId ? Number(existing.investmentId) : null
+    const orderCandidates = await db.investmentOrders
+      .filter((o) => Number(o.transactionId) === cleanId || o.transactionId === cleanId || (existing.investmentOrderId && Number(o.id) === Number(existing.investmentOrderId)))
+      .toArray()
+    let investment = investmentId ? await db.investments.get(investmentId) : null
+    if (!investment && orderCandidates.length > 0) {
+      if (orderCandidates[0].investmentId) {
+        investment = await db.investments.get(Number(orderCandidates[0].investmentId))
+      }
+      if (!investment && orderCandidates[0].name) {
+        investment = await db.investments.filter((i) => String(i.name || '').toLowerCase() === String(orderCandidates[0].name).toLowerCase()).first()
+      }
+    }
+    if (investment && orderCandidates.length > 0) {
+      for (const order of orderCandidates) {
           const orderUpdates = {}
           if (fields.amount !== undefined && Number(fields.amount) !== Number(existing.amount)) {
-            orderUpdates.totalAmount = Number(fields.amount)
+            const nextAmt = Number(fields.amount)
+            orderUpdates.totalAmount = nextAmt
+            const orderQty = Number(order.quantity) || 0
+            if (orderQty > 0) {
+              const nextUnitPrice = nextAmt / orderQty
+              orderUpdates.unitPrice = nextUnitPrice
+              if (order.side === 'buy') {
+                const allBuyOrders = await db.investmentOrders
+                  .filter(
+                    (o) =>
+                      o.side === 'buy' &&
+                      String(o.name || '').toLowerCase() === String(investment.name || '').toLowerCase()
+                  )
+                  .toArray()
+                const totalCost = allBuyOrders.reduce((acc, o) => {
+                  const q = Number(o.quantity) || 0
+                  const u = o.id === order.id ? nextUnitPrice : (Number(o.unitPrice || o.purchasePrice) || 0)
+                  return acc + q * u
+                }, 0)
+                const totalQ = allBuyOrders.reduce((acc, o) => acc + (Number(o.quantity) || 0), 0)
+                const weightedPrice = totalQ > 0 ? totalCost / totalQ : nextUnitPrice
+                await db.investments.update(investment.id, {
+                  purchasePrice: weightedPrice,
+                })
+              }
+            }
           }
           if (fields.date && fields.date !== existing.date) {
             orderUpdates.date = fields.date
@@ -468,7 +521,6 @@ export async function updateTransaction(id, fields) {
           }
         }
       }
-    }
 
     // 3. Synchronize linked savings goal & goal logs if applicable
     if (existing.goalId) {
@@ -559,7 +611,15 @@ export async function updateTransaction(id, fields) {
       if (sanitizedFields.notes !== undefined) {
         sanitizedFields.notes = encryptedNotes
       }
-      if (encryptedSplitItems !== undefined) {
+      if (
+        fields?.isSplit === false ||
+        sanitizedFields.isSplit === false ||
+        fields?.isSplit === 0 ||
+        sanitizedFields.isSplit === 0 ||
+        (sanitizedFields.isSplit !== undefined && !sanitizedFields.isSplit)
+      ) {
+        sanitizedFields.splitItems = null
+      } else if (encryptedSplitItems !== undefined) {
         sanitizedFields.splitItems = encryptedSplitItems
       }
 
@@ -627,23 +687,25 @@ export async function deleteTransaction(id) {
       const rates = getCachedCurrencyRates('USD')
 
       // 1. Guard: Parent Split Bill Transaction Deletion (talangan / fronted transaction only)
-      if (existing.splitBillId) {
-        const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
-        const isTalanganTx =
-          linkedLoans.some((l) => Number(l.initialTransactionId) === cleanId || l.initialTransactionId === cleanId || Number(l.initialTransactionId) === Number(existing.id)) ||
-          Boolean(existing.isExcludeAnalyticsTx) ||
-          existing.category === 'Pinjaman Diberikan'
+      const isTalanganTx = Boolean(
+        existing.splitBillId &&
+        existing.type === 'expense' &&
+        (existing.category === 'Pinjaman Diberikan' ||
+         existing.category === 'Talangan' ||
+         existing.subCategory === 'Talangan' ||
+         Boolean(existing.isTalangan))
+      )
 
-        if (isTalanganTx) {
-          const activeParticipantLoans = linkedLoans.filter(
-            (l) => l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
-          )
-          if (activeParticipantLoans.length > 0) {
-            throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
-          }
-          if (linkedLoans.length > 0) {
-            throw new Error('Transaksi ini merupakan talangan split bill yang memiliki catatan pinjaman partisipan. Kelola atau hapus pinjaman partisipan melalui menu Pinjaman.')
-          }
+      if (isTalanganTx && existing.splitBillId) {
+        const linkedLoans = await db.loans.where('splitBillId').equals(existing.splitBillId).toArray()
+        const activeParticipantLoans = linkedLoans.filter(
+          (l) => !l.isArchived && l.status !== 'paid' && l.status !== 'forgiven' && (Number(l.remainingAmount) || 0) > 0,
+        )
+        if (activeParticipantLoans.length > 0) {
+          throw new Error('Transaksi ini merupakan talangan split bill dengan pinjaman aktif. Hapus atau selesaikan pinjaman terlebih dahulu.')
+        }
+        if (linkedLoans.length > 0) {
+          throw new Error('Transaksi ini merupakan talangan split bill yang memiliki catatan pinjaman partisipan. Kelola atau hapus pinjaman partisipan melalui menu Pinjaman.')
         }
       }
 
@@ -653,9 +715,11 @@ export async function deleteTransaction(id) {
         loan = await db.loans.get(existing.loanId)
       }
       if (!loan) {
-        loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
-        if (!loan && typeof cleanId === 'number') {
-          loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+        if (!existing.splitBillId || isTalanganTx) {
+          loan = await db.loans.where('initialTransactionId').equals(cleanId).first()
+          if (!loan && typeof cleanId === 'number') {
+            loan = await db.loans.where('initialTransactionId').equals(String(cleanId)).first()
+          }
         }
       }
       if (loan) {
@@ -678,6 +742,7 @@ export async function deleteTransaction(id) {
               } else {
                 await db.loanPayments.update(payment.id, {
                   excessAmount: 0,
+                  interestAmount: 0,
                   excessTransactionId: null,
                   amount: remainingPrincipal,
                 })
@@ -853,10 +918,31 @@ export async function deleteTransaction(id) {
           if (holding && qtyToAdjust > 0) {
             const currentQty = Number(holding.quantity) || 0
             const newQty = Math.max(0, currentQty - qtyToAdjust)
-            if (newQty <= 0.000001) {
+            if (newQty <= 0.00000001) {
               await db.investments.delete(holding.id)
             } else {
-              await db.investments.update(holding.id, { quantity: newQty })
+              let nextPurchasePrice = holding.purchasePrice
+              if (order?.id) {
+                const remainingBuyOrders = await db.investmentOrders
+                  .filter(
+                    (o) =>
+                      o.id !== order.id &&
+                      o.side === 'buy' &&
+                      String(o.name || '').toLowerCase() === String(holding.name || '').toLowerCase()
+                  )
+                  .toArray()
+                if (remainingBuyOrders.length > 0) {
+                  const totalCost = remainingBuyOrders.reduce(
+                    (acc, o) => acc + (Number(o.quantity) || 0) * (Number(o.unitPrice || o.purchasePrice) || 0),
+                    0
+                  )
+                  const totalQ = remainingBuyOrders.reduce((acc, o) => acc + (Number(o.quantity) || 0), 0)
+                  if (totalQ > 0) {
+                    nextPurchasePrice = totalCost / totalQ
+                  }
+                }
+              }
+              await db.investments.update(holding.id, { quantity: newQty, purchasePrice: nextPurchasePrice })
             }
           }
         } else {
@@ -870,7 +956,7 @@ export async function deleteTransaction(id) {
               name: order.name,
               type: order.type || 'Investasi',
               quantity: qtyToAdjust,
-              purchasePrice: Number(order.costBasis || order.purchasePrice || order.unitPrice) || 0,
+              purchasePrice: Number(order.costBasis ?? order.purchasePrice ?? order.unitPrice) || 0,
               purchaseCurrency: order.currency || existing.currency || defaultCurrency,
             })
           }

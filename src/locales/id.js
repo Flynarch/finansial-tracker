@@ -576,6 +576,7 @@ export default {
     'habits.notes': 'Catatan (Opsional)',
     'habits.notesPlaceholder': 'Tujuan atau detail cara ngerjain habit ini...',
     'habits.otherSchedules': 'Jadwal Lainnya',
+    'habits.pausedSection': 'Habit Dibekukan',
     'habits.reminder': 'Pengingat Jam',
     'habits.reminderTime': 'Waktu Notifikasi',
     'habits.save': 'Simpan Habit',

@@ -173,6 +173,34 @@ export async function handleTransactionAction(result, {
           }))
         }
 
+        const effectiveType = updatedPayload.type || tx.type
+        if (effectiveType === 'transfer') {
+          const effectiveAmount = updatedPayload.amount !== undefined ? Number(updatedPayload.amount) : Number(tx.amount)
+          const effectiveSrcWalletId = updatedPayload.walletId !== undefined ? Number(updatedPayload.walletId) : Number(tx.walletId)
+          const effectiveTgtWalletId = updatedPayload.targetWalletId !== undefined ? Number(updatedPayload.targetWalletId) : Number(tx.targetWalletId)
+
+          const srcChanged = updatedPayload.walletId !== undefined && Number(updatedPayload.walletId) !== Number(tx.walletId)
+          const tgtChanged = updatedPayload.targetWalletId !== undefined && Number(updatedPayload.targetWalletId) !== Number(tx.targetWalletId)
+          const amtChanged = updatedPayload.amount !== undefined && Number(updatedPayload.amount) !== Number(tx.amount)
+          const typeChanged = updatedPayload.type !== undefined && updatedPayload.type !== tx.type
+
+          if (srcChanged || tgtChanged || amtChanged || typeChanged || (effectiveSrcWalletId && effectiveTgtWalletId && !tx.targetAmount)) {
+            const sWallet = wallets.find((w) => Number(w.id) === effectiveSrcWalletId)
+            const tWallet = wallets.find((w) => Number(w.id) === effectiveTgtWalletId)
+            const sCurr = sWallet?.currency || tx.currency || defaultCurrency
+            const tCurr = tWallet?.currency || defaultCurrency
+            updatedPayload.currency = sCurr
+            updatedPayload.targetCurrency = tCurr
+            if (sCurr !== tCurr) {
+              if (updatedPayload.targetAmount === undefined) {
+                updatedPayload.targetAmount = convertCurrency(effectiveAmount, sCurr, tCurr, rates || {})
+              }
+            } else {
+              updatedPayload.targetAmount = null
+            }
+          }
+        }
+
         await updateTransaction(tx.id, updatedPayload)
         updatedList.push({ ...tx, ...updatedPayload })
       }
@@ -217,6 +245,15 @@ export async function handleTransactionAction(result, {
 
     const sq = result.searchQuery ? result.searchQuery.toLowerCase().trim() : ''
 
+    const getTxWalletNames = (t) => {
+      const w = wallets.find((x) => Number(x.id) === Number(t.walletId))
+      const tw = wallets.find((x) => Number(x.id) === Number(t.targetWalletId))
+      return {
+        walletName: w?.name || '',
+        targetWalletName: tw?.name || '',
+      }
+    }
+
     if (matchedTxs.length === 0) {
       const isVagueDelete = !result.transactionId && rawTargetIds.length === 0 && !sq
       const vagueMsg = locale === 'en'
@@ -234,6 +271,7 @@ export async function handleTransactionAction(result, {
       })
     } else if (matchedTxs.length === 1) {
       const matchedTx = matchedTxs[0]
+      const { walletName, targetWalletName } = getTxWalletNames(matchedTx)
       newMsgs.push({
         id: Date.now() + 3,
         role: 'ai',
@@ -243,9 +281,14 @@ export async function handleTransactionAction(result, {
           amount: matchedTx.amount,
           category: matchedTx.category,
           date: matchedTx.date,
+          time: matchedTx.time || '',
           notes: matchedTx.notes,
           type: matchedTx.type,
           currency: matchedTx.currency || defaultCurrency,
+          walletId: matchedTx.walletId,
+          targetWalletId: matchedTx.targetWalletId,
+          walletName,
+          targetWalletName,
         },
         content: locale === 'en'
           ? 'Are you sure you want to delete this transaction?'
@@ -259,15 +302,23 @@ export async function handleTransactionAction(result, {
         data: {
           isBatch: true,
           ids: matchedTxs.map((t) => t.id),
-          items: matchedTxs.map((t) => ({
-            id: t.id,
-            amount: t.amount,
-            category: t.category,
-            date: t.date,
-            notes: t.notes,
-            type: t.type,
-            currency: t.currency || defaultCurrency,
-          })),
+          items: matchedTxs.map((t) => {
+            const { walletName, targetWalletName } = getTxWalletNames(t)
+            return {
+              id: t.id,
+              amount: t.amount,
+              category: t.category,
+              date: t.date,
+              time: t.time || '',
+              notes: t.notes,
+              type: t.type,
+              currency: t.currency || defaultCurrency,
+              walletId: t.walletId,
+              targetWalletId: t.targetWalletId,
+              walletName,
+              targetWalletName,
+            }
+          }),
         },
         content: locale === 'en'
           ? `Are you sure you want to delete ${matchedTxs.length} transactions?`

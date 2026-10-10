@@ -131,6 +131,8 @@ export async function verifyPin(enteredPin, storedSecret) {
   return constantTimeCompare(trimmedInput, trimmedStored)
 }
 
+export const verifyPattern = verifyPin
+
 const ENCRYPTED_PREFIX = 'enc:v1:'
 
 async function getSecretKey(useLegacy = false) {

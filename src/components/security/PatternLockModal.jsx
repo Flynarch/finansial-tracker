@@ -4,6 +4,7 @@ import { Grid3X3, CheckCircle2, AlertCircle, RotateCcw, Fingerprint } from 'luci
 import { triggerHaptic } from '../../lib/haptics'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
+import { verifyPattern } from '../../lib/crypto'
 
 const DOTS = [
   { id: 0, x: 45, y: 45 },
@@ -17,9 +18,18 @@ const DOTS = [
   { id: 8, x: 205, y: 205 },
 ]
 
-export default function PatternLockModal({ isOpen, onClose, onSave, currentSecret = '', initialBiometric = false }) {
+export default function PatternLockModal({
+  isOpen,
+  onClose,
+  onSave,
+  onVerifySuccess,
+  mode = 'setup',
+  currentSecret = '',
+  initialBiometric = false,
+}) {
   const { t } = useTranslation()
-  const [step, setStep] = useState(1) // 1: draw pattern, 2: confirm pattern
+  const isVerifyOnly = mode === 'verify'
+  const [step, setStep] = useState(isVerifyOnly ? 0 : (currentSecret ? 0 : 1)) // 0: verify current pattern, 1: draw pattern, 2: confirm pattern
   const [firstPattern, setFirstPattern] = useState([])
   const [currentPath, setCurrentPath] = useState([])
   const [isDrawing, setIsDrawing] = useState(false)
@@ -29,16 +39,23 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
   const [useBiometrics, setUseBiometrics] = useState(initialBiometric)
 
   useBackButton(() => {
-    setStep(1)
-    setFirstPattern([])
-    setCurrentPath([])
-    setErrorMsg('')
-  }, isOpen && step === 2)
+    if (step === 2) {
+      setStep(1)
+      setFirstPattern([])
+      setCurrentPath([])
+      setErrorMsg('')
+    } else if (step === 1 && currentSecret && !isVerifyOnly) {
+      setStep(0)
+      setFirstPattern([])
+      setCurrentPath([])
+      setErrorMsg('')
+    }
+  }, isOpen && (step === 2 || (step === 1 && Boolean(currentSecret) && !isVerifyOnly)))
 
   const svgRef = useRef(null)
 
   const handleClose = useCallback(() => {
-    setStep(1)
+    setStep(isVerifyOnly ? 0 : (currentSecret ? 0 : 1))
     setFirstPattern([])
     setCurrentPath([])
     setIsDrawing(false)
@@ -47,7 +64,7 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
     setIsSuccess(false)
     setUseBiometrics(initialBiometric)
     onClose()
-  }, [onClose, initialBiometric])
+  }, [onClose, initialBiometric, currentSecret, isVerifyOnly])
 
   const getSvgPoint = (e) => {
     if (!svgRef.current) return null
@@ -109,6 +126,31 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
       return
     }
 
+    if (step === 0) {
+      const pStr = currentPath.join('-')
+      setCurrentPath([])
+      void (async () => {
+        const isMatch = await verifyPattern(pStr, currentSecret)
+        if (isMatch) {
+          triggerHaptic('success')
+          if (isVerifyOnly) {
+            setIsSuccess(true)
+            setTimeout(() => {
+              onVerifySuccess?.()
+              handleClose()
+            }, 400)
+            return
+          }
+          setStep(1)
+          setErrorMsg('')
+        } else {
+          triggerHaptic('warning')
+          setErrorMsg(t('settings.incorrectCurrentPattern', 'Pola saat ini salah. Silakan coba lagi.'))
+        }
+      })()
+      return
+    }
+
     if (step === 1) {
       setFirstPattern(currentPath)
       setCurrentPath([])
@@ -134,7 +176,7 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
         }, 1200)
       }
     }
-  }, [isDrawing, isSuccess, currentPath, step, firstPattern, onSave, handleClose, t, useBiometrics])
+  }, [isDrawing, isSuccess, currentPath, step, firstPattern, onSave, handleClose, t, useBiometrics, currentSecret, isVerifyOnly, onVerifySuccess])
 
   const displayPath = currentPath
 
@@ -142,24 +184,32 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={currentSecret ? t('settings.changePattern', 'Ubah Pola Aplikasi') : t('settings.setPattern', 'Atur Pola Aplikasi')}
+      title={isVerifyOnly ? t('settings.verifyPattern', 'Verifikasi Pola') : (currentSecret ? t('settings.changePattern', 'Ubah Pola Aplikasi') : t('settings.setPattern', 'Atur Pola Aplikasi'))}
       maxWidth="max-w-xs"
     >
       <div className="flex flex-col items-center text-center py-2 space-y-3 select-none">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
           <Grid3X3 className="h-6 w-6" />
         </div>
 
         <div>
           <h3 className="text-sm font-black text-[var(--fg)]">
-            {step === 1
-              ? t('settings.drawNewPattern', 'Gambar Pola Baru')
-              : t('settings.confirmPattern', 'Konfirmasi Pola')}
+            {isVerifyOnly
+              ? t('settings.verifyPatternToProceed', 'Gambarkan pola saat ini')
+              : step === 0
+              ? t('settings.drawCurrentPattern', 'Gambarkan Pola Saat Ini')
+              : step === 1
+                ? t('settings.drawNewPattern', 'Gambar Pola Baru')
+                : t('settings.confirmPattern', 'Konfirmasi Pola')}
           </h3>
           <p className="text-[11px] text-[var(--muted)] mt-0.5">
-            {step === 1
-              ? t('settings.patternMinDots', 'Hubungkan minimal 4 titik')
-              : t('settings.patternStep2Desc', 'Gambar kembali pola yang sama')}
+            {isVerifyOnly
+              ? t('settings.verifyPatternDesc', 'Konfirmasi identitas Anda untuk melanjutkan')
+              : step === 0
+              ? t('settings.verifyCurrentPatternDesc', 'Verifikasi pola lama sebelum membuat pola baru')
+              : step === 1
+                ? t('settings.patternMinDots', 'Hubungkan minimal 4 titik')
+                : t('settings.patternStep2Desc', 'Gambar kembali pola yang sama')}
           </p>
         </div>
 
@@ -264,32 +314,34 @@ export default function PatternLockModal({ isOpen, onClose, onSave, currentSecre
         </div>
 
         {/* Biometric Toggle Option */}
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light')
-            setUseBiometrics((prev) => !prev)
-          }}
-          className="flex items-center justify-between w-full max-w-[250px] px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs cursor-pointer hover:bg-[var(--panel)] transition active:scale-98"
-        >
-          <div className="flex items-center gap-2">
-            <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
-            <span className="text-[11px] font-bold text-[var(--fg)]">
-              {t('settings.biometricQuickOption', 'Buka juga via Biometrik')}
-            </span>
-          </div>
-          <div
-            className={`w-7 h-4 rounded-full transition-colors relative p-0.5 ${
-              useBiometrics ? 'bg-[var(--lock)]' : 'bg-[var(--border-strong)]'
-            }`}
+        {!isVerifyOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light')
+              setUseBiometrics((prev) => !prev)
+            }}
+            className="flex items-center justify-between w-full max-w-[250px] px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs cursor-pointer hover:bg-[var(--panel)] transition active:scale-98"
           >
+            <div className="flex items-center gap-2">
+              <Fingerprint className="h-4 w-4 text-[var(--lock)]" />
+              <span className="text-[11px] font-bold text-[var(--fg)]">
+                {t('settings.biometricQuickOption', 'Buka juga via Biometrik')}
+              </span>
+            </div>
             <div
-              className={`w-3 h-3 rounded-full bg-white transition-transform ${
-                useBiometrics ? 'translate-x-3' : 'translate-x-0'
+              className={`w-7 h-4 rounded-full transition-colors relative p-0.5 ${
+                useBiometrics ? 'bg-[var(--lock)]' : 'bg-[var(--border-strong)]'
               }`}
-            />
-          </div>
-        </button>
+            >
+              <div
+                className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                  useBiometrics ? 'translate-x-3' : 'translate-x-0'
+                }`}
+              />
+            </div>
+          </button>
+        )}
 
         {/* Action Button: Reset Pattern */}
         <button

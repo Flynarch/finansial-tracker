@@ -25,6 +25,7 @@ import {
 import { downloadExecutiveReportPdf, shareExecutiveReportPdf } from '../../lib/pdfReportGenerator'
 import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../../lib/fieldEncryption'
 import { exportTransactionsToCsv } from '../../lib/exportReports'
+import { getAllWalletBalances } from '../../lib/balanceEngine'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { id as idLocale, enUS } from 'date-fns/locale'
 
@@ -154,9 +155,11 @@ export default function ReportStatementModal({
   const queriedWallets = useLiveQuery(
     async () => {
       if (!isOpen || (Array.isArray(propWallets) && propWallets.length > 0)) return []
-      return await db.wallets.toArray()
+      const raw = await db.wallets.toArray()
+      if (!raw || raw.length === 0) return []
+      return await getAllWalletBalances(raw, rates)
     },
-    [isOpen, propWallets],
+    [isOpen, propWallets, rates],
     []
   )
 
@@ -184,6 +187,15 @@ export default function ReportStatementModal({
     []
   )
 
+  const investmentOrders = useLiveQuery(
+    async () => {
+      if (!isOpen) return []
+      return await db.investmentOrders.toArray()
+    },
+    [isOpen],
+    []
+  )
+
   // Compute Statements
   const incomeStatement = useMemo(() => {
     if (!isOpen) return { totalIncome: 0, totalExpense: 0, netIncome: 0, revenueLines: [], expenseLines: [], totalOperatingProfit: 0 }
@@ -205,8 +217,9 @@ export default function ReportStatementModal({
       transactions: combinedTxs,
       loanPayments: loanPayments || [],
       investments,
+      investmentOrders: investmentOrders || [],
     })
-  }, [isOpen, wallets, savings, loans, investments, endDate, defaultCurrency, rates, transactions, postDateTransactions, loanPayments])
+  }, [isOpen, wallets, savings, loans, investments, investmentOrders, endDate, defaultCurrency, rates, transactions, postDateTransactions, loanPayments])
 
   const cashFlowStatement = useMemo(() => {
     if (!isOpen) return { operating: { net: 0 }, investing: { net: 0 }, financing: { net: 0 }, netChangeInCash: 0 }

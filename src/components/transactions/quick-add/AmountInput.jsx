@@ -154,6 +154,8 @@ export default function AmountInput({
             type="text"
             readOnly
             inputMode="none"
+            data-testid="amount-input"
+            aria-label={txType === 'transfer' ? t('tx.transferAmount', 'Nominal Transfer') : t('addTx.amount', 'Nominal')}
             data-virtual-keypad-target="true"
             value={amount}
             onChange={handleInputChange}

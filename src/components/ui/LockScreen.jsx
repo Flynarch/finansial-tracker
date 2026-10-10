@@ -74,10 +74,34 @@ function LockScreen({ onUnlock }) {
   const [lockoutSeconds, setLockoutSeconds] = useState(0)
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const attempts = Number(localStorage.getItem('ft_lockout_attempts') || 0)
+          if (attempts > 0) setFailedAttempts(attempts)
+          const until = Number(localStorage.getItem('ft_lockout_until') || 0)
+          const remaining = Math.max(0, Math.ceil((until - Date.now()) / 1000))
+          if (remaining > 0) setLockoutSeconds(remaining)
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
     if (lockoutSeconds <= 0) return undefined
     const timer = setInterval(() => {
       setLockoutSeconds((prev) => {
         if (prev <= 1) {
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('ft_lockout_until')
+            }
+          } catch {
+            /* ignore */
+          }
           setError('')
           return 0
         }
@@ -238,41 +262,69 @@ function LockScreen({ onUnlock }) {
   }, [biometricEnabled, securityMethod])
 
   // Handle PIN digit input
-  const handlePinDigit = async (digit) => {
-    if (isBioFilling || isSuccessUnlocked || lockoutSeconds > 0) return
-    triggerHaptic('light')
-    setError('')
+  const handlePinDigit = useCallback(
+    async (digit) => {
+      if (isBioFilling || isSuccessUnlocked || lockoutSeconds > 0) return
+      triggerHaptic('light')
+      setError('')
 
-    const nextPin = pinInput + digit
-    setPinInput(nextPin)
+      const nextPin = pinInput + digit
+      setPinInput(nextPin)
 
-    if (nextPin.length === 4) {
-      const isMatch = await verifyPin(nextPin, lockSecret || storedPin)
-      if (isMatch) {
-        triggerHaptic('success')
-        setIsSuccessUnlocked(true)
-        setFailedAttempts(0)
-        setTrackedTimeout(() => {
-          onUnlock()
-        }, 300)
-      } else {
-        triggerHaptic('warning')
-        setIsShaking(true)
-        const nextFailed = failedAttempts + 1
-        setFailedAttempts(nextFailed)
-        if (nextFailed >= 5) {
-          setLockoutSeconds(30)
-          setError(t('lock.tooManyAttempts', 'Terlalu banyak percobaan salah. Coba lagi dalam 30 detik.'))
+      if (nextPin.length === 4) {
+        const isMatch = await verifyPin(nextPin, lockSecret || storedPin)
+        if (isMatch) {
+          triggerHaptic('success')
+          setIsSuccessUnlocked(true)
+          setFailedAttempts(0)
+          setLockoutSeconds(0)
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('ft_lockout_until')
+              localStorage.removeItem('ft_lockout_attempts')
+            }
+          } catch {
+            /* ignore */
+          }
+          setTrackedTimeout(() => {
+            onUnlock()
+          }, 300)
         } else {
-          setError(t('lock.incorrectPin', 'PIN salah'))
+          triggerHaptic('warning')
+          setIsShaking(true)
+          const nextFailed = failedAttempts + 1
+          setFailedAttempts(nextFailed)
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('ft_lockout_attempts', String(nextFailed))
+            }
+          } catch {
+            /* ignore */
+          }
+          if (nextFailed >= 5) {
+            const penaltySec = nextFailed >= 10 ? 60 : 30
+            const until = Date.now() + penaltySec * 1000
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('ft_lockout_until', String(until))
+              }
+            } catch {
+              /* ignore */
+            }
+            setLockoutSeconds(penaltySec)
+            setError(t('lock.tooManyAttempts', `Terlalu banyak percobaan salah. Coba lagi dalam ${penaltySec} detik.`))
+          } else {
+            setError(t('lock.incorrectPin', 'PIN salah'))
+          }
+          setTrackedTimeout(() => {
+            setPinInput('')
+            setIsShaking(false)
+          }, 600)
         }
-        setTrackedTimeout(() => {
-          setPinInput('')
-          setIsShaking(false)
-        }, 600)
       }
-    }
-  }
+    },
+    [isBioFilling, isSuccessUnlocked, lockoutSeconds, pinInput, lockSecret, storedPin, failedAttempts, onUnlock, t, setTrackedTimeout],
+  )
 
   const handlePinDelete = () => {
     if (isBioFilling || isSuccessUnlocked || lockoutSeconds > 0) return
@@ -327,7 +379,7 @@ function LockScreen({ onUnlock }) {
     }
   }
 
-  const handlePatternEnd = async () => {
+  const handlePatternEnd = useCallback(async () => {
     if (!isDrawingPattern || isSuccessUnlocked || lockoutSeconds > 0) return
     setIsDrawingPattern(false)
     setCursorPos(null)
@@ -340,15 +392,40 @@ function LockScreen({ onUnlock }) {
       triggerHaptic('success')
       setIsSuccessUnlocked(true)
       setFailedAttempts(0)
+      setLockoutSeconds(0)
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('ft_lockout_until')
+          localStorage.removeItem('ft_lockout_attempts')
+        }
+      } catch {
+        /* ignore */
+      }
       setTrackedTimeout(() => onUnlock(), 300)
     } else {
       triggerHaptic('warning')
       setIsShaking(true)
       const nextFailed = failedAttempts + 1
       setFailedAttempts(nextFailed)
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('ft_lockout_attempts', String(nextFailed))
+        }
+      } catch {
+        /* ignore */
+      }
       if (nextFailed >= 5) {
-        setLockoutSeconds(30)
-        setError(t('lock.tooManyAttempts', 'Terlalu banyak percobaan salah. Coba lagi dalam 30 detik.'))
+        const penaltySec = nextFailed >= 10 ? 60 : 30
+        const until = Date.now() + penaltySec * 1000
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('ft_lockout_until', String(until))
+          }
+        } catch {
+          /* ignore */
+        }
+        setLockoutSeconds(penaltySec)
+        setError(t('lock.tooManyAttempts', `Terlalu banyak percobaan salah. Coba lagi dalam ${penaltySec} detik.`))
       } else {
         setError(t('lock.incorrectPattern', 'Pola salah'))
       }
@@ -357,7 +434,7 @@ function LockScreen({ onUnlock }) {
         setIsShaking(false)
       }, 600)
     }
-  }
+  }, [isDrawingPattern, isSuccessUnlocked, lockoutSeconds, patternPath, lockSecret, failedAttempts, onUnlock, t, setTrackedTimeout])
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'del']
 
@@ -625,19 +702,7 @@ function LockScreen({ onUnlock }) {
                 <Lock className="h-4 w-4 text-[var(--muted)]" />
                 <span>{t('lock.unlockWithPin', 'Buka dengan PIN / Sandi')}</span>
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  onUnlock?.()
-                  unlock?.()
-                }}
-                className="flex items-center justify-center gap-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] py-3 px-4 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer"
-              >
-                <Lock className="h-4 w-4 text-[var(--muted)]" />
-                <span>{t('lock.unlockEmergency', 'Buka Aplikasi (Tanpa Sandi)')}</span>
-              </button>
-            )}
+            ) : null}
           </div>
         )}
 

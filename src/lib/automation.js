@@ -174,30 +174,48 @@ export async function processRecurringTransactions(currentDate = new Date()) {
           }
         }
 
-        const srcWallet = item.walletId ? await db.wallets.get(Number(item.walletId)) : null
+        let resolvedWalletId = item.walletId
+        if (!resolvedWalletId) {
+          const defaultWalletId = useSettingsStore.getState?.()?.defaultWalletId
+          if (defaultWalletId) {
+            resolvedWalletId = defaultWalletId
+          } else {
+            const firstActive = await db.wallets.filter((w) => !w.isArchived).first()
+            if (firstActive) resolvedWalletId = firstActive.id
+          }
+        }
+
+        const srcWallet = resolvedWalletId ? await db.wallets.get(Number(resolvedWalletId)) : null
         const srcCurrency = item.currency || srcWallet?.currency || 'IDR'
 
         const txData = {
           date: currentDateKey,
+          time: item.time || format(pointer, 'HH:mm'),
           amount: item.amount,
           type: item.type,
           category: item.category,
+          subcategory: item.subcategory,
+          tags: Array.isArray(item.tags) ? item.tags : undefined,
+          isSplit: item.isSplit === true || item.isSplit === 1,
+          splitItems: Array.isArray(item.splitItems) ? item.splitItems : undefined,
+          isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
           notes: `${item.notes || ''} (Auto: ${item.title})`.trim(),
           currency: srcCurrency,
           createdAt: pointer.getTime(),
         }
-        if (item.walletId) txData.walletId = item.walletId
+        if (resolvedWalletId) txData.walletId = resolvedWalletId
         if (item.type === 'transfer' && item.targetWalletId) {
           txData.targetWalletId = item.targetWalletId
+          const targetWallet = await db.wallets.get(Number(item.targetWalletId))
+          const tgtCurrency = item.targetCurrency || targetWallet?.currency || srcCurrency
+          if (tgtCurrency && tgtCurrency !== srcCurrency) {
+            txData.targetCurrency = tgtCurrency
+          }
           if (item.targetAmount) {
             txData.targetAmount = item.targetAmount
-          } else {
-            const targetWallet = await db.wallets.get(Number(item.targetWalletId))
-            const tgtCurrency = targetWallet?.currency || srcCurrency
-            if (srcCurrency !== tgtCurrency) {
-              const rates = getCachedCurrencyRates('USD')
-              txData.targetAmount = roundCurrency(convertCurrency(item.amount, srcCurrency, tgtCurrency, rates), tgtCurrency)
-            }
+          } else if (srcCurrency !== tgtCurrency) {
+            const rates = getCachedCurrencyRates('USD')
+            txData.targetAmount = roundCurrency(convertCurrency(item.amount, srcCurrency, tgtCurrency, rates), tgtCurrency)
           }
         } else if (item.targetWalletId) {
           txData.targetWalletId = item.targetWalletId
@@ -299,14 +317,10 @@ export async function notifyTodayEvents() {
     await notifyIfAllowed(title, body, '/settings/recurring', { recurringId: item.id, type: 'recurring' })
 
     if (item.autoExecute === false && item.nextDate <= todayKey) {
-      let nextDateStr = item.nextDate
       const anchorDay = item.anchorDay || parseInt(String(item.nextDate).split('-')[2], 10)
-      while (nextDateStr <= todayKey) {
-        const baseDate = new Date(`${nextDateStr}T12:00:00`)
-        const nextPointer = nextDateByFrequency(baseDate, item.frequency, anchorDay)
-        nextDateStr = dateKey(nextPointer)
+      if (!item.anchorDay) {
+        await db.recurringTransactions.update(item.id, { anchorDay })
       }
-      await db.recurringTransactions.update(item.id, { nextDate: nextDateStr, lastRun: todayKey })
     }
   }
 

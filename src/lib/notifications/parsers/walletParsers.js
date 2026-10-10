@@ -18,7 +18,7 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
     // "Pembayaran Rp35.000 ke Solaria berhasil"
     // "Kamu menerima transfer Rp100.000 dari Andi"
     const isIncome = /menerima|top up|cashback|masuk|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
       return {
@@ -35,7 +35,7 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
   // 2. OVO
   if (lowerPkg.includes('ovo') || /ovo/i.test(combined)) {
     const isIncome = /top up|menerima|cashback|pengembalian dana|refund|uang kembali|pengembalian saldo/i.test(combined)
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
       return {
@@ -79,7 +79,7 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
     const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
     const isIncome = isRefund || (/(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback)/i.test(combined) &&
       !/(?:pembayaran|bayar|transfer ke|kirim ke)/i.test(combined))
-    const amtMatch = combined.match(/rp\.?\s*([\d.,]+)/i)
+    const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
       return {

@@ -1,6 +1,8 @@
 import { db } from '../../db'
+import { exportTransactionsToCsv } from '../../exportReports'
+import useSettingsStore from '../../../store/useSettingsStore'
 
-export async function handleExportAction(result) {
+export async function handleExportAction(result, context = {}) {
   const newMsgs = []
   const rawTxs = await db.transactions.toArray()
   const txs = rawTxs.filter((t) => t && !t.deletedAt && !t.isPendingReview)
@@ -14,24 +16,12 @@ export async function handleExportAction(result) {
       content: 'Tidak ada data transaksi untuk diekspor.',
     })
   } else {
-    const headers = ['Tanggal', 'Tipe', 'Kategori', 'Nominal', 'Catatan']
-    const rows = filtered.map((t) => [t.date, t.type, t.category, t.amount, t.notes || ''])
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-    ].join('\n')
+    const rawWallets = await db.wallets.toArray()
+    const settings = useSettingsStore.getState ? useSettingsStore.getState() : {}
+    const defaultCurrency = context.defaultCurrency || settings.defaultCurrency || 'IDR'
+    const locale = context.locale || settings.locale || 'id'
 
-    if (typeof document !== 'undefined') {
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Laporan-Keuangan-${result.month || 'Semua'}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }
+    await exportTransactionsToCsv(filtered, rawWallets || [], defaultCurrency, locale)
 
     newMsgs.push({
       id: Date.now() + 3,

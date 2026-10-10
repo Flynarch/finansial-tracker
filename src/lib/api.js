@@ -360,3 +360,5 @@ export async function fetchCurrencyRates(baseCurrency = "USD") {
   }));
   return fallbackPayload.rates;
 }
+
+export { FALLBACK_EXCHANGE_RATES } from './utils';

@@ -159,8 +159,11 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
     norm.includes('resto') ||
     norm.includes('makan') ||
     norm.includes('gofood') ||
+    norm.includes('go food') ||
     norm.includes('grabfood') ||
+    norm.includes('grab food') ||
     norm.includes('shopeefood') ||
+    norm.includes('shopee food') ||
     norm.includes('bakso') ||
     norm.includes('ayam') ||
     norm.includes('solaria') ||
@@ -170,7 +173,7 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
     norm.includes('burger') ||
     norm.includes('pizza') ||
     norm.includes('hokben') ||
-    norm.includes('mie') ||
+    /\bmie\b/i.test(norm) ||
     norm.includes('warung') ||
     norm.includes('warteg') ||
     norm.includes('dapur') ||
@@ -213,9 +216,9 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
     norm.includes('paket data') ||
     norm.includes('telkomsel') ||
     norm.includes('indosat') ||
-    norm.includes('xl') ||
+    (/\bxl\b/i.test(norm) && !/\b(baju|kaos|celana|kemeja|pakaian|size|ukuran|jaket|hoodie|gamis|rok|dress)\b/i.test(norm)) ||
     norm.includes('smartfren') ||
-    norm.includes('tri') ||
+    /\btri\b/i.test(norm) ||
     norm.includes('by.u')
   ) {
     return 'tagihan/paket_data'
@@ -246,7 +249,7 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
   if (norm.includes('parkir') || norm.includes('parking')) {
     return 'transportasi/parkir'
   }
-  if (norm.includes('tol') || norm.includes('e-toll')) {
+  if (/\b(tol|e-toll)\b/i.test(norm)) {
     return 'transportasi/tol'
   }
   if (norm.includes('kai') || norm.includes('kereta') || norm.includes('krl') || norm.includes('mrt') || norm.includes('lrt')) {
@@ -275,7 +278,19 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
   if (norm.includes('steam') || norm.includes('playstation') || norm.includes('games') || norm.includes('nintendo')) {
     return 'kultur/games'
   }
-  if (norm.includes('baju') || norm.includes('celana') || norm.includes('sepatu') || norm.includes('zalora')) {
+  if (
+    norm.includes('baju') ||
+    norm.includes('kaos') ||
+    norm.includes('kemeja') ||
+    norm.includes('jaket') ||
+    norm.includes('hoodie') ||
+    norm.includes('celana') ||
+    norm.includes('sepatu') ||
+    norm.includes('pakaian') ||
+    norm.includes('zalora') ||
+    norm.includes('uniqlo') ||
+    norm.includes('h&m')
+  ) {
     return 'pakaian/baju'
   }
   if (norm.includes('skincare') || norm.includes('salon') || norm.includes('barbershop') || norm.includes('makeup')) {
@@ -287,7 +302,7 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
   if (norm.includes('sedekah') || norm.includes('donasi') || norm.includes('zakat') || norm.includes('infaq') || norm.includes('kitabisa')) {
     return 'kehidupan_sosial/amal_donasi'
   }
-  if (norm.includes('biaya admin') || norm.includes('adm') || norm.includes('pajak')) {
+  if (norm.includes('biaya admin') || /\badm\b/i.test(norm) || norm.includes('pajak')) {
     return 'lainnya_kategori/pajak'
   }
 

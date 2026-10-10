@@ -246,7 +246,8 @@ export async function getMonthSummaryForPrompt() {
     }, 0)
 
     // Goals / Savings
-    const goals = await db.goals.toArray().catch(() => [])
+    const rawGoals = await db.goals.toArray().catch(() => [])
+    const goals = rawGoals.filter((g) => !g.isArchived && !g.deletedAt)
     const goalsSummary = goals
       .map((g) => {
         const safeGoalName = String(g.name || '').replace(/[\r\n\t]+/g, ' ').replace(/[\\"`<>]/g, '').slice(0, 40)

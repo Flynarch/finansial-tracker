@@ -21,6 +21,8 @@ import PageHeader from '../components/ui/PageHeader'
 import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon, Edit2, Calendar } from 'lucide-react'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
+import { clearCachedDashboardState } from '../hooks/useDashboardData'
+import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 
 function Budget() {
   const { locale, t } = useTranslation()
@@ -132,7 +134,12 @@ function Budget() {
     } else {
       // Exclude subcategory budgets if their parent category budget is already present
       const topLevelCategoryBudgets = categoryBudgets.filter((b) => {
-        return !categoryBudgets.some((other) => other.id !== b.id && b.category.startsWith(`${other.category}/`))
+        const bCat = (b.category || '').toLowerCase()
+        return !categoryBudgets.some((other) => {
+          if (other.id === b.id) return false
+          const otherCat = (other.category || '').toLowerCase()
+          return bCat.startsWith(`${otherCat}/`)
+        })
       })
 
       topLevelCategoryBudgets.forEach((b) => {
@@ -181,6 +188,8 @@ function Budget() {
     }
     if (newBudgets.length > 0) {
       await db.budgets.bulkAdd(newBudgets)
+      clearCachedDashboardState()
+      scheduleNativeWidgetSync()
     }
   }
 
@@ -621,6 +630,8 @@ function Budget() {
                   console.warn('[Budget]', err)
                   await db.budgets.where('id').equals(deletingBudget.id).delete()
                 }
+                clearCachedDashboardState()
+                scheduleNativeWidgetSync(100)
                 setDeletingBudget(null)
               }
             }}

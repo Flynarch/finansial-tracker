@@ -467,16 +467,16 @@ export default function TransactionDetailSheet({
               if (!receiptImageSrc) return null
 
               return (
-                <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-3.5 space-y-2.5">
+                <div className="rounded-2xl border border-[var(--receipt)]/20 bg-[var(--receipt-soft)] p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-500">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--receipt)]">
                       <Paperclip className="h-3.5 w-3.5 shrink-0" />
                       <span>{t('transactions.receiptAttachment', 'Bukti / Lampiran Struk')}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setIsReceiptModalOpen(true)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-500 hover:text-indigo-600 transition cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--receipt)] hover:opacity-80 transition cursor-pointer"
                     >
                       <Eye className="h-3 w-3" />
                       <span>{t('common.viewFull', 'Lihat Bukti')}</span>

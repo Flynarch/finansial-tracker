@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Minus, Target, Edit2, Trash2, Star, Archive, RotateCcw, CheckCircle2, MoreVertical } from 'lucide-react'
-import { differenceInDays, format } from 'date-fns'
+import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import EmptyState from '../components/ui/EmptyState'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
@@ -138,7 +138,8 @@ function Savings() {
       let deadlineText = null
       let isOverdue = false
       if (g.deadline && !isArch) {
-        const daysLeft = differenceInDays(new Date(g.deadline), new Date())
+        const parsedDeadline = typeof g.deadline === 'string' ? parseISO(g.deadline) : new Date(g.deadline)
+        const daysLeft = differenceInCalendarDays(parsedDeadline, new Date())
         if (daysLeft < 0) {
           deadlineText = t('savings.overdue', 'Lewat Tenggat')
           isOverdue = true

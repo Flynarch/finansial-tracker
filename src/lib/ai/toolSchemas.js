@@ -198,7 +198,8 @@ export const getTools = () => [
             },
             title: { type: 'STRING', description: "Nama habit. Jika log_all, isi dengan 'semua'" },
             color: { type: 'STRING', description: "Warna habit (misal: 'red', 'blue', 'indigo')" },
-            frequencyType: { type: 'STRING', enum: ['daily', 'weekly', 'monthly'], description: 'Frekuensi habit' },
+            frequencyType: { type: 'STRING', enum: ['daily', 'weekly', 'specific_days'], description: 'Frekuensi habit' },
+            frequencyValue: { type: 'INTEGER', description: 'Jumlah target frekuensi per minggu jika weekly (misal 3)' },
             reminderTime: { type: 'STRING', description: "Waktu pengingat (format HH:mm, misal: '08:00')" },
             replyMessage: { type: 'STRING', description: 'Pesan balasan untuk user' },
             suggestedChips: {

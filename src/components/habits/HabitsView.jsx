@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
-import { Clock, Pause } from 'lucide-react'
+import { Clock, Pause, ChevronDown } from 'lucide-react'
 import Modal from '../ui/Modal'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
 import HabitStatsModal from './HabitStatsModal'
@@ -209,6 +209,7 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
   const [editForm, setEditForm] = useState({ title: '', notes: '', color: HABIT_COLORS[0], category: 'Lainnya', frequencyType: 'daily', frequencyValue: [], reminderEnabled: false, reminderTime: '08:00' })
   const [editHabitId, setEditHabitId] = useState(null)
   const [selectedHabitForStats, setSelectedHabitForStats] = useState(null)
+  const [showPaused, setShowPaused] = useState(false)
 
   const {
     swipedId: swipeHabitId,
@@ -377,10 +378,15 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
     )
   }
 
+  const pausedHabits = []
   const todayHabits = []
   const otherHabits = []
 
   habits.forEach(habit => {
+    if (habit.isPaused) {
+      pausedHabits.push(habit)
+      return
+    }
     let isToday = false
     if (!habit.frequencyType || habit.frequencyType === 'daily' || habit.frequencyType === 'weekly') {
       isToday = true
@@ -458,6 +464,29 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
               <div className="opacity-60 grayscale-[30%]">
                 {renderHabitList(otherHabits, false)}
               </div>
+            </div>
+          )}
+
+          {pausedHabits.length > 0 && (
+            <div className="pt-5">
+              <button
+                type="button"
+                onClick={() => setShowPaused(!showPaused)}
+                className="flex items-center justify-between w-full text-left mb-3 group"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Pause size={12} className="text-amber-500" />
+                  <h3 className="text-[12.5px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+                    {t('habits.pausedSection', 'Habit Dibekukan')} ({pausedHabits.length})
+                  </h3>
+                </div>
+                <ChevronDown size={14} className={`text-[var(--muted)] transition-transform ${showPaused ? 'rotate-180' : ''}`} />
+              </button>
+              {showPaused && (
+                <div className="opacity-75">
+                  {renderHabitList(pausedHabits, false)}
+                </div>
+              )}
             </div>
           )}
         </>

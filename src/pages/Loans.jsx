@@ -30,7 +30,8 @@ import {
 } from 'lucide-react'
 import LoanForgiveModal from '../components/loans/LoanForgiveModal'
 import LoanInstallmentModal from '../components/loans/LoanInstallmentModal'
-import { differenceInDays, format } from 'date-fns'
+import { getLoanInstallmentSummary } from '../lib/loanUtils'
+import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 
 export default function Loans() {
   const { t, locale } = useTranslation()
@@ -90,6 +91,17 @@ export default function Loans() {
       if (!prev || lp.date > prev) {
         map.set(lp.loanId, lp.date)
       }
+    })
+    return map
+  }, [loanPayments])
+
+  const paymentsByLoanMap = useMemo(() => {
+    const map = new Map()
+    ;(loanPayments ?? []).forEach((lp) => {
+      if (!lp?.loanId) return
+      const list = map.get(lp.loanId) || []
+      list.push(lp)
+      map.set(lp.loanId, list)
     })
     return map
   }, [loanPayments])
@@ -184,7 +196,9 @@ export default function Loans() {
 
   // Calculate totals and format row data
   const rows = useMemo(() => {
-    return (loans ?? []).map((l) => {
+    return (loans ?? [])
+      .filter((l) => !l.isArchived && !l.deletedAt)
+      .map((l) => {
       const total = toSafeNumber(l.totalAmount)
       const remaining = toSafeNumber(l.remainingAmount ?? l.totalAmount)
       const isForgiven = l.status === 'forgiven'
@@ -195,8 +209,37 @@ export default function Loans() {
 
       let dueBadge = null
       let isOverdue = false
-      if (l.dueDate && !isSettled) {
-        const daysLeft = differenceInDays(new Date(l.dueDate), new Date())
+      const tenor = parseInt(l.tenorMonths, 10) || 0
+
+      if (tenor > 1 && !isSettled) {
+        const pmts = paymentsByLoanMap.get(l.id) || []
+        const installmentSummary = getLoanInstallmentSummary(l, pmts)
+        if (installmentSummary.isAnyOverdue) {
+          dueBadge = {
+            text: t('loans.badge.overdue', 'Telat'),
+            color: 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)] border-[var(--earthy-terra)]/25',
+          }
+          isOverdue = true
+        } else if (installmentSummary.nextDueDate) {
+          const parsedDue = parseISO(installmentSummary.nextDueDate)
+          const daysLeft = differenceInCalendarDays(parsedDue, new Date())
+          if (daysLeft === 0) {
+            dueBadge = {
+              text: t('loans.badge.today', 'Hari ini'),
+              color: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+            }
+          } else if (daysLeft > 0) {
+            dueBadge = {
+              text: locale === 'en' ? `${daysLeft}d` : `${daysLeft}h`,
+              color: 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)]',
+            }
+          }
+        }
+      }
+
+      if (!dueBadge && l.dueDate && !isSettled) {
+        const parsedDue = typeof l.dueDate === 'string' ? parseISO(l.dueDate) : new Date(l.dueDate)
+        const daysLeft = differenceInCalendarDays(parsedDue, new Date())
         if (daysLeft < 0) {
           dueBadge = {
             text: t('loans.badge.overdue', 'Telat'),
@@ -235,7 +278,7 @@ export default function Loans() {
         isOverdue,
       }
     })
-  }, [loans, latestPaymentDateMap, t, locale])
+  }, [loans, latestPaymentDateMap, paymentsByLoanMap, t, locale])
 
   const totals = useMemo(() => {
     let totalDebt = 0
@@ -855,7 +898,7 @@ export default function Loans() {
         onClose={() => setDeletingLoan(null)}
         onConfirm={async () => {
           if (deletingLoan) {
-            await deleteLoan(deletingLoan.id)
+            await deleteLoan(deletingLoan.id, { soft: true })
             setDeletingLoan(null)
           }
         }}

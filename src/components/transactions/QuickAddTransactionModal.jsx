@@ -33,11 +33,14 @@ import {
 import {
   fetchGoldPricePerGramIDR,
   getGoldPriceHistory,
+  getCachedCurrencyRates,
+  FALLBACK_EXCHANGE_RATES,
 } from '../../lib/api'
 import { db } from '../../lib/db'
 import { getCachedDashboardWallets } from '../../hooks/dashboard/dashboardCache'
 import { hapticSuccess, hapticWarning } from '../../lib/haptics'
 import {
+  convertCurrency,
   formatCurrency,
   formatMoneyInput,
   parseMoneyInput,
@@ -94,19 +97,24 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     }
   })
   const [previewImage, setPreviewImage] = useState(null)
-  const [investmentForm, setInvestmentForm] = useState(() => ({
-    action: 'buy',
-    investmentId: '',
-    goldInputInAmount: false,
-    name: 'Emas',
-    type: 'Emas',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    quantity: '',
-    totalValue: '',
-    purchasePrice: '',
-    purchaseCurrency: defaultCurrency,
-    fundingSource: 'balance',
-  }))
+  const [investmentForm, setInvestmentForm] = useState(() => {
+    const cachedWallets = (getCachedDashboardWallets() || []).filter((w) => !w.isArchived)
+    const activeWalletId = initialWalletId || defaultWalletId || (cachedWallets.length > 0 ? String(cachedWallets[0].id) : '')
+    return {
+      action: 'buy',
+      investmentId: '',
+      goldInputInAmount: false,
+      name: 'Emas',
+      type: 'Emas',
+      date: format(new Date(), 'yyyy-MM-dd'),
+      quantity: '',
+      totalValue: '',
+      purchasePrice: '',
+      purchaseCurrency: defaultCurrency,
+      fundingSource: 'balance',
+      walletId: activeWalletId,
+    }
+  })
 
   const ownedInvestments = useLiveQuery(
     () => (isOpen && txType === 'investment' ? db.investments.toArray() : []),
@@ -215,6 +223,11 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         notes: nextNotes,
         category: nextCat,
         receiptImage: imagePreview || prev.receiptImage,
+        items: scanResult.items || prev.items,
+        subtotal: scanResult.subtotal !== undefined ? scanResult.subtotal : prev.subtotal,
+        tax: scanResult.tax !== undefined ? scanResult.tax : prev.tax,
+        discount: scanResult.discount !== undefined ? scanResult.discount : prev.discount,
+        merchant: scanResult.merchant || prev.merchant,
       }
     })
     hapticSuccess()
@@ -269,13 +282,19 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         type: row.type,
         purchaseCurrency: row.purchaseCurrency || defaultCurrency,
         quantity: 0,
+        totalCost: 0,
+        purchasePrice: 0,
         sourceEntries: [],
       }
-      prev.quantity += toSafeNumber(row.quantity)
+      const qty = toSafeNumber(row.quantity)
+      const price = toSafeNumber(row.purchasePrice)
+      prev.quantity += qty
+      prev.totalCost += qty * price
+      prev.purchasePrice = prev.quantity > 0 ? prev.totalCost / prev.quantity : price
       prev.sourceEntries.push({
         id: row.id,
-        quantity: toSafeNumber(row.quantity),
-        purchasePrice: toSafeNumber(row.purchasePrice),
+        quantity: qty,
+        purchasePrice: price,
       })
       map.set(key, prev)
     })
@@ -347,6 +366,10 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         receiptImage: '',
       })
       setPreviewImage(null)
+      setInvestmentForm((p) => ({
+        ...p,
+        walletId: p.walletId || String(activeWalletId),
+      }))
       setTags([])
       setTagInput('')
     }
@@ -613,9 +636,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               const sorted = matchRows.slice().sort((a, b) => Number(a.id) - Number(b.id))
               const keep = sorted[0]
               holdingId = keep.id
+              const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
               const existingQty = sorted.reduce((sum, row) => sum + toSafeNumber(row.quantity), 0)
               const existingCost = sorted.reduce(
-                (sum, row) => sum + toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice),
+                (sum, row) => {
+                  const rowCost = toSafeNumber(row.quantity) * toSafeNumber(row.purchasePrice)
+                  const rowCurrency = row.purchaseCurrency || row.currency || selectedCurrency
+                  return sum + convertCurrency(rowCost, rowCurrency, selectedCurrency, activeRates)
+                },
                 0,
               )
               const nextQty = existingQty + quantity
@@ -645,8 +673,12 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               fundingSource: investmentForm.fundingSource,
               costBasis: unitPrice,
             })
-            if (investmentForm.fundingSource === 'balance') {
-              const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
+            if (investmentForm.fundingSource === 'balance' || investmentForm.fundingSource === 'wallet') {
+              const effectiveWalletId = investmentForm.walletId
+                ? Number(investmentForm.walletId)
+                : form.walletId
+                ? Number(form.walletId)
+                : (wallets?.length > 0 ? Number(wallets[0].id) : null)
               await addTransaction({
                 date: effectiveDate,
                 amount: totalAmount,
@@ -675,7 +707,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               const taken = Math.min(sourceQty, remaining)
               const nextQty = sourceQty - taken
               remaining -= taken
-              if (nextQty <= 0.0000001) {
+              if (nextQty <= 0.00000001) {
                 await db.investments.delete(source.id)
               } else {
                 await db.investments.update(source.id, { quantity: nextQty })
@@ -694,8 +726,12 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
               fundingSource: investmentForm.fundingSource,
               costBasis: Number(selectedOwnedInvestment.purchasePrice) || unitPrice,
             })
-            if (investmentForm.fundingSource === 'balance') {
-              const effectiveWalletId = form.walletId ? Number(form.walletId) : (wallets?.length > 0 ? Number(wallets[0].id) : null)
+            if (investmentForm.fundingSource === 'balance' || investmentForm.fundingSource === 'wallet') {
+              const effectiveWalletId = investmentForm.walletId
+                ? Number(investmentForm.walletId)
+                : form.walletId
+                ? Number(form.walletId)
+                : (wallets?.length > 0 ? Number(wallets[0].id) : null)
               const sellCategory = assetType === 'saham' ? 'investasi/jual_saham' : `investasi/${investmentSub}`
               await addTransaction({
                 date: effectiveDate,
@@ -755,7 +791,21 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           return
         }
 
-        let resolvedCategory = txType === 'transfer' ? 'transfer' : form.category
+        let resolvedTargetAmount = undefined
+        if (isCrossCurrencyTransfer) {
+          if (form.targetAmount) {
+            const evalTarget = evaluateExpression(form.targetAmount, targetCurrency)
+            resolvedTargetAmount =
+              evalTarget.isValid && evalTarget.result !== null
+                ? evalTarget.result
+                : parseMoneyInput(form.targetAmount, targetCurrency)
+          } else {
+            const activeRates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+            resolvedTargetAmount = convertCurrency(totalAmount, form.currency, targetCurrency, activeRates)
+          }
+        }
+
+        const resolvedCategory = txType === 'transfer' ? 'transfer' : form.category
 
         const createdTxId = await addTransaction({
           date: form.date,
@@ -766,9 +816,14 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
           currency: form.currency,
           walletId: Number(form.walletId),
           targetWalletId: txType === 'transfer' ? Number(form.targetWalletId) : undefined,
-          targetAmount: isCrossCurrencyTransfer && form.targetAmount ? parseMoneyInput(form.targetAmount, targetCurrency) : undefined,
+          targetAmount: resolvedTargetAmount,
           tags: tags.length > 0 ? tags : undefined,
           receiptImage: form.receiptImage || undefined,
+          items: form.items || undefined,
+          subtotal: form.subtotal !== undefined ? form.subtotal : undefined,
+          tax: form.tax !== undefined ? form.tax : undefined,
+          discount: form.discount !== undefined ? form.discount : undefined,
+          merchant: form.merchant || undefined,
         })
         hapticSuccess()
 
@@ -857,6 +912,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
             ownedInvestmentGroups={ownedInvestmentGroups}
             selectedOwnedInvestment={selectedOwnedInvestment}
             goldAutoPrice={goldAutoPrice}
+            wallets={wallets}
           />
         ) : (
           <>
@@ -971,10 +1027,16 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
                         <input
                           type="text"
                           inputMode="numeric"
+                          data-testid="target-amount-input"
+                          aria-label={t('tx.targetAmount', 'Nominal Diterima')}
                           value={form.targetAmount || ''}
                           onChange={(e) => {
                             const val = e.target.value
-                            setForm((prev) => ({ ...prev, targetAmount: formatMoneyInput(val, targetCurrency) }))
+                            const isTypingExpression = /[+\-*/kKmMbBjJrRtTuU(]/.test(val)
+                            setForm((prev) => ({
+                              ...prev,
+                              targetAmount: isTypingExpression ? val : formatMoneyInput(val, targetCurrency),
+                            }))
                           }}
                           placeholder={formatMoneyInput('0', targetCurrency)}
                           className="w-full h-9 px-3 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-xs font-black text-[var(--fg)] tracking-wide focus:outline-none focus:border-[var(--accent)]"

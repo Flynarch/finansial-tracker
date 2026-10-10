@@ -94,6 +94,15 @@ export function groupTransactionsDetailed(
       }
     }
 
+    const sortedItems = [...items].sort((a, b) => {
+      const timeA = String(a.time || '')
+      const timeB = String(b.time || '')
+      if (timeA && timeB && timeA !== timeB) {
+        return timeB.localeCompare(timeA)
+      }
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0)
+    })
+
     const net = totalIncome - totalExpense
     let dailySummaryText = ''
     if (net > 0) {
@@ -102,13 +111,11 @@ export function groupTransactionsDetailed(
       dailySummaryText = `-${formatCurrency(Math.abs(net), defaultCurrency)}`
     } else if (totalIncome > 0 && totalExpense > 0) {
       dailySummaryText = formatCurrency(0, defaultCurrency)
-    } else if (totalExpense > 0) {
-      dailySummaryText = `-${formatCurrency(totalExpense, defaultCurrency)}`
     }
 
     return {
       dateKey,
-      items,
+      items: sortedItems,
       dateLabel,
       dailySummaryText,
       isPositive: net > 0,

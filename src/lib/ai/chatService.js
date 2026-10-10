@@ -256,7 +256,7 @@ export async function parseTransactionFromText(userMessage, context = {}) {
   let contents = []
   let lastRole = null
 
-  previousMessages.slice(-6).forEach((msg) => {
+  previousMessages.slice(-14).forEach((msg) => {
     // Avoid leading model turns in conversation history
     if (contents.length === 0 && (msg.role === 'ai' || msg.type === 'welcome')) {
       return
@@ -401,10 +401,11 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   const isQuickLog = Boolean(context.isQuickLog || context.preferFastNlp)
   const toolMode = isReceipt ? 'receipt' : (isQuickLog ? 'quick_log' : 'full')
 
-  const callApi = (reqContents) => callApiStreamWithFallback(reqContents, {
+  const callApi = (reqContents, customOptions = {}) => callApiStreamWithFallback(reqContents, {
     sysPrompt,
-    tools: getPrunedTools(toolMode),
+    tools: customOptions.tools !== undefined ? customOptions.tools : getPrunedTools(toolMode),
     onStream,
+    ...customOptions,
   })
 
   contents = sanitizeGeminiContents(contents)
@@ -555,7 +556,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
       }
 
       if (fnName === 'manage_habit') {
-        return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit...", chips: fnCall.args.suggestedChips }
+        return { type: 'habit', action: fnCall.args.action, title: fnCall.args.title, color: fnCall.args.color, frequencyType: fnCall.args.frequencyType, frequencyValue: fnCall.args.frequencyValue, reminderTime: fnCall.args.reminderTime, text: fnCall.args.replyMessage || "Memproses habit...", chips: fnCall.args.suggestedChips }
       }
 
       if (fnName === 'manage_todo') {
@@ -655,7 +656,7 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
           parts: [{ functionResponse: { name: fnCall.name, response: { content: dbResult } } }],
         })
 
-        const secondRes = await callApi(contents)
+        const secondRes = await callApi(contents, { tools: null })
         let textOutput = secondRes.text || "Maaf, tidak bisa merangkum data."
         let chips = ["Analisis pengeluaranku", "Gimana cara lebih hemat?"]
         const chipMatch = textOutput.match(/<chips>(.*?)<\/chips>/)

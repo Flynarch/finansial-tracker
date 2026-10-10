@@ -104,11 +104,18 @@ export async function extractTextFromPdf(arrayBuffer, password = '') {
  */
 export async function parseCsvStatement(csvString) {
   const Papa = await getPapa()
-  const result = Papa.parse(csvString, {
+  const sepMatch = String(csvString || '').match(/^\uFEFF?sep=([^\r\n]+)[\r\n]+/i)
+  const explicitSep = sepMatch ? sepMatch[1].trim() : undefined
+  const cleanedString = String(csvString || '').replace(/^\uFEFF?sep=[^\r\n]*[\r\n]+/i, '')
+  const parseOptions = {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
-  })
+  }
+  if (explicitSep && explicitSep.length === 1) {
+    parseOptions.delimiter = explicitSep
+  }
+  const result = Papa.parse(cleanedString, parseOptions)
   return {
     headers: result.meta.fields || [],
     rows: result.data || [],
@@ -248,7 +255,7 @@ export function parseBcaStatementLines(lines = [], defaultYear = new Date().getF
 /**
  * Parses generic CSV rows using interactive column mappings.
  */
-export function parseGenericCsvRows(rows = [], mapping = {}) {
+export function parseGenericCsvRows(rows = [], mapping = {}, currency = 'IDR') {
   const { dateCol, descCol, amountCol, debitCol, creditCol, typeCol, incomeIndicator = 'CR' } = mapping
   const transactions = []
 
@@ -261,8 +268,8 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
     let type = 'expense'
 
     if (debitCol || creditCol) {
-      const debitAmt = debitCol && row[debitCol] ? Math.abs(parseMoneyInput(row[debitCol], 'IDR')) : 0
-      const creditAmt = creditCol && row[creditCol] ? Math.abs(parseMoneyInput(row[creditCol], 'IDR')) : 0
+      const debitAmt = debitCol && row[debitCol] ? Math.abs(parseMoneyInput(row[debitCol], currency)) : 0
+      const creditAmt = creditCol && row[creditCol] ? Math.abs(parseMoneyInput(row[creditCol], currency)) : 0
       if (creditAmt > 0) {
         amount = creditAmt
         type = 'income'
@@ -270,7 +277,7 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
         amount = debitAmt
         type = 'expense'
       } else if (amountCol && row[amountCol]) {
-        const parsedAmt = parseMoneyInput(row[amountCol], 'IDR')
+        const parsedAmt = parseMoneyInput(row[amountCol], currency)
         if (parsedAmt < 0) {
           amount = Math.abs(parsedAmt)
           type = 'expense'
@@ -278,14 +285,14 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
           amount = parsedAmt
           if (rawType) {
             const typeStr = String(rawType).trim().toUpperCase()
-            if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR') {
+            if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR' || typeStr === 'CREDIT' || typeStr === 'K') {
               type = 'income'
             }
           }
         }
       }
     } else if (amountCol && row[amountCol]) {
-      const parsedAmt = parseMoneyInput(row[amountCol], 'IDR')
+      const parsedAmt = parseMoneyInput(row[amountCol], currency)
       if (parsedAmt < 0) {
         amount = Math.abs(parsedAmt)
         type = 'expense'
@@ -293,7 +300,7 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
         amount = parsedAmt
         if (rawType) {
           const typeStr = String(rawType).trim().toUpperCase()
-          if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR') {
+          if (typeStr === incomeIndicator || typeStr === 'INCOME' || typeStr === 'KREDIT' || typeStr === 'CR' || typeStr === 'CREDIT' || typeStr === 'K') {
             type = 'income'
           }
         }
@@ -304,12 +311,25 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
     if (!rawDate && !rawDesc) return
     if (rawDesc && /^(total|saldo awal|saldo akhir|grand total|subtotal)\b/i.test(String(rawDesc).trim())) return
 
-    // Date normalization (timezone-safe without UTC midnight shift)
+    // Date & Time normalization (timezone-safe without UTC midnight shift)
     let isoDate = format(new Date(), 'yyyy-MM-dd')
+    let parsedTime = null
     try {
-      const trimmedDate = String(rawDate || '').trim()
-      const ymdMatch = trimmedDate.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/)
-      const dmyMatch = trimmedDate.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+      const rawDateStr = String(rawDate || '').trim()
+      // Extract time portion if present (HH:mm:ss or HH:mm)
+      const timeMatch = rawDateStr.match(/(\d{1,2}:\d{2}(?::\d{2})?)/)
+      if (timeMatch) {
+        const timeParts = timeMatch[1].split(':')
+        const hh = timeParts[0].padStart(2, '0')
+        const mm = timeParts[1].padStart(2, '0')
+        parsedTime = `${hh}:${mm}`
+      }
+
+      // Strip time portion to isolate clean date string
+      const dateOnlyStr = rawDateStr.replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/, '').trim().replace(/,/g, '')
+      const ymdMatch = dateOnlyStr.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+      const dmyMatch = dateOnlyStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
+      const textualMonthMatch = dateOnlyStr.match(/^(\d{1,2})[-/ ]([a-zA-Z]{3,})[-/ ](\d{2,4})/)
 
       if (ymdMatch) {
         const [, y, m, d] = ymdMatch
@@ -318,8 +338,19 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
         const [, d, m, y] = dmyMatch
         const fullY = y.length === 2 ? 2000 + Number(y) : Number(y)
         isoDate = `${fullY}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-      } else if (trimmedDate) {
-        const parsed = new Date(trimmedDate)
+      } else if (textualMonthMatch) {
+        const [, d, monStr, y] = textualMonthMatch
+        const monthMap = {
+          jan: '01', feb: '02', mar: '03', apr: '04', mei: '05', may: '05',
+          jun: '06', jul: '07', agu: '08', aug: '08', sep: '09', okt: '10', oct: '10',
+          nop: '11', nov: '11', des: '12', dec: '12',
+        }
+        const monKey = monStr.toLowerCase().slice(0, 3)
+        const m = monthMap[monKey] || '01'
+        const fullY = y.length === 2 ? 2000 + Number(y) : Number(y)
+        isoDate = `${fullY}-${m}-${d.padStart(2, '0')}`
+      } else if (dateOnlyStr) {
+        const parsed = new Date(dateOnlyStr)
         if (isValid(parsed)) {
           isoDate = format(parsed, 'yyyy-MM-dd')
         }
@@ -335,6 +366,8 @@ export function parseGenericCsvRows(rows = [], mapping = {}) {
         rawDescription: String(rawDesc || 'Mutasi'),
         amount,
         type,
+        currency,
+        time: parsedTime || undefined,
       })
     )
   })
@@ -360,8 +393,18 @@ function finalizeParsedTx(tx) {
  * Calculates similarity based on (Date + Amount + Type + Description Similarity >= 85%).
  */
 export function detectDuplicateTransactions(parsedTransactions = [], existingTransactions = [], selectedWalletId = null) {
+  const claimedExistingIds = new Set()
+  const seenInBatch = new Map()
+
   return parsedTransactions.map((parsed) => {
+    // 1. Check intra-file duplicate (same date, type, amount, description within the CSV batch)
+    const batchKey = `${parsed.date}|${parsed.type}|${Number(parsed.amount).toFixed(2)}|${(parsed.cleanMerchant || parsed.rawDescription || parsed.notes || '').toLowerCase().trim()}`
+    const batchCount = (seenInBatch.get(batchKey) || 0) + 1
+    seenInBatch.set(batchKey, batchCount)
+
+    // 2. Find matching existing transaction from database that has NOT been claimed yet
     const matchingCandidate = existingTransactions.find((existing) => {
+      if (claimedExistingIds.has(existing.id)) return false
       // Ignore soft-deleted transactions
       if (existing.deletedAt) {
         return false
@@ -395,11 +438,23 @@ export function detectDuplicateTransactions(parsedTransactions = [], existingTra
     })
 
     if (matchingCandidate) {
+      claimedExistingIds.add(matchingCandidate.id)
       return {
         ...parsed,
         isDuplicate: true,
         selected: false, // Uncheck duplicates by default for safety
         duplicateMatch: matchingCandidate,
+      }
+    }
+
+    if (batchCount > 1) {
+      // Intra-file duplicate within this CSV import
+      return {
+        ...parsed,
+        isDuplicate: true,
+        isDuplicateInImport: true,
+        selected: false,
+        duplicateMatch: { id: `batch-dup-${batchKey}`, date: parsed.date, notes: 'Duplikat dalam berkas rekening koran' },
       }
     }
 

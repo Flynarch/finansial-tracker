@@ -145,7 +145,7 @@ export default function MnemonicSetupModal({ isOpen, onClose, onSuccess }) {
         {step === 'generate' && (
           <div className="space-y-4 animate-fadeIn">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 text-center space-y-2">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mx-auto mb-1">
+              <div className="h-12 w-12 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mx-auto mb-1">
                 <KeyRound className="h-6 w-6" />
               </div>
               <h4 className="text-sm font-black text-[var(--fg)]">

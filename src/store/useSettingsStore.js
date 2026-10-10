@@ -222,6 +222,18 @@ const useSettingsStore = create((set, get) => ({
     const next = Math.min(31, Math.max(1, Math.floor(Number(budgetCycleStartDay) || 1)))
     set({ budgetCycleStartDay: next })
     await get().persist({ budgetCycleStartDay: next })
+    try {
+      const { clearCachedDashboardState } = await import('../hooks/dashboard/dashboardCache')
+      clearCachedDashboardState()
+    } catch (err) {
+      console.error('[useSettingsStore:setBudgetCycleStartDay:clearCachedDashboardState]', err)
+    }
+    try {
+      const { scheduleNativeWidgetSync } = await import('../lib/nativeWidgetSync')
+      scheduleNativeWidgetSync(100)
+    } catch (err) {
+      console.error('[useSettingsStore:setBudgetCycleStartDay:widgetSync]', err)
+    }
   },
   setWidgetRange: async (widgetRange) => {
     const next = widgetRange === 'month' ? 'month' : '7d'

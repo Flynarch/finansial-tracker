@@ -18,6 +18,7 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../../lib/utils'
+import { evaluateExpression } from '../../lib/calcParser'
 import {
   HandCoins,
   Receipt,
@@ -116,10 +117,24 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
 
   const handleTotalAmountChange = (e) => {
     const el = e.target
-    const nextFormatted = formatMoneyInput(el.value, form.currency)
-    const caretPos = getMoneyInputCaret(el.value, nextFormatted, el.selectionStart ?? el.value.length, form.currency)
-    setForm((prev) => ({ ...prev, totalAmount: nextFormatted }))
-    window.requestAnimationFrame(() => el.setSelectionRange(caretPos, caretPos))
+    const rawValue = el.value
+    const sanitized = rawValue.replace(/[^0-9+\-*/()., kKmMbBjJrRtTuU]/g, '')
+    const isTypingExpression = /[+\-*/kKmMbBjJrRtTuU(]/.test(sanitized)
+    if (isTypingExpression) {
+      setForm((prev) => ({ ...prev, totalAmount: sanitized }))
+    } else {
+      const nextFormatted = formatMoneyInput(sanitized, form.currency)
+      const caretPos = getMoneyInputCaret(sanitized, nextFormatted, el.selectionStart ?? sanitized.length, form.currency)
+      setForm((prev) => ({ ...prev, totalAmount: nextFormatted }))
+      window.requestAnimationFrame(() => el.setSelectionRange(caretPos, caretPos))
+    }
+  }
+
+  const handleTotalAmountBlur = () => {
+    const evalRes = evaluateExpression(form.totalAmount, form.currency)
+    if (evalRes.isValid && evalRes.result !== null) {
+      setForm((prev) => ({ ...prev, totalAmount: formatMoneyValueForInput(evalRes.result, form.currency) }))
+    }
   }
 
   const clearAmount = () => {
@@ -128,7 +143,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   }
 
   const isDebt = form.type === 'debt'
-  const numericAmount = parseMoneyInput(form.totalAmount, form.currency) || 0
+  const evalAmount = evaluateExpression(form.totalAmount, form.currency)
+  const numericAmount = evalAmount.isValid && evalAmount.result !== null ? evalAmount.result : (parseMoneyInput(form.totalAmount, form.currency) || 0)
 
   const annualRate = parseFloat(form.interestRate) || 0
   const tenor = parseInt(form.tenorMonths, 10) || 0
@@ -151,7 +167,8 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
   }
 
   const save = async () => {
-    const total = parseMoneyInput(form.totalAmount, form.currency)
+    const evalTotal = evaluateExpression(form.totalAmount, form.currency)
+    const total = evalTotal.isValid && evalTotal.result !== null ? evalTotal.result : parseMoneyInput(form.totalAmount, form.currency)
     if (!form.title.trim()) {
       setSheetError(t('loans.error.titleRequired', 'Judul pinjaman wajib diisi.'))
       return
@@ -334,6 +351,7 @@ export default function LoanSheetModal({ isOpen, onClose, editingLoan = null, de
                 placeholder="0"
                 value={form.totalAmount}
                 onChange={handleTotalAmountChange}
+                onBlur={handleTotalAmountBlur}
               />
             </div>
           </div>

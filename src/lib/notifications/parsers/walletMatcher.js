@@ -1,4 +1,5 @@
-import { toSafeNumber } from '../../utils'
+import { toSafeNumber, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../utils'
+import { getCachedCurrencyRates } from '../../api'
 
 export function getNotificationTimestamp(val) {
   if (!val) return Date.now()
@@ -116,19 +117,32 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
       if (consumedIndices.has(j)) continue
       const candidate = parsedMutations[j]
 
-      // Criteria: Opposite types (one expense, one income), same amount
+      // Criteria: Opposite types (one expense, one income)
       const isOppositeType =
         (current.type === 'expense' && candidate.type === 'income') ||
         (current.type === 'income' && candidate.type === 'expense')
 
-      const isSameAmount = Math.abs(toSafeNumber(current.amount) - toSafeNumber(candidate.amount)) < 0.01
+      const isSameRawAmount = Math.abs(toSafeNumber(current.amount) - toSafeNumber(candidate.amount)) < 0.01
+
+      // Support cross-currency transferred amounts using current rates
+      let isConvertedAmountMatch = false
+      if (!isSameRawAmount && current.currency && candidate.currency && current.currency !== candidate.currency) {
+        const activeRates = options?.rates || getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
+        const convertedCurrent = convertCurrency(toSafeNumber(current.amount), current.currency, candidate.currency, activeRates)
+        const candAmt = toSafeNumber(candidate.amount)
+        if (candAmt > 0 && Math.abs(convertedCurrent - candAmt) / candAmt <= 0.10) {
+          isConvertedAmountMatch = true
+        }
+      }
+
+      const isAmountMatch = isSameRawAmount || isConvertedAmountMatch
 
       // Within 120 seconds time difference
       const timeI = getNotificationTimestamp(current.createdAt || current.timestamp)
       const timeJ = getNotificationTimestamp(candidate.createdAt || candidate.timestamp)
       const isWithinWindow = Math.abs(timeI - timeJ) <= 120000
 
-      if (isOppositeType && isSameAmount && isWithinWindow) {
+      if (isOppositeType && isAmountMatch && isWithinWindow) {
         pairedIndex = j
         break
       }
@@ -151,10 +165,17 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
         Boolean(toMatch.wallet?.id) &&
         String(fromMatch.wallet.id) === String(toMatch.wallet.id)
 
+      const isCrossCurrency =
+        fromMatch.wallet?.currency &&
+        toMatch.wallet?.currency &&
+        fromMatch.wallet.currency !== toMatch.wallet.currency
+
       result.push({
         type: 'transfer',
         amount: fromMutation.amount,
-        currency: fromMutation.currency || 'IDR',
+        currency: fromMutation.currency || fromMatch.wallet?.currency || 'IDR',
+        targetAmount: isCrossCurrency ? toMutation.amount : undefined,
+        targetCurrency: isCrossCurrency ? (toMutation.currency || toMatch.wallet?.currency || 'IDR') : undefined,
         date: fromMutation.date,
         createdAt: fromMutation.createdAt,
         walletId: fromMatch.wallet?.id ? Number(fromMatch.wallet.id) : null,

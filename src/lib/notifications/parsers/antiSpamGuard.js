@@ -108,7 +108,14 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     'bunga ringan',
     'butuh dana',
   ]
-  if (promoBlacklist.some((b) => combined.includes(b))) {
+
+  const hasStrongFinancialIndicator = /(?:berhasil|sukses|total\s+bayar|pembayaran\s+sebesar|transfer\s+berhasil|transaksi\s+berhasil|trsf\s+e-banking|kamu\s+menerima|uang\s+masuk|menerima\s+transfer|pembayaran\s+rp)/i.test(combined)
+  const receiptTolerantPromoWords = ['promo', 'diskon', 'voucher', 'kupon']
+  const effectivePromoBlacklist = hasStrongFinancialIndicator
+    ? promoBlacklist.filter((b) => !receiptTolerantPromoWords.includes(b))
+    : promoBlacklist
+
+  if (effectivePromoBlacklist.some((b) => combined.includes(b))) {
     return false
   }
 
@@ -117,8 +124,14 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     return false
   }
 
-  // 5. Must contain valid monetary pattern (e.g. Rp 10.000, IDR 50.000)
-  const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
+  // 5. Must contain valid monetary pattern (e.g. Rp 10.000, IDR 50.000, or Banking DB/CR format like "TRSF E-BANKING DB 50.000,00")
+  let amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
+  if (!amtMatch) {
+    const bankDbCrMatch = combined.match(/(?:(?:trsf\s+e-banking|transfer)\s+)?(?:db|cr|debet|kredit)\s+([\d.,]+)/i)
+    if (bankDbCrMatch) {
+      amtMatch = bankDbCrMatch
+    }
+  }
   if (!amtMatch) return false
 
   const rawAmount = toSafeNumber(amtMatch[1].replace(/[^0-9]/g, ''))
@@ -206,6 +219,9 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     'notifikasi kredit',
     'd-bca db',
     'd-bca cr',
+    'trsf e-banking',
+    'trsf e-banking db',
+    'trsf e-banking cr',
     'gaji',
     'setoran',
     'kartu kredit bca',

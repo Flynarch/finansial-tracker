@@ -286,8 +286,17 @@ function TodoList() {
     }
   }, [])
 
-  const dueStatus = useCallback((dueDate) => {
+  const dueStatus = useCallback((dueDate, isCompleted = false) => {
     if (!dueDate) return null
+    if (isCompleted) {
+      try {
+        const parsed = parse(dueDate, 'yyyy-MM-dd', new Date())
+        const dateLocale = locale === 'en' ? enLocale : idLocale
+        return { key: 'completed', label: format(parsed, 'd MMM', { locale: dateLocale }), borderClass: '' }
+      } catch {
+        return { key: 'completed', label: dueDate, borderClass: '' }
+      }
+    }
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
       const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
@@ -304,6 +313,7 @@ function TodoList() {
 
   const dueBadgeClass = useCallback((status) => {
     if (!status) return ''
+    if (status.key === 'completed') return 'bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]'
     if (status.key === 'overdue') return 'bg-[var(--status-expense-soft)] text-[var(--status-expense)] border border-[var(--status-expense)]/30'
     if (status.key === 'today') return 'bg-[var(--warning)]/15 text-[var(--warning)] border border-[var(--warning)]/30'
     if (status.key === 'tomorrow') return 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)]'

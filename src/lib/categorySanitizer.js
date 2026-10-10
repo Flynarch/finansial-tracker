@@ -21,13 +21,13 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   // 1. First check if it's already a valid path (e.g. 'makanan/makan_siang' or 'gaji/gaji_pokok')
   if (type === 'income') {
     const parsed = parseIncomeCategoryPath(raw)
-    if (parsed) {
+    if (parsed && (parsed.child || !parsed.childId)) {
       const defaultChild = parsed.parent?.children?.[0]?.id || 'umum'
       return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/${defaultChild}`
     }
   } else {
     const parsed = parseExpenseCategoryPath(raw)
-    if (parsed) {
+    if (parsed && (parsed.child || !parsed.childId)) {
       const defaultChild = parsed.parent?.children?.[0]?.id || 'umum'
       return parsed.childId ? `${parsed.parentId}/${parsed.childId}` : `${parsed.parentId}/${defaultChild}`
     }
@@ -183,8 +183,8 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('malam') || lower.includes('dinner') || lower.includes('nasgor') || lower.includes('pecel lele') || lower.includes('sate') || lower.includes('martabak') || lower.includes('angkringan')) return 'makanan/makan_malam'
   if (lower.includes('jajan') || lower.includes('snack') || lower.includes('cemilan') || lower.includes('seblak') || lower.includes('cilok') || lower.includes('siomay') || lower.includes('batagor') || lower.includes('gorengan') || lower.includes('es krim') || lower.includes('donat') || lower.includes('croissant') || lower.includes('pastry')) return 'makanan/jajan'
   if (lower.includes('minum') || lower.includes('drink') || lower.includes('jus') || lower.includes('air mineral') || lower.includes('galon') || lower.includes('aqua')) return 'makanan/minuman'
-  if (lower.includes('resto') || lower.includes('restoran') || lower.includes('dining') || lower.includes('makan luar') || lower.includes('ayce') || lower.includes('all you can eat')) return 'makanan/makan_diluar'
-  if (lower.includes('makan') || lower.includes('siang') || lower.includes('lunch') || lower.includes('padang') || lower.includes('warteg') || lower.includes('warmindo') || lower.includes('mie ayam') || lower.includes('bakso') || lower.includes('geprek') || lower.includes('ayam') || lower.includes('nasi') || lower.includes('food') || lower.includes('kuliner')) return 'makanan/makan_siang'
+  if (lower.includes('resto') || lower.includes('restoran') || lower.includes('dining') || lower.includes('makan luar') || lower.includes('ayce') || lower.includes('all you can eat') || lower.includes('gofood') || lower.includes('go food') || lower.includes('grabfood') || lower.includes('grab food') || lower.includes('shopeefood') || lower.includes('shopee food')) return 'makanan/makan_diluar'
+  if (lower.includes('makan') || lower.includes('siang') || lower.includes('lunch') || lower.includes('padang') || lower.includes('warteg') || lower.includes('warmindo') || lower.includes('mie ayam') || /\bmie\b/i.test(lower) || lower.includes('bakso') || lower.includes('geprek') || lower.includes('ayam') || lower.includes('nasi') || lower.includes('food') || lower.includes('kuliner')) return 'makanan/makan_siang'
 
   // Transportation
   if (lower.includes('bensin') || lower.includes('pertamax') || lower.includes('pertalite') || lower.includes('bbm') || lower.includes('shell') || lower.includes('fuel') || lower.includes('solar')) return 'transportasi/bensin'
@@ -201,7 +201,7 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('listrik') || lower.includes('pln') || lower.includes('token listrik') || lower.includes('token pln')) return 'tagihan/listrik'
   if (/\b(air|pdam)\b/i.test(lower) && !lower.includes('conditioner') && !lower.includes('fryer')) return 'tagihan/air'
   if (lower.includes('wifi') || lower.includes('indihome') || lower.includes('biznet') || lower.includes('myrepublic') || lower.includes('firstmedia') || lower.includes('internet')) return 'tagihan/internet'
-  if (lower.includes('pulsa') || lower.includes('kuota') || lower.includes('paket data') || lower.includes('paketan') || lower.includes('paket internet') || lower.includes('telkomsel') || lower.includes('indosat') || lower.includes('xl') || lower.includes('tri') || lower.includes('smartfren')) return 'tagihan/paket_data'
+  if (lower.includes('pulsa') || lower.includes('kuota') || lower.includes('paket data') || lower.includes('paketan') || lower.includes('paket internet') || lower.includes('telkomsel') || lower.includes('indosat') || (/\bxl\b/i.test(lower) && !/\b(baju|kaos|celana|kemeja|pakaian|size|ukuran|jaket|hoodie|gamis|rok|dress)\b/i.test(lower)) || /\btri\b/i.test(lower) || lower.includes('smartfren')) return 'tagihan/paket_data'
   if (lower.includes('netflix') || lower.includes('spotify') || lower.includes('youtube') || lower.includes('disney') || lower.includes('apple') || lower.includes('langganan') || lower.includes('subscription')) return 'tagihan/langganan'
   if (lower.includes('asuransi') || lower.includes('bpjs')) return 'tagihan/asuransi'
   if (lower.includes('cicilan') || lower.includes('paylater') || lower.includes('kredivo') || lower.includes('spaylater') || lower.includes('angsuran') || lower.includes('kredit') || /\b(kosan|kos|kontrakan)\b/i.test(lower)) return 'tagihan/cicilan'
@@ -258,6 +258,7 @@ export function sanitizeCategoryPath(input, type = 'expense') {
   if (lower.includes('saham') || lower.includes('ajaib') || lower.includes('stockbit')) return 'investasi_pengeluaran/saham'
   if (lower.includes('crypto') || lower.includes('kripto') || lower.includes('binance') || lower.includes('indodax') || lower.includes('tokocrypto')) return 'investasi_pengeluaran/crypto'
   if (lower.includes('deposito')) return 'investasi_pengeluaran/deposito'
+  if (lower.includes('biaya admin') || /\badm\b/i.test(lower) || lower.includes('pajak')) return 'lainnya_kategori/pajak'
 
   return 'lainnya_kategori/umum'
 }

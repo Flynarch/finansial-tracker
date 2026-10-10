@@ -155,6 +155,64 @@ export function calculateSevenDaysStats(data1w = []) {
   }
 }
 
+export function reconcileNonCashPositionsBeforeDate({
+  dateKey,
+  safeTx = [],
+  portfolioValue = 0,
+  netLoanPosition = 0,
+  totalSavings = 0,
+}) {
+  if (!dateKey) {
+    return { portfolioValue, netLoanPosition, totalSavings }
+  }
+
+  const target = String(dateKey).slice(0, 10)
+  let postInvestmentSpend = 0
+  let postInvestmentProceeds = 0
+  let postSavingsDeposit = 0
+  let postSavingsWithdrawal = 0
+  let postLoanDisbursement = 0
+  let postLoanRepayment = 0
+
+  for (const tx of safeTx) {
+    if (tx?.isPendingReview === true || tx?.isPendingReview === 1) continue
+    const txDate = String(tx?.date || '').slice(0, 10)
+    if (!txDate || txDate < target) continue
+
+    const amt = toSafeNumber(tx.convertedAmount || tx.amount || 0)
+    const cat = String(tx.category || '').toLowerCase()
+
+    if (tx.investmentId || cat.startsWith('investasi_pengeluaran') || cat.startsWith('investasi')) {
+      if (tx.type === 'expense') postInvestmentSpend += amt
+      else if (tx.type === 'income') postInvestmentProceeds += amt
+    }
+
+    if (tx.goalId || cat === 'tabungan' || cat === 'cairkan_tabungan') {
+      if (tx.type === 'expense' || cat === 'tabungan') postSavingsDeposit += amt
+      else if (tx.type === 'income' || cat === 'cairkan_tabungan') postSavingsWithdrawal += amt
+    }
+
+    if (tx.loanId) {
+      if (tx.isLoanInitial) {
+        if (tx.type === 'income') postLoanDisbursement += amt
+        else if (tx.type === 'expense') postLoanDisbursement -= amt
+      } else if (cat === 'bayar hutang' || (tx.type === 'expense' && !tx.isLoanExcess)) {
+        postLoanRepayment += amt
+      }
+    }
+  }
+
+  const recPortfolio = Math.max(0, portfolioValue - postInvestmentSpend + postInvestmentProceeds)
+  const recSavings = Math.max(0, totalSavings - postSavingsDeposit + postSavingsWithdrawal)
+  const recLoan = netLoanPosition + postLoanDisbursement - postLoanRepayment
+
+  return {
+    portfolioValue: recPortfolio,
+    netLoanPosition: recLoan,
+    totalSavings: recSavings,
+  }
+}
+
 export function buildRevenueSeries({
   rangeId,
   chartData,
@@ -212,7 +270,15 @@ export function buildRevenueSeries({
   const startDate = rangeId === 'ytd'
     ? format(startOfYear(new Date()), 'yyyy-MM-01')
     : (isMonthly ? `${firstItem.key}-01` : firstItem.date)
-  const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + portfolioValue + netLoanPosition + totalSavings
+
+  const rec = reconcileNonCashPositionsBeforeDate({
+    dateKey: startDate,
+    safeTx: normalizedTransactions,
+    portfolioValue,
+    netLoanPosition,
+    totalSavings,
+  })
+  const startBalance = (startDate ? computeCashBalanceBeforeDate(startDate) : 0) + rec.portfolioValue + rec.netLoanPosition + rec.totalSavings
 
   let running = startBalance
   return sourceData.map((row) => {
@@ -283,7 +349,14 @@ export function buildPreviousPeriodRevenueSeries({
     })
 
     const startPrevDate = prevDates[0]
-    const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + portfolioValue + netLoanPosition + totalSavings
+    const recPrev = reconcileNonCashPositionsBeforeDate({
+      dateKey: startPrevDate,
+      safeTx,
+      portfolioValue,
+      netLoanPosition,
+      totalSavings,
+    })
+    const startBalancePrev = computeCashBalanceBeforeDate(startPrevDate) + recPrev.portfolioValue + recPrev.netLoanPosition + recPrev.totalSavings
 
     const prevDailyNetMap = new Map(prevDates.map((d) => [d, 0]))
     safeTx.forEach((tx) => {
@@ -328,7 +401,14 @@ export function buildPreviousPeriodRevenueSeries({
       return `${prevYear}-${m}`
     })
 
-    const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + portfolioValue + netLoanPosition + totalSavings
+    const recYtd = reconcileNonCashPositionsBeforeDate({
+      dateKey: `${prevMonths[0]}-01`,
+      safeTx,
+      portfolioValue,
+      netLoanPosition,
+      totalSavings,
+    })
+    const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + recYtd.portfolioValue + recYtd.netLoanPosition + recYtd.totalSavings
     const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
     safeTx.forEach((tx) => {
       const m = String(tx?.date || '').slice(0, 7)
@@ -371,7 +451,14 @@ export function buildPreviousPeriodRevenueSeries({
     })
 
     const firstMonth = prevMonths[0]
-    const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + portfolioValue + netLoanPosition + totalSavings
+    const recAll = reconcileNonCashPositionsBeforeDate({
+      dateKey: firstMonth ? `${firstMonth}-01` : null,
+      safeTx,
+      portfolioValue,
+      netLoanPosition,
+      totalSavings,
+    })
+    const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + recAll.portfolioValue + recAll.netLoanPosition + recAll.totalSavings
     const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
     safeTx.forEach((tx) => {
       const m = String(tx?.date || '').slice(0, 7)

@@ -108,10 +108,13 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
       date: scanResult.date,
       category: scanResult.category || scanResult.suggestedCategory,
       notes: scanResult.notes || scanResult.merchantName,
-      merchant: scanResult.merchantName,
+      merchant: scanResult.merchantName || scanResult.merchant,
       currency: scanResult.currency || defaultCurrency,
       items: scanResult.items || [],
-      merchantName: scanResult.merchantName,
+      subtotal: scanResult.subtotal,
+      tax: scanResult.tax,
+      discount: scanResult.discount,
+      merchantName: scanResult.merchantName || scanResult.merchant,
       receiptImage: compressedProof,
     }, compressedProof)
     handleClose()
@@ -162,8 +165,8 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
         {/* State 1: Choose Image Source */}
         {!imagePreview && (
           <div className="space-y-4 py-2">
-            <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 text-xs leading-relaxed text-[var(--muted)] flex items-start gap-3">
-              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-500/10 text-indigo-500">
+            <div className="rounded-2xl border border-[var(--receipt)]/20 bg-[var(--receipt-soft)] p-4 text-xs leading-relaxed text-[var(--muted)] flex items-start gap-3">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--receipt-soft)] text-[var(--receipt)]">
                 <Sparkles className="h-4.5 w-4.5" />
               </div>
               <div>
@@ -185,7 +188,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
                 onClick={() => handleTriggerPicker(cameraInputRef)}
                 className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-5 text-center transition active:scale-95 hover:bg-[var(--panel)] cursor-pointer shadow-2xs"
               >
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-2xs">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
                   <Camera className="h-6 w-6" />
                 </div>
                 <div>
@@ -248,11 +251,11 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
               />
 
               {isScanning && (
-                <div className="absolute inset-0 bg-indigo-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 p-4">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 p-4">
                   {/* Laser Scan Line Animation */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-bounce shadow-lg" />
-                  <div className="flex items-center gap-2.5 rounded-full bg-black/70 px-4 py-2 border border-indigo-500/40 text-white shadow-xl backdrop-blur-md">
-                    <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--receipt)] to-transparent animate-bounce shadow-lg" />
+                  <div className="flex items-center gap-2.5 rounded-full bg-black/70 px-4 py-2 border border-[var(--receipt)]/40 text-white shadow-xl backdrop-blur-md">
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--receipt)]" />
                     <span className="text-xs font-bold">
                       {t('transactions.ocr.analyzing', 'Menganalisis struk belanja...')}
                     </span>
@@ -342,7 +345,7 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="flex-1 h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
+                  className="flex-1 h-12 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-sm font-black flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
                 >
                   <span>{t('transactions.ocr.applyBtn', 'Gunakan Data Ini')}</span>
                   <ArrowRight className="h-4.5 w-4.5" />

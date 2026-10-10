@@ -1,6 +1,7 @@
 import { db } from './db'
 import { invalidateWalletBalance } from './balanceEngine'
 import { clearCachedDashboardState } from '../hooks/useDashboardData'
+import { scheduleNativeWidgetSync } from './nativeWidgetSync'
 
 export async function exportAllDataAsJson() {
   const [
@@ -111,6 +112,41 @@ export async function importAllDataFromJsonPayload(payload) {
     : (payload && typeof payload === 'object' ? payload : null)
   if (!data || typeof data !== 'object') {
     throw new Error('Format berkas cadangan tidak valid atau data kosong.')
+  }
+
+  // Pre-validation: Prevent accidental database wipe if user provides an encrypted backup
+  if (
+    payload.isEncrypted ||
+    payload.ciphertext ||
+    payload.iv ||
+    payload.salt ||
+    (payload.data && (payload.data.ciphertext || typeof payload.data === 'string')) ||
+    (data && (data.ciphertext || data.isEncrypted))
+  ) {
+    throw new Error('Berkas ini merupakan cadangan terenkripsi. Gunakan menu Pulihkan Cadangan Terenkripsi.')
+  }
+
+  // Ensure the payload contains at least some recognized database entities before wiping tables
+  const hasRecognizedData = [
+    data.transactions,
+    data.wallets,
+    data.categories,
+    data.budgets,
+    data.goals,
+    data.loans,
+    data.habits,
+    data.todos,
+    data.investments,
+    data.settings,
+    data.preferences,
+    data.categoryCustomizations,
+    payload.settings,
+    payload.preferences,
+    payload.categoryCustomizations,
+  ].some((item) => (Array.isArray(item) && item.length > 0) || (item && typeof item === 'object' && Object.keys(item).length > 0))
+
+  if (!hasRecognizedData) {
+    throw new Error('Berkas cadangan tidak memuat data transaksi atau dompet yang valid.')
   }
 
   // 1. Capture current device authentication & security state to prevent session loss or lockout
@@ -237,7 +273,7 @@ export async function importAllDataFromJsonPayload(payload) {
       typeof localStorage !== 'undefined'
         ? localStorage.getItem('ft_default_currency') || 'IDR'
         : 'IDR'
-    await db.wallets.add({
+    const fallbackWalletId = await db.wallets.add({
       name: 'Kas Utama',
       institutionType: 'cash',
       logoUrl: '/logos/wallets/cash.svg',
@@ -245,11 +281,23 @@ export async function importAllDataFromJsonPayload(payload) {
       balance: 0,
       createdAt: Date.now(),
     })
+
+    // Remap any transactions with missing/orphaned walletId to this fallback wallet
+    const orphanedTxs = await db.transactions.filter((tx) => !tx.walletId).toArray()
+    if (orphanedTxs.length > 0) {
+      await db.transactions.bulkPut(
+        orphanedTxs.map((tx) => ({
+          ...tx,
+          walletId: fallbackWalletId,
+        }))
+      )
+    }
   }
 
   // Clear in-memory caches and invalidate balance engine
   clearCachedDashboardState()
   await invalidateWalletBalance()
+  scheduleNativeWidgetSync()
 
   // Dynamically reload store if useSettingsStore is loaded
   try {

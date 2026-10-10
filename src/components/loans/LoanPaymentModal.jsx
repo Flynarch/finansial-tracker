@@ -17,6 +17,7 @@ import {
   parseMoneyInput,
   toSafeNumber,
 } from '../../lib/utils'
+import { evaluateExpression } from '../../lib/calcParser'
 import { HandCoins, Receipt, Calendar, FileText, CheckCircle2, ArrowRight, Sparkles, Wallet, History, HeartHandshake, ChevronRight } from 'lucide-react'
 import LoanForgiveModal from './LoanForgiveModal'
 import CategoryPickerModal from '../transactions/CategoryPickerModal'
@@ -112,7 +113,8 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
   const paidAlready = Math.max(0, total - remaining)
   const isDebt = loan.type === 'debt'
 
-  const currentPayValue = parseMoneyInput(amount, currency) || 0
+  const evalPay = evaluateExpression(amount, currency)
+  const currentPayValue = evalPay.isValid && evalPay.result !== null ? evalPay.result : (parseMoneyInput(amount, currency) || 0)
   const isOverpayment = currentPayValue > remaining
   const principalPortion = Math.min(currentPayValue, remaining)
   const excessPortion = Math.max(0, currentPayValue - remaining)
@@ -125,10 +127,24 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
 
   const handleAmountChange = (e) => {
     const el = e.target
-    const nextFormatted = formatMoneyInput(el.value, currency)
-    const caretPos = getMoneyInputCaret(el.value, nextFormatted, el.selectionStart ?? el.value.length, currency)
-    setAmount(nextFormatted)
-    window.requestAnimationFrame(() => el.setSelectionRange(caretPos, caretPos))
+    const rawValue = el.value
+    const sanitized = rawValue.replace(/[^0-9+\-*/()., kKmMbBjJrRtTuU]/g, '')
+    const isTypingExpression = /[+\-*/kKmMbBjJrRtTuU(]/.test(sanitized)
+    if (isTypingExpression) {
+      setAmount(sanitized)
+    } else {
+      const nextFormatted = formatMoneyInput(sanitized, currency)
+      const caretPos = getMoneyInputCaret(sanitized, nextFormatted, el.selectionStart ?? sanitized.length, currency)
+      setAmount(nextFormatted)
+      window.requestAnimationFrame(() => el.setSelectionRange(caretPos, caretPos))
+    }
+  }
+
+  const handleAmountBlur = () => {
+    const evalRes = evaluateExpression(amount, currency)
+    if (evalRes.isValid && evalRes.result !== null) {
+      setAmount(formatMoneyValueForInput(evalRes.result, currency))
+    }
   }
 
   const setAmountPercent = (pct) => {
@@ -143,7 +159,8 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
 
   const handleSave = async () => {
     if (isSubmitting) return
-    const payAmt = parseMoneyInput(amount, currency)
+    const evalRes = evaluateExpression(amount, currency)
+    const payAmt = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseMoneyInput(amount, currency)
     if (payAmt <= 0) {
       hapticWarning()
       setSheetError(t('loans.payment.amountPositive', 'Nominal pembayaran harus lebih dari 0.'))
@@ -302,6 +319,7 @@ export default function LoanPaymentModal({ isOpen, onClose, loan: incomingLoan =
               placeholder="0"
               value={amount}
               onChange={handleAmountChange}
+              onBlur={handleAmountBlur}
             />
           </div>
 

@@ -95,9 +95,13 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   }
 
   let createdTime = null
-  const createdAtMs = Number(transaction?.createdAt)
-  if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
-    createdTime = format(new Date(createdAtMs), 'HH:mm')
+  if (transaction?.time && typeof transaction.time === 'string' && transaction.time.trim()) {
+    createdTime = transaction.time.trim()
+  } else {
+    const createdAtMs = Number(transaction?.createdAt)
+    if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
+      createdTime = format(new Date(createdAtMs), 'HH:mm')
+    }
   }
 
   const isTransfer = transaction.type === 'transfer'

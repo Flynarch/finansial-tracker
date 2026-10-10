@@ -57,12 +57,18 @@ export default memo(function SavingsSheetModal({ isOpen, onClose, editingGoal = 
   }
 
   const save = async () => {
+    const targetAmount = parseMoneyInput(form.targetAmount, form.currency)
+    const currentAmount = parseMoneyInput(form.currentAmount, form.currency)
+    const isCompleted = targetAmount > 0 && currentAmount >= targetAmount
     const payload = {
       name: String(form.name || '').trim(),
-      targetAmount: parseMoneyInput(form.targetAmount, form.currency),
-      currentAmount: parseMoneyInput(form.currentAmount, form.currency),
+      targetAmount,
+      currentAmount,
       currency: form.currency || defaultCurrency,
       deadline: form.deadline ? form.deadline : '',
+      isCompleted,
+      ...(isCompleted && !editingGoal?.completedAt ? { completedAt: Date.now() } : {}),
+      ...(!isCompleted ? { completedAt: null } : {}),
     }
     if (!payload.name) {
       setSheetError(t('savings.validation.name'))

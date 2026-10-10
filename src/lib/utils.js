@@ -124,7 +124,7 @@ export function formatGroupedIntegerInput(value) {
 
 export function formatMoneyInput(value, currency = 'IDR') {
   const raw = String(value ?? '')
-  if (currency === 'IDR') {
+  if (['IDR', 'JPY', 'KRW', 'VND'].includes(currency)) {
     return formatGroupedIntegerInput(raw)
   }
 
@@ -154,13 +154,20 @@ export function parseMoneyInput(value, currency = 'IDR') {
   const raw = String(value ?? '').trim()
   if (!raw) return 0
   const isNegative = raw.startsWith('-') || /^\(.*\)$/.test(raw)
-  if (currency === 'IDR') {
+  if (['IDR', 'JPY', 'KRW', 'VND'].includes(currency)) {
     const trimmed = raw.replace(/[^\d]+$/, '')
-    // Support trailing sen: e.g. ,00, ,000, ,50, or .00, .50 (1-2 digits decimal, or 3 zero decimals after comma)
-    const decimalMatch = trimmed.match(/^(.*?)(?:,(000)|[,.]([\d]{1,2}))$/)
+    // Support trailing sen: e.g. ,00, ,50, or .00, .50 (1-2 digits decimal)
+    // Or ,000 if preceded by a dot thousand separator (e.g. 50.000,000)
+    let decimalMatch = trimmed.match(/^(.*?)[,.]([\d]{1,2})$/)
+    if (!decimalMatch && trimmed.includes('.')) {
+      decimalMatch = trimmed.match(/^(.*?),000$/)
+      if (decimalMatch) {
+        decimalMatch = [decimalMatch[0], decimalMatch[1], '0']
+      }
+    }
     if (decimalMatch) {
       const intDigits = decimalMatch[1].replace(/[^\d]/g, '')
-      const decDigits = decimalMatch[2] ? '0' : decimalMatch[3]
+      const decDigits = decimalMatch[2]
       const intNum = toSafeNumber(intDigits)
       const decNum = Number(`0.${decDigits}`)
       const total = intNum + (Number.isFinite(decNum) ? decNum : 0)
@@ -192,7 +199,7 @@ export function parseMoneyInput(value, currency = 'IDR') {
 export function formatMoneyValueForInput(value, currency = 'IDR') {
   const numeric = Number(value ?? 0)
   if (!Number.isFinite(numeric)) return ''
-  if (currency === 'IDR') return formatGroupedIntegerInput(String(Math.trunc(numeric)))
+  if (['IDR', 'JPY', 'KRW', 'VND'].includes(currency)) return formatGroupedIntegerInput(String(Math.trunc(numeric)))
   return numeric.toLocaleString('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -200,7 +207,7 @@ export function formatMoneyValueForInput(value, currency = 'IDR') {
 }
 
 export function getMoneyInputCaret(rawValue, formattedValue, rawCaret, currency = 'IDR') {
-  const isToken = (char) => (currency === 'IDR' ? /\d/.test(char) : /[\d,]/.test(char))
+  const isToken = (char) => (['IDR', 'JPY', 'KRW', 'VND'].includes(currency) ? /\d/.test(char) : /[\d,]/.test(char))
   const raw = String(rawValue ?? '')
   const formatted = String(formattedValue ?? '')
   const safeCaret = Math.max(0, Math.min(Number(rawCaret ?? raw.length), raw.length))

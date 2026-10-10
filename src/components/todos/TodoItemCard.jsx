@@ -52,7 +52,7 @@ export const TodoItemCard = memo(function TodoItemCard({
   const showProg = subProgress && subProgress.total > 0
   const doneStyle = todo.completed ? 'opacity-60' : ''
   const dimCompleted = todo.completed ? 'opacity-70' : ''
-  const status = dueStatus(todo.dueDate)
+  const status = dueStatus(todo.dueDate, todo.completed)
   const dueBadgeCls = dueBadgeClass(status)
 
   const catMeta = TODO_CATEGORY_META[todo.category] || TODO_CATEGORY_META.lainnya
@@ -66,7 +66,7 @@ export const TodoItemCard = memo(function TodoItemCard({
 
         <div
           className={`relative z-10 flex h-full touch-pan-y flex-col justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs transition-all ${doneStyle} ${dimCompleted} ${
-            status?.borderClass || ''
+            !todo.completed ? (status?.borderClass || '') : ''
           }`}
           style={{
             transform: isSwiping ? undefined : 'translateX(0px)',

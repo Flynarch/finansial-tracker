@@ -23,6 +23,7 @@ import { getLocalDateString } from '../../lib/dateUtils'
 import { exportAllDataAsEncryptedEnvelope } from '../../lib/backup'
 import { getSessionMnemonicPhrase } from '../../lib/mnemonicCrypto'
 import { getStoredPasskeys } from '../../lib/passkeys'
+import { canUseBiometric, authenticateBiometric } from '../../lib/biometric'
 import {
   SettingsSection,
   SettingsSegmentControl,
@@ -51,6 +52,7 @@ export default function SettingsSecurity() {
   // PIN & Pattern modal state
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [isPatternModalOpen, setIsPatternModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState('setup') // 'setup' | 'verify'
 
   // Zero-Knowledge E2EE State
   const [isE2eeActive, setIsE2eeActive] = useState(() => {
@@ -87,11 +89,45 @@ export default function SettingsSecurity() {
     [t],
   )
 
+  const handleVerifyDisableSecurity = async () => {
+    await setSecurity({
+      securityEnabled: false,
+      securityMethod: 'none',
+    })
+    setStatusMessage(t('settings.securityDisabledSuccess', 'Kunci aplikasi dinonaktifkan.'))
+    setTimeout(() => setStatusMessage(''), 4000)
+  }
+
   const handleSelectMethod = async (nextMethod) => {
     triggerHaptic('medium')
     setStatusMessage('')
 
     if (nextMethod === 'none') {
+      if (securityEnabled && lockSecret) {
+        if (biometricEnabled) {
+          const canBio = await canUseBiometric()
+          if (canBio) {
+            const ok = await authenticateBiometric()
+            if (ok) {
+              await setSecurity({
+                securityEnabled: false,
+                securityMethod: 'none',
+              })
+              setStatusMessage(t('settings.securityDisabledSuccess', 'Kunci aplikasi dinonaktifkan.'))
+              return
+            }
+          }
+        }
+        // Biometric unavailable, cancelled, or disabled - verify with current PIN / Pattern
+        setModalMode('verify')
+        if (securityMethod === 'pattern') {
+          setIsPatternModalOpen(true)
+        } else {
+          setIsPinModalOpen(true)
+        }
+        return
+      }
+
       await setSecurity({
         securityEnabled: false,
         securityMethod: 'none',
@@ -101,6 +137,7 @@ export default function SettingsSecurity() {
     }
 
     if (nextMethod === 'pin') {
+      setModalMode('setup')
       if (securityMethod === 'pin' && lockSecret) {
         await setSecurity({
           securityEnabled: true,
@@ -119,6 +156,7 @@ export default function SettingsSecurity() {
     }
 
     if (nextMethod === 'pattern') {
+      setModalMode('setup')
       if (securityMethod === 'pattern' && lockSecret) {
         await setSecurity({
           securityEnabled: true,
@@ -289,7 +327,10 @@ export default function SettingsSecurity() {
             </div>
             <button
               type="button"
-              onClick={() => setIsPinModalOpen(true)}
+              onClick={() => {
+                setModalMode('setup')
+                setIsPinModalOpen(true)
+              }}
               className="px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer flex items-center gap-1.5"
             >
               <Pencil className="h-3.5 w-3.5 text-[var(--muted)]" />
@@ -315,7 +356,10 @@ export default function SettingsSecurity() {
             </div>
             <button
               type="button"
-              onClick={() => setIsPatternModalOpen(true)}
+              onClick={() => {
+                setModalMode('setup')
+                setIsPatternModalOpen(true)
+              }}
               className="px-3.5 py-2 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer flex items-center gap-1.5"
             >
               <Pencil className="h-3.5 w-3.5 text-[var(--muted)]" />
@@ -487,8 +531,13 @@ export default function SettingsSecurity() {
       {isPinModalOpen && (
         <PinPadModal
           isOpen={isPinModalOpen}
-          onClose={() => setIsPinModalOpen(false)}
+          onClose={() => {
+            setIsPinModalOpen(false)
+            setModalMode('setup')
+          }}
+          mode={modalMode}
           onSave={handleSavePin}
+          onVerifySuccess={handleVerifyDisableSecurity}
           currentSecret={securityMethod === 'pin' ? lockSecret : ''}
           initialBiometric={biometricEnabled}
         />
@@ -497,8 +546,13 @@ export default function SettingsSecurity() {
       {isPatternModalOpen && (
         <PatternLockModal
           isOpen={isPatternModalOpen}
-          onClose={() => setIsPatternModalOpen(false)}
+          onClose={() => {
+            setIsPatternModalOpen(false)
+            setModalMode('setup')
+          }}
+          mode={modalMode}
           onSave={handleSavePattern}
+          onVerifySuccess={handleVerifyDisableSecurity}
           currentSecret={securityMethod === 'pattern' ? lockSecret : ''}
           initialBiometric={biometricEnabled}
         />

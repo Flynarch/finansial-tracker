@@ -89,25 +89,35 @@ export function calculateHabitStats(habit, allLogs) {
     bestStreak = Math.max(bestStreak, currentStreak)
     
     // Completion Rate (Fair calculation)
-    // How many FULL weeks have passed since createdAt?
+    // Iterate through past weeks up to weekStart
     const createdWeekStart = startOfWeek(createdAt, { weekStartsOn: 1 })
-    let pastWeeks = differenceInCalendarDays(weekStart, createdWeekStart) / 7
-    if (pastWeeks < 0) pastWeeks = 0
     
-    // Denominator = (Target * Full Past Weeks) + (Completions this week)
-    // This gives instant reward for this week, without penalizing incomplete targets until the week ends.
-    totalScheduledPast = (Math.floor(pastWeeks) * target) + currentWkCnt
+    let pastScheduled = 0
+    let pastCompleted = 0
     
-    let pastCompletions = 0
-    logs.forEach(log => {
-      const rawDate = typeof log.date === 'string' && log.date.length === 10 ? `${log.date}T12:00:00` : log.date
-      const d = new Date(rawDate)
-      if (isBefore(d, weekStart)) {
-        pastCompletions++
+    let wDate = createdWeekStart
+    while (isBefore(wDate, weekStart)) {
+      const wKey = format(wDate, 'yyyy-MM-dd')
+      const weekCount = weekLogsCount.get(wKey) || 0
+      
+      let weekTarget = target
+      // If it is the creation week, calculate available days from createdAt to end of that week
+      if (isSameWeek(wDate, createdAt, { weekStartsOn: 1 })) {
+        const weekSunday = subDays(wDate, -6)
+        const daysRemaining = Math.max(1, differenceInCalendarDays(weekSunday, createdAt) + 1)
+        weekTarget = Math.min(target, daysRemaining)
       }
-    })
-    // Numerator = Past Completions + Completions this week
-    totalCompletedPast = pastCompletions + currentWkCnt
+      
+      pastScheduled += weekTarget
+      // Cap each past week's contribution to weekTarget preventing over-logging leakage
+      pastCompleted += Math.min(weekTarget, weekCount)
+      
+      wDate = startOfWeek(subDays(wDate, -7), { weekStartsOn: 1 })
+    }
+    
+    const cappedCurrentWkCnt = Math.min(target, currentWkCnt)
+    totalScheduledPast = pastScheduled + cappedCurrentWkCnt
+    totalCompletedPast = pastCompleted + cappedCurrentWkCnt
     
     // Trend data (just days for weekly too for simplicity)
     for (let i = 13; i >= 0; i--) {
@@ -285,15 +295,10 @@ export function calculateWeeklyTrend(habit, allLogs, weeksCount = 8) {
       const rate = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0
       trend.push({ week: format(weekStart, 'dd MMM'), rate, rawCompleted: completed, rawTarget: target })
     } else {
-      // Past week: full target (7 days or weekly target)
-      let target = 7
-      if (habit.frequencyType === 'weekly') {
-        target = habit.frequencyValue || 3
-      } else if (habit.frequencyType === 'specific_days') {
-        target = Array.isArray(habit.frequencyValue) ? habit.frequencyValue.length : 0
-      }
+      // Past week: dynamic target for creation week, or full target
+      let targetDaysCount = 0
+      let completedDaysCount = 0
       
-      let completed = 0
       for (let i = 0; i < 7; i++) {
         const d = subDays(weekStart, -i)
         const dateStr = format(d, 'yyyy-MM-dd')
@@ -307,9 +312,18 @@ export function calculateWeeklyTrend(habit, allLogs, weeksCount = 8) {
           isScheduled = habit.frequencyValue.includes(dayIdx)
         }
         
-        if (isScheduled && logDates.has(dateStr)) {
-          completed++
+        if (isScheduled) {
+          targetDaysCount++
+          if (logDates.has(dateStr)) {
+            completedDaysCount++
+          }
         }
+      }
+      
+      let target = targetDaysCount
+      let completed = completedDaysCount
+      if (habit.frequencyType === 'weekly') {
+        target = Math.min(habit.frequencyValue || 3, targetDaysCount)
       }
       
       const rate = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0

@@ -11,6 +11,7 @@ import useSwipeAction from '../../../hooks/useSwipeAction'
 import { getDecryptedNoteSync, isFieldEncrypted } from '../../../lib/fieldEncryption'
 import { updateTransaction, deleteTransaction } from '../../../services/transactionService'
 import { formatCurrency, formatMoneyValueForInput, parseMoneyInput, convertCurrency } from '../../../lib/utils'
+import { evaluateExpression } from '../../../lib/calcParser'
 import { getCategoryColorClass, resolveTransactionIconKey, getTransactionCategoryLabels } from '../../../lib/categoryIcon'
 import { isTransactionNew } from '../../../lib/transactionLastSeen'
 import useTranslation from '../../../hooks/useTranslation'
@@ -73,7 +74,10 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
   // Edit transaction handler
   const openEditTransaction = useCallback((transaction) => {
     setEditingTransaction(transaction)
-    const targetCurrency = transaction.currency || wallet?.currency || defaultCurrency
+    const matchingWallet = activeWallets?.find((w) => String(w.id) === String(transaction.walletId))
+    const targetCurrency = transaction.currency || matchingWallet?.currency || wallet?.currency || defaultCurrency
+    const tgtWallet = activeWallets?.find((w) => String(w.id) === String(transaction.targetWalletId))
+    const tgtCurr = tgtWallet?.currency || defaultCurrency
     const receipt = transaction.receiptImage || transaction.receipt || transaction.receiptUrl || transaction.image || null
     const rawNote = transaction.notes || ''
     const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
@@ -81,6 +85,7 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
 
     setEditFormData({
       date: transaction.date,
+      time: transaction.time || '',
       amount: formatMoneyValueForInput(transaction.amount, targetCurrency),
       type: transaction.type,
       category: transaction.category,
@@ -88,33 +93,57 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
       currency: targetCurrency,
       walletId: transaction.walletId,
       targetWalletId: transaction.targetWalletId || '',
+      targetCurrency: transaction.targetCurrency || (transaction.targetWalletId ? tgtCurr : undefined),
+      targetAmount: transaction.targetAmount ? formatMoneyValueForInput(transaction.targetAmount, tgtCurr) : '',
       receiptImage: receipt,
       receipt: receipt,
+      items: transaction.items || undefined,
+      subtotal: transaction.subtotal !== undefined ? transaction.subtotal : undefined,
+      tax: transaction.tax !== undefined ? transaction.tax : undefined,
+      discount: transaction.discount !== undefined ? transaction.discount : undefined,
+      merchant: transaction.merchant || undefined,
+      isExcludeAnalyticsTx: Boolean(transaction.isExcludeAnalyticsTx),
       isSplit: Boolean(transaction.isSplit),
       splitItems: Array.isArray(transaction.splitItems)
         ? transaction.splitItems.map((si) => {
             const rawSi = si?.notes || ''
             const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
-            return { ...si, notes: isFieldEncrypted(plainSi) ? '' : plainSi }
+            const safeSi = isFieldEncrypted(plainSi) ? '' : plainSi
+            return { ...si, notes: safeSi }
           })
         : [],
     })
-  }, [wallet?.currency, defaultCurrency])
+  }, [activeWallets, wallet?.currency, defaultCurrency])
 
-  const handleEditSubmit = async () => {
+  const handleEditSubmit = async (e, overrides = {}) => {
     if (!editingTransaction?.id) return
     try {
       const tgtWallet = activeWallets?.find((w) => String(w.id) === String(editFormData.targetWalletId))
       const tgtCurr = tgtWallet?.currency || defaultCurrency
-      const parsedTargetAmount =
-        editFormData.type === 'transfer' && editFormData.targetAmount
-          ? parseMoneyInput(editFormData.targetAmount, tgtCurr)
-          : undefined
+
+      let resolvedAmount = overrides?.amount
+      if (resolvedAmount === undefined) {
+        const evalResult = evaluateExpression(editFormData.amount, editFormData.currency)
+        resolvedAmount =
+          evalResult.isValid && evalResult.result !== null
+            ? evalResult.result
+            : parseMoneyInput(editFormData.amount, editFormData.currency)
+      }
+
+      let parsedTargetAmount = overrides?.targetAmount
+      if (parsedTargetAmount === undefined && editFormData.type === 'transfer' && editFormData.targetAmount) {
+        const evalTgt = evaluateExpression(editFormData.targetAmount, tgtCurr)
+        parsedTargetAmount =
+          evalTgt.isValid && evalTgt.result !== null
+            ? evalTgt.result
+            : parseMoneyInput(editFormData.targetAmount, tgtCurr)
+      }
 
       await updateTransaction(editingTransaction.id, {
         ...editFormData,
-        amount: parseMoneyInput(editFormData.amount, editFormData.currency),
+        amount: resolvedAmount,
         targetAmount: parsedTargetAmount,
+        targetCurrency: editFormData.type === 'transfer' && editFormData.targetWalletId ? tgtCurr : undefined,
         receiptImage: editFormData.receiptImage || null,
         isSplit: Boolean(editFormData.isSplit),
         splitItems: editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,

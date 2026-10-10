@@ -132,20 +132,37 @@ export default function SettingsData() {
     try {
       setBusyAction('reset')
 
-      // 1. Clear all data tables in Dexie EXCEPT db.settings to preserve user authentication, preferences & security
-      const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
-      await Promise.all(tablesToClear.map((tbl) => tbl.clear().catch((err) => console.warn('[SettingsData]', err))))
-
-      // 2. Re-create default primary cash wallet so the user is never left with 0 wallets
+      // 1. Clear all data tables in Dexie EXCEPT db.settings inside an atomic transaction
       const defaultCurrency = useSettingsStore.getState().defaultCurrency || 'IDR'
-      await db.wallets.add({
-        name: 'Kas Utama',
-        institutionType: 'cash',
-        logoUrl: '/logos/wallets/cash.svg',
-        currency: defaultCurrency,
-        balance: 0,
-        createdAt: Date.now(),
-      })
+      if (typeof db.transaction === 'function' && Array.isArray(db.tables)) {
+        await db.transaction('rw', db.tables, async () => {
+          const tablesToClear = db.tables.filter((tbl) => tbl.name !== 'settings')
+          await Promise.all(tablesToClear.map((tbl) => tbl.clear()))
+
+          // 2. Re-create default primary cash wallet so the user is never left with 0 wallets
+          await db.wallets.add({
+            name: 'Kas Utama',
+            institutionType: 'cash',
+            logoUrl: '/logos/wallets/cash.svg',
+            currency: defaultCurrency,
+            balance: 0,
+            createdAt: Date.now(),
+          })
+        })
+      } else {
+        const tablesToClear = Array.isArray(db.tables)
+          ? db.tables.filter((tbl) => tbl.name !== 'settings')
+          : Object.values(db).filter((t) => typeof t?.clear === 'function')
+        await Promise.all(tablesToClear.map((tbl) => tbl?.clear?.().catch(() => {})))
+        await db.wallets?.add?.({
+          name: 'Kas Utama',
+          institutionType: 'cash',
+          logoUrl: '/logos/wallets/cash.svg',
+          currency: defaultCurrency,
+          balance: 0,
+          createdAt: Date.now(),
+        }).catch(() => {})
+      }
 
       // 3. Clear financial price caches, learned memory, and category customizations (preserves auth, profile & onboarding)
       clearFinancialLocalStorage()

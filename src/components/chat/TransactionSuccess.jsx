@@ -11,6 +11,7 @@ import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
 import { triggerHaptic } from '../../lib/haptics'
 import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
+import { getLocalDateString } from '../../lib/dateUtils'
 
 export default function TransactionSuccess({ data, onUndo, isUpdate = false, action, onEditItem, wallets = [] }) {
   const { t } = useTranslation()
@@ -232,7 +233,7 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
                 <span className="text-[var(--fg)] font-bold">{getWalletName(singleTx)}</span>
               </span>
             )}
-            <span>{formatDate(singleTx.date || new Date().toISOString().slice(0, 10))}</span>
+            <span>{formatDate(singleTx.date || getLocalDateString())}</span>
             {singleTx.time && (
               <span>• {singleTx.time}</span>
             )}

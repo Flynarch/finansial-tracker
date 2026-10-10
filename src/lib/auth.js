@@ -116,7 +116,11 @@ export async function ensureFirebaseAuthSynced() {
   if (!Capacitor.isNativePlatform()) return
   try {
     const auth = getFirebaseAuth()
-    if (!auth || auth.currentUser) return
+    if (!auth) return
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true).catch(() => null)
+      return
+    }
     const current = await FirebaseAuthentication.getCurrentUser().catch(() => null)
     if (current?.user) {
       const tokenRes = await FirebaseAuthentication.getIdToken().catch(() => null)
@@ -793,47 +797,52 @@ export async function deleteCurrentAccount() {
     }
   }
 
-  // 3. Purge all local database tables
+  // 3. Purge all local database tables atomically inside Dexie transaction
   try {
-    const dataTables = [
-      db.transactions,
-      db.investments,
-      db.investmentOrders,
-      db.budgets,
-      db.goals,
-      db.goalLogs,
-      db.calendarEvents,
-      db.recurringTransactions,
-      db.todos,
-      db.sub_tasks,
-      db.habits,
-      db.habitLogs,
-      db.ideas,
-      db.board_links,
-      db.notifications,
-      db.wallets,
-      db.loans,
-      db.loanPayments,
-      db.walletBalanceCache,
-      db.chatMessages,
-    ]
-    await Promise.all(dataTables.map((t) => t?.clear?.().catch((err) => console.warn('[auth]', err))))
-  } catch (err){
-      console.warn('[auth]', err)
-    /* ignore */
+    await db.transaction('rw', db.tables, async () => {
+      const dataTables = db.tables.filter((tbl) => tbl.name !== 'settings')
+      await Promise.all(dataTables.map((t) => t.clear()))
+      // Re-create default primary cash wallet
+      await db.wallets.add({
+        name: 'Kas Utama',
+        institutionType: 'cash',
+        logoUrl: '/logos/wallets/cash.svg',
+        currency: 'IDR',
+        balance: 0,
+        createdAt: Date.now(),
+      })
+    })
+  } catch (err) {
+    console.warn('[auth]', err)
   }
 
-  // 4. Reset local store and storage
+  // 4. Reset local store, security secrets, and storage
   try {
     clearAppLocalStorage()
-  } catch (err){
-      console.warn('[auth]', err)
-    /* ignore */
+    try {
+      localStorage.removeItem('ft_lockout_until')
+      localStorage.removeItem('ft_lockout_attempts')
+    } catch {
+      /* ignore */
+    }
+  } catch (err) {
+    console.warn('[auth]', err)
   }
 
   try {
     const resetOnboarding = useSettingsStore.getState().resetOnboarding
     if (resetOnboarding) await resetOnboarding().catch((err) => console.warn('[auth]', err))
+
+    const setSecurity = useSettingsStore.getState().setSecurity
+    if (setSecurity) {
+      await setSecurity({
+        securityEnabled: false,
+        securityMethod: 'none',
+        lockSecret: '',
+        biometricEnabled: true,
+        autoLockTimeout: 0,
+      }).catch((err) => console.warn('[auth]', err))
+    }
 
     const setAuthUser = useSettingsStore.getState().setAuthUser
     if (setAuthUser) {
@@ -846,9 +855,8 @@ export async function deleteCurrentAccount() {
         emailVerified: false,
       }).catch((err) => console.warn('[auth]', err))
     }
-  } catch (err){
-      console.warn('[auth]', err)
-    /* ignore */
+  } catch (err) {
+    console.warn('[auth]', err)
   }
 
   return {

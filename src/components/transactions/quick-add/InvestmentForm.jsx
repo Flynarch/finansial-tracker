@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import CustomDatePicker from '../../ui/CustomDatePicker'
 import { formatMoneyInput, parseMoneyInput, toSafeNumber } from '../../../lib/utils'
 import useTranslation from '../../../hooks/useTranslation'
@@ -20,8 +21,15 @@ export default function InvestmentForm({
   ownedInvestmentGroups = [],
   selectedOwnedInvestment,
   goldAutoPrice = 0,
+  wallets = [],
 }) {
   const { t } = useTranslation()
+
+  useEffect(() => {
+    if (!form.walletId && Array.isArray(wallets) && wallets.length > 0) {
+      setForm((p) => ({ ...p, walletId: String(wallets[0].id) }))
+    }
+  }, [form.walletId, wallets, setForm])
 
   return (
     <>
@@ -32,7 +40,7 @@ export default function InvestmentForm({
             type="button"
             onClick={() => setForm((p) => ({ ...p, action: 'buy' }))}
             className={`rounded-lg px-3 py-2 text-sm font-semibold transition cursor-pointer ${
-              form.action === 'buy' ? 'bg-indigo-600 text-white' : 'text-[var(--muted)]'
+              form.action === 'buy' ? 'bg-[var(--accent)] text-white' : 'text-[var(--muted)]'
             }`}
           >
             {t('addTx.investment.buy', 'Beli')}
@@ -51,7 +59,7 @@ export default function InvestmentForm({
               }))
             }}
             className={`rounded-lg px-3 py-2 text-sm font-semibold transition cursor-pointer ${
-              form.action === 'sell' ? 'bg-indigo-600 text-white' : 'text-[var(--muted)]'
+              form.action === 'sell' ? 'bg-[var(--accent)] text-white' : 'text-[var(--muted)]'
             }`}
           >
             {t('addTx.investment.sell', 'Jual')}
@@ -235,7 +243,7 @@ export default function InvestmentForm({
                   type="number"
                   min="0"
                   max={form.action === 'sell' ? toSafeNumber(selectedOwnedInvestment?.quantity) : undefined}
-                  step="0.0001"
+                  step={String(form.type || '').toLowerCase() === 'crypto' || String(form.type || '').toLowerCase() === 'kripto' ? '0.00000001' : '0.0001'}
                   value={form.quantity}
                   onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))}
                   className="ft-field"
@@ -264,7 +272,7 @@ export default function InvestmentForm({
             type="number"
             min="0"
             max={form.action === 'sell' ? toSafeNumber(selectedOwnedInvestment?.quantity) : undefined}
-            step="0.0001"
+            step={String(form.type || '').toLowerCase() === 'crypto' || String(form.type || '').toLowerCase() === 'kripto' ? '0.00000001' : '0.0001'}
             value={form.quantity}
             onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))}
             className="ft-field"
@@ -304,6 +312,35 @@ export default function InvestmentForm({
           <option value="external">{t('addTx.funding.external', 'Dana Eksternal')}</option>
         </select>
       </label>
+
+      {(form.fundingSource === 'balance' || form.fundingSource === 'wallet') && (
+        <label className="ft-label">
+          {form.action === 'sell'
+            ? t('invest.destinationWallet', 'Dompet Penerima Dana')
+            : t('invest.fundingWallet', 'Dompet Sumber Dana')}
+          <select
+            value={form.walletId || ''}
+            onChange={(e) => setForm((p) => ({ ...p, walletId: e.target.value }))}
+            className="ft-field"
+            required
+            aria-label={
+              form.action === 'sell'
+                ? t('invest.destinationWallet', 'Dompet Penerima Dana')
+                : t('invest.fundingWallet', 'Dompet Sumber Dana')
+            }
+          >
+            {wallets.length === 0 ? (
+              <option value="">{t('wallets.empty', 'Tidak ada dompet')}</option>
+            ) : (
+              wallets.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.currency || 'IDR'})
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+      )}
 
       <label className="ft-label">
         {t('invest.buyCurrency', 'Mata Uang')}
