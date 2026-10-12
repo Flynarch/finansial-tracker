@@ -136,6 +136,7 @@ export default function WalletManageModals({
 
   const handleEditBalance = async (e) => {
     e.preventDefault()
+    if (wallet?.isArchived) return
     const targetCurrency = wallet.currency || defaultCurrency
     const newBal = parseMoneyInput(newBalanceRaw, targetCurrency)
     if (isNaN(newBal)) return
@@ -337,7 +338,7 @@ export default function WalletManageModals({
 
       {/* ── Balance Adjustment Modal ─────────────────────────────────── */}
       <Modal
-        isOpen={isEditBalanceModalOpen}
+        isOpen={Boolean(isEditBalanceModalOpen && !wallet?.isArchived)}
         onClose={() => setIsEditBalanceModalOpen(false)}
         title={t('wallets.adjustBalance', 'Penyesuaian Saldo')}
       >

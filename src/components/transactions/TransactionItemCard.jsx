@@ -76,15 +76,24 @@ export const TransactionItemCard = memo(function TransactionItemCard({
       amountColorClass = 'text-[var(--fg)]'
     }
   } else if (transaction.type === 'transfer') {
-    iconKey = 'arrow-right-left'
-    if (contextWalletId && contextWalletId === transaction.targetWalletId) {
+    iconKey = 'transfer'
+    const isTargetMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.targetWalletId))
+    const isSourceMatch = Boolean(contextWalletId && String(contextWalletId) === String(transaction.walletId))
+
+    if (isTargetMatch) {
       colorClass = 'bg-[var(--earthy-green-soft)] text-[var(--earthy-green)]'
-      labels = { main: 'Transfer Masuk', sub: `Dari ${getWalletName(transaction.walletId)}` }
+      labels = {
+        main: locale === 'en' ? 'Transfer In' : 'Transfer Masuk',
+        sub: `${locale === 'en' ? 'From' : 'Dari'} ${getWalletName(transaction.walletId)}`,
+      }
       amountPrefix = '+'
       amountColorClass = 'ft-income-text'
-    } else if (contextWalletId && contextWalletId === transaction.walletId) {
+    } else if (isSourceMatch) {
       colorClass = 'bg-[var(--earthy-terra-soft)] text-[var(--earthy-terra)]'
-      labels = { main: 'Transfer Keluar', sub: `Ke ${getWalletName(transaction.targetWalletId)}` }
+      labels = {
+        main: locale === 'en' ? 'Transfer Out' : 'Transfer Keluar',
+        sub: `${locale === 'en' ? 'To' : 'Ke'} ${getWalletName(transaction.targetWalletId)}`,
+      }
       amountPrefix = '-'
       amountColorClass = 'ft-expense-text'
     } else {
@@ -195,11 +204,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             <div
               className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-xs font-semibold ${colorClass} shadow-2xs`}
             >
-              {transaction.type === 'transfer' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3 9 15"/><path d="M8 21H3v-5"/><path d="M3 21l12-12"/></svg>
-              ) : (
-                <CategoryIcon icon={iconKey} className="h-4.5 w-4.5" />
-              )}
+              <CategoryIcon icon={iconKey} className="h-4.5 w-4.5" />
             </div>
 
             {/* Micro-Avatar Wallet Badge */}
@@ -263,13 +268,17 @@ export const TransactionItemCard = memo(function TransactionItemCard({
               {isTransfer ? (
                 <>
                   <span className="text-[var(--fg)]/90 font-bold">{sub}</span>
-                  {createdTime ? <> • {createdTime}</> : null}
+                  {sub && createdTime ? <> • {createdTime}</> : createdTime ? <span>{createdTime}</span> : null}
                 </>
               ) : (
                 <>
-                  <span className="text-[var(--fg)]/90 font-bold">{displayWalletName}</span>
-                  {sub ? <> • {sub}</> : null}
-                  {createdTime ? <> • {createdTime}</> : null}
+                  {displayWalletName ? (
+                    <span className="text-[var(--fg)]/90 font-bold">{displayWalletName}</span>
+                  ) : null}
+                  {displayWalletName && sub ? <> • </> : null}
+                  {sub ? <span>{sub}</span> : null}
+                  {(displayWalletName || sub) && createdTime ? <> • </> : null}
+                  {createdTime ? <span>{createdTime}</span> : null}
                 </>
               )}
             </p>

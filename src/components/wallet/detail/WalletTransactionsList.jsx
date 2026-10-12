@@ -272,7 +272,14 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
           if (!timeA && timeB) return 1
           const tsA = Number(a.createdAt) || (typeof a.createdAt === 'string' ? Date.parse(a.createdAt) || 0 : 0)
           const tsB = Number(b.createdAt) || (typeof b.createdAt === 'string' ? Date.parse(b.createdAt) || 0 : 0)
-          if (tsA !== tsB) return tsB - tsA
+          if (tsA && tsB && tsA !== tsB) {
+            return tsB - tsA
+          }
+          const numA = Number(a.id)
+          const numB = Number(b.id)
+          if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+            return numB - numA
+          }
           return String(b.id || '').localeCompare(String(a.id || ''))
         })
         let net = 0

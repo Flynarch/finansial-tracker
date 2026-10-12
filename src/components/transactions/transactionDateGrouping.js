@@ -2,6 +2,37 @@ import { format, subDays } from 'date-fns'
 import { enUS, id as idLocale } from 'date-fns/locale'
 import { convertCurrency, formatCurrency, isExcludeAnalyticsTx, toSafeNumber } from '../../lib/utils'
 
+function getTxSafeTimestamp(tx) {
+  if (!tx?.createdAt) return 0
+  const num = Number(tx.createdAt)
+  if (Number.isFinite(num)) return num
+  if (typeof tx.createdAt === 'string') {
+    const parsed = Date.parse(tx.createdAt)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function getIntradaySortKey(tx) {
+  if (tx?.time && typeof tx.time === 'string' && tx.time.trim()) {
+    return tx.time.trim().slice(0, 5)
+  }
+  const ts = getTxSafeTimestamp(tx)
+  if (ts > 0) {
+    try {
+      const d = new Date(ts)
+      if (!isNaN(d.getTime())) {
+        const hh = String(d.getHours()).padStart(2, '0')
+        const mm = String(d.getMinutes()).padStart(2, '0')
+        return `${hh}:${mm}`
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return ''
+}
+
 /**
  * Groups a list of transactions by date (yyyy-MM-dd), calculates daily income/expense/net totals,
  * unpacks split items respecting analytics exclusions, and returns structured date sections.
@@ -94,37 +125,6 @@ export function groupTransactionsDetailed(
       }
     }
 
-function getTxSafeTimestamp(tx) {
-  if (!tx?.createdAt) return 0
-  const num = Number(tx.createdAt)
-  if (Number.isFinite(num)) return num
-  if (typeof tx.createdAt === 'string') {
-    const parsed = Date.parse(tx.createdAt)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
-}
-
-function getIntradaySortKey(tx) {
-  if (tx?.time && typeof tx.time === 'string' && tx.time.trim()) {
-    return tx.time.trim().slice(0, 5)
-  }
-  const ts = getTxSafeTimestamp(tx)
-  if (ts > 0) {
-    try {
-      const d = new Date(ts)
-      if (!isNaN(d.getTime())) {
-        const hh = String(d.getHours()).padStart(2, '0')
-        const mm = String(d.getMinutes()).padStart(2, '0')
-        return `${hh}:${mm}`
-      }
-    } catch {
-      // fallback
-    }
-  }
-  return ''
-}
-
     const sortedItems = [...items].sort((a, b) => {
       const timeKeyA = getIntradaySortKey(a)
       const timeKeyB = getIntradaySortKey(b)
@@ -136,6 +136,11 @@ function getIntradaySortKey(tx) {
       const tsA = getTxSafeTimestamp(a)
       const tsB = getTxSafeTimestamp(b)
       if (tsA !== tsB) return tsB - tsA
+      const numA = Number(a.id)
+      const numB = Number(b.id)
+      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+        return numB - numA
+      }
       return String(b.id || '').localeCompare(String(a.id || ''))
     })
 

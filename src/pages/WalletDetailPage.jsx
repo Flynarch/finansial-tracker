@@ -28,7 +28,7 @@ export default function WalletDetailPage() {
   const toggleHideBalance = useSettingsStore((state) => state.toggleHideBalance)
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
-  const isDefaultWallet = defaultWalletId === walletId
+  const isDefaultWallet = defaultWalletId != null && String(defaultWalletId) === String(walletId)
   const { locale, t } = useTranslation()
 
   // 2. Modal visibility states

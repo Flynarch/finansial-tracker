@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatCurrency, convertCurrency, FALLBACK_EXCHANGE_RATES } from '../../lib/utils'
+import { formatCurrency, convertCurrency, FALLBACK_EXCHANGE_RATES, toSafeNumber } from '../../lib/utils'
 import { ArrowDownLeft, ArrowUpRight, Plus, Star, Eye, EyeOff } from 'lucide-react'
 import MoneyBagIcon from '../ui/MoneyBagIcon'
 import { getWalletLogoUrl } from '../../data/walletInstitutions'
@@ -56,7 +56,7 @@ export default function WalletCarousel({
   const activeWallets = wallets?.filter(w => !w.isArchived) || []
   const sisaKeuangan = monthIncome - monthExpense
   const totalSaldo = activeWallets.reduce((sum, w) => {
-    const bal = Number(w.currentBalance) || 0
+    const bal = toSafeNumber(w.currentBalance ?? w.balance ?? 0)
     return sum + convertCurrency(bal, w.currency || defaultCurrency, defaultCurrency, rates)
   }, 0)
 
@@ -359,7 +359,7 @@ export default function WalletCarousel({
           {/* Mini Wallet Cards Horizontal Scroll (Logo + Saldo Uang) */}
           <div className="relative z-10 mt-5 flex overflow-x-auto gap-2.5 pb-1 -mx-5 px-5 ft-hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
             {activeWallets.map((w) => {
-              const isPrimary = defaultWalletId ? w.id === defaultWalletId : (activeWallets.length === 1 && w.id === activeWallets[0].id)
+              const isPrimary = defaultWalletId ? String(w.id) === String(defaultWalletId) : (activeWallets.length === 1 && String(w.id) === String(activeWallets[0].id))
               return (
                 <button 
                   key={w.id}

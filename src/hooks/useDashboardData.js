@@ -179,6 +179,7 @@ export function useDashboardData() {
 
   const isDbLoading =
     transactions === null ||
+    investments === null ||
     walletsWithBalance === null ||
     walletsWithBalance === undefined ||
     budgets === null ||

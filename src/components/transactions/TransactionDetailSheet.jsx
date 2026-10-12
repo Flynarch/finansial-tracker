@@ -242,6 +242,11 @@ export default function TransactionDetailSheet({
                 <TypeIcon className="h-3 w-3" strokeWidth={2.5} />
                 <span>{typeLabel}</span>
               </span>
+              {Boolean(transaction.isExcludeAnalyticsTx || transaction.isExcludeFromAnalytics || transaction.excludeFromAnalytics) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--muted)]">
+                  <span>{t('tx.excludedFromAnalytics', 'Di luar Analisis')}</span>
+                </span>
+              )}
               {String(resolvedNotes || '').includes('(Auto:') && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)]">
                   <Repeat className="h-2.5 w-2.5" />
@@ -327,6 +332,12 @@ export default function TransactionDetailSheet({
                         {t('tx.toWallet', 'Ke')}
                       </span>
                       {renderWalletItem(targetWallet, 'Dompet Tujuan')}
+                      {transaction.targetAmount != null && Number(transaction.targetAmount) > 0 && (
+                        <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-[var(--panel)] border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--fg)]">
+                          <span>{t('tx.targetAmountReceived', 'Diterima')}:</span>
+                          <span>{formatCurrency(transaction.targetAmount, transaction.targetCurrency || targetWallet?.currency || defaultCurrency)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -113,7 +113,7 @@ export default function Reports() {
   const loans = useLiveQuery(() => db.loans.toArray(), [])
   const savings = useLiveQuery(() => db.goals.toArray(), [])
 
-  const isDataReady = transactions !== undefined && wallets !== undefined
+  const isDataReady = transactions !== undefined && wallets !== undefined && loans !== undefined && investments !== undefined && savings !== undefined
   const computedWallets = useLiveQuery(
     async () => {
       const rawWallets = await db.wallets.toArray()

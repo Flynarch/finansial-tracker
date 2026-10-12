@@ -8,6 +8,7 @@ import '../styles/react-big-calendar-overrides.css'
 import PageHeader from '../components/ui/PageHeader'
 import TransactionEditSheet from '../components/transactions/TransactionEditSheet'
 import CalendarDayModal from '../components/calendar/CalendarDayModal'
+import { computeCalendarIndicators } from '../components/calendar/calendarIndicators'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
@@ -78,12 +79,12 @@ function Toolbar({ label, onNavigate, t }) {
 }
 
 /* ─── Premium Date Header ─── */
-function MonthDateHeader({ date, label, selectedDate, indicators, onPick }) {
+export function MonthDateHeader({ date, label, selectedDate, indicators, onPick }) {
   const key = format(date, 'yyyy-MM-dd')
-  const day = indicators.get(key) || { income: 0, expense: 0, reminder: 0 }
+  const day = indicators.get(key) || { income: 0, expense: 0, transfer: 0, reminder: 0 }
   const isSelected = sameDate(date, selectedDate)
   const isToday = sameDate(date, new Date())
-  const showDots = day.income + day.expense + day.reminder > 0
+  const showDots = day.income + day.expense + (day.transfer || 0) + day.reminder > 0
 
   return (
     <button
@@ -108,6 +109,7 @@ function MonthDateHeader({ date, label, selectedDate, indicators, onPick }) {
           <>
             {day.expense > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-expense)]" />}
             {day.income > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-income)]" />}
+            {(day.transfer || 0) > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-transfer)]" />}
             {day.reminder > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]" />}
           </>
         )}
@@ -218,6 +220,8 @@ function Calendar() {
               ? 'var(--status-income)'
               : tx.type === 'transfer'
               ? 'var(--status-transfer)'
+              : tx.type === 'balance_adjustment'
+              ? (Number(tx.amount || 0) >= 0 ? 'var(--status-income)' : 'var(--status-expense)')
               : 'var(--status-expense)',
           raw: tx,
         }
@@ -296,67 +300,8 @@ function Calendar() {
   }, [importantEvents, loansData, todos, transactions, t, decryptedTick, calStart, calEnd])
 
   const indicators = useMemo(() => {
-    const map = new Map()
-    const bump = (dateKey, patch) => {
-      const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-      map.set(dateKey, { ...prev, ...patch })
-    }
-    ;(transactions || []).forEach((tx) => {
-      if (!tx?.date || tx.isPendingReview === true || tx.isPendingReview === 1) return
-      const dateKey = String(tx.date).slice(0, 10)
-      const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-      let inc = 0
-      let exp = 0
-      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-        tx.splitItems.forEach((si) => {
-          const itemType = si.type || tx.type
-          if (itemType === 'income') inc++
-          else if (itemType === 'expense') exp++
-        })
-      } else {
-        if (tx.type === 'income') inc++
-        else if (tx.type === 'expense') exp++
-      }
-      map.set(dateKey, {
-        ...prev,
-        income: prev.income + inc,
-        expense: prev.expense + exp,
-      })
-    })
-    ;(importantEvents || []).forEach((ev) => {
-      if (!ev?.date) return
-      const dateKey = String(ev.date).slice(0, 10)
-      const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-      map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
-    })
-    for (const l of (loansData?.loans || [])) {
-      if (l.status === 'paid' || l.status === 'forgiven' || toSafeNumber(l.remainingAmount ?? l.totalAmount) <= 0) continue
-      const tenor = parseInt(l.tenorMonths, 10) || 0
-      if (tenor > 1) {
-        const pmts = loansData?.paymentsByLoan?.get(l.id) || []
-        const schedule = generateInstallmentSchedule(l, pmts)
-        schedule.forEach((inst) => {
-          if (inst.status !== 'paid' && inst.dueDate) {
-            const dateKey = String(inst.dueDate).slice(0, 10)
-            const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-            map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
-          }
-        })
-      } else if (l.dueDate) {
-        const dateKey = String(l.dueDate).slice(0, 10)
-        const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-        map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
-      }
-    }
-    ;(todos || []).forEach((td) => {
-      if (!td?.dueDate) return
-      const dateKey = String(td.dueDate).slice(0, 10)
-      const prev = map.get(dateKey) || { income: 0, expense: 0, reminder: 0 }
-      map.set(dateKey, { ...prev, reminder: prev.reminder + 1 })
-    })
-    bump(toDateOnlyString(selectedDate), {})
-    return map
-  }, [importantEvents, loansData, todos, selectedDate, transactions])
+    return computeCalendarIndicators(transactions, importantEvents, loansData, todos, selectedDate)
+  }, [transactions, importantEvents, loansData, todos, selectedDate])
 
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)

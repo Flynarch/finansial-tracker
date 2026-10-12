@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
 import { PieChart, Target, Plus, AlertTriangle, CheckCircle2, ArrowRight, X, ArrowLeft, Check } from 'lucide-react'
 import {
   formatCurrency,
@@ -201,12 +202,19 @@ export default function BudgetSavingsDetailSheet({
   }, [])
 
   const saveGoal = async () => {
+    const targetAmount = parseMoneyInput(goalForm.targetAmount, goalForm.currency)
+    const currentAmount = parseMoneyInput(goalForm.currentAmount, goalForm.currency)
+    const isCompleted = targetAmount > 0 && currentAmount >= targetAmount
     const payload = {
       name: String(goalForm.name || '').trim(),
-      targetAmount: parseMoneyInput(goalForm.targetAmount, goalForm.currency),
-      currentAmount: parseMoneyInput(goalForm.currentAmount, goalForm.currency),
+      targetAmount,
+      currentAmount,
       currency: goalForm.currency || defaultCurrency,
       deadline: goalForm.deadline ? goalForm.deadline : '',
+      status: isCompleted ? 'completed' : 'active',
+      isCompleted,
+      completedAt: isCompleted ? Date.now() : null,
+      createdAt: Date.now(),
     }
     if (!payload.name) {
       setGoalError(t('savings.validation.name', 'Nama target wajib diisi.'))
@@ -222,7 +230,16 @@ export default function BudgetSavingsDetailSheet({
     }
     try {
       setGoalError('')
-      await db.goals.add(payload)
+      const newGoalId = await db.goals.add(payload)
+      if (currentAmount > 0) {
+        await db.goalLogs.add({
+          goalId: newGoalId,
+          amount: currentAmount,
+          notes: t('savings.initialDeposit', 'Saldo Awal Target Tabungan'),
+          date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+          transactionId: null,
+        })
+      }
       setGoalForm({
         name: '',
         targetAmount: '',
@@ -231,7 +248,7 @@ export default function BudgetSavingsDetailSheet({
         deadline: '',
       })
       setSheetView('detail')
-    } catch (err){
+    } catch (err) {
       console.warn('[BudgetSavingsDetailSheet]', err)
       setGoalError(t('common.error.saveFailed', 'Gagal menyimpan data.'))
     }

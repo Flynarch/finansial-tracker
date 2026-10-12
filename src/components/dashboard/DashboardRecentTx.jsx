@@ -130,6 +130,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
           }
 
           const sub = labels.sub || null
+          const originWallet = wallets?.find((w) => String(w.id) === String(latestTx?.walletId))
 
           return (
             <div className="flex flex-col gap-2 ft-smooth-in">
@@ -147,7 +148,6 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                         <CategoryIcon iconKey={iconKey} className="h-4 w-4" />
                       </div>
                       {(() => {
-                        const originWallet = wallets.find((w) => String(w.id) === String(latestTx?.walletId))
                         if (!originWallet) return null
                         const isCash = originWallet.customIcon === 'dollar' || originWallet.customIcon === 'cash' || String(originWallet.name || '').toLowerCase().includes('cash') || String(originWallet.name || '').toLowerCase().includes('uang tunai')
                         const logo = getWalletLogoUrl(originWallet)
@@ -182,13 +182,21 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                       })()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      {createdTime ? (
-                        <p className="text-[9px] font-medium leading-tight text-[var(--muted)]">{createdTime}</p>
-                      ) : null}
-                      <p className="truncate text-xs font-bold text-[var(--fg)]">{labels.main}</p>
-                      {sub ? (
-                        <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-[var(--muted)]">{sub}</p>
-                      ) : null}
+                      <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">{labels.main}</p>
+                      <p className="mt-0.5 truncate text-[10px] font-semibold leading-tight text-[var(--muted)]">
+                        {latestTx?.type === 'transfer' ? (
+                          <>
+                            <span className="text-[var(--fg)]/90 font-bold">{sub || labels.sub}</span>
+                            {(sub || labels.sub) && createdTime ? <> • {createdTime}</> : createdTime ? <span>{createdTime}</span> : null}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[var(--fg)]/90 font-bold">{originWallet?.name || 'Wallet'}</span>
+                            {sub ? <> • {sub}</> : null}
+                            {createdTime ? <> • {createdTime}</> : null}
+                          </>
+                        )}
+                      </p>
                       {noteStr ? (
                         <p className="mt-0.5 text-[9.5px] italic leading-tight text-[var(--muted-2)] line-clamp-2 break-words [overflow-wrap:anywhere]">&ldquo;{noteStr}&rdquo;</p>
                       ) : null}

@@ -23,9 +23,9 @@ export function useTransactionEditForm({
   defaultCurrency = 'IDR',
   addTransaction,
   updateTransaction,
-  t,
-  setApiError,
-  setApiErrorTone,
+  t = (k, fb) => fb || k,
+  setApiError = () => {},
+  setApiErrorTone = () => {},
 }) {
   const [editingTransaction, setEditingTransaction] = useState(null)
   const [editFormData, setEditFormData] = useState(initialFormData)
@@ -70,6 +70,7 @@ export function useTransactionEditForm({
               const safeSi = isFieldEncrypted(plainSi) ? '' : plainSi
               return {
                 ...si,
+                category: si.category ?? si.name ?? '',
                 notes: safeSi,
               }
             })
@@ -112,7 +113,12 @@ export function useTransactionEditForm({
         receiptImage: editFormData.receiptImage || null,
         isSplit: Boolean(editFormData.isSplit),
         splitItems:
-          editFormData.isSplit && Array.isArray(editFormData.splitItems) ? editFormData.splitItems : undefined,
+          editFormData.isSplit && Array.isArray(editFormData.splitItems)
+            ? editFormData.splitItems.map((si) => ({
+                ...si,
+                category: String(si.category || si.name || '').trim(),
+              }))
+            : undefined,
         isPendingReview: false,
       })
 
@@ -155,6 +161,13 @@ export function useTransactionEditForm({
         delete payload.deletedAt
         delete payload.sourceNotifId
         delete payload.sourceNotifIds
+        delete payload.goalId
+        delete payload.investmentId
+        delete payload.investmentOrderId
+        delete payload.paymentId
+        delete payload.isLoanExcess
+        delete payload.principalTransactionId
+        delete payload.excessTransactionId
         await addTransaction(payload)
         setApiError(t('tx.duplicateSuccess', 'Transaksi berhasil diduplikasi ke hari ini.'))
         setApiErrorTone('success')

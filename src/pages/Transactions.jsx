@@ -101,7 +101,7 @@ function Transactions() {
   }, [transactions])
 
   const isInitialLoading =
-    transactionsRaw === undefined &&
+    (transactionsRaw === undefined || dbWallets === undefined) &&
     (!getCachedDashboardTransactions?.() || getCachedDashboardTransactions().length === 0)
 
   // Filter Engine Hook

@@ -76,8 +76,6 @@ function Budget() {
     }
   }, [])
 
-  const isDataReady = budgets !== undefined
-
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
   const budgetPeriod = useMemo(
@@ -97,9 +95,10 @@ function Budget() {
           (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
         )
         .toArray(),
-    [budgetPeriod.startDate, budgetPeriod.endDate],
-    []
+    [budgetPeriod.startDate, budgetPeriod.endDate]
   )
+
+  const isDataReady = budgets !== undefined && monthExpenseTxs !== undefined
 
   const sortedMonthBudgets = useMemo(() => {
     const list = (monthBudgets ?? []).map((b) => {

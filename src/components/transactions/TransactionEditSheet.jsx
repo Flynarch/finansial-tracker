@@ -329,7 +329,7 @@ export default function TransactionEditSheet({
             setSubmitError(t('tx.splitAmountInvalid', 'Setiap rincian transaksi harus memiliki nominal lebih dari 0.'))
             return
           }
-          if (!item.category || !String(item.category).trim()) {
+          if (!String(item.category || item.name || '').trim()) {
             setCategoryError(true)
             setSubmitError(t('tx.splitCategoryRequired', 'Kategori pada setiap rincian transaksi harus dipilih.'))
             return
@@ -364,8 +364,17 @@ export default function TransactionEditSheet({
       if (typeof propOnSubmit === 'function') {
         await propOnSubmit(event, { amount: totalAmount, targetAmount: evaluatedTargetAmount })
       } else if (transaction?.id) {
+        const cleanSplitItems =
+          formData.isSplit && Array.isArray(formData.splitItems)
+            ? formData.splitItems.map((item) => ({
+                ...item,
+                category: String(item.category || item.name || '').trim(),
+              }))
+            : formData.splitItems
+
         await updateTransaction(transaction.id, {
           ...formData,
+          splitItems: cleanSplitItems,
           amount: totalAmount,
           targetAmount: evaluatedTargetAmount,
           updatedAt: new Date().toISOString(),

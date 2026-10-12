@@ -29,8 +29,13 @@ export default function TransactionEditSplitSection({ formData, handleSplitItemC
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                value={item.name || item.category || ''}
-                onChange={(e) => handleSplitItemChange(idx, 'category', e.target.value)}
+                value={item.category ?? item.name ?? ''}
+                onChange={(e) => {
+                  handleSplitItemChange(idx, 'category', e.target.value)
+                  if (item.name !== undefined) {
+                    handleSplitItemChange(idx, 'name', e.target.value)
+                  }
+                }}
                 placeholder={t('categories.name', 'Kategori / Item')}
                 className="flex-1 min-w-0 bg-[var(--field-bg)] rounded-lg border border-[var(--border)]/50 px-2.5 py-1.5 text-xs font-medium text-[var(--fg)] outline-none focus:border-[var(--accent)]"
               />

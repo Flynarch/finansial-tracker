@@ -46,15 +46,19 @@ function CalendarDayModal({
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [txSubmitError, setTxSubmitError] = useState('')
   const [amountInput, setAmountInput] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const [txForm, setTxForm] = useState(() => ({
-    type: 'expense',
-    category: '',
-    amount: '',
-    currency: defaultCurrency || 'IDR',
-    notes: '',
-    walletId: defaultWalletId || (wallets?.[0]?.id ?? ''),
-  }))
+  const [txForm, setTxForm] = useState(() => {
+    const initWallet = (wallets || []).find((w) => String(w.id) === String(defaultWalletId)) || wallets?.[0]
+    return {
+      type: 'expense',
+      category: '',
+      amount: '',
+      currency: initWallet?.currency || defaultCurrency || 'IDR',
+      notes: '',
+      walletId: defaultWalletId || (wallets?.[0]?.id ?? ''),
+    }
+  })
 
   const [importantForm, setImportantForm] = useState({
     title: '',
@@ -73,6 +77,7 @@ function CalendarDayModal({
   )
 
   const handleAddTransactionFromDate = async () => {
+    if (isSubmitting) return
     setTxSubmitError('')
     const parsedAmount = parseMoneyInput(amountInput, txForm.currency)
     if (!(parsedAmount > 0)) {
@@ -83,20 +88,28 @@ function CalendarDayModal({
       setTxSubmitError(t('addTx.selectCategoryRequired', 'Silakan pilih kategori terlebih dahulu.'))
       return
     }
-    await createTransaction({
-      date: toDateOnlyString(selectedDate),
-      type: txForm.type,
-      category: txForm.category,
-      amount: parsedAmount,
-      currency: txForm.currency,
-      walletId: txForm.walletId || defaultWalletId || (wallets?.[0]?.id ?? null),
-      notes: txForm.notes,
-      createdAt: Date.now(),
-    })
-    setAmountInput('')
-    setTxForm((prev) => ({ ...prev, notes: '' }))
-    setTxSubmitError('')
-    setDayTab('items')
+    setIsSubmitting(true)
+    try {
+      await createTransaction({
+        date: toDateOnlyString(selectedDate),
+        type: txForm.type,
+        category: txForm.category,
+        amount: parsedAmount,
+        currency: txForm.currency,
+        walletId: txForm.walletId || defaultWalletId || (wallets?.[0]?.id ?? null),
+        notes: txForm.notes,
+        createdAt: Date.now(),
+      })
+      setAmountInput('')
+      setTxForm((prev) => ({ ...prev, notes: '' }))
+      setTxSubmitError('')
+      setDayTab('items')
+    } catch (err) {
+      console.error('[CalendarDayModal:handleAddTransactionFromDate]', err)
+      setTxSubmitError(err?.message || t('common.error.saveFailed', 'Gagal menyimpan transaksi.'))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleAddImportantDate = async () => {
@@ -172,54 +185,84 @@ function CalendarDayModal({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div
-                            className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
-                            style={{
-                              background:
-                                tx.type === 'income'
-                                  ? 'color-mix(in srgb, var(--status-income) 15%, transparent)'
-                                  : tx.type === 'transfer'
-                                  ? 'var(--status-transfer-soft)'
-                                  : 'color-mix(in srgb, var(--status-expense) 15%, transparent)',
-                              color:
-                                tx.type === 'income'
-                                  ? 'var(--status-income)'
-                                  : tx.type === 'transfer'
-                                  ? 'var(--status-transfer)'
-                                  : 'var(--status-expense)',
-                            }}
-                          >
-                            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              {tx.type === 'income' ? (
-                                <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-                              ) : tx.type === 'transfer' ? (
-                                <path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16" strokeLinecap="round" strokeLinejoin="round" />
-                              ) : (
-                                <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-                              )}
-                            </svg>
-                          </div>
+                          {(() => {
+                            const isIncome = tx.type === 'income' || (tx.type === 'balance_adjustment' && Number(tx.amount || 0) >= 0)
+                            const isTransfer = tx.type === 'transfer'
+                            const txColor = isIncome
+                              ? 'var(--status-income)'
+                              : isTransfer
+                              ? 'var(--status-transfer)'
+                              : 'var(--status-expense)'
+
+                            return (
+                              <div
+                                className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
+                                style={{
+                                  background:
+                                    isIncome
+                                      ? 'color-mix(in srgb, var(--status-income) 15%, transparent)'
+                                      : isTransfer
+                                      ? 'var(--status-transfer-soft)'
+                                      : 'color-mix(in srgb, var(--status-expense) 15%, transparent)',
+                                  color: txColor,
+                                }}
+                              >
+                                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  {isIncome ? (
+                                    <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                                  ) : isTransfer ? (
+                                    <path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16" strokeLinecap="round" strokeLinejoin="round" />
+                                  ) : (
+                                    <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                                  )}
+                                </svg>
+                              </div>
+                            )
+                          })()}
                           <div className="min-w-0 flex-1">
                             {(() => {
                               const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                               const sub = labels.sub || null
                               const resolvedNote = getDecryptedNoteSync(tx.notes)
                               const noteStr = resolvedNote ? String(resolvedNote).trim() : ''
-                              const txWallet = wallets?.find((w) => String(w.id) === String(tx.walletId))
-                              const walletName = txWallet?.name || 'Wallet'
+                              const fromW = wallets?.find((w) => String(w.id) === String(tx.walletId))
+                              const toW = wallets?.find((w) => String(w.id) === String(tx.targetWalletId))
+                              const subLabel = tx.type === 'transfer'
+                                ? `${fromW?.name || 'Wallet'} -> ${toW?.name || 'Wallet'}`
+                                : `${fromW?.name || 'Wallet'}${sub ? ` • ${sub}` : ''}`
+
                               let createdTime = null
-                              const createdAtMs = Number(tx.createdAt)
-                              if (Number.isFinite(createdAtMs) && createdAtMs > 0) {
-                                createdTime = format(new Date(createdAtMs), 'HH:mm')
+                              if (tx?.time && typeof tx.time === 'string' && tx.time.trim()) {
+                                createdTime = tx.time.trim()
+                              } else if (tx?.createdAt) {
+                                try {
+                                  const rawCreatedAt = tx.createdAt
+                                  let dateObj = null
+                                  if (rawCreatedAt instanceof Date) {
+                                    dateObj = rawCreatedAt
+                                  } else if (typeof rawCreatedAt === 'number' || (typeof rawCreatedAt === 'string' && rawCreatedAt.trim())) {
+                                    const createdAtMs = Number(rawCreatedAt)
+                                    if (Number.isFinite(createdAtMs)) {
+                                      if (createdAtMs > 0) dateObj = new Date(createdAtMs)
+                                    } else {
+                                      const parsed = new Date(rawCreatedAt)
+                                      if (!isNaN(parsed.getTime())) dateObj = parsed
+                                    }
+                                  }
+                                  if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+                                    createdTime = format(dateObj, 'HH:mm')
+                                  }
+                                } catch {
+                                  createdTime = null
+                                }
                               }
 
                               return (
                                 <>
                                   <p className="truncate text-sm font-bold text-[var(--fg)]">{labels.main}</p>
                                   <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-[var(--muted)]">
-                                    <span className="text-[var(--fg)]/90 font-bold">{walletName}</span>
-                                    {sub ? <> • {sub}</> : null}
-                                    {createdTime ? <> • {createdTime}</> : null}
+                                    <span className="text-[var(--fg)]/90 font-bold">{subLabel}</span>
+                                    {subLabel && createdTime ? <> • {createdTime}</> : createdTime ? <span>{createdTime}</span> : null}
                                   </p>
                                   {noteStr ? (
                                     <p className="mt-0.5 text-[11px] italic leading-tight text-[var(--muted)] line-clamp-2 break-words">
@@ -232,19 +275,30 @@ function CalendarDayModal({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p
-                            className="text-sm sm:text-[15px] font-extrabold tabular-nums tracking-tight"
-                            style={{
-                              color:
-                                tx.type === 'income'
-                                  ? 'var(--status-income)'
-                                  : tx.type === 'transfer'
-                                  ? 'var(--status-transfer)'
-                                  : 'var(--status-expense)',
-                            }}
-                          >
-                            {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''} {formatCurrency(tx.amount, tx.currency)}
-                          </p>
+                          {(() => {
+                            const isIncome = tx.type === 'income' || (tx.type === 'balance_adjustment' && Number(tx.amount || 0) >= 0)
+                            const isTransfer = tx.type === 'transfer'
+                            const signPrefix =
+                              tx.type === 'income' || (tx.type === 'balance_adjustment' && Number(tx.amount || 0) > 0)
+                                ? '+'
+                                : tx.type === 'expense' || (tx.type === 'balance_adjustment' && Number(tx.amount || 0) < 0)
+                                ? '-'
+                                : ''
+                            const amountColor = isIncome
+                              ? 'var(--status-income)'
+                              : isTransfer
+                              ? 'var(--status-transfer)'
+                              : 'var(--status-expense)'
+
+                            return (
+                              <p
+                                className="text-sm sm:text-[15px] font-extrabold tabular-nums tracking-tight"
+                                style={{ color: amountColor }}
+                              >
+                                {`${signPrefix}${formatCurrency(tx.amount, tx.currency)}`}
+                              </p>
+                            )
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -266,7 +320,20 @@ function CalendarDayModal({
                     {(dayItems?.loans || []).map((loan) => (
                       <div
                         key={`loan-${loan.id}`}
-                        className={`flex items-center justify-between gap-3 rounded-[1rem] border px-4 py-3 ${
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          onClose?.()
+                          navigate('/loans')
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onClose?.()
+                            navigate('/loans')
+                          }
+                        }}
+                        className={`flex items-center justify-between gap-3 rounded-[1rem] border px-4 py-3 cursor-pointer active:scale-[0.98] transition-transform ${
                           loan.type === 'debt'
                             ? 'border-[var(--status-expense)]/30 bg-[var(--status-expense)]/10'
                             : 'border-[var(--status-income)]/30 bg-[var(--status-income)]/10'
@@ -516,7 +583,12 @@ function CalendarDayModal({
                       wallets={wallets || []}
                       selectedWalletId={txForm.walletId || defaultWalletId}
                       onSelectWallet={(wId) => {
-                        setTxForm((prev) => ({ ...prev, walletId: wId }))
+                        const selected = (wallets || []).find((w) => String(w.id) === String(wId))
+                        setTxForm((prev) => ({
+                          ...prev,
+                          walletId: wId,
+                          currency: selected?.currency || prev.currency,
+                        }))
                         setIsWalletModalOpen(false)
                       }}
                     />
@@ -577,7 +649,7 @@ function CalendarDayModal({
                 <button
                   type="button"
                   onClick={handleAddTransactionFromDate}
-                  disabled={!(parseMoneyInput(amountInput, txForm.currency) > 0)}
+                  disabled={isSubmitting || !(parseMoneyInput(amountInput, txForm.currency) > 0)}
                   className="ft-btn-primary mt-2 w-full py-3 text-[13px] uppercase tracking-wider"
                 >
                   {t('addTx.save')}

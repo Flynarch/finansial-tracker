@@ -720,6 +720,34 @@
   }
 }
 
+:root[data-motion="reduce"] ::view-transition-old(root),
+:root[data-motion="reduce"] ::view-transition-new(root) {
+  animation: none !important;
+}
+
+:root[data-motion="reduce"] .ft-motion-page,
+:root[data-motion="reduce"] .ft-motion-overlay,
+:root[data-motion="reduce"] .ft-motion-panel,
+:root[data-motion="reduce"] .ft-sheet-enter,
+:root[data-motion="reduce"] .ft-sheet-exit,
+:root[data-motion="reduce"] .ft-backdrop-enter,
+:root[data-motion="reduce"] .ft-backdrop-exit,
+:root[data-motion="reduce"] .ft-page-transition,
+:root[data-motion="reduce"] .ft-page-crossfade,
+:root[data-motion="reduce"] .ft-content-loaded,
+:root[data-motion="reduce"] .ft-skeleton-enter,
+:root[data-motion="reduce"] .ft-skeleton-leaving,
+:root[data-motion="reduce"] .ft-fade-up,
+:root[data-motion="reduce"] .ft-todo-card-enter,
+:root[data-motion="reduce"] .ft-page-enter > *,
+:root[data-motion="reduce"] .ft-skeleton::after,
+:root[data-motion="reduce"] .ft-empty-state-icon,
+:root[data-motion="reduce"] .ft-hero-card::before {
+  transition-duration: 1ms !important;
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+}
+
 
 @keyframes stampPop {
   0% {

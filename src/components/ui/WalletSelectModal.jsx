@@ -156,21 +156,21 @@ export default function WalletSelectModal({
 
   const rates = useMemo(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }, [])
   const hasPropWallets = Boolean(propWallets && propWallets.length > 0)
-  const computedDbWallets = useLiveQuery(
+  const enrichedWallets = useLiveQuery(
     async () => {
-      if (!isOpen || hasPropWallets) return []
-      const raw = await db.wallets.toArray()
-      if (!raw || raw.length === 0) return []
-      return await getAllWalletBalances(raw, rates)
+      if (!isOpen) return []
+      // Establish active live dependency on transactions & walletBalanceCache
+      await db.transactions.limit(1).toArray()
+      if (db.walletBalanceCache) {
+        await db.walletBalanceCache.limit(1).toArray()
+      }
+      const list = hasPropWallets ? propWallets : await db.wallets.toArray()
+      if (!list || list.length === 0) return []
+      return await getAllWalletBalances(list, rates)
     },
-    [rates, isOpen, hasPropWallets],
+    [isOpen, hasPropWallets, propWallets, rates],
     propWallets || []
   )
-
-  const enrichedWallets = useMemo(() => {
-    if (hasPropWallets) return propWallets
-    return computedDbWallets || []
-  }, [hasPropWallets, propWallets, computedDbWallets])
 
   const activeWallets = useMemo(() => {
     return (enrichedWallets || []).filter((w) => !w.isArchived)

@@ -80,17 +80,19 @@ export async function recomputeAndCacheWalletBalance(walletId, rates = null, all
   // Update in-memory cache
   memoryBalanceCache.set(cleanId, computed)
 
-  // Update DB cache
-  try {
-    if (db.walletBalanceCache) {
-      await db.walletBalanceCache.put({
-        walletId: cleanId,
-        balance: computed,
-        updatedAt: Date.now(),
-      })
-    }
-  } catch (err) {
-    console.warn('[balanceEngine] Failed to write walletBalanceCache:', err)
+  // Update DB cache asynchronously outside ambient liveQuery zone
+  if (db.walletBalanceCache) {
+    setTimeout(() => {
+      db.walletBalanceCache
+        .put({
+          walletId: cleanId,
+          balance: computed,
+          updatedAt: Date.now(),
+        })
+        .catch((err) => {
+          console.warn('[balanceEngine] Failed to write walletBalanceCache:', err)
+        })
+    }, 0)
   }
 
   return computed
@@ -213,12 +215,12 @@ export async function getAllWalletBalances(wallets = [], rates = null) {
       cacheRows.push({ walletId: cleanId, balance: bal, updatedAt: Date.now() })
     }
 
-    try {
-      if (db.walletBalanceCache && cacheRows.length > 0) {
-        await db.walletBalanceCache.bulkPut(cacheRows)
-      }
-    } catch (err) {
-      console.warn('[balanceEngine] Failed to bulkPut walletBalanceCache:', err)
+    if (db.walletBalanceCache && cacheRows.length > 0) {
+      setTimeout(() => {
+        db.walletBalanceCache.bulkPut(cacheRows).catch((err) => {
+          console.warn('[balanceEngine] Failed to bulkPut walletBalanceCache:', err)
+        })
+      }, 0)
     }
   }
 

@@ -118,6 +118,12 @@ export default function WalletDetailHero({
             <span>{formatAccountType(wallet.institutionType, wallet.name, activeLocale)}</span>
           </div>
 
+          {wallet?.isArchived && (
+            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2.5 py-0.5 text-[10px] font-black text-[var(--muted)] shadow-xs">
+              <span>{activeT('wallets.archived', 'Diarsipkan')}</span>
+            </div>
+          )}
+
           {isDefaultWallet && (
             <div className="inline-flex items-center gap-1 rounded-full border border-amber-500/35 bg-amber-500/15 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-black text-amber-500 shadow-xs animate-in fade-in">
               <Star size={10} className="fill-amber-500 text-amber-500" />
@@ -156,8 +162,13 @@ export default function WalletDetailHero({
             </div>
             <button
               type="button"
-              onClick={onAdjustBalance}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-[11px] font-bold hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+              onClick={wallet?.isArchived ? undefined : onAdjustBalance}
+              disabled={Boolean(wallet?.isArchived)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] text-[11px] font-bold transition shadow-2xs ${
+                wallet?.isArchived
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-[var(--panel)] active:scale-95 cursor-pointer'
+              }`}
               title={activeT('wallets.adjustBalance', 'Penyesuaian Saldo')}
             >
               <Sliders size={12} strokeWidth={2} />
