@@ -178,13 +178,22 @@ function CalendarDayModal({
                               background:
                                 tx.type === 'income'
                                   ? 'color-mix(in srgb, var(--status-income) 15%, transparent)'
+                                  : tx.type === 'transfer'
+                                  ? 'var(--status-transfer-soft)'
                                   : 'color-mix(in srgb, var(--status-expense) 15%, transparent)',
-                              color: tx.type === 'income' ? 'var(--status-income)' : 'var(--status-expense)',
+                              color:
+                                tx.type === 'income'
+                                  ? 'var(--status-income)'
+                                  : tx.type === 'transfer'
+                                  ? 'var(--status-transfer)'
+                                  : 'var(--status-expense)',
                             }}
                           >
                             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
                               {tx.type === 'income' ? (
                                 <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                              ) : tx.type === 'transfer' ? (
+                                <path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16" strokeLinecap="round" strokeLinejoin="round" />
                               ) : (
                                 <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
                               )}
@@ -230,7 +239,7 @@ function CalendarDayModal({
                                 tx.type === 'income'
                                   ? 'var(--status-income)'
                                   : tx.type === 'transfer'
-                                  ? 'var(--accent)'
+                                  ? 'var(--status-transfer)'
                                   : 'var(--status-expense)',
                             }}
                           >

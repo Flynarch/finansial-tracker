@@ -72,7 +72,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
 
           if (latestTx?.type === 'transfer') {
             iconKey = 'transfer'
-            colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
+            colorClass = 'ft-transfer-soft border border-[color-mix(in_srgb,var(--status-transfer)_25%,transparent)]'
             const fromW = wallets.find((w) => String(w.id) === String(latestTx.walletId))
             const toW = wallets.find((w) => String(w.id) === String(latestTx.targetWalletId))
             const fromName = fromW?.name || 'Wallet'
@@ -82,7 +82,7 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
               sub: `${fromName} -> ${toName}`,
             }
             amountPrefix = ''
-            amountColorClass = 'text-[var(--accent)]'
+            amountColorClass = 'ft-transfer-text'
           } else if (latestTx?.type === 'balance_adjustment') {
             iconKey = 'adjustment'
             colorClass = 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'

@@ -217,7 +217,7 @@ function Calendar() {
             tx.type === 'income'
               ? 'var(--status-income)'
               : tx.type === 'transfer'
-              ? 'var(--accent)'
+              ? 'var(--status-transfer)'
               : 'var(--status-expense)',
           raw: tx,
         }
