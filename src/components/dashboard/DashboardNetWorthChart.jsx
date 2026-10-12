@@ -51,7 +51,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
   }
 
   return (
-    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 2 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 2 }}>
       <MiniChartCard
         t={t}
         title={t('dashboard.netWorth')}

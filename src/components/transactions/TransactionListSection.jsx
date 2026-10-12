@@ -126,7 +126,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   const visibleGroups = groupedEntriesDetailed.slice(0, visibleGroupCount)
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full ft-content-loaded">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full">
       <PullToRefresh
         onRefresh={onRefresh}
         disabled={!onRefresh}

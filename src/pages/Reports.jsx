@@ -28,7 +28,6 @@ import useBackButton from '../hooks/useBackButton'
 
 export default function Reports() {
   const { t, locale } = useTranslation()
-  const [isEntering, setIsEntering] = useState(false)
   const [rangeMonths, setRangeMonths] = useState(6)
   const [anchorDate, setAnchorDate] = useState(() => new Date())
   const [selectedMonthKey, setSelectedMonthKey] = useState(null)
@@ -65,10 +64,6 @@ export default function Reports() {
 
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
 
-  useEffect(() => {
-    const id = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(id)
-  }, [])
 
   useEffect(() => {
     const loadRates = async () => {
@@ -521,11 +516,7 @@ export default function Reports() {
         isLoading={!isDataReady}
         skeleton={<PageSkeleton variant="reports" />}
       >
-        <div
-          className={`ft-motion-page min-h-full space-y-4 sm:space-y-5 transform-gpu ${
-            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-          }`}
-        >
+        <div className="ft-motion-page min-h-full space-y-4 sm:space-y-5 transform-gpu">
         {/* Header Section with Time Switcher and Action Pills */}
         <ReportHeader
           rangeMonths={rangeMonths}

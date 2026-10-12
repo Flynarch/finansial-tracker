@@ -43,7 +43,6 @@ export default function Loans() {
   const navigate = useNavigate()
 
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
-  const [isEntering, setIsEntering] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [activeTab, setActiveTab] = useState('debt') // 'debt' or 'receivable'
   const [statusFilter, setStatusFilter] = useState('active') // 'active' | 'paid' | 'all'
@@ -72,8 +71,6 @@ export default function Loans() {
 
   useEffect(() => {
     window.scrollTo(0, 0)
-    const id = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(id)
   }, [])
 
   const loans = useLiveQuery(() => db.loans.toArray(), [])
@@ -143,7 +140,6 @@ export default function Loans() {
   const handleBack = () => {
     if (isLeaving) return
     setIsLeaving(true)
-    setIsEntering(false)
     window.setTimeout(() => {
       navigate(-1)
     }, motionDelay)
@@ -335,11 +331,7 @@ export default function Loans() {
       >
         <div
           className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-            isLeaving
-              ? '-translate-x-2 opacity-0'
-              : isEntering
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-2 opacity-0'
+            isLeaving ? '-translate-x-2 opacity-0' : 'translate-y-0 opacity-100'
           }`}
         >
         {/* Page Header */}

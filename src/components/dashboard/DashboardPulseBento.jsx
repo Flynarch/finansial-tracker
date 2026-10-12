@@ -96,7 +96,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
   const hasGoals = goalRows.length > 0
 
   return (
-    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 4 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
       <div className="grid grid-cols-2 gap-2.5">
         {/* Bento Card 1: Anggaran */}
         <div

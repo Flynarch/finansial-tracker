@@ -808,8 +808,8 @@
 
 @keyframes ft-content-fade-in {
   from {
-    opacity: 0.2;
-    transform: scale(0.996);
+    opacity: 0.85;
+    transform: scale(0.998);
   }
   to {
     opacity: 1;
@@ -829,6 +829,14 @@
 .ft-skeleton-leaving {
   animation: ft-skeleton-fade-out 220ms ease-out forwards;
   pointer-events: none;
+}
+
+.ft-skeleton-leaving .ft-skeleton-enter,
+.ft-skeleton-leaving .ft-fade-up,
+.ft-skeleton-leaving .ft-stagger-in {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 @keyframes ft-toast-progress {

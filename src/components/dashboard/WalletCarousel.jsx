@@ -181,7 +181,7 @@ export default function WalletCarousel({
   }
 
   return (
-    <section className="relative ft-stagger-in ft-content-loaded" style={{ '--stagger': 0 }}>
+    <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
       <div 
         ref={scrollRef}
         onScroll={handleScroll}

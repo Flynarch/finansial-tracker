@@ -4,6 +4,7 @@ import { render, screen, cleanup, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Profile from '../src/pages/Profile'
 import TodoList from '../src/pages/TodoList'
+import Calendar from '../src/pages/Calendar'
 
 let mockLiveQueryState = {
   txCount: undefined,
@@ -127,11 +128,13 @@ describe('Profile and TodoList SkeletonTransition Integration', () => {
         </MemoryRouter>
       )
 
-      // Content wrapper should now have ft-content-loaded class
+      // Content wrapper should now have ft-content-loaded class and not be gated by opacity-0
       const contentWrapper = container.querySelector('.ft-content-loaded')
       expect(contentWrapper).not.toBeNull()
+      const motionPage = container.querySelector('.ft-motion-page')
+      expect(motionPage.className).not.toContain('opacity-0')
 
-      // Transition leaving overlay is present
+      // Transition leaving overlay is present synchronously on render
       expect(container.querySelector('.ft-skeleton-leaving')).not.toBeNull()
 
       // Stat cards display resolved counts
@@ -211,10 +214,12 @@ describe('Profile and TodoList SkeletonTransition Integration', () => {
         </MemoryRouter>
       )
 
-      // Content wrapper should now have ft-content-loaded class
+      // Content wrapper should now have ft-content-loaded class and not be gated by opacity-0
       expect(container.querySelector('.ft-content-loaded')).not.toBeNull()
+      const motionPage = container.querySelector('.ft-motion-page')
+      expect(motionPage.className).not.toContain('opacity-0')
 
-      // Transition leaving overlay is present
+      // Transition leaving overlay is present synchronously on render
       expect(container.querySelector('.ft-skeleton-leaving')).not.toBeNull()
 
       // Empty state is rendered
@@ -248,6 +253,19 @@ describe('Profile and TodoList SkeletonTransition Integration', () => {
       )
 
       expect(screen.getByText('Beli Kebutuhan Bulanan')).toBeDefined()
+    })
+  })
+
+  describe('Calendar Entrance Consistency', () => {
+    it('mounts immediately visible without opacity-0 entrance gate', () => {
+      const { container } = render(
+        <MemoryRouter>
+          <Calendar />
+        </MemoryRouter>
+      )
+      const motionPage = container.querySelector('.ft-motion-page')
+      expect(motionPage).not.toBeNull()
+      expect(motionPage.className).not.toContain('opacity-0')
     })
   })
 })

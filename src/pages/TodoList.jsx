@@ -52,7 +52,6 @@ function TodoList() {
     )
   }
   const [filter, setFilter] = useState(() => 'all')
-  const [isEntering, setIsEntering] = useState(false)
   const [sortPref, setSortPref] = useState(() => {
     if (typeof window === 'undefined') return 'latest'
     const raw = window.localStorage.getItem(TODO_SORT_PREF_KEY)
@@ -173,10 +172,6 @@ function TodoList() {
     return next
   }, [filteredTodos, sortPref])
 
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(frameId)
-  }, [])
 
   useEffect(() => {
     const onPointerDown = (event) => {
@@ -403,11 +398,7 @@ function TodoList() {
         skeleton={<PageSkeleton variant="todo" />}
         className="min-h-full w-full"
       >
-        <div
-          className={`ft-motion-page min-h-full space-y-4 transform-gpu pb-2 ${
-            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-          }`}
-        >
+        <div className="ft-motion-page min-h-full space-y-4 transform-gpu pb-2">
         <PageHeader
           title={t('todo.pageTitle')}
           titlePosition="left"
@@ -582,7 +573,6 @@ function TodoList() {
             ) : !sortedTodos?.length ? (
               <EmptyState
                 variant="todos"
-                className={reduceMotion ? '' : 'ft-content-loaded'}
                 title={t('todo.emptyState.title', 'Tidak ada tugas')}
                 description={
                   filter === 'all'
@@ -605,7 +595,7 @@ function TodoList() {
                 }
               />
             ) : (
-              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-content-loaded'}`}>
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {sortedTodos.map((todo) => (
                   <TodoItemCard
                     key={todo.id}

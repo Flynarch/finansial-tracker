@@ -131,6 +131,42 @@ describe('SkeletonTransition Component', () => {
     expect(document.querySelector('.ft-skeleton-leaving')).toBeNull()
   })
 
+  it('synchronously renders the exiting skeleton overlay on the first render frame without blank gap', () => {
+    const { rerender } = render(
+      <SkeletonTransition
+        isLoading={true}
+        skeleton={<div data-testid="skeleton-layer">Loading Skeleton</div>}
+      >
+        <div data-testid="live-content">Live Content</div>
+      </SkeletonTransition>
+    )
+
+    expect(screen.getByTestId('skeleton-layer')).toBeDefined()
+    expect(screen.queryByTestId('live-content')).toBeNull()
+
+    // Flip isLoading to false synchronously
+    rerender(
+      <SkeletonTransition
+        isLoading={false}
+        skeleton={<div data-testid="skeleton-layer">Loading Skeleton</div>}
+      >
+        <div data-testid="live-content">Live Content</div>
+      </SkeletonTransition>
+    )
+
+    // Synchronous state adjustment ensures BOTH live content AND leaving skeleton overlay exist in Frame 1
+    expect(screen.getByTestId('live-content')).toBeDefined()
+    const overlay = document.querySelector('.ft-skeleton-leaving')
+    expect(overlay).not.toBeNull()
+    expect(overlay.querySelector('[data-testid="skeleton-layer"]')).not.toBeNull()
+
+    // After 240ms timeout, overlay is removed
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    expect(document.querySelector('.ft-skeleton-leaving')).toBeNull()
+  })
+
   it('resets transition cleanly if isLoading toggles back to true during cross-dissolve', () => {
     const { rerender } = render(
       <SkeletonTransition

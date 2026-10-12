@@ -124,16 +124,10 @@ function Calendar() {
   const { t, locale } = useTranslation()
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
-  const [isEntering, setIsEntering] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isDayModalOpen, setIsDayModalOpen] = useState(false)
   const [dayTab, setDayTab] = useState('items') // items | add
   const [editingTx, setEditingTx] = useState(null)
-
-  useEffect(() => {
-    const id = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(id)
-  }, [])
 
   const calStart = useMemo(() => format(subMonths(startOfMonth(selectedDate), 2), 'yyyy-MM-dd'), [selectedDate])
   const calEnd = useMemo(() => format(endOfMonth(addMonths(startOfMonth(selectedDate), 2)), 'yyyy-MM-dd'), [selectedDate])
@@ -404,11 +398,7 @@ function Calendar() {
 
   return (
     <div className="min-h-full">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-          isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-        }`}
-      >
+      <div className="ft-motion-page min-h-full space-y-4 transform-gpu">
         {/* Header */}
         <PageHeader
           title={t('calendar.title')}

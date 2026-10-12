@@ -18,38 +18,41 @@ export default function SkeletonTransition({
   children,
   className = '',
 }) {
+  const [prevLoading, setPrevLoading] = useState(isLoading)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [exitingSkeleton, setExitingSkeleton] = useState(null)
-  const prevLoadingRef = useRef(isLoading)
   const timeoutRef = useRef(null)
 
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    // If it transitions from loading (true) to loaded (false)
-    if (prevLoadingRef.current && !isLoading) {
+  // Synchronous state adjustment during render (React 19 pattern)
+  // Eliminates the 1-frame gap where the skeleton is unmounted before useEffect runs
+  if (isLoading !== prevLoading) {
+    setPrevLoading(isLoading)
+    if (prevLoading && !isLoading) {
       setIsTransitioning(true)
       setExitingSkeleton(skeleton)
+    } else if (!prevLoading && isLoading) {
+      setIsTransitioning(false)
+      setExitingSkeleton(null)
+    }
+  }
 
+  useEffect(() => {
+    if (isTransitioning) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
         setIsTransitioning(false)
         setExitingSkeleton(null)
         timeoutRef.current = null
       }, 240)
-    } else if (isLoading && timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
     }
 
-    prevLoadingRef.current = isLoading
-  }, [isLoading, skeleton])
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [isTransitioning])
 
   // While actively loading, strictly render skeleton ONLY.
   // Children is NEVER evaluated/mounted to protect against TypeError on undefined data.

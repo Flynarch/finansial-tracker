@@ -28,7 +28,7 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
   }
 
   return (
-    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 3 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 3 }}>
       <div
         role="button"
         tabIndex={0}

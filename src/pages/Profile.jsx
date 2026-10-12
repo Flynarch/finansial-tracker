@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Camera, Pencil } from 'lucide-react'
@@ -143,7 +143,6 @@ function ShortcutRow({ icon, label, sublabel, onClick }) {
 function Profile() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const [isEntering, setIsEntering] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [splitBillOpen, setSplitBillOpen] = useState(false)
@@ -167,11 +166,6 @@ function Profile() {
   )
   const isDataReady = txCount !== undefined && budgetCount !== undefined && goalsCount !== undefined
 
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(frameId)
-  }, [])
-
   const displayName = profileName || t('profile.userName')
 
   const openEditModal = () => {
@@ -192,11 +186,7 @@ function Profile() {
         skeleton={<PageSkeleton variant="profile" />}
         className="min-h-full w-full"
       >
-        <div
-          className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-          }`}
-        >
+        <div className="ft-motion-page min-h-full space-y-4 transform-gpu">
         <PageHeader
           title={t('profile.pageTitle', 'Profil')}
           titlePosition="left"

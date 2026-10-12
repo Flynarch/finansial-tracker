@@ -136,7 +136,6 @@ function Transactions() {
   const [showBottomFade, setShowBottomFade] = useState(false)
   const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false)
   const [isSplitBillOpen, setIsSplitBillOpen] = useState(false)
-  const [isEntering, setIsEntering] = useState(false)
   const listScrollRef = useRef(null)
   const stagingScrollRef = useRef(null)
 
@@ -260,12 +259,10 @@ function Transactions() {
     loadRates()
   }, [defaultCurrency, t])
 
-  // Page entrance animation, scroll reset & clear mutation badge
+  // Scroll reset & clear mutation badge
   useEffect(() => {
     window.scrollTo(0, 0)
     clearUnviewedMutations?.()
-    const frameId = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(frameId)
   }, [clearUnviewedMutations])
 
   // Grouped entries for TransactionListSection
@@ -326,11 +323,7 @@ function Transactions() {
         skeleton={<PageSkeleton variant="transactions" />}
         className="h-full flex-1 flex flex-col min-h-0 overflow-hidden"
       >
-        <div
-          className={`ft-motion-page flex h-full flex-1 min-h-0 flex-col gap-2 overflow-hidden transform-gpu ${
-            isEntering ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
+        <div className="ft-motion-page flex h-full flex-1 min-h-0 flex-col gap-2 overflow-hidden transform-gpu">
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
 
         {/* Top Bar Header */}

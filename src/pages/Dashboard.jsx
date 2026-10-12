@@ -28,7 +28,6 @@ import PageSkeleton from '../components/ui/PageSkeleton'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [isEntering, setIsEntering] = useState(false)
   const [isMobileScreen, setIsMobileScreen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false))
   const [zoomedChart, setZoomedChart] = useState(null)
   const [zoomVisible, setZoomVisible] = useState(false)
@@ -102,10 +101,6 @@ export default function Dashboard() {
   const widgetRange = useSettingsStore((s) => s.widgetRange) || '7d'
   const motionDelay = reduceMotion ? 0 : 200
 
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(frameId)
-  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
@@ -194,11 +189,7 @@ export default function Dashboard() {
         skeleton={<PageSkeleton variant="dashboard" />}
         className="min-h-full w-full"
       >
-        <div
-          className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
-            isEntering ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
+        <div className="min-h-full flex flex-col gap-4 transform-gpu">
           {/* 1. Wallet Carousel (Hero) */}
           <div data-tour="hero-carousel">
             <WalletCarousel

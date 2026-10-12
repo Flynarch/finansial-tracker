@@ -36,7 +36,6 @@ function Budget() {
   const location = useLocation()
 
   const [rates, setRates] = useState(() => getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES })
-  const [isEntering, setIsEntering] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
   useEffect(() => {
@@ -54,8 +53,6 @@ function Budget() {
 
   useEffect(() => {
     window.scrollTo(0, 0)
-    const id = window.requestAnimationFrame(() => setIsEntering(true))
-    return () => window.cancelAnimationFrame(id)
   }, [])
 
   const [month, setMonth] = useState(() => getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay))
@@ -279,7 +276,6 @@ function Budget() {
   const handleBack = () => {
     if (isLeaving) return
     setIsLeaving(true)
-    setIsEntering(false)
     window.setTimeout(() => {
       navigate(-1)
     }, motionDelay)
@@ -293,11 +289,7 @@ function Budget() {
       >
         <div
           className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-            isLeaving
-              ? '-translate-x-2 opacity-0'
-              : isEntering
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-2 opacity-0'
+            isLeaving ? '-translate-x-2 opacity-0' : 'translate-y-0 opacity-100'
           }`}
         >
         {/* Header */}

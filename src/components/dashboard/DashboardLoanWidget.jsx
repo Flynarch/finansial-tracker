@@ -48,7 +48,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   const isNetNegative = netPosition < 0
 
   return (
-    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 5 }}>
+    <section className="ft-stagger-in" style={{ '--stagger': 5 }}>
       <div
         onClick={() => navigate('/loans')}
         className="group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-[0.995] space-y-3"
