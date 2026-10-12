@@ -59,6 +59,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
         trendBadge={
           hasGrowth ? (
             <span
+              title={`${isNetPositive ? '+' : ''}${formatCurrency(netWorthGrowth.net, defaultCurrency)}`}
               className={`inline-flex whitespace-nowrap shrink-0 items-center self-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border transition-colors leading-none ${
                 isNetPositive
                   ? 'bg-[var(--status-income-soft)] text-[var(--status-income)] border-[var(--status-income)]/20'
@@ -73,8 +74,7 @@ export const DashboardNetWorthChart = memo(function DashboardNetWorthChart({
                 <TrendingDown className="h-3 w-3 shrink-0 text-[var(--status-expense)]" strokeWidth={2.5} />
               ) : null}
               <span className="leading-tight">
-                {isNetPositive ? '+' : ''}
-                {formatCurrency(netWorthGrowth.net, defaultCurrency)} ({formatGrowthPercentage(netWorthGrowth.pct, true)})
+                {formatGrowthPercentage(netWorthGrowth.pct, true)}
               </span>
             </span>
           ) : null

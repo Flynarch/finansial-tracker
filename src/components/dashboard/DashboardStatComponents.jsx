@@ -126,8 +126,8 @@ export const MiniChartCard = memo(function MiniChartCard({
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold tracking-wide text-[var(--muted)]">{title}</p>
           {!isEmptyData && (
-            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-              <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)]">
+            <div className="mt-0.5 flex items-center gap-2 flex-nowrap min-w-0">
+              <p className="text-[clamp(15px,3.8vw,18px)] font-black leading-tight tracking-tight tabular-nums text-[var(--fg)] truncate">
                 {scrubbedPoint ? scrubbedPoint.value : value}
               </p>
               {scrubbedPoint?.time ? (

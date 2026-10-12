@@ -1,5 +1,7 @@
 <div align="center">
 
+<br />
+
 <a href="https://github.com/Flynarch/finansial-tracker">
   <img src="docs/assets/logo.png" alt="FinTrack Logo" width="112" height="112" />
 </a>
@@ -12,6 +14,7 @@
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![Tests](https://img.shields.io/badge/Tests-1%2C748%20Passed%20(120%20Suites)-brightgreen.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20E2EE-blueviolet.svg?style=flat-square)](SECURITY.md)
+
 [![React](https://img.shields.io/badge/React-19.2.5-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.2-38B2AC.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
@@ -53,56 +56,39 @@ FinTrack gives you complete ownership over your personal finances. Built from th
 
 ## App Preview
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/dashboard.png" alt="FinTrack Dashboard" width="240" />
-        <br />
-        <strong>Interactive Dashboard</strong>
-        <br />
-        <sub>Net worth curve, active account carousel, and daily consistency tracking</sub>
-      </td>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/transactions.png" alt="Transaction Ledger" width="240" />
-        <br />
-        <strong>Daily Transaction Ledger</strong>
-        <br />
-        <sub>Two-tier categories, wallet badges, structured notes, and date grouping</sub>
-      </td>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/reports.png" alt="Financial Reports" width="240" />
-        <br />
-        <strong>Financial Reports</strong>
-        <br />
-        <sub>Net surplus metrics, cash flow breakdowns, AI advisor insights, and PDF exports</sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/budget.png" alt="Budget Management" width="240" />
-        <br />
-        <strong>Payday-Aligned Budgets</strong>
-        <br />
-        <sub>Category spending limits, real-time pace meters, and overspend warnings</sub>
-      </td>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/savings.png" alt="Savings Goals Vaults" width="240" />
-        <br />
-        <strong>Savings Vaults & Runway</strong>
-        <br />
-        <sub>Target progression, deadline estimation, and automated emergency runway</sub>
-      </td>
-      <td align="center" width="33%">
-        <img src="docs/screenshots/ai_chat.png" alt="AI Finance Assistant" width="240" />
-        <br />
-        <strong>AI Assistant & Receipt OCR</strong>
-        <br />
-        <sub>Conversational audits, paper receipt scanning, and quick action cards</sub>
-      </td>
-    </tr>
-  </table>
-</div>
+<p align="center">
+  <a href="docs/screenshots/dashboard.png"><img src="docs/screenshots/dashboard.png" width="31%" alt="FinTrack Interactive Dashboard" /></a>
+  &nbsp;&nbsp;
+  <a href="docs/screenshots/transactions.png"><img src="docs/screenshots/transactions.png" width="31%" alt="Daily Transaction Ledger" /></a>
+  &nbsp;&nbsp;
+  <a href="docs/screenshots/reports.png"><img src="docs/screenshots/reports.png" width="31%" alt="Financial Reports & Analytics" /></a>
+</p>
+
+<p align="center">
+  <sub><strong>Interactive Dashboard</strong> &bull; Net worth curve, account carousel, and habit consistency</sub>
+  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+  <sub><strong>Daily Transaction Ledger</strong> &bull; Two-tier categories, wallet badges, and structured notes</sub>
+  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+  <sub><strong>Financial Reports</strong> &bull; Cash flow, net surplus metrics, and instant PDF/CSV exports</sub>
+</p>
+
+<br />
+
+<p align="center">
+  <a href="docs/screenshots/budget.png"><img src="docs/screenshots/budget.png" width="31%" alt="Payday-Aligned Budgets" /></a>
+  &nbsp;&nbsp;
+  <a href="docs/screenshots/savings.png"><img src="docs/screenshots/savings.png" width="31%" alt="Savings Goals Vaults" /></a>
+  &nbsp;&nbsp;
+  <a href="docs/screenshots/ai_chat.png"><img src="docs/screenshots/ai_chat.png" width="31%" alt="AI Finance Assistant" /></a>
+</p>
+
+<p align="center">
+  <sub><strong>Payday-Aligned Budgets</strong> &bull; Category spending limits, pace meters, and overspend alerts</sub>
+  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+  <sub><strong>Savings Goals Vaults</strong> &bull; Target progress rings, deadline projection, and emergency runway</sub>
+  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+  <sub><strong>AI Finance Assistant</strong> &bull; Natural language audits, smart actions, and camera receipt OCR</sub>
+</p>
 
 ---
 
