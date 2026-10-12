@@ -1,5 +1,9 @@
 <div align="center">
 
+<a href="https://github.com/Flynarch/finansial-tracker">
+  <img src="docs/assets/logo.png" alt="FinTrack Logo" width="112" height="112" />
+</a>
+
 # FinTrack
 
 **A local-first personal finance application for Android with native home screen widgets, receipt scanning, and offline storage.**
@@ -16,7 +20,7 @@
 
 FinTrack gives you complete ownership over your personal finances. Built from the ground up for Android, all accounts, ledgers, and transactions live strictly on your device inside an encrypted offline database. No accounts required, no trackers, and zero forced cloud sync.
 
-[Download Latest APK (v6.1.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) • [Key Features](#key-features) • [Comparison](#why-fintrack) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Security](SECURITY.md)
+[Download Latest APK (v6.1.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) • [App Preview](#app-preview) • [Key Features](#key-features) • [Comparison](#why-fintrack) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Security](SECURITY.md)
 
 ---
 
@@ -24,6 +28,7 @@ FinTrack gives you complete ownership over your personal finances. Built from th
 
 ## Table of Contents
 
+- [App Preview](#app-preview)
 - [Why FinTrack?](#why-fintrack)
 - [Key Features](#key-features)
   - [1. Frictionless Daily Tracking](#1-frictionless-daily-tracking)
@@ -43,6 +48,61 @@ FinTrack gives you complete ownership over your personal finances. Built from th
 - [Testing & Quality Verification](#testing--quality-verification)
 - [Project Structure](#project-structure)
 - [License](#license)
+
+---
+
+## App Preview
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/dashboard.png" alt="FinTrack Dashboard" width="240" />
+        <br />
+        <strong>Interactive Dashboard</strong>
+        <br />
+        <sub>Net worth curve, active account carousel, and daily consistency tracking</sub>
+      </td>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/transactions.png" alt="Transaction Ledger" width="240" />
+        <br />
+        <strong>Daily Transaction Ledger</strong>
+        <br />
+        <sub>Two-tier categories, wallet badges, structured notes, and date grouping</sub>
+      </td>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/reports.png" alt="Financial Reports" width="240" />
+        <br />
+        <strong>Financial Reports</strong>
+        <br />
+        <sub>Net surplus metrics, cash flow breakdowns, AI advisor insights, and PDF exports</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/budget.png" alt="Budget Management" width="240" />
+        <br />
+        <strong>Payday-Aligned Budgets</strong>
+        <br />
+        <sub>Category spending limits, real-time pace meters, and overspend warnings</sub>
+      </td>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/savings.png" alt="Savings Goals Vaults" width="240" />
+        <br />
+        <strong>Savings Vaults & Runway</strong>
+        <br />
+        <sub>Target progression, deadline estimation, and automated emergency runway</sub>
+      </td>
+      <td align="center" width="33%">
+        <img src="docs/screenshots/ai_chat.png" alt="AI Finance Assistant" width="240" />
+        <br />
+        <strong>AI Assistant & Receipt OCR</strong>
+        <br />
+        <sub>Conversational audits, paper receipt scanning, and quick action cards</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 

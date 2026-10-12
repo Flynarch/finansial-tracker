@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E2A22"/>
+      <stop offset="100%" stop-color="#121A15"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- Squircle Base -->
+  <rect width="128" height="128" rx="28" fill="url(#bgGrad)" filter="url(#softShadow)"/>
+  <rect width="126" height="126" x="1" y="1" rx="27" fill="none" stroke="#2D3E33" stroke-width="1.5"/>
+  
+  <!-- Financial Growth Bars -->
+  <!-- Bar 1 (Short, Forest Green) -->
+  <rect x="26" y="70" width="18" height="26" rx="4" fill="#4C6B54" />
+  <!-- Bar 2 (Medium, Sage Green) -->
+  <rect x="52" y="52" width="18" height="44" rx="4" fill="#8AA68F" />
+  <!-- Bar 3 (Tall, Terracotta Accent) -->
+  <rect x="78" y="32" width="18" height="64" rx="4" fill="#A15A42" />
+  <!-- Growth Apex Arrow Accent (Warm Cream) -->
+  <path d="M84 32 L96 32 L96 44 Z" fill="#F3EEE2" />
+</svg>
