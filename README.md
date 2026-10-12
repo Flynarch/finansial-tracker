@@ -8,7 +8,9 @@
 
 # FinTrack
 
-**A local-first personal finance application for Android with native home screen widgets, receipt scanning, and offline storage.**
+**The Local-First Financial Operating System for Android.**
+
+Native home screen widgets, intelligent bank SMS ingestion, zero cloud lock-in, and offline-first encrypted storage.
 
 [![Version](https://img.shields.io/badge/Version-v6.1.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.1.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
@@ -19,30 +21,44 @@
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.2-38B2AC.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Dexie.js](https://img.shields.io/badge/Storage-IndexedDB_Local_First-FFA500.svg?style=flat-square)](https://dexie.org/)
+[![Privacy](https://img.shields.io/badge/Telemetry-0%25_Zero_Tracking-success.svg?style=flat-square)](SECURITY.md)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
-FinTrack gives you complete ownership over your personal finances. Built from the ground up for Android, all accounts, ledgers, and transactions live strictly on your device inside an encrypted offline database. No accounts required, no trackers, and zero forced cloud sync.
+<br />
 
-[Download Latest APK (v6.1.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) • [App Preview](#app-preview) • [Key Features](#key-features) • [Comparison](#why-fintrack) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Security](SECURITY.md)
+FinTrack gives you complete ownership over your personal finances. Built from the ground up as a native Android application, all accounts, ledgers, and transactions live strictly on your device inside an encrypted offline database. No accounts required, no trackers, and zero forced cloud sync.
 
----
+[Download Latest APK (v6.1.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) &bull; [Hero Showcase](#hero-showcase) &bull; [App Preview](#app-preview) &bull; [Why FinTrack?](#why-fintrack) &bull; [Key Features](#key-features) &bull; [Architecture](#architecture) &bull; [Getting Started](#getting-started) &bull; [Security](SECURITY.md)
+
+<br />
 
 </div>
 
+## Hero Showcase
+
+<p align="center">
+  <a href="https://github.com/Flynarch/finansial-tracker/releases/latest">
+    <img src="docs/assets/hero_showcase.png" alt="FinTrack Flagship Interface Showcase" width="100%" />
+  </a>
+</p>
+
+---
+
 ## Table of Contents
 
+- [Hero Showcase](#hero-showcase)
 - [App Preview](#app-preview)
 - [Why FinTrack?](#why-fintrack)
 - [Key Features](#key-features)
-  - [1. Frictionless Daily Tracking](#1-frictionless-daily-tracking)
-  - [2. Android Native Integration](#2-android-native-integration)
-  - [3. Deep Financial Intelligence & Reports](#3-deep-financial-intelligence--reports)
-  - [4. Planning, Savings & Debt Management](#4-planning-savings--debt-management)
-  - [5. Zero-Knowledge Privacy & Security](#5-zero-knowledge-privacy--security)
-  - [6. Optional AI Powers (Bring Your Own Key)](#6-optional-ai-powers-bring-your-own-key)
-- [Feature Comparison](#feature-comparison)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
+  - [1. Frictionless Daily Tracking & In-App Calculator](#1-frictionless-daily-tracking--in-app-calculator)
+  - [2. Android Native Power & Home Screen Widgets](#2-android-native-power--home-screen-widgets)
+  - [3. Intelligent Ingestion & Notification Sync](#3-intelligent-ingestion--notification-sync)
+  - [4. Planning, Savings Vaults & Emergency Runway](#4-planning-savings-vaults--emergency-runway)
+  - [5. 120 FPS GPU Ergonomics & Seamless Skeleton Crossfade](#5-120-fps-gpu-ergonomics--seamless-skeleton-crossfade)
+  - [6. Zero-Knowledge Privacy & Bring-Your-Own-Key Gemini AI](#6-zero-knowledge-privacy--bring-your-own-key-gemini-ai)
+- [Feature Comparison Matrix](#feature-comparison-matrix)
+- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation & Local Run](#installation--local-run)
@@ -65,11 +81,11 @@ FinTrack gives you complete ownership over your personal finances. Built from th
 </p>
 
 <p align="center">
-  <sub><strong>Interactive Dashboard</strong> &bull; Net worth curve, account carousel, and habit consistency</sub>
-  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <sub><strong>Daily Transaction Ledger</strong> &bull; Two-tier categories, wallet badges, and structured notes</sub>
-  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <sub><strong>Financial Reports</strong> &bull; Cash flow, net surplus metrics, and instant PDF/CSV exports</sub>
+  <sub><strong>Interactive Dashboard</strong> &bull; Net worth curve, multi-account carousel, habit discipline heatmap, and quick stats</sub>
+  &nbsp;&bull;&nbsp;
+  <sub><strong>Daily Transaction Ledger</strong> &bull; Two-tier categories, wallet institution badges, and structured notes</sub>
+  &nbsp;&bull;&nbsp;
+  <sub><strong>Financial Reports</strong> &bull; 6M net surplus metrics, cash flow ratio, and client-side PDF/CSV exports</sub>
 </p>
 
 <br />
@@ -83,130 +99,142 @@ FinTrack gives you complete ownership over your personal finances. Built from th
 </p>
 
 <p align="center">
-  <sub><strong>Payday-Aligned Budgets</strong> &bull; Category spending limits, pace meters, and overspend alerts</sub>
-  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <sub><strong>Savings Goals Vaults</strong> &bull; Target progress rings, deadline projection, and emergency runway</sub>
-  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <sub><strong>AI Finance Assistant</strong> &bull; Natural language audits, smart actions, and camera receipt OCR</sub>
+  <sub><strong>Payday-Aligned Budgets</strong> &bull; Category limits, real-time pace meters, and overspend warnings</sub>
+  &nbsp;&bull;&nbsp;
+  <sub><strong>Savings Goals Vaults</strong> &bull; Target progress rings, deadline projections, and emergency runway calculator</sub>
+  &nbsp;&bull;&nbsp;
+  <sub><strong>AI Finance Assistant</strong> &bull; Conversational audits, atomic subtask entity sync, and camera receipt OCR</sub>
 </p>
 
 ---
 
 ## Why FinTrack?
 
-Most modern finance apps demand your phone number, upload your financial history to third-party cloud servers, and clutter your experience with advertisements or subscriptions.
+Traditional finance apps frequently demand phone numbers, upload private transaction history to commercial cloud servers, and monetize personal data through advertisements or paid subscriptions.
 
-FinTrack is built on three core principles:
+FinTrack is built around four fundamental architectural pillars:
 
 1. **Complete Data Sovereignty (Local-First)**: Your financial data belongs exclusively to you. Every ledger transaction is stored locally using Dexie.js and IndexedDB on your device. The app operates with 100% functionality even in airplane mode.
-2. **Native Mobile Ergonomics**: Designed specifically for Android. Features home screen adaptive widgets (2x2, 4x2, 4x3+), biometric fingerprint unlock, responsive haptic feedback, and a built-in numeric keypad that prevents Android keyboard layout shifts.
-3. **Rigorous Double-Entry & Ledger Integrity**: Supports complex multi-item transaction splits, internal non-analytic transfers, partial debt repayments, and automatic currency normalization with verifiable accounting invariants.
+2. **Android Native Ergonomics**: Engineered specifically for the Android OS ecosystem. Features RemoteViews home screen adaptive widgets (2x2, 4x2, 4x3+), biometric fingerprint unlock via Android Keystore, and responsive haptic feedback.
+3. **Accounting & Ledger Invariants**: Enforces strict financial accounting standards including multi-item split transactions, decoupled internal transfers, partial debt repayments, and month-end date stepping.
+4. **Hardware-Accelerated 120 FPS Performance**: Touch gestures and bottom sheets bypass React state during movement, applying direct CSS transform compositing for zero-frame-drop interactions on high-refresh-rate displays.
 
 ---
 
 ## Key Features
 
-### 1. Frictionless Daily Tracking
-- **Built-in Keypad Calculator**: Enter transaction amounts with an in-app keypad featuring live arithmetic operators (`+`, `-`, `x`, `/`), quick multipliers (`000` / `k`), and instant previews before submission.
-- **Two-Tier Category Hierarchy**: Categorize spending into primary categories and detailed subcategories, each equipped with customizable brand icons and color themes.
-- **Multi-Category Split Transactions**: Divide a single receipt or bill across different categories with individual notes and per-item analytics toggles.
-- **Automated Recurring Transactions**: Schedule recurring subscriptions, bills, or paychecks with automated interval stepping that safely handles leap years and month-end dates.
-- **Bank Notification Ingestion**: Optional Android notification listener that detects SMS and bank notifications (BCA, Mandiri, BRI, BNI, Jago, GoPay, OVO, Dana) for one-tap review and approval.
+### 1. Frictionless Daily Tracking & In-App Calculator
+- **Built-in Keypad Calculator**: Enter transaction amounts with an in-app keypad featuring live arithmetic operators (`+`, `-`, `x`, `/`), quick multipliers (`000` / `k`), and instant previews before submission, completely eliminating mobile virtual keyboard layout shifts.
+- **Two-Tier Category Hierarchy**: Categorize spending into primary categories and detailed subcategories, each equipped with customizable brand icons and color tokens.
+- **Multi-Category Split Transactions**: Divide a single receipt or bill across different categories with individual notes and per-item analytics toggles. Parent-level amounts govern cash balances while child items determine category analytics.
+- **Automated Recurring Stepping**: Schedule recurring subscriptions, bills, or paychecks with automated interval stepping that safely handles leap years and month-end dates using start-of-month anchoring.
 
-### 2. Android Native Integration
+### 2. Android Native Power & Home Screen Widgets
 - **Adaptive Home Screen Widgets**:
   - **Compact (2x2)**: Total net balance, current period label, and quick transaction launch button.
   - **Standard (4x2)**: Net balance alongside real-time income, expense, and surplus/deficit metrics.
   - **Expanded (4x3+)**: Adds an interactive canvas cash flow curve rendered natively via Android RemoteViews.
-  - **Privacy Mode**: Tap to mask sensitive balance figures into masked dots directly on the home screen.
+  - **Privacy Mode**: Tap to mask sensitive balance figures into dots directly on the home screen without opening the app.
 - **Deep Links & Quick Actions**: Tap the widget plus icon to instantly trigger transaction entry via `fintrack://quick-add`.
-- **Hardware Back Button Handling**: Native Android back gesture closes active bottom sheets, modals, and date pickers in orderly sequence before navigating back.
+- **Hardware Back Button Orchestration**: Native Android back gesture closes active bottom sheets, modal dialogs, and date pickers in strict LIFO order before navigating backwards or exiting.
 
-### 3. Deep Financial Intelligence & Reports
-- **Net Worth & Asset Aggregation**: Live calculation combining liquid cash, bank balances, e-wallets, investment portfolios, and net debt positions.
-- **Comprehensive Financial Statements**: Generate detailed Income Statements, Expense Breakdowns, and Balance Sheets on demand.
-- **Client-Side PDF & CSV Export**: Export publication-grade PDF statements and raw CSV data directly in the browser runtime without sending data to an external server.
-- **Financial Calendar & Consistency Heatmap**: Track daily transaction counts, review daily income/expense summaries, and build consistent logging habits via an activity heatmap.
+### 3. Intelligent Ingestion & Notification Sync
+- **Bank & E-Wallet Notification Listener**: Android notification listener bridge detecting incoming receipts from Indonesian banks (BCA, Mandiri, BRI, BNI, Jago) and e-wallets (GoPay, OVO, Dana).
+- **In-Flight Synchronization Mutex**: Concurrency lock ensuring app resume events (`visibilitychange` and `appStateChange`) never trigger duplicate database insertions when returning from banking apps.
+- **Admin Fee Tolerance**: Automatic correlation for internal top-ups and transfers accommodating standard bank virtual account admin fees up to Rp 2.500.
 
-### 4. Planning, Savings & Debt Management
+### 4. Planning, Savings Vaults & Emergency Runway
 - **Payday-Aligned Budget Cycles**: Configure custom monthly budgeting start dates (e.g. Starting every 25th) to match your real-world income cycle.
-- **Savings Vaults & Emergency Runway**: Allocate money toward specific targets with visual progress rings. Includes an automated Emergency Runway calculator that estimates how many months your savings can cover based on real average burn rates.
+- **Savings Vaults & Emergency Runway**: Allocate money toward specific targets with visual progress rings. Includes an automated Emergency Runway calculator that estimates how many months your savings can cover based on real historical burn rates.
 - **Dual Debt & Receivable Ledger (Hutang-Piutang)**: Manage both liabilities (debts you owe) and receivables (loans granted to others), complete with installment schedules and debt forgiveness support.
-- **Bill Splitting (Split Bill)**: Calculate fair group expenses evenly or item-by-item, with proportional distribution of taxes, service fees, and discounts.
+- **Proportional Bill Splitting**: Calculate group expenses evenly or item-by-item, with proportional distribution of taxes, service fees, and discounts.
 
-### 5. Zero-Knowledge Privacy & Security
-- **Biometric Security**: Unlock using device fingerprint or facial recognition backed by Android Keystore and Hardware Security Modules.
+### 5. 120 FPS GPU Ergonomics & Seamless Skeleton Crossfade
+- **Hardware-Composited Sheet Physics**: Draggable modal sheets and drawers execute touch-drag transformations directly on DOM nodes via `translate3d`, avoiding React re-renders and layout reflows mid-gesture.
+- **Seamless Skeleton Crossfade**: Custom `<SkeletonTransition>` component ensures zero OLED black flicker and zero layout pop when transitioning from loading states to loaded content.
+- **Stateless Gesture Tracking**: Eliminates upward drag-to-dismiss teleport glitches by managing exit keyframes and inline transitions independently.
+
+### 6. Zero-Knowledge Privacy & Bring-Your-Own-Key Gemini AI
 - **Field-Level AES-256-GCM Encryption**: Transaction notes and sensitive details are encrypted at rest using PBKDF2 key derivation and AES-GCM.
 - **Encrypted Local Backup**: Export complete database backups secured by a 12-word mnemonic recovery phrase.
-- **Zero Third-Party Trackers**: No third-party tracking scripts, analytics SDKs, or background telemetries.
-
-### 6. Optional AI Powers (Bring Your Own Key)
-- **Zero Lock-In (BYOK)**: FinTrack never requires a paid subscription. You can enter your personal Google Gemini API key to unlock AI features.
-- **Receipt OCR & Item Extraction**: Scan physical paper receipts with your camera; Gemini Vision extracts merchant names, individual item prices, dates, taxes, and suggested categories automatically.
-- **Conversational Finance Assistant**: Natural language financial assistant to answer questions about your monthly spending trends and budget health.
-- **Secure Key Storage**: API keys are encrypted locally using AES-GCM and excluded from all exports.
+- **Zero Third-Party Telemetry**: Zero tracking scripts, zero advertising SDKs, and zero background analytics.
+- **Optional Gemini AI (BYOK)**: Connect your personal Google Gemini API key to unlock natural language financial queries, automated receipt OCR extraction from camera photos, and atomic entity mutations.
 
 ---
 
-## Feature Comparison
+## Feature Comparison Matrix
 
-| Feature | FinTrack | Standard Cloud Finance Apps | Simple Spreadsheet |
+| Feature | FinTrack | Standard Cloud Apps | Traditional Spreadsheets |
 | :--- | :--- | :--- | :--- |
-| **Data Storage** | Local Device (IndexedDB) | Remote Cloud Server | Cloud Drive or File |
-| **Offline Reliability** | 100% Fully Functional | Often Blocked / Degraded | Limited Mobile UX |
-| **Mandatory Sign-Up** | None (Zero Login Required) | Required (Email/Phone) | Requires Account |
-| **Home Screen Widgets** | Native Android (2x2, 4x2, 4x3+) | Rare or Read-Only | None |
+| **Data Sovereignty** | 100% Local Device (IndexedDB) | Remote Cloud Server | Cloud Drive or Local File |
+| **Offline Reliability** | Fully Functional (Airplane Mode) | Often Blocked / Degraded | Limited Mobile Usability |
+| **Account Creation** | Zero Login Required | Mandatory (Email/Phone) | Requires Cloud Account |
+| **Home Screen Widgets** | Android RemoteViews (2x2, 4x2, 4x3+) | Rare or Static Read-Only | None |
+| **In-App Calculator** | Built-in Numeric Keypad | Standard OS Keyboard | Formula Cell Typing |
 | **Note Encryption** | AES-256-GCM at rest | Plaintext on Server | Plaintext |
-| **In-App Calculator** | Built-in Numeric Keypad | Basic OS Keyboard | Formula typing |
-| **Receipt OCR** | Optional (Personal Gemini Key) | Paid Subscription | Manual Entry |
-| **Advertisements / Trackers**| Zero Ads, Zero Trackers | Common Advertisements | None |
+| **Bank Notification Sync**| Native Listener with Mutex | Cloud Plaid / Yodlee Sync | Manual Entry |
+| **Receipt OCR** | Optional (Personal Gemini Key) | Paid Subscription Paywall | Manual Data Entry |
+| **Advertisements & Trackers**| Zero Ads, Zero Trackers | Common Advertisements | None |
 
 ---
 
-## Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph UI_Layer [Frontend Layer - React 19]
-        A[React Pages & Components] --> B[Zustand State Stores]
-        A --> C[Tailwind CSS v4 Tokens]
-        A --> D[Recharts Visualizations]
+    subgraph UI_Layer ["Frontend Application Layer (React 19 + Tailwind v4)"]
+        Pages["Pages (Dashboard, Ledger, Reports, Budgets, Savings)"]
+        Zustand["Zustand Client Stores"]
+        Charts["Recharts SVG Engine"]
+        Sheets["120 FPS GPU Sheet Compositor"]
+        Transitions["Skeleton Crossfade Layer"]
     end
 
-    subgraph Native_Bridge [Android Native Bridge - Capacitor 8]
-        E[FinTrackWidgetProvider] --> I[Android RemoteViews Widgets]
-        F[Notification Ingestion Plugin] --> J[SharedPreferences & Ingestion Bridge]
-        G[Biometric Auth Plugin] --> K[Android Keystore / TEE]
-        H[Local Notifications] --> L[Android Notification Channels]
+    subgraph Native_Bridge ["Capacitor 8 Android Native Bridge"]
+        WidgetProvider["FinTrackWidgetProvider (RemoteViews Canvas Curve)"]
+        NotifService["FinTrackNotificationService (Bank SMS Parser)"]
+        BiometricAuth["@aparajita/capacitor-biometric-auth (Keystore TEE)"]
+        LocalNotifs["@capacitor/local-notifications (Daily Reminders)"]
     end
 
-    subgraph Storage_Layer [Offline Storage & Security]
-        B <--> M[(Dexie.js IndexedDB)]
-        M --> P[Field Encryption Engine: AES-256-GCM]
-        B -. Optional Cloud Sync .-> N[Firebase Auth & Firestore]
-        B <--> O[Google Gemini API: User BYOK]
+    subgraph Storage_Security ["Storage & Security Engine"]
+        DexieDB[("Dexie.js IndexedDB (v22 Schema)")]
+        AES["Field Encryption Engine (AES-256-GCM)"]
+        Backup["Encrypted Backup (12-Word Mnemonic)"]
     end
 
-    A <--> Native_Bridge
-    B <--> Storage_Layer
+    subgraph AI_OptIn ["Optional AI Subsystem (User BYOK)"]
+        GeminiVision["Gemini Vision Receipt OCR"]
+        GeminiChat["Gemini Chat Assistant & Entity Sync"]
+    end
+
+    Pages <--> Zustand
+    Pages <--> Sheets
+    Pages <--> Transitions
+    Pages <--> Charts
+    Zustand <--> DexieDB
+    DexieDB <--> AES
+    DexieDB <--> Backup
+    Pages <--> Native_Bridge
+    Pages <--> AI_OptIn
 ```
 
 ---
 
-## Tech Stack
+## Technology Stack
 
-| Component | Technology | Version | Description |
+| Layer | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **UI Framework** | React | 19.2.5 | Component-driven declarative UI |
+| **UI Framework** | React | 19.2.5 | Component-driven declarative mobile interface |
 | **Bundler & Tooling**| Vite | 8.0.10 | High-speed development server and production bundler |
-| **Styling** | Tailwind CSS | 4.2.4 | Design system tokens and adaptive layouts |
-| **Native Runtime** | Capacitor | 8.4.1 | Android native bridge and plugin ecosystem |
+| **Styling** | Tailwind CSS | 4.2.4 | CSS tokens, fluid dark/light theming, and responsive layouts |
+| **Native Runtime** | Capacitor | 8.4.1 | Android native bridge, plugin ecosystem, and lifecycle events |
 | **Local Database** | Dexie.js | 4.4.2 | IndexedDB wrapper with reactive queries (`useLiveQuery`) |
-| **State Management** | Zustand | 5.0.13 | High-performance decoupled client state stores |
+| **Client State** | Zustand | 5.0.13 | High-performance decoupled client state stores |
 | **Visual Charts** | Recharts | 3.9.2 | Responsive SVG chart visualizations |
 | **Biometric Auth** | @aparajita/capacitor-biometric-auth | 10.0.0 | Android Keystore fingerprint and biometric unlock |
 | **Math Precision** | decimal.js-light | 2.5.1 | Arbitrary precision arithmetic preventing floating point drift |
-| **Date Management** | date-fns | 4.1.0 | Immutable date math and localization |
+| **Date Management** | date-fns | 4.1.0 | Immutable date mathematics and localization |
 | **PDF Generation** | jsPDF | 4.2.1 | In-memory client-side PDF document generation |
 | **Icons** | Lucide React | 1.25.0 | Clean, accessible SVG iconography |
 
@@ -217,7 +245,7 @@ flowchart TD
 ### Prerequisites
 - **Node.js**: `v20.x` or higher
 - **npm**: `v9.x` or higher
-- **Android Studio** & **Java JDK 17 / 21** (only required if building the native APK from source)
+- **Android Studio** & **Java JDK 17 / 21** (only required if building the native Android APK from source)
 
 ### Installation & Local Run
 
@@ -247,7 +275,7 @@ Environment variables are entirely optional. If you wish to set development defa
 # Optional Google Gemini fallback for development
 VITE_GEMINI_API_KEY=your_gemini_api_key
 
-# Optional Firebase configuration for testing cloud backup
+# Optional Firebase configuration for cloud backup testing
 VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
@@ -310,11 +338,14 @@ finansial-tracker/
 ├── android/                  # Native Android Capacitor project
 │   └── app/src/main/
 │       ├── java/com/fintrack/app/
-│       │   ├── FinTrackWidgetProvider.java       # Home screen widget logic & canvas rendering
+│       │   ├── FinTrackWidgetProvider.java       # Home screen widget logic & canvas curve rendering
 │       │   ├── FinTrackWidgetConfigActivity.java # Widget configuration activity
 │       │   ├── FinTrackNotificationPlugin.java   # Native notification ingestion bridge
 │       │   └── MainActivity.java                 # Android entry activity
 │       └── res/                                  # Widget XML layouts, drawables, and themes
+├── docs/                     # Documentation assets and screenshots
+│   ├── assets/               # Brand logos and flagship hero showcase banner
+│   └── screenshots/          # Ultra-HD 2x device mockups
 ├── src/
 │   ├── components/           # Domain-driven UI components
 │   │   ├── budget/           # Budget cycle limits, warnings, and alerts
@@ -328,7 +359,7 @@ finansial-tracker/
 │   │   ├── settings/         # Security preferences, biometrics, and backups
 │   │   ├── split-bill/       # Multi-participant bill splitting dialogs
 │   │   ├── transactions/     # Transaction cards, custom keypad, and filter drawers
-│   │   └── ui/               # Reusable primitives (Buttons, Sheets, Modals)
+│   │   └── ui/               # Reusable primitives (Buttons, Sheets, Modals, SkeletonTransition)
 │   ├── hooks/                # Custom React hooks (useDashboardData, useBackButton, etc.)
 │   ├── lib/                  # Offline database, encryption, currency, and AI services
 │   ├── locales/              # Bilingual dictionaries (id.js, en.js)
