@@ -153,6 +153,62 @@ function getDynamicInitialsBadge(name) {
   return createTextBadge(palette.bg, palette.fg, initials)
 }
 
+// ── Matcher Table for Indonesian Financial Institutions ────────────────────
+const WALLET_KEYWORD_MATCHERS = [
+  // Special multi-word bank abbreviations & common variations
+  { keys: ['bca digital', 'blu'], brand: 'blu' },
+  { keys: ['bca'], instKeys: ['bca'], brand: 'bca' },
+  { keys: ['bri'], instKeys: ['bri'], brand: 'bri' },
+  { keys: ['mandiri', 'livin'], instKeys: ['mandiri'], brand: 'mandiri' },
+  { keys: ['bni', 'wondr'], instKeys: ['bni'], brand: 'bni' },
+  { keys: ['jago'], instKeys: ['jago'], brand: 'jago' },
+  { keys: ['seabank', 'sea bank'], instKeys: ['seabank'], brand: 'seabank' },
+  { keys: ['bsi', 'syariah indonesia'], instKeys: ['bsi'], brand: 'bsi' },
+  { keys: ['cimb', 'octo'], instKeys: ['cimb'], brand: 'cimb' },
+  { keys: ['jenius', 'btpn'], instKeys: ['jenius'], brand: 'jenius' },
+  { keys: ['neobank', 'neo commerce', 'bnc'], brand: 'neobank' },
+  { keys: ['allobank', 'allo bank', 'allo'], brand: 'allobank' },
+  { keys: ['superbank', 'super bank'], brand: 'superbank' },
+  { keys: ['banksaqu', 'bank saqu', 'saqu'], brand: 'banksaqu' },
+  { keys: ['btn'], instKeys: ['btn'], brand: 'btn' },
+  { keys: ['permata'], instKeys: ['permata'], brand: 'permata' },
+  { keys: ['danamon'], instKeys: ['danamon'], brand: 'danamon' },
+  { keys: ['mega'], instKeys: ['mega'], brand: 'mega' },
+  { keys: ['ocbc'], instKeys: ['ocbc'], brand: 'ocbc' },
+  { keys: ['maybank'], instKeys: ['maybank'], brand: 'maybank' },
+  { keys: ['dbs', 'digibank'], instKeys: ['dbs'], brand: 'dbs' },
+  { keys: ['uob', 'tmrw'], instKeys: ['uob'], brand: 'uob' },
+
+  // E-wallets
+  { keys: ['gopaylater', 'paylater gopay'], brand: 'gopaylater' },
+  { keys: ['gopay', 'gojek'], instKeys: ['gopay'], brand: 'gopay' },
+  { keys: ['ovo'], instKeys: ['ovo'], brand: 'ovo' },
+  { keys: ['dana'], instKeys: ['dana'], brand: 'dana', exclude: ['reksadana', 'reksa dana'] },
+  { keys: ['spaylater', 'shopee paylater'], brand: 'spaylater' },
+  { keys: ['shopeepay', 'shopee'], instKeys: ['shopeepay', 'shopee'], brand: 'shopeepay' },
+  { keys: ['linkaja'], instKeys: ['linkaja'], brand: 'linkaja' },
+  { keys: ['paypal'], instKeys: ['paypal'], brand: 'paypal' },
+  { keys: ['wise', 'transferwise'], instKeys: ['wise'], brand: 'wise' },
+  { keys: ['kredivo'], brand: 'kredivo' },
+  { keys: ['akulaku'], brand: 'akulaku' },
+  { keys: ['isaku', 'i.saku'], brand: 'isaku' },
+  { keys: ['sakuku'], brand: 'sakuku' },
+
+  // Investasi & Crypto
+  { keys: ['bibit'], instKeys: ['bibit'], brand: 'bibit' },
+  { keys: ['ajaib'], instKeys: ['ajaib'], brand: 'ajaib' },
+  { keys: ['bareksa'], instKeys: ['bareksa'], brand: 'bareksa' },
+  { keys: ['stockbit'], instKeys: ['stockbit'], brand: 'stockbit' },
+  { keys: ['pintu'], instKeys: ['pintu'], brand: 'pintu' },
+  { keys: ['indodax'], instKeys: ['indodax'], brand: 'indodax' },
+  { keys: ['tokocrypto', 'toko crypto'], brand: 'tokocrypto' },
+  { keys: ['binance'], instKeys: ['binance'], brand: 'binance' },
+  { keys: ['pluang'], brand: 'pluang' },
+  { keys: ['pegadaian', 'tabungan emas'], brand: 'pegadaian' },
+  { keys: ['ipot', 'indo premier'], brand: 'ipot' },
+  { keys: ['mirae'], brand: 'mirae' },
+]
+
 // ── Smart Vector & App Icon Resolver ───────────────────────────────────────
 export function getWalletLogoUrl(wallet) {
   if (!wallet) return ''
@@ -187,57 +243,16 @@ export function getWalletLogoUrl(wallet) {
   }
 
   // 4. Special multi-word bank abbreviations & common variations
-  if (name.includes('bca digital') || name.includes('blu')) return BRAND_LOGO_MAP.blu
-  if (name.includes('bca') || inst.includes('bca')) return BRAND_LOGO_MAP.bca
-  if (name.includes('bri') || inst.includes('bri')) return BRAND_LOGO_MAP.bri
-  if (name.includes('mandiri') || inst.includes('mandiri') || name.includes('livin')) return BRAND_LOGO_MAP.mandiri
-  if (name.includes('bni') || inst.includes('bni') || name.includes('wondr')) return BRAND_LOGO_MAP.bni
-  if (name.includes('jago') || inst.includes('jago')) return BRAND_LOGO_MAP.jago
-  if (name.includes('seabank') || inst.includes('seabank') || name.includes('sea bank')) return BRAND_LOGO_MAP.seabank
-  if (name.includes('bsi') || inst.includes('bsi') || name.includes('syariah indonesia')) return BRAND_LOGO_MAP.bsi
-  if (name.includes('cimb') || inst.includes('cimb') || name.includes('octo')) return BRAND_LOGO_MAP.cimb
-  if (name.includes('jenius') || inst.includes('jenius') || name.includes('btpn')) return BRAND_LOGO_MAP.jenius
-  if (name.includes('neobank') || name.includes('neo commerce') || name.includes('bnc')) return BRAND_LOGO_MAP.neobank
-  if (name.includes('allobank') || name.includes('allo bank') || name.includes('allo')) return BRAND_LOGO_MAP.allobank
-  if (name.includes('superbank') || name.includes('super bank')) return BRAND_LOGO_MAP.superbank
-  if (name.includes('banksaqu') || name.includes('bank saqu') || name.includes('saqu')) return BRAND_LOGO_MAP.banksaqu
-  if (name.includes('btn') || inst.includes('btn')) return BRAND_LOGO_MAP.btn
-  if (name.includes('permata') || inst.includes('permata')) return BRAND_LOGO_MAP.permata
-  if (name.includes('danamon') || inst.includes('danamon')) return BRAND_LOGO_MAP.danamon
-  if (name.includes('mega') || inst.includes('mega')) return BRAND_LOGO_MAP.mega
-  if (name.includes('ocbc') || inst.includes('ocbc')) return BRAND_LOGO_MAP.ocbc
-  if (name.includes('maybank') || inst.includes('maybank')) return BRAND_LOGO_MAP.maybank
-  if (name.includes('dbs') || inst.includes('dbs') || name.includes('digibank')) return BRAND_LOGO_MAP.dbs
-  if (name.includes('uob') || inst.includes('uob') || name.includes('tmrw')) return BRAND_LOGO_MAP.uob
-
-  // E-wallets
-  if (name.includes('gopaylater') || name.includes('paylater gopay')) return BRAND_LOGO_MAP.gopaylater
-  if (name.includes('gopay') || inst.includes('gopay') || name.includes('gojek')) return BRAND_LOGO_MAP.gopay
-  if (name.includes('ovo') || inst.includes('ovo')) return BRAND_LOGO_MAP.ovo
-  if (name.includes('dana') || inst.includes('dana')) return BRAND_LOGO_MAP.dana
-  if (name.includes('spaylater') || name.includes('shopee paylater')) return BRAND_LOGO_MAP.spaylater
-  if (name.includes('shopeepay') || name.includes('shopee') || inst.includes('shopee')) return BRAND_LOGO_MAP.shopeepay
-  if (name.includes('linkaja') || inst.includes('linkaja')) return BRAND_LOGO_MAP.linkaja
-  if (name.includes('paypal') || inst.includes('paypal')) return BRAND_LOGO_MAP.paypal
-  if (name.includes('wise') || inst.includes('wise') || name.includes('transferwise')) return BRAND_LOGO_MAP.wise
-  if (name.includes('kredivo')) return BRAND_LOGO_MAP.kredivo
-  if (name.includes('akulaku')) return BRAND_LOGO_MAP.akulaku
-  if (name.includes('isaku') || name.includes('i.saku')) return BRAND_LOGO_MAP.isaku
-  if (name.includes('sakuku')) return BRAND_LOGO_MAP.sakuku
-
-  // Investasi & Crypto
-  if (name.includes('bibit') || inst.includes('bibit')) return BRAND_LOGO_MAP.bibit
-  if (name.includes('ajaib') || inst.includes('ajaib')) return BRAND_LOGO_MAP.ajaib
-  if (name.includes('bareksa') || inst.includes('bareksa')) return BRAND_LOGO_MAP.bareksa
-  if (name.includes('stockbit') || inst.includes('stockbit')) return BRAND_LOGO_MAP.stockbit
-  if (name.includes('pintu') || inst.includes('pintu')) return BRAND_LOGO_MAP.pintu
-  if (name.includes('indodax') || inst.includes('indodax')) return BRAND_LOGO_MAP.indodax
-  if (name.includes('tokocrypto') || name.includes('toko crypto')) return BRAND_LOGO_MAP.tokocrypto
-  if (name.includes('binance') || inst.includes('binance')) return BRAND_LOGO_MAP.binance
-  if (name.includes('pluang')) return BRAND_LOGO_MAP.pluang
-  if (name.includes('pegadaian') || name.includes('tabungan emas')) return BRAND_LOGO_MAP.pegadaian
-  if (name.includes('ipot') || name.includes('indo premier')) return BRAND_LOGO_MAP.ipot
-  if (name.includes('mirae')) return BRAND_LOGO_MAP.mirae
+  for (const matcher of WALLET_KEYWORD_MATCHERS) {
+    if (matcher.exclude && matcher.exclude.some((ex) => name.includes(ex))) {
+      continue
+    }
+    const isNameMatch = matcher.keys.some((k) => name.includes(k))
+    const isInstMatch = matcher.instKeys && matcher.instKeys.some((k) => inst.includes(k))
+    if (isNameMatch || isInstMatch) {
+      return BRAND_LOGO_MAP[matcher.brand]
+    }
+  }
 
   // 5. Keyword fuzzy match across all Indonesian institutions
   for (const [key, logoPath] of Object.entries(BRAND_LOGO_MAP)) {

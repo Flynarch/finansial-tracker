@@ -24,7 +24,7 @@ public class FinTrackNotificationService extends NotificationListenerService {
     public static final Object QUEUE_LOCK = new Object();
 
     // Whitelisted Indonesian Financial & E-Wallet Applications
-    private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(
+    public static final String[] KNOWN_FINANCIAL_PACKAGES = {
         "com.bca",
         "com.bca.mybca",
         "id.co.bcadigital.blu",
@@ -61,7 +61,9 @@ public class FinTrackNotificationService extends NotificationListenerService {
         "com.android.mms",
         "com.coloros.mms",
         "com.vivo.mms"
-    ));
+    };
+
+    private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(KNOWN_FINANCIAL_PACKAGES));
 
     private static final Set<String> SMS_PACKAGES = new HashSet<>(Arrays.asList(
         "com.google.android.apps.messaging",

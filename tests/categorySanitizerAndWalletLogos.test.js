@@ -1,0 +1,103 @@
+import { describe, it, expect } from 'vitest'
+import { sanitizeCategoryPath } from '../src/lib/categorySanitizer'
+import { getWalletLogoUrl } from '../src/data/walletInstitutions'
+
+describe('categorySanitizer refactored lookup rules', () => {
+  it('handles edge cases and transfers cleanly', () => {
+    expect(sanitizeCategoryPath('anything', 'transfer')).toBe('transfer/umum')
+    expect(sanitizeCategoryPath('', 'income')).toBe('gaji/gaji_pokok')
+    expect(sanitizeCategoryPath(null, 'expense')).toBe('makanan/makan_siang')
+    expect(sanitizeCategoryPath('   ', 'expense')).toBe('makanan/makan_siang')
+  })
+
+  it('preserves valid canonical category paths', () => {
+    expect(sanitizeCategoryPath('makanan/makan_siang', 'expense')).toBe('makanan/makan_siang')
+    expect(sanitizeCategoryPath('gaji/gaji_pokok', 'income')).toBe('gaji/gaji_pokok')
+    expect(sanitizeCategoryPath('transportasi/bensin', 'expense')).toBe('transportasi/bensin')
+  })
+
+  it('normalizes colloquial income keywords correctly', () => {
+    expect(sanitizeCategoryPath('dapat uang saku dari om', 'income')).toBe('uang_jajan/uang_saku')
+    expect(sanitizeCategoryPath('uang lembur sabtu', 'income')).toBe('gaji/lembur')
+    expect(sanitizeCategoryPath('tunjangan hari raya', 'income')).toBe('gaji/tunjangan')
+    expect(sanitizeCategoryPath('gaji bulanan pt sukses', 'income')).toBe('gaji/gaji_pokok')
+    expect(sanitizeCategoryPath('thr kantor', 'income')).toBe('bonus/thr')
+    expect(sanitizeCategoryPath('kado ulang tahun', 'income')).toBe('bonus/hadiah')
+    expect(sanitizeCategoryPath('cashback belanja', 'income')).toBe('bonus/cashback')
+    expect(sanitizeCategoryPath('jual baju bekas', 'income')).toBe('bisnis/penjualan')
+    expect(sanitizeCategoryPath('proyek freelance desain', 'income')).toBe('bisnis/freelance')
+    expect(sanitizeCategoryPath('komisi jastip dan tip', 'income')).toBe('bisnis/komisi')
+    expect(sanitizeCategoryPath('saweria livestream', 'income')).toBe('bisnis/content_creator')
+    expect(sanitizeCategoryPath('balikin uang teman', 'income')).toBe('kas_kecil/bayar_utang')
+    expect(sanitizeCategoryPath('sisa belanja bulanan', 'income')).toBe('kas_kecil/kembalian')
+    expect(sanitizeCategoryPath('patungan makan', 'income')).toBe('kas_kecil/patungan')
+    expect(sanitizeCategoryPath('dividen saham bbca', 'income')).toBe('investasi/dividen')
+    expect(sanitizeCategoryPath('bunga deposito bca', 'income')).toBe('investasi/bunga_bank')
+    expect(sanitizeCategoryPath('cuan bitcoin', 'income')).toBe('investasi/jual_crypto')
+    expect(sanitizeCategoryPath('menang undian', 'income')).toBe('lainnya/menang_undian')
+  })
+
+  it('normalizes colloquial expense keywords correctly', () => {
+    expect(sanitizeCategoryPath('ngopi di starbucks', 'expense')).toBe('makanan/kopi')
+    expect(sanitizeCategoryPath('sarapan lontong sayur', 'expense')).toBe('makanan/sarapan')
+    expect(sanitizeCategoryPath('makan malam pecel lele', 'expense')).toBe('makanan/makan_malam')
+    expect(sanitizeCategoryPath('jajan seblak pedas', 'expense')).toBe('makanan/jajan')
+    expect(sanitizeCategoryPath('beli air mineral galon aqua', 'expense')).toBe('makanan/minuman')
+    expect(sanitizeCategoryPath('makan siang warteg', 'expense')).toBe('makanan/makan_siang')
+    expect(sanitizeCategoryPath('isi bensin pertamax', 'expense')).toBe('transportasi/bensin')
+    expect(sanitizeCategoryPath('ongkos ojol gojek', 'expense')).toBe('transportasi/ojol')
+    expect(sanitizeCategoryPath('karcis parkir mall', 'expense')).toBe('transportasi/parkir')
+    expect(sanitizeCategoryPath('bayar tol cipularang', 'expense')).toBe('transportasi/tol')
+    expect(sanitizeCategoryPath('tiket krl commuter line', 'expense')).toBe('transportasi/kereta')
+    expect(sanitizeCategoryPath('servis motor ganti oli', 'expense')).toBe('transportasi/servis_kendaraan')
+    expect(sanitizeCategoryPath('token pln rumah', 'expense')).toBe('tagihan/listrik')
+    expect(sanitizeCategoryPath('bayar tagihan air pdam', 'expense')).toBe('tagihan/air')
+    expect(sanitizeCategoryPath('paket wifi indihome', 'expense')).toBe('tagihan/internet')
+    expect(sanitizeCategoryPath('beli pulsa telkomsel', 'expense')).toBe('tagihan/paket_data')
+    expect(sanitizeCategoryPath('langganan netflix', 'expense')).toBe('tagihan/langganan')
+    expect(sanitizeCategoryPath('bayar asuransi bpjs', 'expense')).toBe('tagihan/asuransi')
+    expect(sanitizeCategoryPath('angsuran cicilan motor', 'expense')).toBe('tagihan/cicilan')
+    expect(sanitizeCategoryPath('belanja bulanan indomaret', 'expense')).toBe('kebutuhan_harian/belanja_bulanan')
+    expect(sanitizeCategoryPath('cuci baju laundry kiloan', 'expense')).toBe('kebutuhan_harian/laundry')
+    expect(sanitizeCategoryPath('rawat hewan kucing whiskas', 'expense')).toBe('kebutuhan_harian/hewan_peliharaan')
+    expect(sanitizeCategoryPath('nongkrong di warkop', 'expense')).toBe('kehidupan_sosial/kumpul_teman')
+    expect(sanitizeCategoryPath('sewa lapangan badminton', 'expense')).toBe('kehidupan_sosial/hobi')
+    expect(sanitizeCategoryPath('uang amplop kondangan', 'expense')).toBe('kehidupan_sosial/kondangan')
+    expect(sanitizeCategoryPath('nonton bioskop xxi', 'expense')).toBe('kultur/bioskop')
+    expect(sanitizeCategoryPath('topup diamond mlbb', 'expense')).toBe('kultur/games')
+    expect(sanitizeCategoryPath('beli kaos uniqlo', 'expense')).toBe('pakaian/baju')
+    expect(sanitizeCategoryPath('beli sunscreen facetology', 'expense')).toBe('kecantikan/skincare')
+    expect(sanitizeCategoryPath('potong rambut barbershop', 'expense')).toBe('kecantikan/salon')
+    expect(sanitizeCategoryPath('bayar ukt kuliah', 'expense')).toBe('pendidikan/sekolah')
+    expect(sanitizeCategoryPath('berobat ke dokter klinik', 'expense')).toBe('kesehatan/dokter')
+    expect(sanitizeCategoryPath('beli emas antam', 'expense')).toBe('investasi_pengeluaran/emas')
+    expect(sanitizeCategoryPath('investasi saham bibit', 'expense')).toBe('investasi_pengeluaran/reksadana')
+  })
+})
+
+describe('walletInstitutions refactored matcher table', () => {
+  it('resolves direct paths and cash correctly', () => {
+    expect(getWalletLogoUrl({ logoUrl: '/wallet-logos/bca.svg' })).toBe('/wallet-logos/bca.svg')
+    expect(getWalletLogoUrl({ id: 'cash', name: 'Dompet' })).toContain('/wallet-logos/cash.')
+    expect(getWalletLogoUrl({ name: 'Uang Tunai Dompet Fisik' })).toContain('/wallet-logos/cash.')
+  })
+
+  it('matches banks, e-wallets, and fintech platforms correctly', () => {
+    expect(getWalletLogoUrl({ name: 'BCA Utama' })).toContain('/wallet-logos/bca.')
+    expect(getWalletLogoUrl({ name: 'Blu by BCA Digital' })).toContain('/wallet-logos/blu.')
+    expect(getWalletLogoUrl({ name: 'Bank Mandiri Livin' })).toContain('/wallet-logos/mandiri.')
+    expect(getWalletLogoUrl({ name: 'Bank Jago' })).toContain('/wallet-logos/jago.')
+    expect(getWalletLogoUrl({ name: 'SeaBank Tabungan' })).toContain('/wallet-logos/seabank.')
+    expect(getWalletLogoUrl({ name: 'GoPay Saldo' })).toContain('/wallet-logos/gopay.')
+    expect(getWalletLogoUrl({ name: 'DANA Dompet' })).toContain('/wallet-logos/dana.')
+    expect(getWalletLogoUrl({ name: 'OVO Dompet Digital' })).toContain('/wallet-logos/ovo.')
+    expect(getWalletLogoUrl({ name: 'ShopeePay Rekening' })).toContain('/wallet-logos/shopeepay.')
+    expect(getWalletLogoUrl({ name: 'Bibit Reksadana' })).toContain('/wallet-logos/bibit.')
+    expect(getWalletLogoUrl({ name: 'Ajaib Investasi' })).toContain('/wallet-logos/ajaib.')
+  })
+
+  it('falls back to initials badge gracefully for unrecognized names', () => {
+    const result = getWalletLogoUrl({ name: 'Koperasi Simpan Pinjam Bahagia' })
+    expect(result).toMatch(/^data:image\/svg\+xml/)
+  })
+})

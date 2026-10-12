@@ -42,43 +42,7 @@ import java.util.Set;
 )
 public class FinTrackNotificationPlugin extends Plugin {
 
-    private static final String[] KNOWN_FINANCIAL_PACKAGES = {
-        "com.bca",
-        "com.bca.mybca",
-        "id.co.bcadigital.blu",
-        "com.bca.blu",
-        "id.bmri.livin",
-        "id.co.bankmandiri.livin",
-        "id.co.bri.brimo",
-        "id.bni.wondr",
-        "id.co.bni.wondr",
-        "src.bni",
-        "com.btpn.dc",
-        "com.btpn.jenius",
-        "id.co.bankbsi.mobile",
-        "com.bsi.mobile",
-        "com.cimbniaga.octomobile",
-        "id.co.cimbniaga.octomobile",
-        "com.linecorp.linebank.id",
-        "com.seabank.id",
-        "com.jago.digitalBanking",
-        "com.jago.bank",
-        "id.co.banksaqu.mobile",
-        "id.co.superbank.app",
-        "com.allobank.allobank",
-        "com.bnc.finance",
-        "com.gojek.app",
-        "com.gojek.gopay",
-        "com.gopay.wallet",
-        "ovo.id",
-        "id.dana",
-        "com.shopee.id",
-        "com.google.android.apps.messaging",
-        "com.samsung.android.messaging",
-        "com.android.mms",
-        "com.coloros.mms",
-        "com.vivo.mms"
-    };
+    private static final String[] KNOWN_FINANCIAL_PACKAGES = FinTrackNotificationService.KNOWN_FINANCIAL_PACKAGES;
 
     @PluginMethod
     public void isPermissionGranted(PluginCall call) {

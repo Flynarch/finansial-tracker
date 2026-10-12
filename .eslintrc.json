@@ -1,0 +1,28 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "rules": {
+    "no-unused-vars": "off"
+  },
+  "ignorePatterns": [
+    "dist/",
+    "build/",
+    "android/",
+    "tests/",
+    "docs/",
+    "scripts/",
+    "node_modules/",
+    "*.config.js",
+    "*.config.mjs"
+  ]
+}

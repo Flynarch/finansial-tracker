@@ -10,10 +10,18 @@ export const VoiceVisualizer = memo(function VoiceVisualizer({
 }) {
   const [seconds, setSeconds] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
+  const [prevRecording, setPrevRecording] = useState(isRecording)
+
+  if (isRecording !== prevRecording) {
+    setPrevRecording(isRecording)
+    if (!isRecording) {
+      setSeconds(0)
+      setAudioLevel(0)
+    }
+  }
 
   useEffect(() => {
     if (!isRecording) {
-      setSeconds(0)
       return undefined
     }
     const interval = setInterval(() => {
@@ -24,7 +32,6 @@ export const VoiceVisualizer = memo(function VoiceVisualizer({
 
   useEffect(() => {
     if (!isRecording || typeof window === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
-      setAudioLevel(0)
       return undefined
     }
 

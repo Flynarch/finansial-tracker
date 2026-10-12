@@ -23,16 +23,16 @@ export const VirtualKeypad = memo(function VirtualKeypad({
   const isLongPressRef = useRef(false)
   const [justCalculated, setJustCalculated] = useState(false)
   const [expression, setExpression] = useState(amount || '')
-  const wasOpenRef = useRef(false)
+  const [prevOpenState, setPrevOpenState] = useState(isOpen)
 
-  // Sync internal calculator expression when keypad opens
-  useEffect(() => {
-    if (isOpen && !wasOpenRef.current) {
+  // Sync internal calculator expression when keypad opens (React 19 pattern)
+  if (isOpen !== prevOpenState) {
+    setPrevOpenState(isOpen)
+    if (isOpen) {
       setExpression(amount || '')
       setJustCalculated(false)
     }
-    wasOpenRef.current = isOpen
-  }, [isOpen, amount])
+  }
 
   // Internal real-time evaluation of the calculator expression
   const calcEvaluation = useMemo(() => {
@@ -388,10 +388,17 @@ export const VirtualKeypad = memo(function VirtualKeypad({
 
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isEntering, setIsEntering] = useState(false)
+  const [prevRenderOpen, setPrevRenderOpen] = useState(isOpen)
+
+  if (isOpen !== prevRenderOpen) {
+    setPrevRenderOpen(isOpen)
+    if (isOpen) {
+      setShouldRender(true)
+    }
+  }
 
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true)
       const frame = window.requestAnimationFrame(() => setIsEntering(true))
       return () => window.cancelAnimationFrame(frame)
     } else {
