@@ -52,12 +52,23 @@ export async function handleTodoAction(result) {
   } else if (result.action === 'complete') {
     const matched = todos.find((t) => !t.completed && fuzzyMatch(t.title, result.title))
     if (matched) {
-      await db.todos.update(matched.id, { completed: true, completedAt: new Date().toISOString() })
+      await db.transaction('rw', db.todos, db.sub_tasks, async () => {
+        await db.todos.update(matched.id, { completed: true, completedAt: new Date().toISOString() })
+        await db.sub_tasks.where('todoId').equals(matched.id).modify({ checked: true })
+      })
       if (Capacitor.isNativePlatform()) {
         await LocalNotifications.cancel({
           notifications: [{ id: 100000 + matched.id * 10 + 1 }, { id: 100000 + matched.id * 10 + 2 }],
         }).catch(() => {})
       }
+
+      const existingSubs = await db.sub_tasks.where('todoId').equals(matched.id).sortBy('id')
+      const formattedSubTasks = existingSubs.map((st) => ({
+        id: st.id,
+        title: st.label,
+        completed: true,
+      }))
+
       newMsgs.push({
         id: Date.now() + 3,
         role: 'ai',
@@ -72,6 +83,8 @@ export async function handleTodoAction(result) {
             category: matched.category,
             dueDate: matched.dueDate,
             priority: matched.priority,
+            completed: true,
+            subTasks: formattedSubTasks,
           },
         },
       })

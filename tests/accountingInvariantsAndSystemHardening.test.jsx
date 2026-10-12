@@ -13,7 +13,7 @@ import InvestmentForm from '../src/components/transactions/quick-add/InvestmentF
 import useSettingsStore from '../src/store/useSettingsStore'
 import * as dashboardCache from '../src/hooks/dashboard/dashboardCache'
 import * as nativeWidgetSync from '../src/lib/nativeWidgetSync'
-import { differenceInDays, differenceInCalendarDays, parseISO } from 'date-fns'
+import { differenceInDays, differenceInCalendarDays, parseISO, format } from 'date-fns'
 
 describe('Accounting Invariants and System Hardening Test Suite', () => {
   beforeEach(async () => {
@@ -289,7 +289,7 @@ describe('Accounting Invariants and System Hardening Test Suite', () => {
       const now = new Date()
       const tomorrow = new Date(now)
       tomorrow.setDate(now.getDate() + 1)
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+      const tomorrowStr = format(tomorrow, 'yyyy-MM-dd')
 
       const labelId = formatInstallmentRelativeDate(tomorrowStr, 'id')
       expect(labelId).toBe('Besok')
@@ -302,13 +302,13 @@ describe('Accounting Invariants and System Hardening Test Suite', () => {
       const now = new Date()
       const futureDate = new Date(now)
       futureDate.setDate(now.getDate() + 5)
-      const futureStr = futureDate.toISOString().slice(0, 10)
+      const futureStr = format(futureDate, 'yyyy-MM-dd')
 
       const loan = {
         totalAmount: 1000000,
         tenorMonths: 1,
         dueDate: futureStr,
-        startDate: now.toISOString().slice(0, 10),
+        startDate: format(now, 'yyyy-MM-dd'),
       }
 
       const schedule = generateInstallmentSchedule(loan, [])

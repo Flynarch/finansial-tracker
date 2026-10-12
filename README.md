@@ -4,7 +4,7 @@
 
 **A local-first personal finance application for Android with native home screen widgets, receipt scanning, and offline storage.**
 
-[![Version](https://img.shields.io/badge/Version-v6.0.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.0.0)
+[![Version](https://img.shields.io/badge/Version-v6.1.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.1.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![Tests](https://img.shields.io/badge/Tests-1%2C748%20Passed%20(120%20Suites)-brightgreen.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20E2EE-blueviolet.svg?style=flat-square)](SECURITY.md)
@@ -16,7 +16,7 @@
 
 FinTrack gives you complete ownership over your personal finances. Built from the ground up for Android, all accounts, ledgers, and transactions live strictly on your device inside an encrypted offline database. No accounts required, no trackers, and zero forced cloud sync.
 
-[Download Latest APK (v6.0.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) • [Key Features](#key-features) • [Comparison](#why-fintrack) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Security](SECURITY.md)
+[Download Latest APK (v6.1.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) • [Key Features](#key-features) • [Comparison](#why-fintrack) • [Architecture](#architecture) • [Getting Started](#getting-started) • [Security](SECURITY.md)
 
 ---
 

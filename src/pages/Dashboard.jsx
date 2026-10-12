@@ -23,6 +23,8 @@ import { clearCachedDashboardState } from '../hooks/useDashboardData'
 import { fetchCurrencyRates } from '../lib/api'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
 import useSettingsStore from '../store/useSettingsStore'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -187,116 +189,123 @@ export default function Dashboard() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="min-h-full w-full">
-      <div
-        className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
-          isEntering ? 'opacity-100' : 'opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={isDbLoading}
+        skeleton={<PageSkeleton variant="dashboard" />}
+        className="min-h-full w-full"
       >
-        {/* 1. Wallet Carousel (Hero) */}
-        <div data-tour="hero-carousel">
-          <WalletCarousel
-            monthIncome={monthIncome}
-            monthExpense={monthExpense}
-            wallets={walletsWithBalance}
-            defaultCurrency={defaultCurrency}
-            rates={rates}
-          />
-        </div>
-
-        {/* Staging Review Alert Banner */}
-        {pendingReviewCount > 0 && (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3.5 sm:p-4 text-[var(--fg)] shadow-xs animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-white shadow-2xs">
-                <Inbox className="h-4.5 w-4.5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-bold truncate">
-                  {t('tx.staging.bannerTitle', 'Mutasi Bank Menunggu Tinjauan')}
-                </p>
-                <p className="text-[11px] font-medium text-[var(--muted)]">
-                  {t('tx.staging.bannerDesc', 'Ada {{count}} transaksi baru dari notifikasi siap diperiksa.', { count: pendingReviewCount })}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/transactions?tab=staging')}
-              className="flex shrink-0 items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-            >
-              <span>{t('tx.staging.reviewNow', 'Tinjau')}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+        <div
+          className={`ft-page-enter min-h-full flex flex-col gap-4 transform-gpu transition-opacity duration-300 ${
+            isEntering ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* 1. Wallet Carousel (Hero) */}
+          <div data-tour="hero-carousel">
+            <WalletCarousel
+              monthIncome={monthIncome}
+              monthExpense={monthExpense}
+              wallets={walletsWithBalance}
+              defaultCurrency={defaultCurrency}
+              rates={rates}
+            />
           </div>
-        )}
 
-        {/* 2. Transaksi Terakhir Card */}
-        <DashboardRecentTx
-          groupedRecentEntries={groupedRecentEntries}
-          isDbLoading={isDbLoading}
-          defaultCurrency={defaultCurrency}
-          locale={locale}
-          rates={rates}
-          wallets={walletsWithBalance}
-          t={t}
-        />
+          {/* Staging Review Alert Banner */}
+          {pendingReviewCount > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3.5 sm:p-4 text-[var(--fg)] shadow-xs animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-white shadow-2xs">
+                  <Inbox className="h-4.5 w-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold truncate">
+                    {t('tx.staging.bannerTitle', 'Mutasi Bank Menunggu Tinjauan')}
+                  </p>
+                  <p className="text-[11px] font-medium text-[var(--muted)]">
+                    {t('tx.staging.bannerDesc', 'Ada {{count}} transaksi baru dari notifikasi siap diperiksa.', { count: pendingReviewCount })}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/transactions?tab=staging')}
+                className="flex shrink-0 items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+              >
+                <span>{t('tx.staging.reviewNow', 'Tinjau')}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
-        {/* Email Verification Reminder Banner (Placed directly below Transaksi Terakhir) */}
-        <EmailVerificationBanner />
-
-        {/* 3. Net Worth Mini Chart */}
-        <div data-tour="networth-chart">
-          <DashboardNetWorthChart
+          {/* 2. Transaksi Terakhir Card */}
+          <DashboardRecentTx
+            groupedRecentEntries={groupedRecentEntries}
             isDbLoading={isDbLoading}
-            t={t}
             defaultCurrency={defaultCurrency}
-            miniRevenueRange={miniRevenueRange}
-            miniRevenueSeries={miniRevenueSeries}
-            miniRevenueChartDomain={miniRevenueChartDomain}
-            miniRevenueAxisTicks={miniRevenueAxisTicks}
-            netWorthGrowth={netWorthGrowth}
-            computeRevenueValue={computeRevenueValue}
-            onOpenZoom={() => openZoom('revenue')}
-            formatAxisCurrency={formatAxisCurrency}
-            isMobileScreen={isMobileScreen}
-          />
-        </div>
-
-        {/* 4. Habit Consistency Heatmap */}
-        <DashboardHabitWidget
-          isDbLoading={isDbLoading}
-          globalConsistencyStreak={globalConsistencyStreak}
-          onOpenHabitsZoom={() => openZoom('habits')}
-        />
-
-        {/* 5. Compact Anggaran & Target Tabungan Bento Cards (Opens Detail Sheet on Tap) */}
-        <div data-tour="pulse-bento">
-          <DashboardPulseBento
-            isDbLoading={isDbLoading}
-            budgetGoalSummary={budgetGoalSummary}
-            defaultCurrency={defaultCurrency}
-            rates={rates}
             locale={locale}
-            onOpenBudgetDetail={() => setDetailSheetMode('budget')}
-            onOpenSavingsDetail={() => setDetailSheetMode('savings')}
+            rates={rates}
+            wallets={walletsWithBalance}
+            t={t}
+          />
+
+          {/* Email Verification Reminder Banner (Placed directly below Transaksi Terakhir) */}
+          <EmailVerificationBanner />
+
+          {/* 3. Net Worth Mini Chart */}
+          <div data-tour="networth-chart">
+            <DashboardNetWorthChart
+              isDbLoading={isDbLoading}
+              t={t}
+              defaultCurrency={defaultCurrency}
+              miniRevenueRange={miniRevenueRange}
+              miniRevenueSeries={miniRevenueSeries}
+              miniRevenueChartDomain={miniRevenueChartDomain}
+              miniRevenueAxisTicks={miniRevenueAxisTicks}
+              netWorthGrowth={netWorthGrowth}
+              computeRevenueValue={computeRevenueValue}
+              onOpenZoom={() => openZoom('revenue')}
+              formatAxisCurrency={formatAxisCurrency}
+              isMobileScreen={isMobileScreen}
+            />
+          </div>
+
+          {/* 4. Habit Consistency Heatmap */}
+          <DashboardHabitWidget
+            isDbLoading={isDbLoading}
+            globalConsistencyStreak={globalConsistencyStreak}
+            onOpenHabitsZoom={() => openZoom('habits')}
+          />
+
+          {/* 5. Compact Anggaran & Target Tabungan Bento Cards (Opens Detail Sheet on Tap) */}
+          <div data-tour="pulse-bento">
+            <DashboardPulseBento
+              isDbLoading={isDbLoading}
+              budgetGoalSummary={budgetGoalSummary}
+              defaultCurrency={defaultCurrency}
+              rates={rates}
+              locale={locale}
+              onOpenBudgetDetail={() => setDetailSheetMode('budget')}
+              onOpenSavingsDetail={() => setDetailSheetMode('savings')}
+            />
+          </div>
+
+          {/* 6. Utang & Piutang Widget */}
+          <DashboardLoanWidget
+            isDbLoading={isDbLoading}
+            loanSummary={loanSummary}
+            defaultCurrency={defaultCurrency}
+            locale={locale}
+            onOpenLoanSheet={() => setIsLoanSheetOpen(true)}
+            onPayLoan={(loan) => {
+              setPayLoan(loan)
+              setIsPayOpen(true)
+            }}
           />
         </div>
+      </SkeletonTransition>
 
-        {/* 6. Utang & Piutang Widget */}
-        <DashboardLoanWidget
-          isDbLoading={isDbLoading}
-          loanSummary={loanSummary}
-          defaultCurrency={defaultCurrency}
-          locale={locale}
-          onOpenLoanSheet={() => setIsLoanSheetOpen(true)}
-          onPayLoan={(loan) => {
-            setPayLoan(loan)
-            setIsPayOpen(true)
-          }}
-        />
-
-        {/* Detail Bottom Sheet for Budget & Savings */}
-        <BudgetSavingsDetailSheet
+      {/* Detail Bottom Sheet for Budget & Savings */}
+      <BudgetSavingsDetailSheet
           isOpen={Boolean(detailSheetMode)}
           onClose={() => setDetailSheetMode(null)}
           initialMode={detailSheetMode || 'budget'}
@@ -364,7 +373,6 @@ export default function Dashboard() {
           }}
           loan={payLoan}
         />
-      </div>
     </PullToRefresh>
   )
 }

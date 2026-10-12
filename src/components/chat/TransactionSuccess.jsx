@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatCurrency } from '../../lib/utils'
-import { CheckCircle2, RotateCcw, ArrowRight, Wallet, Check, Sparkles, WifiOff, Pencil } from 'lucide-react'
+import { CheckCircle2, RotateCcw, ArrowRight, Wallet, Check, Pencil } from 'lucide-react'
 import CategoryIcon from '../ui/CategoryIcon'
 import { resolveTransactionIconKey, getCategoryColorClass, getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { format, parseISO } from 'date-fns'
@@ -13,7 +13,41 @@ import { triggerHaptic } from '../../lib/haptics'
 import { getDecryptedNoteSync, warmupDecryptionCache, isFieldEncrypted } from '../../lib/fieldEncryption'
 import { getLocalDateString } from '../../lib/dateUtils'
 
-export default function TransactionSuccess({ data, onUndo, isUpdate = false, action, onEditItem, wallets = [] }) {
+const savedTxKeys = new Set()
+try {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    const stored = window.sessionStorage.getItem('ft_saved_tx_keys')
+    if (stored) {
+      JSON.parse(stored).forEach((k) => savedTxKeys.add(k))
+    }
+  }
+} catch {
+  // Ignore sessionStorage errors
+}
+
+function markPermanentlySaved(key) {
+  if (!key) return
+  savedTxKeys.add(key)
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem('ft_saved_tx_keys', JSON.stringify([...savedTxKeys]))
+    }
+  } catch {
+    // Ignore sessionStorage errors
+  }
+}
+
+export default function TransactionSuccess({
+  data,
+  onUndo,
+  isUpdate = false,
+  action,
+  onEditItem,
+  wallets = [],
+  timestamp,
+  msgId,
+  isSaved = false,
+}) {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
@@ -37,8 +71,6 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
     singleTx?.action === 'update' ||
     (txs.length > 0 && txs[0]?.isUpdate)
   )
-  const engine = singleTx?.engine || txs[0]?.engine || (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline_nlp' : 'online_ai')
-  const isOnlineAi = engine === 'online_ai'
 
   const [, setDecryptedTick] = useState(0)
 
@@ -56,32 +88,86 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
     }
   }, [])
 
-  // 5-second auto-expiring undo timer
-  const [undoActive, setUndoActive] = useState(Boolean(onUndo))
-  const [undoProgress, setUndoProgress] = useState(100)
+  const txKey = useMemo(() => {
+    if (msgId) return `msg_${msgId}`
+    if (Array.isArray(data) && data.length > 0) {
+      const ids = data.map((t) => t.id || t.createdAt).filter(Boolean)
+      if (ids.length > 0) return `txs_${ids.join('_')}`
+    }
+    if (data?.id) return `tx_${data.id}`
+    if (timestamp) return `ts_${timestamp}`
+    return null
+  }, [data, msgId, timestamp])
+
+  const [undoActive, setUndoActive] = useState(() => {
+    if (!onUndo || isSaved) return false
+    if (txKey && savedTxKeys.has(txKey)) return false
+    const effectiveTs = Number(
+      timestamp ||
+      singleTx?.createdAt ||
+      singleTx?.timestamp ||
+      (Array.isArray(data) && data[0]?.createdAt) ||
+      (Array.isArray(data) && data[0]?.timestamp)
+    )
+    if (Number.isFinite(effectiveTs) && effectiveTs > 0) {
+      if (Date.now() - effectiveTs >= 5000) {
+        if (txKey) markPermanentlySaved(txKey)
+        return false
+      }
+    }
+    return true
+  })
+  const [undoProgress, setUndoProgress] = useState(() => {
+    if (!onUndo || isSaved) return 0
+    if (txKey && savedTxKeys.has(txKey)) return 0
+    const effectiveTs = Number(
+      timestamp ||
+      singleTx?.createdAt ||
+      singleTx?.timestamp ||
+      (Array.isArray(data) && data[0]?.createdAt) ||
+      (Array.isArray(data) && data[0]?.timestamp)
+    )
+    if (Number.isFinite(effectiveTs) && effectiveTs > 0) {
+      const elapsed = Date.now() - effectiveTs
+      if (elapsed >= 5000) return 0
+      return Math.max(0, Math.min(100, ((5000 - elapsed) / 5000) * 100))
+    }
+    return 100
+  })
   const timerRef = useRef(null)
 
   useEffect(() => {
-    if (!onUndo) return
+    if (!onUndo || !undoActive) return
+
+    const effectiveTs = Number(
+      timestamp ||
+      singleTx?.createdAt ||
+      singleTx?.timestamp ||
+      (Array.isArray(data) && data[0]?.createdAt) ||
+      (Array.isArray(data) && data[0]?.timestamp)
+    )
+
+    const now = Date.now()
     const duration = 5000
+    const startTime = Number.isFinite(effectiveTs) && effectiveTs > 0 ? effectiveTs : now
     const interval = 50
-    const step = (interval / duration) * 100
 
     timerRef.current = setInterval(() => {
-      setUndoProgress((prev) => {
-        if (prev <= step) {
-          clearInterval(timerRef.current)
-          setUndoActive(false)
-          return 0
-        }
-        return prev - step
-      })
+      const elapsed = Date.now() - startTime
+      if (elapsed >= duration) {
+        clearInterval(timerRef.current)
+        setUndoActive(false)
+        setUndoProgress(0)
+        if (txKey) markPermanentlySaved(txKey)
+      } else {
+        setUndoProgress(Math.max(0, Math.min(100, ((duration - elapsed) / duration) * 100)))
+      }
     }, interval)
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [onUndo])
+  }, [onUndo, undoActive, txKey, timestamp, singleTx, data])
 
   const grouped = {}
   txs.forEach((tx) => {
@@ -115,7 +201,6 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
     if (onUndo) onUndo()
   }
 
-  // Single transaction hero details
   const isIncome = singleTx?.type === 'income'
   const isTransfer = singleTx?.type === 'transfer'
   const typeLabel = isIncome
@@ -131,40 +216,33 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
     : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
 
   return (
-    <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-sm overflow-hidden my-1 ft-msg-enter">
-      {/* Top Accent Line */}
-      <div className={`h-1 w-full ${isIncome ? 'bg-emerald-500/60' : isTransfer ? 'bg-sky-500/60' : 'bg-rose-500/60'}`} />
-
-      {/* Header Banner */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--border)]/50">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-500 flex items-center justify-center shrink-0 shadow-2xs">
+    <div className="relative rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)]/85 backdrop-blur-md p-3 sm:p-3.5 shadow-sm overflow-hidden my-1 ft-msg-enter space-y-2.5">
+      {/* Top Header Row: Status & Actions */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div
+            className={`p-1 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs ${
+              isIncome
+                ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500'
+                : isTransfer
+                ? 'bg-sky-500/15 border-sky-500/25 text-sky-500'
+                : 'bg-rose-500/15 border-rose-500/25 text-rose-500'
+            }`}
+          >
             <CheckCircle2 className="h-3.5 w-3.5" />
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
-              {effectiveIsUpdate
-                ? (txs.length > 1
-                    ? t('ai.multipleTxUpdated', '{{count}} Transaksi Diperbarui', { count: txs.length })
-                    : t('ai.txUpdated', 'Transaksi Diperbarui'))
-                : (txs.length > 1
-                    ? t('ai.multipleTxLogged', '{{count}} Transaksi Dicatat', { count: txs.length })
-                    : t('ai.txLogged', 'Transaksi Berhasil Dicatat'))}
-            </span>
-            {isOnlineAi ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-500 shrink-0">
-                <Sparkles className="h-2.5 w-2.5" />
-                <span>AI Gemini (Online)</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-amber-500 shrink-0">
-                <WifiOff className="h-2.5 w-2.5" />
-                <span>NLP Lokal (Offline)</span>
-              </span>
-            )}
-          </div>
+          <span className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
+            {effectiveIsUpdate
+              ? txs.length > 1
+                ? t('ai.multipleTxUpdated', '{{count}} Transaksi Diperbarui', { count: txs.length })
+                : t('ai.txUpdated', 'Transaksi Diperbarui')
+              : txs.length > 1
+              ? t('ai.multipleTxLogged', '{{count}} Transaksi Dicatat', { count: txs.length })
+              : t('ai.txLogged', 'Transaksi Berhasil Dicatat')}
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+
+        <div className="flex items-center gap-1.5 shrink-0">
           {onEditItem && singleTx && (
             <button
               type="button"
@@ -172,7 +250,7 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
                 triggerHaptic('light')
                 onEditItem(singleTx)
               }}
-              className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--accent)] hover:underline transition cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:underline transition cursor-pointer active:scale-95"
               title={locale === 'en' ? 'Edit' : 'Edit'}
             >
               <Pencil className="h-3 w-3" />
@@ -182,7 +260,7 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
           <button
             type="button"
             onClick={handleViewAll}
-            className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--fg)] transition cursor-pointer active:scale-95"
           >
             <span>{t('common.view', 'Lihat')}</span>
             <ArrowRight className="h-3 w-3" />
@@ -190,19 +268,28 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
         </div>
       </div>
 
-      {/* Single Transaction Hero Section */}
+      {/* Single Transaction Micro-Receipt Body */}
       {isSingle && singleTx ? (
         <div
           onClick={() => onEditItem?.(singleTx)}
-          className={`p-4 flex flex-col items-center justify-center text-center bg-[var(--field-bg)]/40 border-b border-[var(--border)]/30 ${onEditItem ? 'cursor-pointer hover:bg-[var(--field-bg)]/60 transition active:scale-[0.99]' : ''}`}
+          className={`rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/60 p-3 flex flex-col gap-2 ${
+            onEditItem ? 'cursor-pointer hover:bg-[var(--field-bg)]/80 transition active:scale-[0.99]' : ''
+          }`}
         >
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border mb-1.5 ${typeColorClass}`}>
-            {typeLabel}
-          </span>
-          <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight text-[var(--fg)]">
-            <span className="text-xs text-[var(--muted)] font-bold mr-1">{singleTx.currency || defaultCurrency}</span>
-            <span>{isIncome ? '+' : isTransfer ? '' : '-'}{formatCurrency(singleTx.amount, singleTx.currency || defaultCurrency).replace(/^[^\d]+/, '')}</span>
+          {/* Amount & Type Badge */}
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums tracking-tight text-[var(--fg)]">
+              <span className="text-xs text-[var(--muted)] font-bold mr-1">{singleTx.currency || defaultCurrency}</span>
+              <span className={isIncome ? 'text-emerald-500' : isTransfer ? 'text-sky-500' : ''}>
+                {isIncome ? '+' : isTransfer ? '' : '-'}{formatCurrency(singleTx.amount, singleTx.currency || defaultCurrency).replace(/^[^\d]+/, '')}
+              </span>
+            </div>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-wider border shrink-0 ${typeColorClass}`}>
+              {typeLabel}
+            </span>
           </div>
+
+          {/* Category & Notes */}
           {(() => {
             const rawNote = singleTx.notes
             const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
@@ -210,14 +297,14 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
             const labels = getTransactionCategoryLabels(singleTx.category, singleTx.type, locale)
             const catDisplay = labels.main ? `${labels.main}${labels.sub ? ` • ${labels.sub}` : ''}` : singleTx.category
             return (
-              <div className="mt-1 flex flex-col items-center gap-0.5 max-w-[90%]">
+              <div className="flex flex-col gap-0.5">
                 {catDisplay && (
                   <p className="text-xs font-bold text-[var(--fg)] truncate">
                     {catDisplay}
                   </p>
                 )}
                 {safeNote && (
-                  <p className="text-[11px] text-[var(--muted)] italic font-normal truncate">
+                  <p className="text-[11px] text-[var(--muted)] italic font-normal line-clamp-2">
                     &quot;{safeNote}&quot;
                   </p>
                 )}
@@ -225,38 +312,38 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
             )
           })()}
 
-          {/* Account & Date Specs */}
-          <div className="flex items-center gap-3 mt-2 text-[10.5px] font-semibold text-[var(--muted)]">
-            {getWalletName(singleTx) && (
-              <span className="inline-flex items-center gap-1">
-                <Wallet size={11} className="text-[var(--accent)]" />
-                <span className="text-[var(--fg)] font-bold">{getWalletName(singleTx)}</span>
-              </span>
-            )}
-            <span>{formatDate(singleTx.date || getLocalDateString())}</span>
-            {singleTx.time && (
-              <span>• {singleTx.time}</span>
-            )}
+          {/* Wallet & Date Specs */}
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/40 text-[10.5px] font-semibold text-[var(--muted)]">
+            <div className="flex items-center gap-1.5 truncate">
+              {getWalletName(singleTx) && (
+                <span className="inline-flex items-center gap-1 truncate text-[var(--fg)] font-bold">
+                  <Wallet size={11} className="text-[var(--accent)] shrink-0" />
+                  <span className="truncate">{getWalletName(singleTx)}</span>
+                </span>
+              )}
+            </div>
+            <span className="shrink-0 text-[10px] tabular-nums">
+              {formatDate(singleTx.date || getLocalDateString())}{singleTx.time ? ` • ${singleTx.time}` : ''}
+            </span>
           </div>
         </div>
       ) : null}
 
       {/* Multi-transaction Items List */}
       {!isSingle && (
-        <div className={`p-3 space-y-3 ${txs.length >= 4 ? 'max-h-72 overflow-y-auto ft-hide-scrollbar pr-0.5' : ''}`}>
+        <div className={`space-y-2.5 ${txs.length >= 4 ? 'max-h-72 overflow-y-auto ft-hide-scrollbar pr-0.5' : ''}`}>
           {Object.entries(grouped).map(([dateStr, items]) => (
-            <div key={dateStr} className="space-y-2">
+            <div key={dateStr} className="space-y-1.5">
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">
                 {formatDate(dateStr)}
               </span>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {items.map((tx, i) => {
-                  const iconKey = resolveTransactionIconKey(tx.category, tx.type)
-                  const colorClass = getCategoryColorClass(iconKey, tx.type, tx.category)
-                  const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
                   const txIsIncome = tx.type === 'income'
                   const txIsTransfer = tx.type === 'transfer'
-                  const wName = getWalletName(tx)
+                  const labels = getTransactionCategoryLabels(tx.category, tx.type, locale)
+                  const iconKey = resolveTransactionIconKey(tx.category, tx.type)
+                  const colorClass = getCategoryColorClass(iconKey, tx.type)
                   const rawNote = tx.notes
                   const plain = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
                   const safeNote = isFieldEncrypted(plain) ? '' : (plain || '')
@@ -264,56 +351,45 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
                   return (
                     <div
                       key={tx.id || i}
-                      onClick={() => onEditItem?.(tx)}
-                      className="flex items-start justify-between gap-2.5 p-2.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)]/40 hover:border-[var(--accent)]/40 transition cursor-pointer group active:scale-[0.99]"
+                      className="flex items-start justify-between gap-2.5 rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/60 p-2.5"
                     >
-                      <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                        <div className={`grid h-8 w-8 place-items-center rounded-xl ${colorClass} shrink-0 mt-0.5`}>
-                          <CategoryIcon icon={iconKey} className="h-4 w-4" />
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                          <span className="font-mono text-[9.5px] font-bold text-[var(--muted)]">#{i + 1}</span>
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-lg border ${colorClass}`}>
+                            <CategoryIcon categoryKey={iconKey} className="h-3.5 w-3.5" />
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          {/* Baris 1: Kategori Utama & Urutan */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-[var(--muted)] shrink-0">#{i + 1}</span>
-                            <p className="truncate text-xs font-bold text-[var(--fg)] leading-tight">
-                              {labels.main || tx.category}
-                            </p>
-                          </div>
-
-                          {/* Baris 2: Nama Wallet (kontras bold) • Subkategori • Jam */}
-                          <div className="flex items-center gap-1.5 flex-wrap text-[10.5px] mt-1 text-[var(--muted)]">
-                            {wName && (
-                              <span className="font-bold text-[var(--fg)] inline-flex items-center gap-0.5">
-                                <Wallet size={10} className="text-[var(--accent)] shrink-0" />
-                                <span>{wName}</span>
-                              </span>
-                            )}
-                            {labels.sub && (
-                              <span>• {labels.sub}</span>
-                            )}
-                            {tx.time && (
-                              <span>• {tx.time}</span>
-                            )}
-                          </div>
-
-                          {/* Baris 3: Catatan pengguna di baris baru (italic dengan tanda kutip, line-clamp-2) */}
-                          {safeNote && (
-                            <p className="text-[11px] font-normal italic text-[var(--fg)]/80 mt-1 line-clamp-2 break-words">
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                          <p className="text-xs font-bold text-[var(--fg)] truncate">
+                            {labels.main || tx.category}
+                          </p>
+                          <p className="text-[10px] text-[var(--muted)] truncate">
+                            <span className="font-bold text-[var(--fg)]">{getWalletName(tx) || (locale === 'en' ? 'Cash' : 'Kas')}</span>
+                            {labels.sub ? <span className="opacity-75"> • {labels.sub}</span> : null}
+                            {tx.time ? <span className="tabular-nums"> • {tx.time}</span> : null}
+                          </p>
+                          {safeNote ? (
+                            <p className="text-[10.5px] italic text-[var(--muted)] line-clamp-2">
                               &quot;{safeNote}&quot;
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
-                      <div className="shrink-0 flex flex-col items-end gap-1.5 pl-1">
-                        <span className={`text-xs font-black tabular-nums ${txIsIncome ? 'ft-income-text' : txIsTransfer ? 'text-sky-500' : 'ft-expense-text'}`}>
-                          {txIsIncome ? '+' : txIsTransfer ? '' : '-'}{formatCurrency(tx.amount, tx.currency || defaultCurrency)}
+                      <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                        <span
+                          className={`font-mono text-xs font-bold tabular-nums ${
+                            txIsIncome ? 'text-emerald-500' : txIsTransfer ? 'text-sky-500' : 'text-[var(--fg)]'
+                          }`}
+                        >
+                          {txIsIncome ? '+' : txIsTransfer ? '' : '-'}
+                          {formatCurrency(tx.amount, tx.currency || defaultCurrency)}
                         </span>
                         {onEditItem && (
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
+                            onClick={() => {
                               triggerHaptic('light')
                               onEditItem(tx)
                             }}
@@ -321,7 +397,7 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
                             title={locale === 'en' ? `Edit #${i + 1}` : `Edit #${i + 1}`}
                             aria-label={`Edit ${labels.main || tx.category}`}
                           >
-                            <Pencil size={12} strokeWidth={2} />
+                            <Pencil size={11} strokeWidth={2} />
                           </button>
                         )}
                       </div>
@@ -334,23 +410,15 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
         </div>
       )}
 
-      {/* Ticket Tear Perforation */}
-      <div className="relative flex items-center px-3 py-0.5">
-        <div className="absolute -left-2 h-4 w-4 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]" />
-        <div className="w-full border-t border-dashed border-[var(--border-strong)]/50" />
-        <div className="absolute -right-2 h-4 w-4 rounded-full bg-[var(--bg)] border border-[var(--border)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]" />
-      </div>
-
-      {/* Card Actions Footer with Auto-Expiring Undo Bar */}
-      <div className="p-2.5 bg-[var(--field-bg)]/40 flex items-center justify-between gap-2">
+      {/* Card Micro-Actions Footer with Auto-Expiring Undo Bar */}
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/40">
         {onUndo && undoActive ? (
           <div className="relative flex-1 max-w-[130px]">
             <button
               type="button"
               onClick={handleUndo}
-              className="w-full relative z-10 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition cursor-pointer active:scale-95 overflow-hidden"
+              className="w-full relative z-10 inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-xl text-[10.5px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition cursor-pointer active:scale-95 overflow-hidden"
             >
-              {/* Expiring progress indicator background */}
               <div
                 className="absolute inset-0 bg-rose-500/15 pointer-events-none transition-all duration-75 origin-left"
                 style={{ width: `${undoProgress}%` }}
@@ -360,14 +428,14 @@ export default function TransactionSuccess({ data, onUndo, isUpdate = false, act
             </button>
           </div>
         ) : (
-          <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-500">
-            <Check size={13} className="stroke-[2.5]" />
+          <div className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
+            <Check size={12} className="stroke-[2.5]" />
             <span>{effectiveIsUpdate ? t('ai.updatedBadge', 'Diperbarui') : (locale === 'en' ? 'Saved' : 'Tersimpan')}</span>
           </div>
         )}
 
-        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 ml-auto">
-          FinTrack Verified
+        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--muted)]/60 tabular-nums ml-auto">
+          FinTrack Ledger
         </span>
       </div>
     </div>

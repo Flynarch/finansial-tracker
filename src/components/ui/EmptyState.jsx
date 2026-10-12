@@ -45,6 +45,14 @@ function EmptyIllustration({ variant = 'generic' }) {
           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
         </svg>
       )
+    case 'habits':
+      return (
+        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      )
     case 'calendar':
       return (
         <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -87,7 +95,7 @@ function EmptyIllustration({ variant = 'generic' }) {
  * Features ambient badge halo, contextual domain illustrations, clear typography, and tactile CTA.
  *
  * @param {object} props
- * @param {'generic'|'transactions'|'budget'|'savings'|'loans'|'todos'|'calendar'|'reports'|'search'} [props.variant='generic']
+ * @param {'generic'|'transactions'|'budget'|'savings'|'loans'|'todos'|'habits'|'calendar'|'reports'|'search'} [props.variant='generic']
  * @param {React.ReactNode} [props.icon] - Override icon to show inside inner core
  * @param {string} props.title - Title message
  * @param {string} [props.description] - Contextual description or guide

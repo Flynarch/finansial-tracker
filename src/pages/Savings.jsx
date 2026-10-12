@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Minus, Target, Edit2, Trash2, Star, Archive, RotateCcw, CheckCircle2, MoreVertical } from 'lucide-react'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import EmptyState from '../components/ui/EmptyState'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import SavingsSheetModal from '../components/savings/SavingsSheetModal'
 import SavingsFundSheetModal from '../components/savings/SavingsFundSheetModal'
@@ -68,7 +70,7 @@ function Savings() {
       console.warn('[Savings]', err)
       return []
     }
-  }, [], [])
+  }, [])
 
   const wallets = useLiveQuery(async () => {
     try {
@@ -77,7 +79,9 @@ function Savings() {
       console.warn('[Savings]', err)
       return []
     }
-  }, [], [])
+  }, [])
+
+  const isDataReady = goals !== undefined && wallets !== undefined
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = useCallback(() => setSheetOpen(true), [])
@@ -226,10 +230,14 @@ function Savings() {
     openSheet()
   }
 
+  const handledOpenAddRef = useRef(false)
   useEffect(() => {
-    if (location.state?.openAdd) {
-      window.setTimeout(() => openAdd(), 0)
+    if (location.state?.openAdd && !handledOpenAddRef.current) {
+      handledOpenAddRef.current = true
+      openAdd()
       navigate(location.pathname, { replace: true, state: null })
+    } else if (!location.state?.openAdd) {
+      handledOpenAddRef.current = false
     }
   }, [location.pathname, location.state, navigate, openAdd])
 
@@ -248,15 +256,19 @@ function Savings() {
 
   return (
     <div className="min-h-[100dvh] pb-24">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-          isLeaving
-            ? '-translate-x-2 opacity-0'
-            : isEntering
-              ? 'translate-y-0 opacity-100'
-              : 'translate-y-2 opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="savings" />}
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
+            isLeaving
+              ? '-translate-x-2 opacity-0'
+              : isEntering
+                ? 'translate-y-0 opacity-100'
+                : 'translate-y-2 opacity-0'
+          }`}
+        >
         {/* Page Header */}
         <PageHeader
           title={showArchive ? t('savings.archiveTitle', 'Arsip Tabungan') : t('savings.title', 'Target Tabungan')}
@@ -574,6 +586,7 @@ function Savings() {
           )}
         </div>
       </div>
+    </SkeletonTransition>
 
       <SavingsSheetModal
         isOpen={sheetOpen}

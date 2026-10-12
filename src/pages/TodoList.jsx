@@ -8,6 +8,8 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import EmptyState from '../components/ui/EmptyState'
 import PageHeader from '../components/ui/PageHeader'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import { Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import useTranslation from '../hooks/useTranslation'
@@ -395,16 +397,21 @@ function TodoList() {
     }`
 
   return (
-    <div>
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu pb-2 ${
-          isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-        }`}
+    <div className="min-h-full">
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="todo" />}
+        className="min-h-full w-full"
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 transform-gpu pb-2 ${
+            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+          }`}
+        >
         <PageHeader
           title={t('todo.pageTitle')}
           titlePosition="left"
-          className="!mb-0"
+          className="mb-2 sm:mb-2.5"
           rightAction={
             activeTab === 'todo' ? (
               <button
@@ -413,7 +420,7 @@ function TodoList() {
                   resetAddForm()
                   setAddOpen(true)
                 }}
-                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-1.5 min-h-[44px] h-11 w-24 min-w-[96px] rounded-2xl bg-[var(--accent)] px-3 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
                 aria-label={t('todo.add')}
               >
                 <Plus size={15} strokeWidth={3} />
@@ -423,7 +430,7 @@ function TodoList() {
               <button
                 type="button"
                 onClick={() => setHabitAddOpen(true)}
-                className="flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-1.5 min-h-[44px] h-11 w-24 min-w-[96px] rounded-2xl bg-[var(--accent)] px-3 py-2 text-xs font-extrabold text-white shadow-md transition-all active:scale-95 cursor-pointer"
                 aria-label={t('habits.addShort', 'Habit')}
               >
                 <Plus size={15} strokeWidth={3} />
@@ -434,7 +441,7 @@ function TodoList() {
         />
 
         {/* Segmented Control with Smooth Sliding Indicator */}
-        <div className="relative grid grid-cols-2 rounded-[1rem] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] p-1 border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-inner select-none overflow-hidden">
+        <div className="relative grid grid-cols-2 rounded-[1rem] bg-[color-mix(in_srgb,var(--field-bg)_60%,transparent)] p-1 border border-[color-mix(in_srgb,var(--border)_50%,transparent)] shadow-inner select-none overflow-hidden mb-3 sm:mb-4">
           {/* Sliding Animated Pill */}
           <div
             className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-[0.75rem] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] ring-1 ring-[color-mix(in_srgb,var(--border)_80%,transparent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
@@ -473,12 +480,12 @@ function TodoList() {
         </div>
 
         {activeTab === 'habits' && (
-          <div key="tab-habits" className="ft-tab-fade">
+          <div key="tab-habits" className="ft-tab-fade pt-1 space-y-4">
             <HabitsView addOpen={habitAddOpen} onAddOpenChange={setHabitAddOpen} />
           </div>
         )}
         {activeTab === 'todo' && (
-          <div key="tab-todo" className="space-y-4 ft-tab-fade">
+          <div key="tab-todo" className="space-y-4 ft-tab-fade pt-1">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 min-w-0 flex-1 whitespace-nowrap">
                 <button type="button" className={pillClass(filter === 'all')} onClick={() => setFilter('all')}>
@@ -552,7 +559,7 @@ function TodoList() {
             </div>
 
             {!isDataReady ? (
-              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-fade-up'}`}>
+              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-skeleton-enter'}`}>
                 {Array.from({ length: 4 }).map((_, i) => (
                   <li key={`todo-skeleton-${i}`}>
                     <div className="h-[8.75rem] rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs ft-skeleton-card space-y-3">
@@ -575,6 +582,7 @@ function TodoList() {
             ) : !sortedTodos?.length ? (
               <EmptyState
                 variant="todos"
+                className={reduceMotion ? '' : 'ft-content-loaded'}
                 title={t('todo.emptyState.title', 'Tidak ada tugas')}
                 description={
                   filter === 'all'
@@ -597,7 +605,7 @@ function TodoList() {
                 }
               />
             ) : (
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ul className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${reduceMotion ? '' : 'ft-content-loaded'}`}>
                 {sortedTodos.map((todo) => (
                   <TodoItemCard
                     key={todo.id}
@@ -624,6 +632,7 @@ function TodoList() {
           </div>
         )}
       </div>
+    </SkeletonTransition>
 
       {/* Todo Create Modal */}
       <TodoCreateModal

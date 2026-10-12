@@ -162,27 +162,26 @@ export default function WalletCarousel({
   if (wallets === undefined || wallets === null) {
     return (
       <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
-        <div className="ft-hero-card flex flex-col justify-between p-5 h-[200px] animate-pulse border border-[var(--border)] bg-[var(--panel-strong)] rounded-3xl">
+        <div className="ft-hero-card flex flex-col justify-between p-5 h-[200px] ft-skeleton-enter ft-skeleton-card border border-[var(--border)] bg-[var(--panel-strong)] rounded-3xl">
           <div className="flex items-center justify-between">
-            <div className="h-3.5 w-28 rounded-md bg-[var(--border)]/70" />
-            <div className="h-4 w-4 rounded-full bg-[var(--border)]/50" />
+            <div className="h-3.5 w-28 rounded-md ft-skeleton" />
+            <div className="h-4 w-4 rounded-full ft-skeleton" />
           </div>
           <div className="space-y-2">
-            <div className="h-8 w-48 rounded-lg bg-[var(--border)]/80" />
-            <div className="h-3 w-20 rounded bg-[var(--border)]/50" />
+            <div className="h-8 w-48 rounded-lg ft-skeleton" />
+            <div className="h-3 w-20 rounded ft-skeleton" />
           </div>
           <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="h-10 rounded-xl bg-[var(--field-bg)]/60" />
-            <div className="h-10 rounded-xl bg-[var(--field-bg)]/60" />
+            <div className="h-10 rounded-xl ft-skeleton" />
+            <div className="h-10 rounded-xl ft-skeleton" />
           </div>
         </div>
       </section>
     )
   }
 
-
   return (
-    <section className="relative ft-stagger-in" style={{ '--stagger': 0 }}>
+    <section className="relative ft-stagger-in ft-content-loaded" style={{ '--stagger': 0 }}>
       <div 
         ref={scrollRef}
         onScroll={handleScroll}

@@ -84,17 +84,21 @@ export default function useBottomSheet(configOrState = false) {
     ? Boolean(controlledIsOpen) && !isExiting && !isClosingControlled
     : internalOpen && !isExiting
 
-  // Lock body scroll while sheet is open
+  // Lock body scroll while sheet is open without blocking initial animation frame
   useEffect(() => {
     if (!isMounted || !lockBodyScroll || typeof document === 'undefined') return undefined
     const { body, documentElement } = document
     const prevBodyOverflow = body.style.overflow
     const prevHtmlOverflow = documentElement.style.overflow
 
-    body.style.overflow = 'hidden'
-    documentElement.style.overflow = 'hidden'
+    // Defer overflow lock by 1 rAF tick so GPU compositor starts slide-up animation before layout reflow
+    const rafId = window.requestAnimationFrame(() => {
+      body.style.overflow = 'hidden'
+      documentElement.style.overflow = 'hidden'
+    })
 
     return () => {
+      window.cancelAnimationFrame(rafId)
       body.style.overflow = prevBodyOverflow && prevBodyOverflow !== 'hidden' ? prevBodyOverflow : ''
       body.style.touchAction = ''
       body.style.overscrollBehavior = 'none'

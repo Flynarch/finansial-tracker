@@ -5,6 +5,7 @@ import ChatMessageItem from './ChatMessageItem'
 export default function ChatMessageList({
   messages = [],
   isLoading = false,
+  isOnline = true,
   locale = 'id',
   defaultCurrency = 'IDR',
   todayExpense = 0,
@@ -12,6 +13,7 @@ export default function ChatMessageList({
   messagesEndRef,
   onScroll,
   onSend,
+  onRegenerate,
   onStagePrompt,
   onSelectPrompt,
   onMsgTouchStart,
@@ -41,11 +43,15 @@ export default function ChatMessageList({
     return 'single'
   }
 
+  const lastUserMsg = visibleMessages.slice().reverse().find((m) => m.role === 'user')
+  const hasImage = Boolean(lastUserMsg?.image)
+
   return (
     <main
       ref={chatScrollContainerRef}
       onScroll={onScroll}
-      className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 sm:py-4 space-y-2.5 ft-hide-scrollbar"
+      className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 sm:py-4 space-y-2.5 ft-hide-scrollbar touch-pan-y"
+      style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {isOnlyWelcome && !isLoading ? (
         <WelcomeHero
@@ -53,6 +59,7 @@ export default function ChatMessageList({
           onStagePrompt={handleStage}
           todayExpense={todayExpense}
           todayCurrency={defaultCurrency}
+          isOnline={isOnline}
         />
       ) : (
         visibleMessages.map((msg, index) => {
@@ -70,6 +77,7 @@ export default function ChatMessageList({
               isLoading={isLoading}
               locale={locale}
               onSend={onSend}
+              onRegenerate={onRegenerate}
               onStagePrompt={handleStage}
               onMsgTouchStart={onMsgTouchStart}
               onMsgTouchMove={onMsgTouchMove}
@@ -86,7 +94,7 @@ export default function ChatMessageList({
       )}
 
       {isLoading && !messages.some((m) => m.id === (messages[messages.length - 1]?.id) && m.role === 'ai' && m.content) && (
-        <ReasoningIndicator />
+        <ReasoningIndicator hasImage={hasImage} />
       )}
 
       <div ref={messagesEndRef} className="h-2" />

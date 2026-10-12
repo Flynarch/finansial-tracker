@@ -83,10 +83,20 @@ To maintain compatibility across diverse developer environments (Antigravity 2.0
 - **Financial Split Transaction Invariants**: When aggregating transaction totals for analytics (daily flow, monthly stats, category breakdowns, or charts), transactions with `tx.isSplit === true` MUST unpack `tx.splitItems`. Parent-level amounts apply ONLY to wallet-level cash balance changes (`cashNet`). Analytics exclusion (`isExcludeAnalyticsTx`) and category categorization must be evaluated on each individual split item.
 - **Safe Month Date Stepping**: Never use `d.setMonth(d.getMonth() - n)` on raw dates. Month-end dates (29th, 30th, 31st) will silently skip short months (e.g. March 31 minus 1 month evaluates to March 2/3 instead of February). Always anchor to the start of the month using `subMonths(startOfMonth(date), n)` from `date-fns`.
 - **Immutable Ledger History on Deletion**: Never execute `db.transactions.bulkDelete()` when deleting parent entities (loans, goals, categories, wallets). Always soft-archive (`isArchived: 1`) or decouple transaction references (`loanId = null`) to maintain historical wallet balances and bank statement reconciliation.
+- **AI Chat Entity & Child Record Synchronization**: Whenever an AI chat action handler (`src/lib/ai/chatActions/`) executes mutations on parent entities (todos, loans, savings goals, habits):
+  1. It MUST atomically synchronize all child records in IndexedDB within a `db.transaction('rw', ...)` block (e.g. completing a parent todo MUST update all child `db.sub_tasks` to `checked: true`).
+  2. The returned `action_success` data payload MUST include complete, freshly queried child details (`subTasks: [...]`, `remainingAmount`, `id`) so chat widgets render complete status immediately.
+  3. Generative chat widgets (`TodoCardWidget`, `LoanCardWidget`, etc.) MUST use reactive hooks (`useLiveQuery`) to hydrate child records from IndexedDB if props payload is empty or when re-opened from chat history.
 
 ---
 
 ## 7. Verification & Definition of Done
+
+### Testing Discipline During Active Iteration
+- **Targeted Test Execution**: Because the repository maintains over 140 test files (1,890+ tests) with `jsdom` where full suite runs take ~15 minutes due to Windows/OneDrive disk I/O, NEVER run the entire `npm test` suite during iterative development or bug fixing.
+- **Development Iteration**: Always run focused tests (`npm test -- path/to/file.test.jsx`) or changed files (`npx vitest run --changed`).
+- **Final Gate Only**: Execute the full `npm test` suite exclusively at the final verification gate before merging, releasing, or assembling an APK.
+
 Before marking any task as complete, execute and pass all verification gates in order:
 
 1. `npm test` (All unit tests must pass)

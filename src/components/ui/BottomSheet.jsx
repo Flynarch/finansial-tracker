@@ -27,14 +27,40 @@ export default function BottomSheet({
   })
   const defaultCloseLabel = closeAriaLabel || t('common.close', 'Tutup')
 
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isDismissing, setIsDismissing] = useState(false)
-  const [isSnappingBack, setIsSnappingBack] = useState(false)
-  const snapTimeoutRef = useRef(null)
+  const dialogRef = useRef(null)
+  const handleBarRef = useRef(null)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
   const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
+
+  const [hasEntered, setHasEntered] = useState(false)
+
+  const [prevSheetVisible, setPrevSheetVisible] = useState(sheetVisible)
+  if (sheetVisible !== prevSheetVisible) {
+    setPrevSheetVisible(sheetVisible)
+    if (!sheetVisible) {
+      setHasEntered(false)
+    } else {
+      setIsDismissedByDrag(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!sheetVisible) return undefined
+    if (dialogRef.current) {
+      dialogRef.current.style.transform = ''
+      dialogRef.current.style.transition = ''
+      dialogRef.current.style.opacity = ''
+    }
+    const timer = setTimeout(() => {
+      setHasEntered(true)
+    }, 260)
+    return () => clearTimeout(timer)
+  }, [sheetVisible])
 
   useEffect(() => {
     return () => {
@@ -42,62 +68,152 @@ export default function BottomSheet({
     }
   }, [])
 
-  const handleTouchStart = useCallback((e) => {
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
     if (snapTimeoutRef.current) {
       clearTimeout(snapTimeoutRef.current)
       snapTimeoutRef.current = null
     }
     hasTriggeredSnapHaptic.current = false
-    touchStartY.current = e.touches[0].clientY
+    setHasEntered(true)
+    touchStartY.current = clientY
     touchStartTime.current = Date.now()
-    setIsDragging(true)
-    setIsSnappingBack(false)
-    setIsDismissing(false)
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
+
+    if (dialogRef.current) {
+      dialogRef.current.style.transition = 'none'
+    }
+    if (handleBarRef.current) {
+      handleBarRef.current.style.transition = 'none'
+    }
   }, [])
 
-  const handleTouchMove = useCallback((e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
 
     if (deltaY > 0) {
-      // Natural downward drag
-      setDragOffset(deltaY)
       if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
         hasTriggeredSnapHaptic.current = true
         triggerHaptic('light')
       } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
         hasTriggeredSnapHaptic.current = false
       }
-    } else {
-      // Elastic rubberband resistance for upward pull
-      setDragOffset(deltaY * 0.15)
+    }
+
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (dialogRef.current) {
+      const y = Math.max(0, currentOffset)
+      dialogRef.current.style.transform = `translate3d(0, ${y}px, 0)`
+    }
+
+    if (handleBarRef.current) {
+      const y = Math.max(0, currentOffset)
+      const scaleX = Math.min(1.45, Math.max(1, 1 + (y * 0.2) / 44))
+      handleBarRef.current.style.transform = `scale3d(${scaleX}, 1, 1)`
+      if (currentOffset >= 80) {
+        handleBarRef.current.style.backgroundColor = 'var(--accent)'
+      } else {
+        handleBarRef.current.style.backgroundColor = ''
+      }
     }
   }, [])
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStartY.current && !isDragging) return
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
     const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1) // px per ms
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1) // px per ms
 
     hasTriggeredSnapHaptic.current = false
-    setIsDragging(false)
+    isDraggingRef.current = false
     touchStartY.current = 0
 
     // Threshold: dragged down > 80px OR high downward flick velocity
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      setIsDismissing(true)
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        dialogRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        dialogRef.current.style.opacity = '0'
+      }
       closeSheet()
-    } else if (dragOffset !== 0) {
-      // Elastic snap back
-      setIsSnappingBack(true)
-      setDragOffset(0)
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      // Elastic snap back with smooth spring curve
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        dialogRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease'
+        handleBarRef.current.style.transform = 'scale3d(1, 1, 1)'
+        handleBarRef.current.style.backgroundColor = ''
+      }
       snapTimeoutRef.current = setTimeout(() => {
-        setIsSnappingBack(false)
+        dragOffsetRef.current = 0
+        if (dialogRef.current) {
+          dialogRef.current.style.transform = ''
+          dialogRef.current.style.transition = ''
+          dialogRef.current.style.opacity = ''
+        }
+        if (handleBarRef.current) {
+          handleBarRef.current.style.transform = ''
+          handleBarRef.current.style.transition = ''
+        }
         snapTimeoutRef.current = null
       }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (dialogRef.current) {
+        dialogRef.current.style.transform = ''
+        dialogRef.current.style.transition = ''
+        dialogRef.current.style.opacity = ''
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transform = ''
+        handleBarRef.current.style.transition = ''
+      }
     }
-  }, [dragOffset, isDragging, closeSheet])
+  }, [closeSheet])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
 
   if (!isMounted || typeof document === 'undefined') return null
 
@@ -120,37 +236,26 @@ export default function BottomSheet({
       {/* Sheet Container with iOS / Vaul-style seamless slide-up and gesture drag-to-dismiss */}
       <div className={`absolute inset-x-0 bottom-0 mx-auto w-full sm:px-4 sm:pb-6 ${maxWidth}`}>
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={typeof title === 'string' ? title : defaultCloseLabel}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && e.animationName === 'ft-sheet-slide-up') {
+              setHasEntered(true)
+            }
+          }}
           className={`flex flex-col ${maxHeight} w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu overflow-hidden ${
-            isDragging || isDismissing || isSnappingBack
+            !sheetVisible
+              ? (isDismissedByDrag ? '' : 'ft-sheet-exit')
+              : hasEntered
               ? ''
-              : sheetVisible
-              ? 'ft-sheet-enter'
-              : 'ft-sheet-exit'
+              : 'ft-sheet-enter'
           } ${className}`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            ...(isDragging
-              ? {
-                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
-                  opacity: Math.max(0.4, 1 - dragOffset / 300),
-                  transition: 'none',
-                }
-              : isDismissing
-              ? {
-                  transform: 'translate3d(0, 100%, 0)',
-                  opacity: 0,
-                  transition: 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
-                }
-              : isSnappingBack
-              ? {
-                  transform: 'translate3d(0, 0, 0)',
-                  opacity: 1,
-                  transition: 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out',
-                }
-              : {}),
+            willChange: 'transform',
+            contain: 'paint layout',
           }}
         >
           {/* ZONE 1: FIXED TOP (Handle + Sticky Header) */}
@@ -161,20 +266,12 @@ export default function BottomSheet({
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
-                className="mx-auto -mt-1.5 mb-2 pt-1 pb-1 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+                onMouseDown={handleMouseDown}
+                className="mx-auto -mt-2 mb-2 py-2.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none -my-1"
               >
                 <div
-                  className={`rounded-full ${
-                    dragOffset >= 80
-                      ? 'h-2 bg-[var(--accent)] shadow-xs'
-                      : 'h-1.5 bg-[var(--border-strong)] hover:bg-[var(--muted)]'
-                  }`}
-                  style={{
-                    width: `${Math.min(64, Math.max(44, 44 + (dragOffset > 0 ? dragOffset * 0.2 : 0)))}px`,
-                    transition: isDragging
-                      ? 'background-color 150ms ease, height 150ms ease'
-                      : 'width 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, height 150ms ease',
-                  }}
+                  ref={handleBarRef}
+                  className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] hover:bg-[var(--muted)] transition-colors origin-center"
                 />
               </div>
             )}

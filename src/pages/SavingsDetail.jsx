@@ -13,6 +13,7 @@ import EmptyState from '../components/ui/EmptyState'
 import CustomDatePicker from '../components/ui/CustomDatePicker'
 import WalletSelectModal, { WalletSelectTrigger } from '../components/ui/WalletSelectModal'
 import PageHeader from '../components/ui/PageHeader'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import CanvasConfettiOverlay from '../components/ui/CanvasConfettiOverlay'
 import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { getCachedCurrencyRates } from '../lib/api'
@@ -375,7 +376,7 @@ export default function SavingsDetail() {
     }))
   }, [logs])
 
-  if (goal === undefined) return <div className="min-h-screen bg-[var(--bg)]" />
+  if (goal === undefined) return <PageSkeleton variant="savings-detail" />
   if (goal === null) {
     return (
       <div className="flex h-screen items-center justify-center p-4">

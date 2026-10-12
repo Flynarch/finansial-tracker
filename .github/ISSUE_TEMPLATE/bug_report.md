@@ -22,7 +22,7 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots or recordings to help explain your problem.
 
 ### Environment
-- App Version: v6.0.0
+- App Version: v6.1.0
 - Device / Emulator: [e.g. Samsung Galaxy S23, Google Pixel 8]
 - Android OS Version: [e.g. Android 14, Android 13]
 - Browser (if dev preview): [e.g. Chrome, Firefox]

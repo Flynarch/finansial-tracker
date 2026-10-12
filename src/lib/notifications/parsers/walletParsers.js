@@ -56,10 +56,26 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
     /dana\s*kaget/i.test(combined)) && !/danamon/i.test(combined)
   if (isDanaBrand) {
     const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
-    const isExplicitOutgoing = !isRefund && /(?:kirim uang(?!\s+diterima)|transfer ke|pembayaran|bayar|kamu telah membayar|telah membayar|berhasil dikirim(?:\s+ke)?|berhasil ditransfer(?:\s+ke)?|berhasil terkirim|terkirim(?:\s+ke)?|telah dikirim|uang keluar|kirim dana kaget)/i.test(combined)
-    const isExplicitIncoming = isRefund || /(?:kirim uang diterima|isi saldo|saldo bertambah|dapat kiriman|kiriman uang|kamu menerima|menerima saldo|menerima kiriman|saldo masuk|dana masuk|dana diterima|penerimaan dana|dana kaget|dapat dana kaget|terima dana kaget|masuk ke saldo(?!\s*(?:ke\s+)?penerima)|top\s*up|cashback|saldo ditambahkan)/i.test(combined) ||
-      (/(?:uang masuk)/i.test(combined) && !/(?:uang masuk ke saldo penerima|uang masuk ke rekening penerima|uang masuk ke tujuan)/i.test(combined))
-    const isIncome = isRefund || (!isExplicitOutgoing && isExplicitIncoming)
+
+    // Explicit incoming indicators take highest precedence (isi saldo, top up, saldo bertambah, uang masuk)
+    const isUangMasukKePenerima = /(?:uang masuk ke (?:saldo |rekening )?(?:penerima|tujuan))/i.test(combined)
+    const isUangMasuk = /(?:uang masuk)/i.test(combined) && !isUangMasukKePenerima
+    const isExplicitTopUp = /(?:isi saldo|top\s*up|saldo\s*.*bertambah|saldo ditambahkan)/i.test(combined)
+    const isHighPrecedenceIncoming = isRefund || isExplicitTopUp || isUangMasuk
+
+    // Outgoing indicators (sending money to others or external accounts)
+    const isDefiniteOutgoing = /(?:kirim uang(?!\s+diterima)|transfer ke|berhasil dikirim(?:\s+ke)?|berhasil ditransfer(?:\s+ke)?|berhasil terkirim|terkirim(?:\s+ke)?|telah dikirim|uang keluar|kirim dana kaget)/i.test(combined)
+
+    // Other incoming indicators
+    const isOtherIncoming = /(?:kirim uang diterima|dapat kiriman|kiriman uang|kamu menerima|menerima saldo|menerima kiriman|saldo masuk|dana masuk|dana diterima|penerimaan dana|dana kaget|dapat dana kaget|terima dana kaget|masuk ke saldo(?!\s*(?:ke\s+)?penerima)|cashback)/i.test(combined)
+
+    const isExplicitIncoming = isHighPrecedenceIncoming || isOtherIncoming
+
+    const isIncome = isHighPrecedenceIncoming
+      ? true
+      : isDefiniteOutgoing
+      ? false
+      : isExplicitIncoming
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
       const amount = parseAmountFromRegexMatch(amtMatch[1])
@@ -77,7 +93,8 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
   // 4. ShopeePay
   if (lowerPkg.includes('shopee') || /shopeepay/i.test(combined)) {
     const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
-    const isIncome = isRefund || (/(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback)/i.test(combined) &&
+    const isTopUp = /(?:isi saldo|top\s*up)/i.test(combined)
+    const isIncome = isRefund || isTopUp || (/(?:menerima transfer|terima saldo|saldo masuk|cashback)/i.test(combined) &&
       !/(?:pembayaran|bayar|transfer ke|kirim ke)/i.test(combined))
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {
@@ -96,7 +113,8 @@ export function parseWithWalletRegex(title = '', text = '', packageName = '') {
   // 5. LinkAja
   if (lowerPkg.includes('linkaja') || /linkaja|link\s*aja/i.test(combined)) {
     const isRefund = /(?:pengembalian dana|refund|uang kembali|pengembalian saldo)/i.test(combined)
-    const isIncome = isRefund || (/(?:isi saldo|menerima transfer|terima saldo|saldo masuk|top\s*up|cashback|uang masuk)/i.test(combined) &&
+    const isTopUp = /(?:isi saldo|top\s*up)/i.test(combined)
+    const isIncome = isRefund || isTopUp || (/(?:menerima transfer|terima saldo|saldo masuk|cashback|uang masuk)/i.test(combined) &&
       !/(?:pembayaran|bayar|transfer ke|kirim ke|debit)/i.test(combined))
     const amtMatch = combined.match(/(?:rp|idr)\.?\s*([\d.,]+)/i)
     if (amtMatch) {

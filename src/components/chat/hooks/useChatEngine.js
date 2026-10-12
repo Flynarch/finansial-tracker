@@ -54,7 +54,7 @@ export function useChatEngine({
   }, [])
 
   const handleSend = useCallback(
-    async (text, image, scanMode = 'all', targetWalletId = null) => {
+    async (text, image, scanMode = 'all', targetWalletId = null, customPreviousMessages = null, isRegenerate = false) => {
       if (isLoadingRef.current || isStreamingRef.current) return
 
       const textToSend = (text !== undefined ? text : inputValueRef.current) || ''
@@ -73,18 +73,22 @@ export function useChatEngine({
         image: imageToSend || null,
       }
 
-      inputValueRef.current = ''
-      selectedImageRef.current = null
-      setInputValue?.('')
-      setSelectedImage?.(null)
-      setShowScanModePicker?.(false)
-      if (inputRef?.current) inputRef.current.style.height = 'auto'
+      if (!isRegenerate) {
+        inputValueRef.current = ''
+        selectedImageRef.current = null
+        setInputValue?.('')
+        setSelectedImage?.(null)
+        setShowScanModePicker?.(false)
+        if (inputRef?.current) inputRef.current.style.height = 'auto'
+      }
 
       isLoadingRef.current = true
       setIsLoading(true)
 
       const aiMsgId = now + 1
-      setMessages((prev) => [...prev, userMsg])
+      if (!isRegenerate) {
+        setMessages((prev) => [...prev, userMsg])
+      }
 
       isStreamingRef.current = true
       streamBufferRef.current = ''
@@ -94,7 +98,7 @@ export function useChatEngine({
         const result = await parseTransactionFromText(clampedText || 'Lihat gambar struk ini', {
           locale,
           defaultCurrency,
-          previousMessages: messages,
+          previousMessages: customPreviousMessages || messages,
           imageData: imageToSend,
           wallets,
           rates: activeRates,
@@ -113,7 +117,11 @@ export function useChatEngine({
                   return [...prev, { id: aiMsgId, timestamp: aiMsgId, role: 'ai', type: 'text', content: currentBuffered }]
                 })
                 if (chatScrollContainerRef?.current) {
-                  chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
+                  const el = chatScrollContainerRef.current
+                  const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+                  if (dist <= 150) {
+                    el.scrollTop = el.scrollHeight
+                  }
                 }
               })
             }
@@ -238,6 +246,46 @@ export function useChatEngine({
     ],
   )
 
+  const handleRegenerate = useCallback(
+    async (targetAiMsgId) => {
+      if (isLoadingRef.current || isStreamingRef.current) return
+
+      const msgs = messages
+      let targetIndex = -1
+      if (targetAiMsgId) {
+        targetIndex = msgs.findIndex((m) => m.id === targetAiMsgId)
+      } else {
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].role === 'ai') {
+            targetIndex = i
+            break
+          }
+        }
+      }
+
+      if (targetIndex === -1) return
+
+      let userMsg = null
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user') {
+          userMsg = msgs[i]
+          break
+        }
+      }
+      if (!userMsg) return
+
+      triggerHaptic('medium')
+
+      const targetId = msgs[targetIndex].id
+      setMessages((prev) => prev.filter((m) => m.id !== targetId))
+
+      const contextSlice = msgs.slice(0, targetIndex).filter((m) => m.id !== targetId && m.id !== userMsg.id)
+
+      await handleSend(userMsg.content, userMsg.image, 'all', null, contextSlice, true)
+    },
+    [messages, setMessages, handleSend]
+  )
+
   useEffect(() => {
     handleSendRef.current = handleSend
   }, [handleSend])
@@ -246,6 +294,7 @@ export function useChatEngine({
     isLoading,
     isStreamingRef,
     handleSend,
+    handleRegenerate,
     handleSendRef,
   }
 }

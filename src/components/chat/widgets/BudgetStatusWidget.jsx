@@ -7,6 +7,7 @@ import { formatCurrency, toSafeNumber } from '../../../lib/utils'
 import { getTransactionCategoryLabels } from '../../../lib/categoryIcon'
 import { getBudgetPeriodDateRange, getCurrentBudgetMonthKey } from '../../../lib/budgetUtils'
 import { parseISO, differenceInCalendarDays } from 'date-fns'
+import { triggerHaptic } from '../../../lib/haptics'
 
 export default function BudgetStatusWidget({
   category = 'makanMinum',
@@ -31,6 +32,7 @@ export default function BudgetStatusWidget({
   const categoryName = categoryLabels.sub || categoryLabels.main || category
 
   const handleNavigate = () => {
+    triggerHaptic('light')
     if (onClose) onClose()
     navigate('/budget')
   }
@@ -86,11 +88,11 @@ export default function BudgetStatusWidget({
   const StatusIcon = statusBadge.Icon
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm my-1.5 ft-msg-enter">
+    <div className="relative rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)]/85 backdrop-blur-md p-3.5 sm:p-4 shadow-sm overflow-hidden my-1.5 ft-msg-enter">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--border)]/40">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 shadow-2xs">
             <CircleDollarSign size={16} strokeWidth={2.2} />
           </div>
           <div className="min-w-0">
@@ -101,7 +103,7 @@ export default function BudgetStatusWidget({
           </div>
         </div>
 
-        <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold shrink-0 ${statusBadge.colorClass}`}>
+        <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold shrink-0 shadow-2xs ${statusBadge.colorClass}`}>
           <StatusIcon size={12} strokeWidth={2.5} />
           <span>{statusBadge.label}</span>
         </div>
@@ -122,7 +124,7 @@ export default function BudgetStatusWidget({
 
       {/* Dual-Marker Progress Track */}
       <div className="space-y-1.5 my-2">
-        <div className="relative h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden border border-[var(--border)]/60">
+        <div className="relative h-2 w-full rounded-full bg-[var(--field-bg)]/80 overflow-hidden border border-[var(--border)]/50">
           <div
             className={`h-full rounded-full transition-all duration-500 ${statusBadge.barClass}`}
             style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -159,7 +161,7 @@ export default function BudgetStatusWidget({
         <button
           type="button"
           onClick={handleNavigate}
-          className="inline-flex items-center gap-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)]/60 border border-[var(--border)]/60 px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
         >
           <span>{t('budget.manage', 'Kelola')}</span>
           <ArrowUpRight size={12} strokeWidth={2.5} />

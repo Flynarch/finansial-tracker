@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, memo } from 'react'
 import { Camera } from 'lucide-react'
 import { formatMoneyInput, getMoneyInputCaret } from '../../../lib/utils'
 import { resolveCalculatedAmount } from '../../../lib/calcParser'
@@ -6,7 +6,7 @@ import useTranslation from '../../../hooks/useTranslation'
 import useBackButton from '../../../hooks/useBackButton'
 import VirtualKeypad from './VirtualKeypad'
 
-export default function AmountInput({
+const AmountInput = memo(function AmountInput({
   amount = '',
   onChangeAmount,
   currency = 'IDR',
@@ -209,4 +209,6 @@ export default function AmountInput({
       />
     </div>
   )
-}
+})
+
+export default AmountInput

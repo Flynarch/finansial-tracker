@@ -48,6 +48,7 @@ const useSettingsStore = create((set, get) => ({
   biometricEnabled: true,
   autoLockTimeout: 0, // 0 = immediately on background, 60 = 1 min, 300 = 5 min
   geminiApiKey: '',
+  quickLogEngine: 'smart_ai', // 'smart_ai' | 'fast_nlp'
   dailyReminderEnabled: true,
   dailyReminderTime: '20:00',
   budgetAlertsEnabled: true,
@@ -88,6 +89,7 @@ const useSettingsStore = create((set, get) => ({
       biometricEnabled: next.biometricEnabled !== undefined ? Boolean(next.biometricEnabled) : true,
       autoLockTimeout: next.autoLockTimeout,
       geminiApiKey: persistedApiKey,
+      quickLogEngine: next.quickLogEngine === 'fast_nlp' ? 'fast_nlp' : 'smart_ai',
       dailyReminderEnabled: next.dailyReminderEnabled !== undefined ? Boolean(next.dailyReminderEnabled) : true,
       dailyReminderTime: next.dailyReminderTime || '20:00',
       budgetAlertsEnabled: next.budgetAlertsEnabled !== undefined ? Boolean(next.budgetAlertsEnabled) : true,
@@ -202,6 +204,11 @@ const useSettingsStore = create((set, get) => ({
     const next = String(geminiApiKey || '').trim()
     set({ geminiApiKey: next })
     await get().persist({ geminiApiKey: next })
+  },
+  setQuickLogEngine: async (quickLogEngine) => {
+    const next = quickLogEngine === 'fast_nlp' ? 'fast_nlp' : 'smart_ai'
+    set({ quickLogEngine: next })
+    await get().persist({ quickLogEngine: next })
   },
   setDailyReminderEnabled: async (dailyReminderEnabled) => {
     const next = Boolean(dailyReminderEnabled)
@@ -400,6 +407,7 @@ const useSettingsStore = create((set, get) => ({
       biometricEnabled: record.biometricEnabled !== undefined ? Boolean(record.biometricEnabled) : true,
       autoLockTimeout: record.autoLockTimeout !== undefined ? Number(record.autoLockTimeout) : 0,
       geminiApiKey: decryptedApiKey,
+      quickLogEngine: record.quickLogEngine === 'fast_nlp' ? 'fast_nlp' : 'smart_ai',
       dailyReminderEnabled: record.dailyReminderEnabled !== undefined ? Boolean(record.dailyReminderEnabled) : true,
       dailyReminderTime: record.dailyReminderTime || '20:00',
       budgetAlertsEnabled: record.budgetAlertsEnabled !== undefined ? Boolean(record.budgetAlertsEnabled) : true,

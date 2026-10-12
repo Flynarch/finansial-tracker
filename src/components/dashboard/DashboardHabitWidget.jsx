@@ -13,22 +13,22 @@ export const DashboardHabitWidget = memo(function DashboardHabitWidget({
   if (isDbLoading) {
     return (
       <section className="ft-stagger-in" style={{ '--stagger': 3 }}>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm animate-pulse space-y-3">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm ft-skeleton-enter ft-skeleton-card space-y-3">
           <div className="flex items-center justify-between mb-1">
             <div className="space-y-1">
-              <div className="h-3.5 w-32 rounded bg-[var(--border)]/70" />
-              <div className="h-2.5 w-20 rounded bg-[var(--border)]/40" />
+              <div className="h-3.5 w-32 rounded ft-skeleton" />
+              <div className="h-2.5 w-20 rounded ft-skeleton" />
             </div>
-            <div className="h-6 w-12 rounded bg-[var(--border)]/60" />
+            <div className="h-6 w-12 rounded ft-skeleton" />
           </div>
-          <div className="h-8 w-full rounded-xl bg-[var(--field-bg)]/60" />
+          <div className="h-8 w-full rounded-xl ft-skeleton" />
         </div>
       </section>
     )
   }
 
   return (
-    <section className="ft-stagger-in" style={{ '--stagger': 3 }}>
+    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 3 }}>
       <div
         role="button"
         tabIndex={0}

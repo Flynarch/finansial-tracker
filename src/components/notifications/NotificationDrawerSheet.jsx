@@ -15,8 +15,10 @@ import {
   CheckCircle2,
   X,
   ArrowRight,
+  Settings,
 } from 'lucide-react'
 import BottomSheet from '../ui/BottomSheet'
+import EmptyState from '../ui/EmptyState'
 import { db } from '../../lib/db'
 import useTranslation from '../../hooks/useTranslation'
 import useTransactionStore from '../../store/useTransactionStore'
@@ -369,25 +371,37 @@ export default function NotificationDrawerSheet({ isOpen, onClose }) {
                 <Trash2 size={13} />
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light')
+                onClose?.()
+                navigate('/settings/notifications')
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer"
+              title={t('settings.notifications.title', 'Pengaturan Notifikasi')}
+              aria-label={t('settings.notifications.title', 'Pengaturan Notifikasi')}
+            >
+              <Settings size={14} />
+            </button>
           </div>
         </div>
 
         {/* Notifications List */}
         <div className="space-y-2.5 pt-1">
           {filteredNotifications.length === 0 ? (
-            <div className="py-12 text-center flex flex-col items-center justify-center">
-              <div className="mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]/60 shadow-inner">
-                <BellOff className="h-6 w-6 opacity-60" strokeWidth={1.8} />
-              </div>
-              <p className="text-[14px] font-black text-[var(--fg)]">
-                {activeTab === 'unread'
+            <EmptyState
+              icon={<BellOff className="h-7 w-7 opacity-80" strokeWidth={1.8} />}
+              title={
+                activeTab === 'unread'
                   ? t('notifications.emptyUnreadTitle', 'Semua Notifikasi Telah Dibaca')
                   : activeTab === 'alerts'
                   ? t('notifications.emptyAlertsTitle', 'Tidak Ada Peringatan')
-                  : t('notifications.emptyTitle', 'Belum Ada Notifikasi')}
-              </p>
-              <p className="mt-1 px-4 text-[12px] font-medium leading-relaxed text-[var(--muted)] max-w-[280px]">
-                {activeTab === 'unread'
+                  : t('notifications.emptyTitle', 'Belum Ada Notifikasi')
+              }
+              description={
+                activeTab === 'unread'
                   ? t(
                       'notifications.emptyUnreadDesc',
                       'Tidak ada notifikasi baru yang belum dibaca saat ini.'
@@ -400,9 +414,9 @@ export default function NotificationDrawerSheet({ isOpen, onClose }) {
                   : t(
                       'notifications.emptyDesc',
                       'Pengingat tugas, utang-piutang, dan transaksi berulang akan muncul di sini.'
-                    )}
-              </p>
-            </div>
+                    )
+              }
+            />
           ) : (
             filteredNotifications.map((item) => {
               const { Icon, color, bg } = getNotificationMeta(item)

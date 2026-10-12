@@ -21,6 +21,8 @@ import ReportBarChart from '../components/reports/ReportBarChart'
 import ReportDonutSection from '../components/reports/ReportDonutSection'
 import ReportNetWorthChart from '../components/reports/ReportNetWorthChart'
 import ReportStatementModal from '../components/reports/ReportStatementModal'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import useTransactionStore from '../store/useTransactionStore'
 import useBackButton from '../hooks/useBackButton'
 
@@ -109,13 +111,14 @@ export default function Reports() {
         .toArray()
       return (list || []).filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
     },
-    [startDate, endDate],
-    []
+    [startDate, endDate]
   )
-  const investments = useLiveQuery(() => db.investments.toArray(), [], [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
-  const loans = useLiveQuery(() => db.loans.toArray(), [], [])
-  const savings = useLiveQuery(() => db.goals.toArray(), [], [])
+  const investments = useLiveQuery(() => db.investments.toArray(), [])
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const loans = useLiveQuery(() => db.loans.toArray(), [])
+  const savings = useLiveQuery(() => db.goals.toArray(), [])
+
+  const isDataReady = transactions !== undefined && wallets !== undefined
   const computedWallets = useLiveQuery(
     async () => {
       const rawWallets = await db.wallets.toArray()
@@ -514,11 +517,15 @@ export default function Reports() {
 
   return (
     <div className="min-h-full pb-32 sm:pb-24">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 sm:space-y-5 transform-gpu ${
-          isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="reports" />}
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 sm:space-y-5 transform-gpu ${
+            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+          }`}
+        >
         {/* Header Section with Time Switcher and Action Pills */}
         <ReportHeader
           rangeMonths={rangeMonths}
@@ -697,21 +704,21 @@ export default function Reports() {
             />
           </>
         )}
+        </div>
+      </SkeletonTransition>
 
-
-        {/* In-App Financial Statement Preview Modal */}
-        {isStatementModalOpen && (
-          <ReportStatementModal
-            isOpen={isStatementModalOpen}
-            onClose={() => setIsStatementModalOpen(false)}
-            wallets={computedWallets || []}
-            savings={savings || []}
-            loans={loans || []}
-            investments={investments || []}
-            rates={rates}
-          />
-        )}
-      </div>
+      {/* In-App Financial Statement Preview Modal */}
+      {isStatementModalOpen && (
+        <ReportStatementModal
+          isOpen={isStatementModalOpen}
+          onClose={() => setIsStatementModalOpen(false)}
+          wallets={computedWallets || []}
+          savings={savings || []}
+          loans={loans || []}
+          investments={investments || []}
+          rates={rates}
+        />
+      )}
     </div>
   )
 }

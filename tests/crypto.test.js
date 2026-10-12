@@ -90,16 +90,26 @@ describe('Crypto & PIN Hashing Utilities', () => {
     })
 
     it('migrates legacy static encrypted keys to new client salt via migrateSecretIfNeeded', async () => {
-      // Temporarily mock localStorage so we test migration
       const testKey = 'AIzaSyD-legacy-key-to-migrate'
-      // Encrypt with client salt
       const encrypted = await encryptSecret(testKey)
-      // When already on client salt, migrateSecretIfNeeded returns null (no migration needed)
       const noMigrate = await migrateSecretIfNeeded(encrypted)
       expect(noMigrate).toBeNull()
-
-      // Verify that decryptSecret decrypts accurately
       expect(await decryptSecret(encrypted)).toBe(testKey)
+    })
+
+    it('gracefully falls back to plaintext when subtle is unavailable (insecure context on mobile LAN)', async () => {
+      const originalSubtle = globalThis.crypto?.subtle
+      try {
+        // Temporarily redefine subtle to undefined (simulating http://192.168.x.x:5173/)
+        Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true })
+        const secret = 'test-secret-on-lan'
+        const result = await encryptSecret(secret)
+        expect(result).toBe(secret)
+        const decrypted = await decryptSecret(result)
+        expect(decrypted).toBe(secret)
+      } finally {
+        Object.defineProperty(globalThis.crypto, 'subtle', { value: originalSubtle, configurable: true })
+      }
     })
   })
 })

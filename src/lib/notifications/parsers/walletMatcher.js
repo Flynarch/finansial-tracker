@@ -64,13 +64,51 @@ export function findBestMatchingWallet(institution = '', availableWallets = [], 
     }
   }
 
-  // Check 2: Fuzzy / Alias matching on wallet name & institutionName
+  // Check 2: Tier 1 Exact Match (wName === alias or wInst === alias)
+  const GENERIC_DANA_PHRASES = /(?:dana\s*(?:darurat|cadangan|siaga|tabungan|simpanan|pensiun|pendidikan|liburan|kas|abadi|nikah|rumah|khusus|amal|usaha|modal))/i
+
+  const exactMatches = availableWallets.filter((w) => {
+    const wName = (w.name || '').trim().toLowerCase()
+    const wInst = (w.institutionName || '').trim().toLowerCase()
+    return aliases.some((alias) => {
+      if (!alias) return false
+      const isDanaAlias = alias === 'dana' || alias === 'dompet dana'
+      const isGenericFund = isDanaAlias && (GENERIC_DANA_PHRASES.test(wName) || GENERIC_DANA_PHRASES.test(wInst))
+      if (isGenericFund) return false
+      return wName === alias || wInst === alias
+    })
+  })
+
+  if (exactMatches.length === 1) {
+    return { wallet: exactMatches[0], matches: exactMatches, isAmbiguous: false }
+  }
+  if (exactMatches.length > 1) {
+    // If multiple exact matches exist, prioritize exact wallet name match over institution-only match
+    const exactNameMatches = exactMatches.filter((w) => {
+      const wName = (w.name || '').trim().toLowerCase()
+      return aliases.some((alias) => alias && wName === alias)
+    })
+    if (exactNameMatches.length === 1) {
+      return { wallet: exactNameMatches[0], matches: exactNameMatches, isAmbiguous: false }
+    }
+    return { wallet: null, matches: exactMatches, isAmbiguous: true }
+  }
+
+  // Check 3: Fuzzy / Alias matching on wallet name & institutionName
   const matchedWallets = availableWallets.filter((w) => {
     const wName = (w.name || '').trim().toLowerCase()
     const wInst = (w.institutionName || '').trim().toLowerCase()
 
     const matchesAlias = aliases.some((alias) => {
       if (!alias) return false
+
+      // When matching the e-wallet alias 'dana', exclude generic Indonesian fund phrases
+      const isDanaAlias = alias === 'dana' || alias === 'dompet dana'
+      const isGenericFund = isDanaAlias && (GENERIC_DANA_PHRASES.test(wName) || GENERIC_DANA_PHRASES.test(wInst))
+      if (isGenericFund) {
+        return false
+      }
+
       return (
         (wName && (wName === alias || wName.includes(alias) || (wName.length >= 3 && alias.includes(wName)))) ||
         (wInst && (wInst === alias || wInst.includes(alias) || (wInst.length >= 3 && alias.includes(wInst))))
@@ -96,8 +134,9 @@ export function findBestMatchingWallet(institution = '', availableWallets = [], 
  * Correlates dual debit/credit mutations within 120s into a single Transfer (Pindah Dana)
  */
 export function correlateInternalTransfers(parsedMutations = [], availableWallets = [], options = {}) {
-  if (!Array.isArray(parsedMutations) || parsedMutations.length < 2) {
-    return { correlated: parsedMutations, transfersCreated: 0 }
+  const hasRecentTx = Array.isArray(options?.recentTransactions) && options.recentTransactions.length > 0
+  if (!Array.isArray(parsedMutations) || (parsedMutations.length < 2 && !hasRecentTx)) {
+    return { correlated: parsedMutations || [], transfersCreated: 0, updatedExisting: [] }
   }
 
   const notificationAutoApprove =
@@ -124,9 +163,19 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
 
       const isSameRawAmount = Math.abs(toSafeNumber(current.amount) - toSafeNumber(candidate.amount)) < 0.01
 
+      // Admin fee tolerance for same-currency (e.g. Bank debits Rp 51.000, DANA receives Rp 50.000)
+      const currentCurr = (current.currency || 'IDR').toUpperCase()
+      const candCurr = (candidate.currency || 'IDR').toUpperCase()
+      const isSameCurrency = currentCurr === candCurr
+      const rawDiff = Math.abs(toSafeNumber(current.amount) - toSafeNumber(candidate.amount))
+      const minAmount = Math.min(toSafeNumber(current.amount), toSafeNumber(candidate.amount))
+      const expenseAmount = current.type === 'expense' ? toSafeNumber(current.amount) : toSafeNumber(candidate.amount)
+      const incomeAmount = current.type === 'income' ? toSafeNumber(current.amount) : toSafeNumber(candidate.amount)
+      const isFeeToleranceMatch = isSameCurrency && minAmount >= 5000 && rawDiff <= 2500 && expenseAmount >= incomeAmount
+
       // Support cross-currency transferred amounts using current rates
       let isConvertedAmountMatch = false
-      if (!isSameRawAmount && current.currency && candidate.currency && current.currency !== candidate.currency) {
+      if (!isSameRawAmount && !isFeeToleranceMatch && current.currency && candidate.currency && current.currency !== candidate.currency) {
         const activeRates = options?.rates || getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES }
         const convertedCurrent = convertCurrency(toSafeNumber(current.amount), current.currency, candidate.currency, activeRates)
         const candAmt = toSafeNumber(candidate.amount)
@@ -135,7 +184,7 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
         }
       }
 
-      const isAmountMatch = isSameRawAmount || isConvertedAmountMatch
+      const isAmountMatch = isSameRawAmount || isFeeToleranceMatch || isConvertedAmountMatch
 
       // Within 120 seconds time difference
       const timeI = getNotificationTimestamp(current.createdAt || current.timestamp)
@@ -170,12 +219,15 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
         toMatch.wallet?.currency &&
         fromMatch.wallet.currency !== toMatch.wallet.currency
 
+      const hasAmountDiff = Math.abs(toSafeNumber(fromMutation.amount) - toSafeNumber(toMutation.amount)) >= 0.01
+      const isTargetAmountNeeded = isCrossCurrency || hasAmountDiff
+
       result.push({
         type: 'transfer',
         amount: fromMutation.amount,
         currency: fromMutation.currency || fromMatch.wallet?.currency || 'IDR',
-        targetAmount: isCrossCurrency ? toMutation.amount : undefined,
-        targetCurrency: isCrossCurrency ? (toMutation.currency || toMatch.wallet?.currency || 'IDR') : undefined,
+        targetAmount: isTargetAmountNeeded ? toMutation.amount : undefined,
+        targetCurrency: isTargetAmountNeeded ? (toMutation.currency || toMatch.wallet?.currency || fromMutation.currency || 'IDR') : undefined,
         date: fromMutation.date,
         createdAt: fromMutation.createdAt,
         walletId: fromMatch.wallet?.id ? Number(fromMatch.wallet.id) : null,
@@ -200,5 +252,129 @@ export function correlateInternalTransfers(parsedMutations = [], availableWallet
     }
   }
 
-  return { correlated: result, transfersCreated }
+  // Cross-batch correlation against existing Dexie transactions (within 120s)
+  const updatedExistingTransactions = []
+  const consumedRecentIds = new Set()
+
+  if (Array.isArray(options?.recentTransactions) && options.recentTransactions.length > 0) {
+    for (let i = 0; i < result.length; i++) {
+      const item = result[i]
+      if (item.type !== 'income' && item.type !== 'expense') continue
+
+      const itemTime = getNotificationTimestamp(item.createdAt || item.timestamp)
+
+      const matchedExistingIndex = options.recentTransactions.findIndex((existing) => {
+        if (!existing || existing.deletedAt || consumedRecentIds.has(existing.id)) return false
+        if (existing.type !== 'income' && existing.type !== 'expense') return false
+
+        const isOpposite =
+          (item.type === 'expense' && existing.type === 'income') ||
+          (item.type === 'income' && existing.type === 'expense')
+        if (!isOpposite) return false
+
+        const existingTime = getNotificationTimestamp(existing.createdAt || existing.date)
+        if (Math.abs(itemTime - existingTime) > 120000) return false
+
+        const isSameRaw = Math.abs(toSafeNumber(item.amount) - toSafeNumber(existing.amount)) < 0.01
+        const itemCurr = (item.currency || 'IDR').toUpperCase()
+        const existCurr = (existing.currency || 'IDR').toUpperCase()
+        const isSameCurr = itemCurr === existCurr
+        const rawDiff = Math.abs(toSafeNumber(item.amount) - toSafeNumber(existing.amount))
+        const minAmt = Math.min(toSafeNumber(item.amount), toSafeNumber(existing.amount))
+        const expenseAmount = item.type === 'expense' ? toSafeNumber(item.amount) : toSafeNumber(existing.amount)
+        const incomeAmount = item.type === 'income' ? toSafeNumber(item.amount) : toSafeNumber(existing.amount)
+        const isFeeTolerance = isSameCurr && minAmt >= 5000 && rawDiff <= 2500 && expenseAmount >= incomeAmount
+
+        if (!isSameRaw && !isFeeTolerance) return false
+
+        // Disallow cross-batch correlation if both mutations clearly belong to the exact same institution
+        const itemInst = item.institution || item.suggestedInstitution || ''
+        const existInst = existing.institution || existing.suggestedInstitution || ''
+        if (itemInst && existInst && itemInst.trim().toLowerCase() === existInst.trim().toLowerCase()) {
+          return false
+        }
+
+        return true
+      })
+
+      if (matchedExistingIndex !== -1) {
+        const existingTx = options.recentTransactions[matchedExistingIndex]
+        consumedRecentIds.add(existingTx.id)
+        transfersCreated++
+
+        const fromMutation = item.type === 'expense' ? item : existingTx
+        const toMutation = item.type === 'income' ? item : existingTx
+
+        const fromInst = fromMutation.institution || fromMutation.suggestedInstitution || ''
+        const toInst = toMutation.institution || toMutation.suggestedInstitution || ''
+
+        const fromMatch = fromMutation.walletId
+          ? { wallet: availableWallets.find((w) => Number(w.id) === Number(fromMutation.walletId)) || { id: fromMutation.walletId }, isAmbiguous: false }
+          : findBestMatchingWallet(fromInst, availableWallets, fromMutation.rawDescription || fromMutation.notes)
+
+        const toMatch = toMutation.walletId
+          ? { wallet: availableWallets.find((w) => Number(w.id) === Number(toMutation.walletId)) || { id: toMutation.walletId }, isAmbiguous: false }
+          : findBestMatchingWallet(toInst, availableWallets, toMutation.rawDescription || toMutation.notes)
+
+        const hasAmountDiff = Math.abs(toSafeNumber(fromMutation.amount) - toSafeNumber(toMutation.amount)) >= 0.01
+        const isCrossCurrency =
+          fromMatch.wallet?.currency &&
+          toMatch.wallet?.currency &&
+          fromMatch.wallet.currency !== toMatch.wallet.currency
+        const isTargetAmountNeeded = isCrossCurrency || hasAmountDiff
+
+        const isSameResolvedWallet =
+          Boolean(fromMatch.wallet?.id) &&
+          Boolean(toMatch.wallet?.id) &&
+          String(fromMatch.wallet.id) === String(toMatch.wallet.id)
+
+        const fromWalletId = fromMatch.wallet?.id ? Number(fromMatch.wallet.id) : null
+        const toWalletId = toMatch.wallet?.id ? Number(toMatch.wallet.id) : null
+
+        const combinedNotifIds = [
+          existingTx.sourceNotifId,
+          ...(Array.isArray(existingTx.sourceNotifIds) ? existingTx.sourceNotifIds : []),
+          item.sourceNotifId,
+          ...(Array.isArray(item.sourceNotifIds) ? item.sourceNotifIds : []),
+        ].filter(Boolean)
+        const uniqueNotifIds = Array.from(new Set(combinedNotifIds))
+
+        const changes = {
+          type: 'transfer',
+          amount: fromMutation.amount,
+          currency: fromMutation.currency || fromMatch.wallet?.currency || 'IDR',
+          walletId: fromWalletId,
+          targetWalletId: toWalletId,
+          targetAmount: isTargetAmountNeeded ? toMutation.amount : undefined,
+          targetCurrency: isTargetAmountNeeded ? (toMutation.currency || toMatch.wallet?.currency || fromMutation.currency || 'IDR') : undefined,
+          category: 'transfer',
+          notes: `[Pindah Dana] ${fromInst || 'Bank'} -> ${toInst || 'E-Wallet'}`,
+          cleanMerchant: `Pindah Dana: ${fromInst || 'Bank'} -> ${toInst || 'E-Wallet'}`,
+          refNumber: fromMutation.refNumber || toMutation.refNumber || existingTx.refNumber || undefined,
+          sourceNotifId: existingTx.sourceNotifId || item.sourceNotifId || undefined,
+          sourceNotifIds: uniqueNotifIds.length > 0 ? uniqueNotifIds : undefined,
+          isPendingReview:
+            !notificationAutoApprove ||
+            fromMatch.isAmbiguous ||
+            toMatch.isAmbiguous ||
+            !fromMatch.wallet ||
+            !toMatch.wallet ||
+            isSameResolvedWallet,
+          source: 'notification_listener_transfer',
+        }
+
+        updatedExistingTransactions.push({
+          id: existingTx.id,
+          sourceNotifId: item.sourceNotifId,
+          sourceNotifIds: uniqueNotifIds.length > 0 ? uniqueNotifIds : [existingTx.sourceNotifId, item.sourceNotifId].filter(Boolean),
+          changes,
+        })
+
+        result.splice(i, 1)
+        i--
+      }
+    }
+  }
+
+  return { correlated: result, transfersCreated, updatedExisting: updatedExistingTransactions }
 }

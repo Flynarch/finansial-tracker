@@ -1,4 +1,5 @@
-import { memo } from 'react'
+import { memo, useState, useRef } from 'react'
+import { Reply } from 'lucide-react'
 import { UserBubble, AiBubble, ChartBubble } from './ChatBubble'
 import CardCarousel from './CardCarousel'
 import ActionSuccessCard from './ActionSuccessCard'
@@ -7,6 +8,7 @@ import TransactionSuccess from './TransactionSuccess'
 import QuickChips from './QuickChips'
 import DeleteConfirmCard from './DeleteConfirmCard'
 import { translate } from '../../lib/i18n'
+import { triggerHaptic } from '../../lib/haptics'
 
 const ChatMessageItem = memo(function ChatMessageItem({
   msg,
@@ -16,6 +18,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
   isLoading = false,
   locale = 'id',
   onSend,
+  onRegenerate,
   onStagePrompt,
   onMsgTouchStart,
   onMsgTouchMove,
@@ -27,16 +30,71 @@ const ChatMessageItem = memo(function ChatMessageItem({
   onEditItem,
   wallets = [],
 }) {
+  const [swipeX, setSwipeX] = useState(0)
+  const [isSwiping, setIsSwiping] = useState(false)
+  const touchStartRef = useRef({ x: 0, y: 0 })
+
+  const handleTouchStart = (e) => {
+    const t = e.touches?.[0]
+    if (t) {
+      touchStartRef.current = { x: t.clientX, y: t.clientY }
+    }
+    setIsSwiping(false)
+    onMsgTouchStart?.(msg)
+  }
+
+  const handleTouchMove = (e) => {
+    onMsgTouchMove?.()
+    const t = e.touches?.[0]
+    if (!t) return
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+
+    if (Math.abs(dx) > Math.abs(dy) * 1.4 && dx > 6) {
+      setIsSwiping(true)
+      const clamped = Math.min(dx * 0.42, 60)
+      setSwipeX(clamped)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    onMsgTouchEnd?.()
+    if (isSwiping && swipeX >= 36) {
+      triggerHaptic('medium')
+      if (msg.content) {
+        onStagePrompt?.(msg.content)
+      }
+    }
+    setSwipeX(0)
+    setIsSwiping(false)
+  }
+
   return (
-    <div className="flex flex-col gap-1.5 w-full min-w-0 max-w-full">
-      {msg.role === 'user' && (
+    <div
+      className="relative flex flex-col gap-1.5 w-full min-w-0 max-w-full touch-pan-y"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onContextMenu={(e) => onMsgContextMenu?.(e, msg)}
+      style={{
+        transform: `translateX(${swipeX}px)`,
+        transition: isSwiping ? 'none' : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {swipeX > 6 && (
         <div
-          className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full cursor-pointer"
-          onTouchStart={() => onMsgTouchStart?.(msg)}
-          onTouchMove={onMsgTouchMove}
-          onTouchEnd={onMsgTouchEnd}
-          onContextMenu={(e) => onMsgContextMenu?.(e, msg)}
+          className="absolute -left-7 top-1/2 -translate-y-1/2 flex items-center justify-center h-6 w-6 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] pointer-events-none transition-opacity"
+          style={{
+            opacity: Math.min(swipeX / 36, 1),
+            transform: `translateY(-50%) scale(${Math.min(0.7 + (swipeX / 70), 1)})`,
+          }}
         >
+          <Reply size={13} strokeWidth={2.4} />
+        </div>
+      )}
+
+      {msg.role === 'user' && (
+        <div className="flex flex-col items-end gap-1 w-full min-w-0 max-w-full cursor-pointer">
           {msg.image && (
             <img
               src={msg.image}
@@ -56,13 +114,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
 
       {(msg.role === 'ai' || msg.role === 'assistant') && (
         <>
-          <div
-            className="w-full min-w-0 max-w-full cursor-pointer"
-            onTouchStart={() => onMsgTouchStart?.(msg)}
-            onTouchMove={onMsgTouchMove}
-            onTouchEnd={onMsgTouchEnd}
-            onContextMenu={(e) => onMsgContextMenu?.(e, msg)}
-          >
+          <div className="w-full min-w-0 max-w-full cursor-pointer">
             <AiBubble
               content={msg.content || (msg.type === 'welcome' ? translate(locale, 'aiChat.welcome') : '')}
               timestamp={msg.timestamp}
@@ -70,6 +122,8 @@ const ChatMessageItem = memo(function ChatMessageItem({
               isNew={isLatestMessage}
               isStreaming={isLoading && isLatestMessage}
               expandableDetails={msg.expandableDetails || null}
+              onRegenerate={onRegenerate}
+              msgId={msg.id}
               embeddedWidget={
                 msg.type === 'carousel' && Array.isArray(msg.items) ? (
                   <CardCarousel>
@@ -109,6 +163,9 @@ const ChatMessageItem = memo(function ChatMessageItem({
                   <TransactionSuccess
                     data={msg.data}
                     embedded={true}
+                    timestamp={msg.timestamp}
+                    msgId={msg.id}
+                    isSaved={Boolean(msg.isSaved)}
                     isUpdate={Boolean(msg.isUpdate || msg.action === 'update')}
                     onUndo={() => onUndoTransaction?.(msg.data, msg.id, Boolean(msg.isUpdate || msg.action === 'update'), msg.previousData)}
                     onEditItem={onEditItem}

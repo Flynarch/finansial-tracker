@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { Bell, Clock, HandCoins, Sparkles, X, CheckCircle2, AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
-import { hapticImpact } from '../../lib/haptics'
+import { triggerHaptic } from '../../lib/haptics'
 
 function toTimestamp(val) {
   if (!val) return 0
@@ -40,12 +40,28 @@ function getToastIcon(type = '', title = '', message = '') {
   return { Icon: Bell, color: 'text-sky-500', bg: 'bg-sky-500/15 border border-sky-500/20' }
 }
 
+function getToastHapticType(type = '', title = '', message = '') {
+  const text = (title + ' ' + message).toLowerCase()
+  if (type === 'danger' || type === 'error' || type === 'recurring_failed' || text.includes('gagal') || text.includes('failed')) {
+    return 'error'
+  }
+  if (type === 'budget' || type === 'todo' || type === 'habit' || text.includes('anggaran') || text.includes('jatuh tempo') || text.includes('due')) {
+    return 'warning'
+  }
+  if (type === 'success' || type === 'recurring' || type === 'recurring_auto' || text.includes('berhasil') || text.includes('tersimpan')) {
+    return 'success'
+  }
+  return 'light'
+}
+
 export default function InAppNotificationToast() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [activeToast, setActiveToast] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
+  const [isDismissing, setIsDismissing] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [dragDirection, setDragDirection] = useState('up')
   const [isDragging, setIsDragging] = useState(false)
 
   const queueRef = useRef([])
@@ -57,7 +73,7 @@ export default function InAppNotificationToast() {
   const isPausedRef = useRef(false)
   const [isPaused, setIsPaused] = useState(false)
   const processedIdsRef = useRef(new Set())
-  const touchStartRef = useRef({ y: 0, time: 0, moved: false })
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0, moved: false, lockAxis: null })
   const processNextToastRef = useRef(null)
 
   useEffect(() => {
@@ -77,7 +93,7 @@ export default function InAppNotificationToast() {
       .sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt))
   }, [])
 
-  const dismissToast = useCallback(() => {
+  const dismissToast = useCallback((direction = 'up') => {
     if (timerRef.current) {
       clearTimeout(timerRef.current)
       timerRef.current = null
@@ -88,11 +104,14 @@ export default function InAppNotificationToast() {
     }
     isPausedRef.current = false
     setIsPaused(false)
+    setIsDismissing(true)
     setIsVisible(false)
-    setDragOffset(0)
+    if (direction) setDragDirection(direction)
 
     dismissTimerRef.current = setTimeout(() => {
       setActiveToast(null)
+      setIsDismissing(false)
+      setDragOffset({ x: 0, y: 0 })
       isShowingRef.current = false
       if (queueRef.current.length > 0 && typeof processNextToastRef.current === 'function') {
         processNextToastRef.current()
@@ -118,7 +137,7 @@ export default function InAppNotificationToast() {
     setIsPaused(false)
     timerStartRef.current = Date.now()
     timerRef.current = setTimeout(() => {
-      dismissToast()
+      dismissToast('up')
     }, remainingTimeRef.current)
   }, [dismissToast])
 
@@ -129,9 +148,13 @@ export default function InAppNotificationToast() {
     if (!nextItem) return
 
     isShowingRef.current = true
+    setIsDismissing(false)
+    setDragOffset({ x: 0, y: 0 })
+    setDragDirection('up')
     setActiveToast(nextItem)
-    setDragOffset(0)
-    hapticImpact('light')
+
+    const hapticType = getToastHapticType(nextItem.type, nextItem.title, nextItem.message)
+    triggerHaptic(hapticType)
 
     requestAnimationFrame(() => {
       setIsVisible(true)
@@ -144,7 +167,7 @@ export default function InAppNotificationToast() {
     setIsPaused(false)
 
     timerRef.current = setTimeout(() => {
-      dismissToast()
+      dismissToast('up')
     }, duration)
   }, [dismissToast])
 
@@ -155,7 +178,8 @@ export default function InAppNotificationToast() {
   const enqueueToast = useCallback(
     (toastData) => {
       if (!toastData) return
-      queueRef.current.push(toastData)
+      const toastId = toastData.id || `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      queueRef.current.push({ ...toastData, id: toastId })
       if (!isShowingRef.current) {
         processNextToast()
       }
@@ -200,7 +224,7 @@ export default function InAppNotificationToast() {
     if (touchStartRef.current.moved) return
     if (!activeToast) return
 
-    hapticImpact('light')
+    triggerHaptic('light')
     const rawRoute = activeToast.route
     const cleanRoute = rawRoute && typeof rawRoute === 'string'
       ? (rawRoute.startsWith('fintrack://') ? rawRoute.replace(/^fintrack:\/\//, '/') : rawRoute)
@@ -216,51 +240,79 @@ export default function InAppNotificationToast() {
       navigate('/todos')
     } else if (activeToast.type === 'budget') {
       navigate('/budget')
+    } else if (activeToast.type === 'savings' || activeToast.type === 'goal') {
+      navigate('/savings')
     } else if (activeToast.type === 'recurring' || activeToast.type === 'recurring_auto' || activeToast.type === 'recurring_failed') {
       navigate('/settings/recurring')
     }
 
-    dismissToast()
+    dismissToast('up')
   }, [activeToast, navigate, dismissToast])
 
-  // Touch handlers for swipe-up dismiss gesture with velocity tracking
+  // Dual-axis touch handlers with directional locking and swipe velocity tracking
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return
     pauseTimer()
     setIsDragging(true)
+    const touch = e.touches[0]
     touchStartRef.current = {
-      y: e.touches[0].clientY,
+      x: touch.clientX,
+      y: touch.clientY,
       time: Date.now(),
       moved: false,
+      lockAxis: null,
     }
   }
 
   const handleTouchMove = (e) => {
     if (!e.touches || e.touches.length === 0) return
-    const dy = e.touches[0].clientY - touchStartRef.current.y
-    if (Math.abs(dy) > 5) {
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartRef.current.x
+    const dy = touch.clientY - touchStartRef.current.y
+    const absX = Math.abs(dx)
+    const absY = Math.abs(dy)
+
+    if (absX > 6 || absY > 6) {
       touchStartRef.current.moved = true
+      if (!touchStartRef.current.lockAxis) {
+        touchStartRef.current.lockAxis = absX > absY ? 'x' : 'y'
+      }
     }
-    // Only allow upward drag (negative dy) or slight damping downward
-    if (dy < 0) {
-      setDragOffset(dy)
-    } else {
-      setDragOffset(dy * 0.15)
+
+    if (touchStartRef.current.lockAxis === 'x') {
+      setDragOffset({ x: dx, y: 0 })
+    } else if (touchStartRef.current.lockAxis === 'y') {
+      const clampedY = dy < 0 ? dy : dy * 0.15
+      setDragOffset({ x: 0, y: clampedY })
     }
   }
 
   const handleTouchEnd = (e) => {
     setIsDragging(false)
+    const clientX = e.changedTouches?.[0]?.clientX ?? touchStartRef.current.x
     const clientY = e.changedTouches?.[0]?.clientY ?? touchStartRef.current.y
+    const dx = clientX - touchStartRef.current.x
     const dy = clientY - touchStartRef.current.y
     const dt = Math.max(1, Date.now() - touchStartRef.current.time)
-    const velocity = -dy / dt // px/ms upward
+    const velocityX = Math.abs(dx) / dt
+    const velocityY = -dy / dt
 
-    if (dy < -40 || velocity > 0.4) {
-      hapticImpact('light')
-      dismissToast()
+    const lockAxis = touchStartRef.current.lockAxis
+
+    // Minimum travel distances required before considering velocity fling
+    const isHorizontalFling = Math.abs(dx) > 25 && velocityX > 0.35
+    const isHorizontalSwipe = Math.abs(dx) > 65
+    const isVerticalUpFling = dy < -20 && velocityY > 0.35
+    const isVerticalUpSwipe = dy < -35
+
+    if (lockAxis === 'x' && (isHorizontalSwipe || isHorizontalFling)) {
+      triggerHaptic('light')
+      dismissToast(dx < 0 ? 'left' : 'right')
+    } else if ((lockAxis === 'y' || !lockAxis) && (isVerticalUpSwipe || isVerticalUpFling)) {
+      triggerHaptic('light')
+      dismissToast('up')
     } else {
-      setDragOffset(0)
+      setDragOffset({ x: 0, y: 0 })
       resumeTimer()
     }
   }
@@ -280,7 +332,7 @@ export default function InAppNotificationToast() {
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => {
           setIsDragging(false)
-          setDragOffset(0)
+          setDragOffset({ x: 0, y: 0 })
           resumeTimer()
         }}
         onMouseEnter={pauseTimer}
@@ -292,84 +344,95 @@ export default function InAppNotificationToast() {
         }`}
         style={{
           transform: isVisible
-            ? `translate3d(0, ${dragOffset}px, 0) scale(1)`
+            ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) scale(1)`
+            : isDismissing
+            ? dragDirection === 'left'
+              ? 'translate3d(-115%, 0, 0) scale(0.95)'
+              : dragDirection === 'right'
+              ? 'translate3d(115%, 0, 0) scale(0.95)'
+              : 'translate3d(0, -100%, 0) scale(0.95)'
             : 'translate3d(0, -100%, 0) scale(0.95)',
           transition: isDragging
             ? 'none'
             : isVisible
             ? 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
             : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
-          touchAction: 'pan-y',
+          touchAction: 'none',
         }}
       >
         <div className="relative overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[var(--panel-strong)]/95 backdrop-blur-2xl p-3.5 shadow-2xl shadow-black/20 flex items-start gap-3 active:scale-[0.98] transition-transform">
-        {/* Icon Badge */}
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg} ${color} shadow-xs`}>
-          <Icon size={18} strokeWidth={2.2} />
-        </div>
-
-        {/* Text Content */}
-        <div className="min-w-0 flex-1 pt-0.5">
-          <div className="flex items-center justify-between gap-2">
-            <h5 className="text-xs font-black tracking-tight text-[var(--fg)] truncate">
-              {activeToast?.title || t('notifications.fallbackTitle', 'Notifikasi')}
-            </h5>
-            <span className="text-[10px] font-extrabold text-[var(--accent-alt,#6B7C5E)] tracking-wider uppercase shrink-0">
-              {t('notifications.toastBadgeNew', 'Baru')}
-            </span>
+          {/* Icon Badge */}
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg} ${color} shadow-xs`}>
+            <Icon size={18} strokeWidth={2.2} />
           </div>
-          <p className="mt-0.5 text-[11.5px] font-medium leading-snug text-[var(--muted)] line-clamp-2">
-            {activeToast?.message}
-          </p>
 
-          {/* Action Slot (e.g. Urungkan / Undo) */}
-          {activeToast?.action && (
-            <div className="mt-2.5 flex items-center">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  hapticImpact('medium')
-                  activeToast.action.onClick?.()
-                  dismissToast()
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--field-bg)] hover:bg-[var(--panel)] border border-[var(--border)] text-[11px] font-black text-[var(--accent)] active:scale-95 transition shadow-2xs cursor-pointer"
-              >
-                <RotateCcw size={12} strokeWidth={2.5} />
-                <span>{activeToast.action.label || t('common.undo', 'Urungkan')}</span>
-              </button>
+          {/* Text Content */}
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <h5 className="text-xs font-black tracking-tight text-[var(--fg)] truncate">
+                {activeToast?.title || t('notifications.fallbackTitle', 'Notifikasi')}
+              </h5>
+              <span className="text-[10px] font-extrabold text-[var(--accent-alt,#6B7C5E)] tracking-wider uppercase shrink-0">
+                {t('notifications.toastBadgeNew', 'Baru')}
+              </span>
             </div>
-          )}
-        </div>
+            <p className="mt-0.5 text-[11.5px] font-medium leading-snug text-[var(--muted)] line-clamp-2">
+              {activeToast?.message}
+            </p>
 
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            dismissToast()
-          }}
-          className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition shrink-0 cursor-pointer"
-          title={t('common.close', 'Tutup')}
-        >
-          <X size={14} />
-        </button>
+            {/* Action Slot (e.g. Urungkan / Undo) */}
+            {activeToast?.action && (
+              <div className="mt-2.5 flex items-center">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    triggerHaptic('medium')
+                    activeToast.action.onClick?.()
+                    dismissToast('up')
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--field-bg)] hover:bg-[var(--panel)] border border-[var(--border)] text-[11px] font-black text-[var(--accent)] active:scale-95 transition shadow-2xs cursor-pointer"
+                >
+                  <RotateCcw size={12} strokeWidth={2.5} />
+                  <span>{activeToast.action.label || t('common.undo', 'Urungkan')}</span>
+                </button>
+              </div>
+            )}
+          </div>
 
-        {/* Bottom Progress Timer Line */}
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--border)]/30 overflow-hidden">
-          <div
-            className={`h-full ${color.replace('text-', 'bg-')} transition-all linear`}
-            style={{
-              width: isVisible ? '0%' : '100%',
-              transitionDuration: isVisible ? `${activeToast?.duration || 4500}ms` : '0ms',
-              transitionPlayState: isPaused ? 'paused' : 'running',
-              animationPlayState: isPaused ? 'paused' : 'running',
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              triggerHaptic('light')
+              dismissToast('up')
             }}
-          />
+            className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)] transition shrink-0 cursor-pointer"
+            title={t('common.close', 'Tutup')}
+          >
+            <X size={14} />
+          </button>
+
+          {/* Bottom Progress Timer Line (Hardware-accelerated CSS scaleX with freeze & fade-out on dismiss) */}
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--border)]/30 overflow-hidden pointer-events-none">
+            <div
+              key={`progress-${activeToast?.id}`}
+              className={`h-full ${color.replace('text-', 'bg-')} origin-left transform-gpu`}
+              style={{
+                animationName: 'ft-toast-progress',
+                animationDuration: `${activeToast?.duration || 4500}ms`,
+                animationTimingFunction: 'linear',
+                animationFillMode: 'forwards',
+                animationPlayState: isPaused || isDismissing ? 'paused' : 'running',
+                opacity: isDismissing ? 0 : 1,
+                transition: isDismissing ? 'opacity 160ms ease-out' : 'none',
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
-  </div>,
-  document.body
-)
+    </div>,
+    document.body
+  )
 }

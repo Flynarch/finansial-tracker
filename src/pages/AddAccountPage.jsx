@@ -7,6 +7,7 @@ import { walletInstitutions, getWalletLogoUrl } from '../data/walletInstitutions
 import AddAccountForm from '../components/wallet/AddAccountForm'
 import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import PageHeader from '../components/ui/PageHeader'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import useTranslation from '../hooks/useTranslation'
 
 const getAvatarColor = (name) => {
@@ -65,7 +66,7 @@ function CircularInstitutionLogo({ inst }) {
 export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const wallets = useLiveQuery(() => db.wallets.toArray()) || []
+  const wallets = useLiveQuery(() => db.wallets.toArray())
 
   const tabs = useMemo(
     () => [
@@ -90,7 +91,7 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   )
 
   const isInstitutionAdded = (inst) => {
-    return wallets.some((w) => {
+    return (wallets || []).some((w) => {
       if (w.isArchived) return false
       if (inst.logoUrl && w.logoUrl === inst.logoUrl) return true
       if (inst.customIcon && w.customIcon === inst.customIcon) return true
@@ -110,6 +111,10 @@ export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
       return matchTab && matchSearch
     })
   }, [search, activeTab])
+
+  if (wallets === undefined) {
+    return <PageSkeleton variant="add-account" />
+  }
 
   if (selectedInst) {
     return (

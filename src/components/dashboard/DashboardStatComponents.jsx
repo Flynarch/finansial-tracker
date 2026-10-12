@@ -148,7 +148,7 @@ export const MiniChartCard = memo(function MiniChartCard({
       </div>
 
       {isEmptyData ? (
-        <div className="mt-2.5 h-36 sm:h-40 w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-3 text-center transition-colors hover:border-[var(--border-strong)]">
+        <div className="mt-2.5 h-36 sm:h-40 w-full rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-3 text-center transition-colors hover:border-[var(--border-strong)]">
           {/* Subtle background curved wave SVG */}
           <svg className="absolute inset-0 h-full w-full opacity-10 pointer-events-none stroke-[var(--accent)] fill-none" viewBox="0 0 300 100" preserveAspectRatio="none">
             <path d="M 0,80 Q 75,30 150,70 T 300,40" strokeWidth="2.5" strokeDasharray="6 6" />

@@ -7,6 +7,7 @@ import { db } from '../../../lib/db'
 import useTranslation from '../../../hooks/useTranslation'
 import useChatStore from '../../../store/useChatStore'
 import { safeFormatDate } from '../../../lib/utils'
+import { triggerHaptic } from '../../../lib/haptics'
 
 export default function HabitCardWidget({
   habitId,
@@ -45,6 +46,7 @@ export default function HabitCardWidget({
 
   const handleToggleLog = async () => {
     if (isProcessing) return
+    triggerHaptic('light')
     setIsProcessing(true)
 
     try {
@@ -79,16 +81,17 @@ export default function HabitCardWidget({
   }
 
   const handleNavigate = () => {
+    triggerHaptic('light')
     if (onClose) onClose()
     navigate('/todos')
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm my-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="relative rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)]/85 backdrop-blur-md p-3.5 sm:p-4 shadow-sm overflow-hidden my-1.5 ft-msg-enter">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--border)]/40">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shadow-2xs">
             <Flame size={16} strokeWidth={2.5} />
           </div>
           <div className="min-w-0">
@@ -106,7 +109,7 @@ export default function HabitCardWidget({
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-bold transition active:scale-95 cursor-pointer shadow-2xs shrink-0 ${
             isLoggedToday
               ? 'bg-emerald-500 text-white border-emerald-600'
-              : 'bg-[var(--field-bg)] text-[var(--fg)] border-[var(--border)] hover:border-emerald-500/50'
+              : 'bg-[var(--field-bg)]/60 text-[var(--fg)] border-[var(--border)]/60 hover:border-emerald-500/50'
           }`}
         >
           <Check size={13} strokeWidth={3} className={isLoggedToday ? 'text-white' : 'text-[var(--muted)]'} />
@@ -118,9 +121,9 @@ export default function HabitCardWidget({
       <div className="my-3">
         <div className="text-[10.5px] font-bold text-[var(--muted)] mb-1.5 flex items-center justify-between">
           <span>{t('habits.weeklyProgress', 'Pelacak 7 Hari Terakhir')}</span>
-          <span className="text-[10px] text-[var(--muted)]/80">{todayStr}</span>
+          <span className="text-[10px] text-[var(--muted)]/80 font-mono">{todayStr}</span>
         </div>
-        <div className="flex items-center justify-between gap-1.5 rounded-xl border border-[var(--border)]/60 bg-[var(--field-bg)]/60 p-2">
+        <div className="flex items-center justify-between gap-1.5 rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/40 p-2">
           {pastWeekLogs.map((item, idx) => {
             const isToday = item.date === todayStr
             return (
@@ -131,7 +134,7 @@ export default function HabitCardWidget({
                       ? 'bg-emerald-500 text-white shadow-xs'
                       : isToday
                       ? 'border-2 border-dashed border-[var(--accent)] text-[var(--accent)]'
-                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)]/50'
+                      : 'bg-[var(--field-bg)]/50 border border-[var(--border)]/50 text-[var(--muted)]/50'
                   }`}
                 >
                   {item.done ? <Check size={11} strokeWidth={3} /> : idx + 1}
@@ -150,7 +153,7 @@ export default function HabitCardWidget({
         <button
           type="button"
           onClick={handleNavigate}
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:text-[var(--accent-strong)] transition active:scale-95 cursor-pointer"
         >
           <span>{t('habits.viewAll', 'Lihat Semua Habit')}</span>
           <ArrowUpRight size={12} strokeWidth={2.5} />

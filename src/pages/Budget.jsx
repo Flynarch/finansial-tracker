@@ -1,8 +1,10 @@
 import { format, subMonths, startOfMonth } from 'date-fns'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import EmptyState from '../components/ui/EmptyState'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import MonthPicker from '../components/ui/MonthPicker'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import BudgetSheetModal from '../components/budget/BudgetSheetModal'
@@ -75,7 +77,9 @@ function Budget() {
       console.warn('[Budget]', err)
       return []
     }
-  }, [], [])
+  }, [])
+
+  const isDataReady = budgets !== undefined
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
@@ -261,10 +265,14 @@ function Budget() {
     openSheet()
   }
 
+  const handledOpenAddRef = useRef(false)
   useEffect(() => {
-    if (location.state?.openAdd) {
-      window.setTimeout(() => openAdd(), 0)
+    if (location.state?.openAdd && !handledOpenAddRef.current) {
+      handledOpenAddRef.current = true
+      openAdd()
       navigate(location.pathname, { replace: true, state: null })
+    } else if (!location.state?.openAdd) {
+      handledOpenAddRef.current = false
     }
   }, [location.pathname, location.state, navigate, openAdd])
 
@@ -279,15 +287,19 @@ function Budget() {
 
   return (
     <div className="min-h-[100dvh] pb-24">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-          isLeaving
-            ? '-translate-x-2 opacity-0'
-            : isEntering
-              ? 'translate-y-0 opacity-100'
-              : 'translate-y-2 opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="budget" />}
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
+            isLeaving
+              ? '-translate-x-2 opacity-0'
+              : isEntering
+                ? 'translate-y-0 opacity-100'
+                : 'translate-y-2 opacity-0'
+          }`}
+        >
         {/* Header */}
         <PageHeader
           title={t('budget.title')}
@@ -605,8 +617,10 @@ function Budget() {
             </div>
           </div>
         )}
+      </div>
+    </SkeletonTransition>
 
-        <BudgetSheetModal
+      <BudgetSheetModal
           isOpen={sheetOpen}
           onClose={closeSheet}
           editingBudget={budgets?.find((b) => b.id === editingId)}
@@ -644,7 +658,6 @@ function Budget() {
           onClose={() => setIsCycleModalOpen(false)}
           currentMonth={month}
         />
-      </div>
     </div>
   )
 }

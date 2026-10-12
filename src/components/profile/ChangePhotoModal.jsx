@@ -4,115 +4,14 @@ import {
   Trash2,
   Check,
   Camera,
+  Sliders,
 } from 'lucide-react'
 import Modal from '../ui/Modal'
 import UserAvatar from '../ui/UserAvatar'
+import PhotoCropperModal from './PhotoCropperModal'
+import { PRESET_AVATARS, AVATAR_CATEGORIES } from './presetAvatarsData'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
-
-// Curated preset vector avatars encoded as clean SVG data URIs
-const PRESET_AVATARS = [
-  {
-    id: 'preset-1',
-    label: 'Persona Violet',
-    color: '#8b5cf6',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g1" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%238B5CF6"/><stop offset="100%25" stop-color="%233B82F6"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g1)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-2',
-    label: 'Persona Emerald',
-    color: '#10b981',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g2" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%2310B981"/><stop offset="100%25" stop-color="%23047857"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g2)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-3',
-    label: 'Persona Amber',
-    color: '#f59e0b',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g3" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23F59E0B"/><stop offset="100%25" stop-color="%23EF4444"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g3)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-4',
-    label: 'Persona Sky',
-    color: '#0ea5e9',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g4" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%230EA5E9"/><stop offset="100%25" stop-color="%236366F1"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g4)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-5',
-    label: 'Persona Rose',
-    color: '#f43f5e',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g5" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%23F43F5E"/><stop offset="100%25" stop-color="%23FB7185"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g5)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-6',
-    label: 'Persona Obsidian',
-    color: '#334155',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g6" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%231E293B"/><stop offset="100%25" stop-color="%230F172A"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g6)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-7',
-    label: 'Persona Teal',
-    color: '#14b8a6',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g7" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%2314B8A6"/><stop offset="100%25" stop-color="%230D9488"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g7)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-  {
-    id: 'preset-8',
-    label: 'Persona Minimal',
-    color: '#64748b',
-    dataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g8" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse"><stop offset="0%25" stop-color="%2364748B"/><stop offset="100%25" stop-color="%23475569"/></linearGradient></defs><rect width="120" height="120" fill="url(%23g8)"/><circle cx="60" cy="48" r="22" fill="white" opacity="0.95"/><path d="M24 106 C24 82 42 76 60 76 C78 76 96 82 96 106 Z" fill="white" opacity="0.95"/></svg>`,
-  },
-]
-
-/**
- * Client-side high-performance canvas image compressor
- * Scales image to maximum 400x400 square (centered crop) and outputs WebP / JPEG
- */
-function compressImage(file, maxSize = 400, quality = 0.85) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = reject
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onerror = reject
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let width = img.width
-        let height = img.height
-
-        // Calculate square crop dimensions
-        const minDim = Math.min(width, height)
-        const sx = (width - minDim) / 2
-        const sy = (height - minDim) / 2
-
-        const targetSize = Math.min(maxSize, minDim)
-        canvas.width = targetSize
-        canvas.height = targetSize
-
-        const ctx = canvas.getContext('2d')
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'high'
-
-        // Draw cropped square image
-        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize)
-
-        // Try WebP with JPEG fallback
-        try {
-          const dataUrl = canvas.toDataURL('image/webp', quality)
-          if (dataUrl.startsWith('data:image/webp')) {
-            resolve(dataUrl)
-            return
-          }
-        } catch (err){
-      console.warn('[ChangePhotoModal]', err)
-          /* ignore and use jpeg */
-        }
-
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.src = e.target.result
-    }
-    reader.readAsDataURL(file)
-  })
-}
 
 function ChangePhotoContent({
   currentPhoto = '',
@@ -123,11 +22,24 @@ function ChangePhotoContent({
   t,
 }) {
   const [previewPhoto, setPreviewPhoto] = useState(currentPhoto || '')
+  const [rawImageForCrop, setRawImageForCrop] = useState(null)
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [activeCategory, setActiveCategory] = useState('all')
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const fileInputRef = useRef(null)
 
-  const handleFileChange = async (e) => {
+  const isPresetSelected = PRESET_AVATARS.some((p) => p.dataUrl === previewPhoto)
+  const selectedPreset = PRESET_AVATARS.find((p) => p.dataUrl === previewPhoto)
+  const isCustomPhoto = Boolean(previewPhoto && !isPresetSelected)
+
+  const filteredAvatars =
+    activeCategory === 'all'
+      ? PRESET_AVATARS
+      : PRESET_AVATARS.filter((p) => p.category === activeCategory)
+
+  // File upload trigger -> open cropper
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -136,18 +48,32 @@ function ChangePhotoContent({
       return
     }
 
-    try {
-      setIsProcessing(true)
-      setErrorMsg('')
-      const compressedDataUrl = await compressImage(file, 400, 0.85)
-      setPreviewPhoto(compressedDataUrl)
-    } catch (err){
-      console.warn('[ChangePhotoModal]', err)
+    const reader = new FileReader()
+    reader.onerror = () => {
       setErrorMsg(t('profile.photoProcessError', 'Gagal memproses gambar. Silakan coba gambar lain.'))
-    } finally {
-      setIsProcessing(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+    reader.onload = (event) => {
+      setRawImageForCrop(event.target?.result)
+      setIsCropperOpen(true)
+      setErrorMsg('')
+    }
+    reader.readAsDataURL(file)
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // Open cropper for current custom photo
+  const handleOpenAdjustCurrent = () => {
+    if (!previewPhoto) return
+    setRawImageForCrop(previewPhoto)
+    setIsCropperOpen(true)
+  }
+
+  // Cropper applied
+  const handleCropApply = (croppedDataUrl) => {
+    setPreviewPhoto(croppedDataUrl)
+    setIsCropperOpen(false)
+    setErrorMsg('')
   }
 
   const handleSelectPreset = (preset) => {
@@ -169,7 +95,7 @@ function ChangePhotoContent({
         await setProfilePhoto(previewPhoto)
       }
       onClose()
-    } catch (err){
+    } catch (err) {
       console.warn('[ChangePhotoModal]', err)
       setErrorMsg(t('profile.photoSaveError', 'Gagal menyimpan foto profil.'))
     } finally {
@@ -178,17 +104,17 @@ function ChangePhotoContent({
   }
 
   return (
-    <div className="space-y-3.5 pt-0.5">
+    <div className="space-y-4 pt-0.5">
       {/* ── 1. Compact Header Profile Card & Actions ── */}
-      <div className="flex items-center gap-3 p-2.5 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
+      <div className="flex items-center gap-3.5 p-3 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]">
         <div className="relative shrink-0">
-          <div className="p-0.5 rounded-full border border-[var(--accent)]/50 shadow-xs">
+          <div className="p-0.5 rounded-full border-2 border-[var(--accent)]/60 shadow-xs">
             <UserAvatar
               photo={previewPhoto}
               name={profileName}
-              size={56}
+              size={60}
               shape="circle"
-              className="w-14 h-14"
+              className="w-15 h-15"
             />
           </div>
 
@@ -196,48 +122,60 @@ function ChangePhotoContent({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isProcessing}
-            className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-[var(--fg)] text-[var(--bg)] border border-[var(--panel-strong)] shadow-xs transition hover:scale-110 active:scale-95 cursor-pointer"
+            className="absolute -bottom-1 -right-1 grid h-6.5 w-6.5 place-items-center rounded-full bg-[var(--fg)] text-[var(--bg)] border-2 border-[var(--panel-strong)] shadow-xs transition hover:scale-110 active:scale-95 cursor-pointer"
             title={t('profile.changePhotoDesc', 'Unggah foto dari perangkat')}
             aria-label={t('profile.changePhotoDesc', 'Unggah foto dari perangkat')}
           >
-            <Camera size={11} strokeWidth={2.5} />
+            <Camera size={12} strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 space-y-2">
           <div>
-            <p className="text-xs font-black text-[var(--fg)] truncate">
+            <p className="text-sm font-black text-[var(--fg)] truncate">
               {profileName || 'FinTrack User'}
             </p>
-            <p className="text-[10.5px] font-medium text-[var(--muted)] leading-tight">
+            <p className="text-[11px] font-medium text-[var(--muted)] leading-tight">
               {previewPhoto
-                ? PRESET_AVATARS.some((p) => p.dataUrl === previewPhoto)
-                  ? `Persona ${PRESET_AVATARS.find((p) => p.dataUrl === previewPhoto)?.label.replace('Persona ', '')}`
+                ? isPresetSelected
+                  ? selectedPreset?.label
                   : t('profile.photoCustomActive', 'Foto kustom aktif')
                 : t('profile.photoDefaultInitials', 'Inisial nama (default)')}
             </p>
           </div>
 
-          {/* Inline Action Buttons */}
-          <div className="flex items-center gap-1.5">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
-              className="flex items-center gap-1 py-1 px-2 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] text-[10.5px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition cursor-pointer shadow-2xs active:scale-95"
+              className="flex items-center gap-1 py-1 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition cursor-pointer shadow-2xs active:scale-95"
             >
-              <Upload size={11} />
+              <Upload size={12} />
               <span>{t('profile.uploadPhoto', 'Unggah Foto')}</span>
             </button>
+
+            {isCustomPhoto && (
+              <button
+                type="button"
+                onClick={handleOpenAdjustCurrent}
+                disabled={isProcessing}
+                className="flex items-center gap-1 py-1 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] text-[11px] font-bold text-[var(--accent)] hover:border-[var(--accent)]/50 transition cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Sliders size={12} />
+                <span>{t('profile.adjustPhoto', 'Sesuaikan')}</span>
+              </button>
+            )}
 
             {previewPhoto ? (
               <button
                 type="button"
                 onClick={handleRemovePhoto}
                 disabled={isProcessing}
-                className="flex items-center gap-1 py-1 px-2 rounded-lg border border-red-500/20 bg-red-500/10 text-[10.5px] font-bold text-red-500 hover:bg-red-500/20 transition cursor-pointer shadow-2xs active:scale-95"
+                className="flex items-center gap-1 py-1 px-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-[11px] font-bold text-red-500 hover:bg-red-500/20 transition cursor-pointer shadow-2xs active:scale-95"
               >
-                <Trash2 size={11} />
+                <Trash2 size={12} />
                 <span>{t('profile.removePhoto', 'Hapus')}</span>
               </button>
             ) : null}
@@ -246,7 +184,7 @@ function ChangePhotoContent({
       </div>
 
       {errorMsg ? (
-        <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 text-center text-[11px] font-semibold text-rose-500">
+        <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2 text-center text-xs font-semibold text-rose-500">
           {errorMsg}
         </div>
       ) : null}
@@ -260,42 +198,71 @@ function ChangePhotoContent({
         onChange={handleFileChange}
       />
 
-      {/* ── 2. Preset Persona Avatars (4x2 Clean Fixed Grid) ── */}
-      <div className="space-y-1.5">
-        <label className="block text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-          {t('profile.presetAvatars', 'Atau Pilih Avatar Persona')}
-        </label>
+      {/* ── 2. Preset Avatars Section with Category Filter ── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+            {t('profile.presetAvatars', 'Pilihan Avatar Profil')}
+          </label>
+          <span className="text-[10px] font-bold text-[var(--muted-2)]">
+            {filteredAvatars.length} {t('common.options', 'Pilihan')}
+          </span>
+        </div>
 
-        <div className="grid grid-cols-4 gap-1.5">
-          {PRESET_AVATARS.map((preset) => {
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {AVATAR_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                activeCategory === cat.id
+                  ? 'bg-[var(--accent)] text-[var(--bg)] shadow-2xs font-black'
+                  : 'bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] border border-[var(--border)]'
+              }`}
+            >
+              {t(cat.labelKey, cat.labelDefault)}
+            </button>
+          ))}
+        </div>
+
+        {/* Responsive Avatars Grid */}
+        <div className="grid grid-cols-4 gap-2 max-h-[340px] sm:max-h-[380px] overflow-y-auto overscroll-contain pr-1">
+          {filteredAvatars.map((preset) => {
             const isSelected = previewPhoto === preset.dataUrl
             return (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => handleSelectPreset(preset)}
-                className={`group relative flex flex-col items-center gap-1 p-1.5 rounded-xl border transition-all cursor-pointer ${
+                className={`group relative flex flex-col items-center gap-1.5 p-2 rounded-2xl border transition-all cursor-pointer ${
                   isSelected
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-2xs ring-1 ring-[var(--accent)]'
-                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)]'
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/12 shadow-sm ring-2 ring-[var(--accent)] scale-[1.02]'
+                    : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel-strong)] hover:border-[var(--border-strong)] active:scale-95'
                 }`}
               >
-                <div className="relative w-9 h-9 rounded-full overflow-hidden border-[0.5px] border-[var(--border)] shadow-2xs">
+                <div className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-full overflow-hidden border border-[var(--border)] shadow-xs transition-transform duration-200 group-hover:scale-105">
                   <img
                     src={preset.dataUrl}
                     alt={preset.label}
                     className="w-full h-full object-cover"
                   />
                   {isSelected && (
-                    <div className="absolute inset-0 bg-[var(--accent)]/30 backdrop-blur-[1px] flex items-center justify-center text-white">
-                      <Check size={14} strokeWidth={3} />
+                    <div className="absolute inset-0 bg-[var(--accent)]/35 backdrop-blur-[1px] flex items-center justify-center text-white">
+                      <Check size={18} strokeWidth={3} />
                     </div>
                   )}
                 </div>
 
-                <span className="text-[9.5px] font-bold text-[var(--muted)] group-hover:text-[var(--fg)] truncate max-w-full">
-                  {preset.label.replace('Persona ', '')}
-                </span>
+                <div className="w-full text-center min-w-0">
+                  <p className="text-[10.5px] font-bold text-[var(--fg)] truncate leading-tight">
+                    {preset.label}
+                  </p>
+                  <p className="text-[9px] font-medium text-[var(--muted)] truncate leading-tight">
+                    {preset.subtitle}
+                  </p>
+                </div>
               </button>
             )
           })}
@@ -307,7 +274,7 @@ function ChangePhotoContent({
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 py-2 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition cursor-pointer active:scale-95"
+          className="flex-1 py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-strong)] transition cursor-pointer active:scale-95"
         >
           {t('profile.editModal.cancel', 'Batal')}
         </button>
@@ -316,12 +283,23 @@ function ChangePhotoContent({
           type="button"
           onClick={handleSave}
           disabled={isProcessing}
-          className="flex-[1.5] flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
+          className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] text-xs font-black shadow-xs transition hover:opacity-90 active:scale-[0.98] cursor-pointer"
         >
           <Check size={14} strokeWidth={2.5} />
           <span>{t('profile.saveChanges', 'Simpan Perubahan')}</span>
         </button>
       </div>
+
+      {/* ── 4. Interactive Photo Cropper Modal ── */}
+      {isCropperOpen && (
+        <PhotoCropperModal
+          isOpen={isCropperOpen}
+          imageSrc={rawImageForCrop}
+          onApply={handleCropApply}
+          onClose={() => setIsCropperOpen(false)}
+          zIndex="z-[70]"
+        />
+      )}
     </div>
   )
 }
@@ -345,7 +323,7 @@ export default function ChangePhotoModal({
       isOpen={isOpen}
       onClose={onClose}
       title={t('profile.changePhotoModalTitle', 'Foto Profil')}
-      maxWidth="max-w-sm"
+      maxWidth="max-w-md"
       zIndex={zIndex}
     >
       {isOpen ? (

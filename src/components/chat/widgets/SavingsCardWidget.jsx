@@ -3,6 +3,7 @@ import { Target, PiggyBank, ArrowUpRight } from 'lucide-react'
 import useTranslation from '../../../hooks/useTranslation'
 import useChatStore from '../../../store/useChatStore'
 import { formatCurrency, toSafeNumber } from '../../../lib/utils'
+import { triggerHaptic } from '../../../lib/haptics'
 
 export default function SavingsCardWidget({
   title = 'Target Tabungan',
@@ -21,16 +22,17 @@ export default function SavingsCardWidget({
   const remaining = Math.max(0, numTarget - numCurrent)
 
   const handleNavigate = () => {
+    triggerHaptic('light')
     if (onClose) onClose()
     navigate('/savings')
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm my-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="relative rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)]/85 backdrop-blur-md p-3.5 sm:p-4 shadow-sm overflow-hidden my-1.5 ft-msg-enter">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--border)]/40">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 shadow-2xs">
             {action === 'add' ? <PiggyBank size={16} strokeWidth={2.2} /> : <Target size={16} strokeWidth={2.2} />}
           </div>
           <div className="min-w-0">
@@ -41,23 +43,23 @@ export default function SavingsCardWidget({
           </div>
         </div>
 
-        <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/15 px-2 py-0.5 text-[10.5px] font-bold text-[var(--accent)] shrink-0">
+        <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/15 px-2 py-0.5 text-[10.5px] font-bold text-[var(--accent)] shrink-0 shadow-2xs">
           {percentage}%
         </span>
       </div>
 
       {/* Numerical Stats */}
       <div className="grid grid-cols-2 gap-2 my-3">
-        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/70 p-2.5">
+        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/40 p-2.5">
           <div className="text-[10px] font-medium text-[var(--muted)]">{t('savings.collected', 'Terkumpul')}</div>
-          <div className="text-xs sm:text-sm font-black text-emerald-500 mt-0.5">
+          <div className="text-xs sm:text-sm font-black text-emerald-500 mt-0.5 font-mono">
             {formatCurrency(numCurrent, currency)}
           </div>
         </div>
 
-        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/70 p-2.5">
+        <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--field-bg)]/40 p-2.5">
           <div className="text-[10px] font-medium text-[var(--muted)]">{t('savings.target', 'Target')}</div>
-          <div className="text-xs sm:text-sm font-black text-[var(--fg)] mt-0.5">
+          <div className="text-xs sm:text-sm font-black text-[var(--fg)] mt-0.5 font-mono">
             {formatCurrency(numTarget, currency)}
           </div>
         </div>
@@ -65,7 +67,7 @@ export default function SavingsCardWidget({
 
       {/* Progress Bar */}
       <div className="space-y-1">
-        <div className="h-2 w-full rounded-full bg-[var(--field-bg)] overflow-hidden border border-[var(--border)]/60">
+        <div className="h-2 w-full rounded-full bg-[var(--field-bg)]/80 overflow-hidden border border-[var(--border)]/50">
           <div
             className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
             style={{ width: `${percentage}%` }}
@@ -80,7 +82,7 @@ export default function SavingsCardWidget({
             <span className="text-emerald-500 font-bold">{t('savings.targetReached', 'Target Tercapai!')}</span>
           ) : (
             <span>
-              {t('savings.remaining', 'Kurang')}: <strong className="text-[var(--fg)]">{formatCurrency(remaining, currency)}</strong>
+              {t('savings.remaining', 'Kurang')}: <strong className="text-[var(--fg)] font-mono">{formatCurrency(remaining, currency)}</strong>
             </span>
           )}
         </div>
@@ -88,7 +90,7 @@ export default function SavingsCardWidget({
         <button
           type="button"
           onClick={handleNavigate}
-          className="inline-flex items-center gap-1 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)]/60 border border-[var(--border)]/60 px-2.5 py-1 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--field-bg)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
         >
           <span>{t('savings.viewGoals', 'Lihat Tabungan')}</span>
           <ArrowUpRight size={12} strokeWidth={2.5} />

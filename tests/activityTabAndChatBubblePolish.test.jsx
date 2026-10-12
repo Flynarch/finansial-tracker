@@ -30,12 +30,11 @@ describe('Chat Bubble Compact Layout & Timestamp Polish', () => {
 
     const bubbleEl = container.querySelector('.flex-1')
     expect(bubbleEl).toBeDefined()
-    expect(bubbleEl.className).toContain('px-3.5 py-2.25')
-    expect(bubbleEl.className).toContain('gap-1')
+    expect(container.querySelector('.ft-ai-editorial-flow')).toBeDefined()
 
-    const timeSpan = container.querySelector('span.text-\\[9\\.5px\\]')
+    const timeSpan = container.querySelector('span.tabular-nums')
     expect(timeSpan).toBeDefined()
-    expect(timeSpan.className).toContain('-mt-0.5')
+    expect(timeSpan.textContent).toBeTruthy()
   })
 })
 

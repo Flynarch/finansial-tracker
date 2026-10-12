@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import BottomSheet from '../ui/BottomSheet'
@@ -29,7 +29,14 @@ export default function SavingsFundSheetModal({
   const [selectedWalletId, setSelectedWalletId] = useState('')
   const [walletModalOpen, setWalletModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitLockRef = useRef(false)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      submitLockRef.current = false
+    }
+  }, [isOpen])
 
   const wallets = useLiveQuery(
     () => {
@@ -59,8 +66,9 @@ export default function SavingsFundSheetModal({
   const handleSave = async () => {
     const targetCurrency = goal.currency || defaultCurrency
     const val = parseMoneyInput(amountInput, targetCurrency)
-    if (val <= 0 || isSubmitting) return
+    if (val <= 0 || isSubmitting || submitLockRef.current) return
 
+    submitLockRef.current = true
     setIsSubmitting(true)
     try {
       const isWithdraw = fundActionType === 'withdraw'
@@ -159,6 +167,7 @@ export default function SavingsFundSheetModal({
       console.error('Failed to save savings transaction:', err)
     } finally {
       setIsSubmitting(false)
+      submitLockRef.current = false
     }
   }
 

@@ -22,7 +22,7 @@ export async function handleSavingsAction(result, {
     const goalCurrency = (result.currency && typeof result.currency === 'string' && result.currency.trim())
       ? result.currency.trim().toUpperCase()
       : defaultCurrency
-    await db.goals.add({
+    const goalId = await db.goals.add({
       name: result.name,
       targetAmount: targetAmt,
       currentAmount: 0,
@@ -38,6 +38,7 @@ export async function handleSavingsAction(result, {
         action: 'create',
         title: result.name,
         data: {
+          id: goalId,
           title: result.name,
           targetAmount: targetAmt,
           currentAmount: 0,
@@ -134,6 +135,7 @@ export async function handleSavingsAction(result, {
               title: matched.name,
               subtitle: walletSubtitle,
               data: {
+                id: matched.id,
                 title: matched.name,
                 targetAmount: matched.targetAmount,
                 currentAmount: newCurrent,
@@ -257,6 +259,7 @@ export async function handleSavingsAction(result, {
               title: matched.name,
               subtitle: walletSubtitle,
               data: {
+                id: matched.id,
                 title: matched.name,
                 targetAmount: matched.targetAmount,
                 currentAmount: newCurrent,

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import EmptyState from '../components/ui/EmptyState'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import LoanSheetModal from '../components/loans/LoanSheetModal'
 import LoanPaymentModal from '../components/loans/LoanPaymentModal'
@@ -74,9 +76,10 @@ export default function Loans() {
     return () => window.cancelAnimationFrame(id)
   }, [])
 
-  const loans = useLiveQuery(() => db.loans.toArray(), [], [])
-  const loanPayments = useLiveQuery(() => db.loanPayments.toArray(), [], [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [], [])
+  const loans = useLiveQuery(() => db.loans.toArray(), [])
+  const loanPayments = useLiveQuery(() => db.loanPayments.toArray(), [])
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const isDataReady = loans !== undefined && loanPayments !== undefined && wallets !== undefined
   const walletMap = useMemo(() => {
     const map = new Map()
     wallets?.forEach((w) => map.set(w.id, w.name))
@@ -326,15 +329,19 @@ export default function Loans() {
 
   return (
     <div className="min-h-[100dvh] pb-24">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-          isLeaving
-            ? '-translate-x-2 opacity-0'
-            : isEntering
-              ? 'translate-y-0 opacity-100'
-              : 'translate-y-2 opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="loans" />}
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
+            isLeaving
+              ? '-translate-x-2 opacity-0'
+              : isEntering
+                ? 'translate-y-0 opacity-100'
+                : 'translate-y-2 opacity-0'
+          }`}
+        >
         {/* Page Header */}
         <PageHeader
           title={t('loans.title')}
@@ -856,6 +863,7 @@ export default function Loans() {
           )}
         </div>
       </div>
+    </SkeletonTransition>
 
       {/* Modals */}
       <LoanSheetModal

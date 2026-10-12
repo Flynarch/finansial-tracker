@@ -97,7 +97,7 @@ describe('Round 9 Hardening Suite: Habits, Investments, Loans, AI & Sync', () =>
     })
 
     it('calculateHabitStats caps current week over-logging to prevent leaking completions to past weeks', () => {
-      const twoWeeksAgo = subWeeks(new Date(), 2)
+      const twoWeeksAgo = startOfWeek(subWeeks(new Date(), 2), { weekStartsOn: 1 })
       const habit = {
         id: 30,
         title: 'Meditasi',

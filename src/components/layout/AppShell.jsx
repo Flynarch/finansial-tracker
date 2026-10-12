@@ -54,7 +54,8 @@ function getSkeletonVariant(pathname) {
   if (pathname === '/todos') return 'todo'
   if (pathname.startsWith('/todos/')) return 'todo-detail'
   if (pathname === '/profile') return 'profile'
-  if (pathname.startsWith('/wallet/')) return 'wallet-detail'
+  if (pathname === '/add-account' || pathname === '/wallet/add') return 'add-account'
+  if (pathname.startsWith('/wallet/') || pathname.startsWith('/wallets/')) return 'wallet-detail'
   if (pathname === '/settings/security') return 'settings-security'
   if (pathname === '/settings/categories') return 'settings-categories'
   if (pathname === '/settings/recurring') return 'settings-recurring'
@@ -707,13 +708,20 @@ function AppShell() {
       <div className="mx-auto flex max-w-7xl">
         <Sidebar />
         {location.pathname === '/ai-chat' || location.pathname === '/chat' || location.pathname === '/ai-finance' ? (
-          <Suspense
-            fallback={<PageSkeleton variant="chat" />}
+          <div
+            key={location.pathname}
+            className="ft-page-crossfade flex-1 min-w-0 flex flex-col min-h-[calc(100dvh-64px)] md:min-h-[calc(100vh-65px)]"
           >
-            <ErrorBoundary>
-              <Outlet />
-            </ErrorBoundary>
-          </Suspense>
+            <Suspense
+              fallback={<PageSkeleton variant="chat" />}
+            >
+              <div className="ft-content-loaded flex-1 min-w-0 flex flex-col h-full w-full">
+                <ErrorBoundary>
+                  <Outlet />
+                </ErrorBoundary>
+              </div>
+            </Suspense>
+          </div>
         ) : (
           <main
             className={`${
@@ -742,9 +750,15 @@ function AppShell() {
               <Suspense
                 fallback={<PageSkeleton variant={getSkeletonVariant(location.pathname)} />}
               >
-                <ErrorBoundary>
-                  <Outlet />
-                </ErrorBoundary>
+                <div
+                  className={`ft-content-loaded ${
+                    location.pathname === '/transactions' ? 'h-full flex-1 flex flex-col min-h-0 overflow-hidden' : 'w-full min-h-full'
+                  }`}
+                >
+                  <ErrorBoundary>
+                    <Outlet />
+                  </ErrorBoundary>
+                </div>
               </Suspense>
             </div>
           </main>

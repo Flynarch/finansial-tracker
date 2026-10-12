@@ -1,5 +1,5 @@
-import { useMemo, memo, useState, useEffect, useCallback } from 'react'
-import { Sparkles, Check, CheckCheck } from 'lucide-react'
+import { useMemo, memo, useState, useCallback } from 'react'
+import { Sparkles, Check, CheckCheck, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
@@ -7,6 +7,8 @@ import useSettingsStore from '../../store/useSettingsStore'
 import { getTransactionCategoryLabels } from '../../lib/categoryIcon'
 import { formatCurrency } from '../../lib/utils'
 import { getChartPalette } from '../../lib/chartTheme'
+import { translate } from '../../lib/i18n'
+import { triggerHaptic } from '../../lib/haptics'
 import ExpandableSection from './ExpandableSection'
 
 function getCurrentTimeStr(timestamp) {
@@ -15,15 +17,16 @@ function getCurrentTimeStr(timestamp) {
 }
 
 // ── User Message Bubble ──
+// ── User Message Bubble ──
 // Features: asymmetric corner, floating inline timestamp, delivery status tick
 export const UserBubble = memo(function UserBubble({ content, timestamp, status = 'confirmed' }) {
   const timeStr = getCurrentTimeStr(timestamp)
   const StatusIcon = status === 'confirmed' ? CheckCheck : Check
   return (
-    <div className="ft-msg-enter flex flex-col items-end gap-0.5 max-w-[85%] sm:max-w-[80%] self-end my-0.5 min-w-0">
+    <div className="ft-msg-enter flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[78%] self-end my-1 min-w-0">
       <div className="rounded-2xl rounded-tr-xs bg-[var(--fg)] text-[var(--bg)] px-3.5 py-2 shadow-xs text-[13.5px] font-medium leading-relaxed break-words [overflow-wrap:anywhere]">
         <span>{content}</span>
-        <span className="inline-flex items-center gap-1 float-right mt-1 ml-2.5 text-[9.5px] text-[var(--bg)]/55 font-mono tabular-nums select-none whitespace-nowrap">
+        <span className="inline-flex items-center gap-1 float-right mt-1 ml-3 text-[9.5px] text-[var(--bg)]/60 font-mono tabular-nums select-none whitespace-nowrap">
           {timeStr}
           <StatusIcon size={11} className={status === 'confirmed' ? 'text-emerald-400' : 'opacity-50'} />
         </span>
@@ -35,23 +38,18 @@ export const UserBubble = memo(function UserBubble({ content, timestamp, status 
 // ── AI Avatar Badge ──
 export const AiAvatarBadge = memo(function AiAvatarBadge({ isThinking = false }) {
   return (
-    <div className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] shadow-2xs relative ${
-      isThinking ? 'ring-2 ring-[var(--accent)]/40 animate-pulse' : ''
-    }`}>
-      <Sparkles size={14} className="stroke-[2.2]" />
+    <div
+      className={`shrink-0 flex h-6.5 w-6.5 items-center justify-center rounded-xl bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)] shadow-2xs relative mt-0.5 ${
+        isThinking ? 'ring-2 ring-[var(--accent)]/40 animate-pulse' : ''
+      }`}
+    >
+      <Sparkles size={13} className="stroke-[2.2]" />
     </div>
   )
 })
 
 // ── AI Message Bubble ──
-// Features: message grouping position, floating timestamp, spring entrance animation
-const POSITION_RADIUS = {
-  single: 'rounded-2xl rounded-tl-xs',
-  first: 'rounded-2xl rounded-bl-lg rounded-tl-xs',
-  middle: 'rounded-2xl rounded-l-lg',
-  last: 'rounded-2xl rounded-tl-lg',
-}
-
+// Editorial Flow: Balasan AI mengalir natural tanpa border kotak kaku, tipografi lapang dan bersih
 function isSafeHttpUrl(url) {
   if (!url || typeof url !== 'string') return false
   try {
@@ -95,22 +93,35 @@ export const AiBubble = memo(function AiBubble({
   timestamp,
   isStreaming = false,
   isNew = false,
+  isRegenerating = false,
   embeddedWidget = null,
   position = 'single',
   expandableDetails = null,
+  onRegenerate = null,
+  msgId = null,
 }) {
+  const locale = useSettingsStore((s) => s.locale)
   if (!content && !embeddedWidget && !expandableDetails) return null
   const timeStr = getCurrentTimeStr(timestamp)
-  const radiusClass = POSITION_RADIUS[position] || POSITION_RADIUS.single
   const showAvatar = position === 'single' || position === 'first'
 
   return (
-    <div className={`ft-msg-enter flex items-start gap-2 max-w-[88%] sm:max-w-[85%] self-start ${position === 'single' || position === 'first' ? 'my-1' : 'my-0.5'} min-w-0 ${isNew ? 'ft-chat-ai--shimmer' : ''}`}>
-      {showAvatar ? <AiAvatarBadge /> : <div className="w-7 shrink-0" />}
-      
-      <div className={`flex-1 min-w-0 overflow-hidden flex flex-col gap-1 ${radiusClass} bg-[var(--field-bg)] border border-[var(--border)] px-3.5 py-2.25 shadow-xs`}>
+    <div
+      className={`ft-msg-enter flex items-start gap-2.5 max-w-[94%] sm:max-w-[88%] self-start ${
+        position === 'single' || position === 'first' ? 'my-1.5' : 'my-0.5'
+      } min-w-0 ${isNew ? 'ft-stream-fade' : ''} ${
+        isRegenerating ? 'ft-chat-ai--regenerating' : ''
+      }`}
+    >
+      {showAvatar ? <AiAvatarBadge /> : <div className="w-6.5 shrink-0" />}
+
+      <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-0.5">
         {content && (
-          <div className="ft-md-prose leading-relaxed text-[13.5px] text-[var(--fg)] break-words [overflow-wrap:anywhere]">
+          <div
+            className={`ft-md-prose ft-ai-editorial-flow leading-relaxed text-[14px] text-[var(--fg)] break-words [overflow-wrap:anywhere] ${
+              isNew || isRegenerating || isStreaming ? 'ft-regenerate-enter ft-stream-fade' : ''
+            }`}
+          >
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {content}
             </ReactMarkdown>
@@ -119,71 +130,79 @@ export const AiBubble = memo(function AiBubble({
         )}
 
         {expandableDetails && (
-          <ExpandableSection title={expandableDetails.title || 'Rincian Tambahan'}>
-            {typeof expandableDetails.content === 'string' ? (
-              <div className="ft-md-prose text-xs text-[var(--muted)]">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                  {expandableDetails.content}
-                </ReactMarkdown>
-              </div>
-            ) : (
-              expandableDetails.content
-            )}
-          </ExpandableSection>
+          <div className="rounded-2xl border border-[var(--border)]/70 bg-[var(--field-bg)]/50 p-2.5 mt-1">
+            <ExpandableSection title={expandableDetails.title || 'Rincian Tambahan'}>
+              {typeof expandableDetails.content === 'string' ? (
+                <div className="ft-md-prose text-xs text-[var(--muted)]">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {expandableDetails.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                expandableDetails.content
+              )}
+            </ExpandableSection>
+          </div>
         )}
 
         {embeddedWidget && (
-          <div className={`${content ? 'mt-1 pt-1.5 border-t border-[var(--border)]/40' : ''} w-full min-w-0 overflow-hidden`}>
+          <div className="w-full min-w-0 overflow-hidden mt-1.5">
             {embeddedWidget}
           </div>
         )}
 
-        <span className="self-end text-[9.5px] font-medium text-[var(--muted)]/60 tabular-nums select-none -mt-0.5">
-          {timeStr}
-        </span>
+        <div className="flex items-center justify-between gap-2 mt-1.5 pt-0.5">
+          {onRegenerate && !isStreaming ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                triggerHaptic('light')
+                onRegenerate(msgId)
+              }}
+              className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--muted)] hover:text-[var(--fg)] px-2.5 py-1 rounded-full border border-[var(--border)]/50 bg-[var(--field-bg)]/40 hover:bg-[var(--field-bg)]/80 hover:border-[var(--accent)]/40 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              title={translate(locale, 'aiChat.regenerate') || (locale === 'en' ? 'Regenerate' : 'Buat Ulang')}
+              aria-label={translate(locale, 'aiChat.regenerate') || (locale === 'en' ? 'Regenerate' : 'Buat Ulang')}
+            >
+              <RotateCcw size={11} className={isRegenerating ? 'animate-spin text-[var(--accent)]' : ''} />
+              <span>{translate(locale, 'aiChat.regenerate') || (locale === 'en' ? 'Regenerate' : 'Buat Ulang')}</span>
+            </button>
+          ) : <div />}
+
+          <span className="self-end text-[10px] font-mono text-[var(--muted)]/60 tabular-nums select-none tracking-tight">
+            {timeStr}
+          </span>
+        </div>
       </div>
     </div>
   )
 })
 
-// ── Reasoning Step Indicator ──
-// Replaces the old 3-dot TypingIndicator with contextual reasoning steps
-const REASONING_STEPS_ID = [
-  'Membaca pesan Anda...',
-  'Menganalisis nominal dan kategori...',
-  'Memeriksa saldo dan batas anggaran...',
-  'Menyusun jawaban...',
-]
-const REASONING_STEPS_EN = [
-  'Reading your message...',
-  'Analyzing amounts and categories...',
-  'Checking balances and budget limits...',
-  'Composing response...',
-]
-const STEP_INTERVALS = [0, 1000, 3000, 5000]
+// ── AI Thinking / Reasoning Indicator ──
+// Clean, aesthetic and non-robotic indicator reflecting the active processing state
+export const ReasoningIndicator = memo(function ReasoningIndicator({ hasImage = false }) {
+  const locale = useSettingsStore((s) => s.locale)
+  const isEn = locale === 'en'
 
-export const ReasoningIndicator = memo(function ReasoningIndicator() {
-  const locale = useSettingsStore(s => s.locale)
-  const [stepIndex, setStepIndex] = useState(0)
-  const steps = locale === 'en' ? REASONING_STEPS_EN : REASONING_STEPS_ID
-
-  useEffect(() => {
-    const timers = STEP_INTERVALS.slice(1).map((delay, i) =>
-      setTimeout(() => setStepIndex(i + 1), delay)
-    )
-    return () => timers.forEach(clearTimeout)
-  }, [])
+  const label = hasImage
+    ? (translate(locale, 'aiChat.scanningReceipt') || (isEn ? 'Analyzing receipt...' : 'Memindai struk...'))
+    : (translate(locale, 'aiChat.thinking') || (isEn ? 'Thinking...' : 'Sedang berpikir...'))
 
   return (
-    <div className="flex items-center gap-2 max-w-[85%] my-1 ft-msg-enter">
+    <div className="flex items-center gap-2.5 max-w-[88%] sm:max-w-[85%] my-2 ft-msg-enter">
       <AiAvatarBadge isThinking />
-      <div className="flex items-center gap-2 rounded-2xl rounded-tl-xs border border-[var(--border)] bg-[var(--field-bg)] px-3 py-2 shadow-xs">
-        <span className="relative flex h-2 w-2">
+      <div className="inline-flex items-center gap-2 rounded-2xl rounded-tl-xs border border-[var(--border)]/70 bg-[var(--field-bg)]/80 backdrop-blur-xs px-3.5 py-2 shadow-2xs ft-reasoning-card">
+        <span className="relative flex h-2 w-2 shrink-0">
           <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75 animate-ping" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
         </span>
-        <span className="text-xs font-semibold text-[var(--muted)] transition-opacity duration-200">
-          {steps[stepIndex]}
+        <span className="text-[12px] font-medium text-[var(--muted)] ft-reasoning-step-enter leading-none">
+          {label}
+        </span>
+        <span className="inline-flex items-center gap-0.5 ml-0.5">
+          <span className="h-1 w-1 rounded-full bg-[var(--accent)]/60 animate-bounce [animation-delay:0ms]" />
+          <span className="h-1 w-1 rounded-full bg-[var(--accent)]/60 animate-bounce [animation-delay:150ms]" />
+          <span className="h-1 w-1 rounded-full bg-[var(--accent)]/60 animate-bounce [animation-delay:300ms]" />
         </span>
       </div>
     </div>

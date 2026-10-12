@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { APP_VERSION, APP_DISPLAY_VERSION } from '../src/lib/version'
+import { APP_VERSION, APP_DISPLAY_VERSION, APP_BUILD_NUMBER } from '../src/lib/version'
 import { translate } from '../src/lib/i18n'
 
 describe('Version Consistency Verification', () => {
@@ -25,6 +25,7 @@ describe('Version Consistency Verification', () => {
     const readme = readFileSync(path.resolve(process.cwd(), 'README.md'), 'utf8')
     expect(readme).toContain(`Version-${APP_DISPLAY_VERSION}`)
     expect(readme).toContain(`releases/tag/${APP_DISPLAY_VERSION}`)
+    expect(readme).toContain(`[Download Latest APK (${APP_DISPLAY_VERSION})]`)
   })
 
   it('matches android/app/build.gradle versionName and valid versionCode', () => {
@@ -36,6 +37,7 @@ describe('Version Consistency Verification', () => {
     expect(versionNameMatch[1]).toBe(APP_VERSION)
 
     expect(versionCodeMatch).not.toBeNull()
+    expect(versionCodeMatch[1]).toBe(APP_BUILD_NUMBER)
     expect(Number(versionCodeMatch[1])).toBeGreaterThan(0)
   })
 

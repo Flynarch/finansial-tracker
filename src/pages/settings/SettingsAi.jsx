@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Activity,
   Loader2,
+  Zap,
 } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -22,6 +23,8 @@ export default function SettingsAi() {
   const { t } = useTranslation()
   const geminiApiKey = useSettingsStore((state) => state.geminiApiKey)
   const setGeminiApiKey = useSettingsStore((state) => state.setGeminiApiKey)
+  const quickLogEngine = useSettingsStore((state) => state.quickLogEngine || 'smart_ai')
+  const setQuickLogEngine = useSettingsStore((state) => state.setQuickLogEngine)
 
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || '')
   const [showKey, setShowKey] = useState(false)
@@ -102,19 +105,107 @@ export default function SettingsAi() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border)]/60 text-center">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
+        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)]/60 text-center">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-1.5">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.ai.quotaStatus', 'Status Kuota')}</span>
-            <span className="block text-xs font-black text-[var(--fg)] mt-0.5">
-              {geminiApiKey ? t('settings.ai.unlimitedPersonal', 'Tanpa Batas (Pribadi)') : t('settings.ai.sharedQuota', 'Kuota Bersama')}
+            <span className="block text-xs font-black text-[var(--fg)] mt-0.5 truncate">
+              {geminiApiKey ? t('settings.ai.unlimitedPersonal', 'Tanpa Batas') : t('settings.ai.sharedQuota', 'Bawaan')}
             </span>
           </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-2">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-1.5">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.ai.activeEngine', 'Mode Catat')}</span>
+            <span className="block text-xs font-black text-[var(--accent)] mt-0.5 truncate">
+              {quickLogEngine === 'fast_nlp' ? t('settings.ai.engineNlpShort', 'NLP Lokal') : t('settings.ai.engineAiShort', 'AI Gemini')}
+            </span>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)] py-2 px-1.5">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{t('settings.ai.encryption', 'Enkripsi')}</span>
-            <span className="block text-xs font-black text-emerald-500 mt-0.5">{t('settings.ai.localOnDevice', '100% Lokal di HP')}</span>
+            <span className="block text-xs font-black text-emerald-500 mt-0.5 truncate">{t('settings.ai.localOnDevice', '100% Lokal')}</span>
           </div>
         </div>
       </div>
+
+      {/* Quick Log Engine Selection */}
+      <SettingsSection
+        label={t('settings.ai.quickLogEngineTitle', 'Mode Mesin Catat Cepat (Quick Log)')}
+        footnote={t('settings.ai.quickLogEngineDesc', 'Tentukan mesin pemroses teks saat mencatat transaksi cepat. Mode Pintar menggunakan model AI Gemini saat online, sedangkan Mode Instan mengutamakan kecepatan 0ms dengan NLP lokal.')}
+      >
+        <div className="ft-settings-cell space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* Option 1: Smart AI (Gemini Online) */}
+            <button
+              type="button"
+              onClick={async () => {
+                await setQuickLogEngine('smart_ai')
+                setKeyStatusMessage(t('settings.ai.engineSaved', 'Mode Mesin Catat Cepat diperbarui ke Mode Pintar (AI Gemini).'))
+                setTimeout(() => setKeyStatusMessage(''), 3500)
+              }}
+              className={`relative flex flex-col text-left p-3.5 rounded-2xl border transition active:scale-[0.99] cursor-pointer ${
+                quickLogEngine === 'smart_ai'
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-xl border ${
+                    quickLogEngine === 'smart_ai'
+                      ? 'border-[var(--accent)]/30 bg-[var(--accent)]/20 text-[var(--accent)]'
+                      : 'border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)]'
+                  }`}>
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-black text-[var(--fg)]">
+                    {t('settings.ai.engineSmartAi', 'Mode Pintar (AI Gemini)')}
+                  </span>
+                </div>
+                {quickLogEngine === 'smart_ai' ? (
+                  <CheckCircle2 className="h-4 w-4 text-[var(--accent)] shrink-0" />
+                ) : null}
+              </div>
+              <p className="text-[11px] font-medium text-[var(--muted)] leading-relaxed">
+                {t('settings.ai.engineSmartAiDesc', 'Menganalisis teks dengan model Google Gemini saat online untuk pemahaman konteks terbaik. Otomatis beralih ke NLP lokal jika offline atau kuota habis.')}
+              </p>
+            </button>
+
+            {/* Option 2: Fast NLP (Local 0ms) */}
+            <button
+              type="button"
+              onClick={async () => {
+                await setQuickLogEngine('fast_nlp')
+                setKeyStatusMessage(t('settings.ai.engineSavedFast', 'Mode Mesin Catat Cepat diperbarui ke Mode Instan (NLP Lokal).'))
+                setTimeout(() => setKeyStatusMessage(''), 3500)
+              }}
+              className={`relative flex flex-col text-left p-3.5 rounded-2xl border transition active:scale-[0.99] cursor-pointer ${
+                quickLogEngine === 'fast_nlp'
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--field-bg)] hover:bg-[var(--panel-strong)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-xl border ${
+                    quickLogEngine === 'fast_nlp'
+                      ? 'border-[var(--accent)]/30 bg-[var(--accent)]/20 text-[var(--accent)]'
+                      : 'border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)]'
+                  }`}>
+                    <Zap className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-black text-[var(--fg)]">
+                    {t('settings.ai.engineFastNlp', 'Mode Instan (NLP Lokal 0ms)')}
+                  </span>
+                </div>
+                {quickLogEngine === 'fast_nlp' ? (
+                  <CheckCircle2 className="h-4 w-4 text-[var(--accent)] shrink-0" />
+                ) : null}
+              </div>
+              <p className="text-[11px] font-medium text-[var(--muted)] leading-relaxed">
+                {t('settings.ai.engineFastNlpDesc', 'Penguraian ekspresi reguler lokal 0ms langsung di perangkat. Menghemat kuota API dan tanpa jeda jaringan.')}
+              </p>
+            </button>
+          </div>
+        </div>
+      </SettingsSection>
 
       {/* API Key Configuration Form */}
       <SettingsSection

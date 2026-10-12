@@ -1,83 +1,110 @@
-import { ChevronLeft, Sparkles, Paintbrush, Check, Trash2 } from 'lucide-react'
+import { ChevronLeft, Paintbrush, Check, Trash2, MoreVertical } from 'lucide-react'
 import { translate } from '../../lib/i18n'
 
 const BG_TEXTURE_OPTIONS = [
-  { id: 'paper', labelKey: 'aiChat.texture.paper', defaultLabel: 'Kertas Jurnal' },
-  { id: 'dots', labelKey: 'aiChat.texture.dots', defaultLabel: 'Dot Matrix' },
-  { id: 'grid', labelKey: 'aiChat.texture.grid', defaultLabel: 'Ledger Grid' },
-  { id: 'topo', labelKey: 'aiChat.texture.topo', defaultLabel: 'Topografis' },
-  { id: 'clean', labelKey: 'aiChat.texture.clean', defaultLabel: 'Minimalis' },
+  { id: 'paper', defaultLabelId: 'Kertas Jurnal', defaultLabelEn: 'Journal Paper' },
+  { id: 'dots', defaultLabelId: 'Dot Matrix', defaultLabelEn: 'Dot Matrix' },
+  { id: 'grid', defaultLabelId: 'Ledger Grid', defaultLabelEn: 'Ledger Grid' },
+  { id: 'topo', defaultLabelId: 'Topografis', defaultLabelEn: 'Topographic' },
+  { id: 'clean', defaultLabelId: 'Minimalis', defaultLabelEn: 'Minimalist' },
 ]
 
 export default function ChatHeaderToolbar({
   onBack,
-  isOnline,
-  locale,
-  showTexturePicker,
-  setShowTexturePicker,
+  isOnline = true,
+  locale = 'id',
+  hasActiveChat = false,
+  hasMessages = false,
+  isScrolled,
+  showOptionsMenu = false,
+  setShowOptionsMenu,
+  optionsMenuRef,
   backgroundTexture,
   setBackgroundTexture,
-  textureDropdownRef,
   onOpenClearConfirm,
 }) {
-  return (
-    <header className="shrink-0 flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel-strong)]/90 backdrop-blur-xl px-3 py-2.5 pt-[max(env(safe-area-inset-top,0px),0.75rem)] shadow-xs z-20">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] active:scale-95 transition cursor-pointer"
-          aria-label={translate(locale, 'common.back') || 'Kembali'}
-        >
-          <ChevronLeft size={20} strokeWidth={2.5} />
-        </button>
+  const isEn = locale === 'en'
+  const isFrosted = typeof isScrolled === 'boolean' ? isScrolled : hasActiveChat
 
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">
-            <Sparkles size={16} strokeWidth={2.2} />
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ring-2 ring-[var(--panel-strong)]`} />
-            </span>
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-sm font-black tracking-tight text-[var(--fg)] truncate">
-              {translate(locale, 'aiChat.title') || 'AI Finance Advisor'}
-            </h1>
-            <p className="text-[10.5px] font-semibold text-[var(--muted)] truncate flex items-center gap-1">
-              <span>{isOnline ? 'Gemini 3.8 Flash' : 'NLP Lokal'}</span>
-              <span className="inline-block h-1 w-1 rounded-full bg-[var(--muted-2)]" />
-              <span className={isOnline ? 'text-emerald-500 font-bold' : 'text-amber-500 font-bold'}>
-                {isOnline ? (locale === 'en' ? 'Online' : 'Aktif') : (locale === 'en' ? 'Offline' : 'Offline')}
-              </span>
-            </p>
-          </div>
-        </div>
+  return (
+    <header
+      className={`shrink-0 relative flex items-center justify-between px-3 py-2 pt-[max(env(safe-area-inset-top,0px),0.75rem)] z-20 transition-all duration-300 ease-out border-none shadow-none ${
+        isFrosted
+          ? 'bg-[var(--panel-strong)]/85 backdrop-blur-xl'
+          : 'bg-transparent'
+      }`}
+    >
+      {/* Left: Back button */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="grid h-9 w-9 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)]/60 active:scale-95 transition cursor-pointer"
+        aria-label={translate(locale, 'common.back') || 'Kembali'}
+      >
+        <ChevronLeft size={22} strokeWidth={2.2} />
+      </button>
+
+      {/* Center: Title (Perfect centered balance, pure typography, no dots/indicators) */}
+      <div
+        className={`absolute left-1/2 -translate-x-1/2 flex items-center justify-center max-w-[65%] min-w-0 transition-all duration-300 ease-out pointer-events-none ${
+          hasActiveChat
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-1.5'
+        }`}
+      >
+        <h1 className="text-sm font-semibold tracking-tight text-[var(--fg)] truncate text-center">
+          {translate(locale, 'aiChat.title') || (isEn ? 'FinTrack AI Assistant' : 'Asisten Finansial FinTrack')}
+        </h1>
       </div>
 
-      {/* Action Controls: Background Picker & Clear History */}
-      <div className="flex items-center gap-1.5 shrink-0" ref={textureDropdownRef}>
-        {/* Background Texture Popover Trigger */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowTexturePicker((prev) => !prev)}
-            className={`grid h-8.5 w-8.5 place-items-center rounded-xl border transition active:scale-95 cursor-pointer ${
-              showTexturePicker
-                ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent'
-                : 'bg-[var(--field-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--fg)]'
-            }`}
-            title={locale === 'en' ? 'Background Texture' : 'Tekstur Latar Belakang'}
-            aria-label={locale === 'en' ? 'Background Texture' : 'Tekstur Latar Belakang'}
-          >
-            <Paintbrush size={15} strokeWidth={2.2} />
-          </button>
+      {/* Right: Consolidated 3-dots Menu Button */}
+      <div className="relative shrink-0" ref={optionsMenuRef}>
+        <button
+          type="button"
+          onClick={() => setShowOptionsMenu?.((prev) => !prev)}
+          className={`grid h-9 w-9 place-items-center rounded-full transition cursor-pointer active:scale-95 ${
+            showOptionsMenu
+              ? 'bg-[var(--field-bg)] text-[var(--fg)]'
+              : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--field-bg)]/60'
+          }`}
+          title={translate(locale, 'aiChat.options') || (isEn ? 'Chat Options' : 'Opsi Obrolan')}
+          aria-label={translate(locale, 'aiChat.options') || (isEn ? 'Chat Options' : 'Opsi Obrolan')}
+          aria-expanded={showOptionsMenu}
+        >
+          <MoreVertical size={19} strokeWidth={2.2} />
+        </button>
 
-          {showTexturePicker && (
-            <div className="absolute right-0 top-10 z-50 w-52 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-2 shadow-xl animate-[ft-spring-dropdown_0.2s_ease-out_both]">
-              <p className="px-2 py-1 text-[10.5px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
-                {locale === 'en' ? 'Background Texture' : 'Pilihan Latar Belakang'}
-              </p>
-              <div className="mt-1 space-y-1">
+        {/* Options Dropdown Menu */}
+        {showOptionsMenu && (
+          <div className="absolute right-0 top-11 z-50 w-56 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)]/95 backdrop-blur-xl p-2.5 shadow-2xl animate-[ft-spring-dropdown_0.2s_ease-out_both] divide-y divide-[var(--border)]/70">
+            {/* Model Info Section */}
+            <div className="px-2 py-1.5 pb-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                {translate(locale, 'aiChat.modelStatus') || (isEn ? 'Model Status' : 'Status Model')}
+              </span>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-xs font-bold text-[var(--fg)]">Gemini 3.8 Flash</span>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isOnline ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  {isOnline ? (isEn ? 'Online' : 'Aktif') : 'Offline'}
+                </span>
+              </div>
+            </div>
+
+            {/* Background Texture Options */}
+            <div className="py-2 space-y-1">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
+                <Paintbrush size={12} strokeWidth={2.5} />
+                <span>
+                  {translate(locale, 'aiChat.backgroundTexture') ||
+                    (isEn ? 'Background Texture' : 'Tekstur Latar Belakang')}
+                </span>
+              </div>
+              <div className="space-y-0.5">
                 {BG_TEXTURE_OPTIONS.map((tex) => {
                   const isSelected = backgroundTexture === tex.id
                   return (
@@ -86,34 +113,43 @@ export default function ChatHeaderToolbar({
                       type="button"
                       onClick={() => {
                         setBackgroundTexture(tex.id)
-                        setShowTexturePicker(false)
+                        setShowOptionsMenu?.(false)
                       }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition active:scale-[0.98] cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold transition active:scale-[0.98] cursor-pointer ${
                         isSelected
-                          ? 'bg-[var(--accent)] text-white shadow-2xs'
+                          ? 'bg-[var(--accent)] text-white shadow-2xs font-bold'
                           : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
                       }`}
                     >
-                      <span>{tex.defaultLabel}</span>
+                      <span>{isEn ? tex.defaultLabelEn : tex.defaultLabelId}</span>
                       {isSelected && <Check size={14} strokeWidth={2.5} />}
                     </button>
                   )
                 })}
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Clear Chat Button */}
-        <button
-          type="button"
-          onClick={onOpenClearConfirm}
-          className="grid h-8.5 w-8.5 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-rose-500 hover:border-rose-500/30 transition active:scale-95 cursor-pointer"
-          title={locale === 'en' ? 'Clear History' : 'Hapus Percakapan'}
-          aria-label={locale === 'en' ? 'Clear History' : 'Hapus Percakapan'}
-        >
-          <Trash2 size={15} strokeWidth={2.2} />
-        </button>
+            {/* Clear Conversation Option */}
+            {hasMessages && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOptionsMenu?.(false)
+                    onOpenClearConfirm()
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 active:scale-[0.98] transition cursor-pointer"
+                >
+                  <Trash2 size={14} strokeWidth={2.2} />
+                  <span>
+                    {translate(locale, 'aiChat.clearHistory') ||
+                      (isEn ? 'Clear Conversation' : 'Hapus Percakapan')}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )

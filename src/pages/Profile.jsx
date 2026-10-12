@@ -10,6 +10,8 @@ import PageHeader from '../components/ui/PageHeader'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import { db } from '../lib/db'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import { APP_VERSION } from '../lib/version'
 
 /* ─── stat mini-icons ─── */
@@ -156,15 +158,14 @@ function Profile() {
 
   const txCount = useLiveQuery(
     () => db.transactions.filter((tx) => !tx.deletedAt).count(),
-    [],
-    0,
+    []
   )
-  const budgetCount = useLiveQuery(() => db.budgets.count(), [], 0)
+  const budgetCount = useLiveQuery(() => db.budgets.count(), [])
   const goalsCount = useLiveQuery(
     () => db.goals.filter((g) => !g.isCompleted && !g.isArchived).count(),
-    [],
-    0
+    []
   )
+  const isDataReady = txCount !== undefined && budgetCount !== undefined && goalsCount !== undefined
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntering(true))
@@ -186,11 +187,16 @@ function Profile() {
 
   return (
     <div className="min-h-full">
-      <div
-        className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
-          isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={!isDataReady}
+        skeleton={<PageSkeleton variant="profile" />}
+        className="min-h-full w-full"
       >
+        <div
+          className={`ft-motion-page min-h-full space-y-4 transform-gpu ${
+            isEntering ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+          }`}
+        >
         <PageHeader
           title={t('profile.pageTitle', 'Profil')}
           titlePosition="left"
@@ -279,17 +285,17 @@ function Profile() {
         {/* ── Stats row ── */}
         <section className="flex gap-3 ft-stagger-in">
           <ProfileStatCard
-            value={txCount}
+            value={txCount ?? 0}
             label={t('profile.stats.transactions')}
             icon="tx"
           />
           <ProfileStatCard
-            value={budgetCount}
+            value={budgetCount ?? 0}
             label={t('profile.stats.budgets')}
             icon="budget"
           />
           <ProfileStatCard
-            value={goalsCount}
+            value={goalsCount ?? 0}
             label={t('profile.stats.goals')}
             icon="goals"
           />
@@ -370,6 +376,7 @@ function Profile() {
           <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
         </div>
       </div>
+    </SkeletonTransition>
 
       {/* ── Edit name modal ── */}
       <Modal isOpen={editOpen} title={t('profile.editName', 'Ubah Nama')} onClose={() => setEditOpen(false)}>

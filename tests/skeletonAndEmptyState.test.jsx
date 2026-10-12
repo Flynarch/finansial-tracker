@@ -124,6 +124,19 @@ describe('Skeleton and EmptyState Quality Assurance Suite', () => {
         unmount()
       })
     })
+
+    it('renders high-fidelity "add-account" skeleton with institution logos, search bar, and pills', () => {
+      const { container } = render(<PageSkeleton variant="add-account" />)
+      const statusEl = screen.getByRole('status')
+      expect(statusEl).toBeDefined()
+      expect(statusEl.getAttribute('aria-busy')).toBe('true')
+      // Circular logo skeletons
+      const circles = container.querySelectorAll('.ft-skeleton.\\!rounded-full')
+      expect(circles.length).toBeGreaterThanOrEqual(5)
+      // Overall skeleton shimmers
+      const allShimmers = container.querySelectorAll('.ft-skeleton')
+      expect(allShimmers.length).toBeGreaterThanOrEqual(15)
+    })
   })
 
   describe('EmptyState Component Features', () => {
@@ -179,6 +192,7 @@ describe('Skeleton and EmptyState Quality Assurance Suite', () => {
       'savings',
       'loans',
       'todos',
+      'habits',
       'calendar',
       'reports',
       'search',

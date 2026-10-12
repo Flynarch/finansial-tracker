@@ -242,7 +242,7 @@ export default function SettingsSecurity() {
       const envelope = await exportAllDataAsEncryptedEnvelope(savedPhrase.trim())
       const jsonStr = JSON.stringify(envelope, null, 2)
       const ymd = getLocalDateString()
-      downloadTextFile(`fintrack-e2ee-backup-${ymd}.enc`, jsonStr, 'application/json')
+      await downloadTextFile(`fintrack-e2ee-backup-${ymd}.enc`, jsonStr, 'application/json')
       setStatusMessage(t('mnemonic.exportSuccessBanner', 'Cadangan terenkripsi berhasil diunduh.'))
       setTimeout(() => setStatusMessage(''), 4000)
     } catch (err){

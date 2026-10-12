@@ -1,4 +1,5 @@
 import { ArrowUpRight, PieChart, Target, HandCoins, TrendingUp, Receipt, Flame, ListChecks } from 'lucide-react'
+import { triggerHaptic } from '../../lib/haptics'
 
 // Detect contextual icon based on chip text keywords
 function getChipIcon(text) {
@@ -20,14 +21,20 @@ export default function QuickChips({ chips: aiChips, onSelect }) {
   if (!chipsList) return null
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 ft-hide-scrollbar w-full min-w-0 max-w-full">
+    <div
+      className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-0.5 ft-hide-scrollbar w-full min-w-0 max-w-full scroll-smooth overscroll-x-contain touch-pan-x"
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       {chipsList.map((chipText, idx) => (
         <button
           key={idx}
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-bold text-[var(--fg)] hover:border-[var(--accent)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer opacity-0 ft-msg-enter"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)]/70 bg-[var(--panel-strong)]/75 backdrop-blur-md px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--panel-strong)] transition-all active:scale-95 shrink-0 shadow-2xs cursor-pointer opacity-0 ft-msg-enter"
           style={{ animationDelay: `${idx * 50}ms`, animationFillMode: 'forwards' }}
-          onClick={() => onSelect(chipText)}
+          onClick={() => {
+            triggerHaptic('light')
+            onSelect(chipText)
+          }}
         >
           {getChipIcon(chipText)}
           <span>{chipText}</span>

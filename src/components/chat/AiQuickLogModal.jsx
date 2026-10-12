@@ -45,6 +45,7 @@ export default function AiQuickLogModal() {
   const { t } = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency)
+  const quickLogEngine = useSettingsStore((s) => s.quickLogEngine || 'smart_ai')
   const queriedWallets = useLiveQuery(
     () => {
       if (!isOpen) return []
@@ -84,11 +85,20 @@ export default function AiQuickLogModal() {
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
+  const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
   const [showMediaSourcePicker, setShowMediaSourcePicker] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
 
   const [prevOpen, setPrevOpen] = useState(isOpen)
   const isOpenRef = useRef(isOpen)
@@ -97,6 +107,7 @@ export default function AiQuickLogModal() {
     setPrevOpen(isOpen)
     if (isOpen) {
       setShouldRender(true)
+      setIsDismissedByDrag(false)
     } else {
       setIsAnimatingIn(false)
     }
@@ -109,34 +120,122 @@ export default function AiQuickLogModal() {
   const sheetRef = useRef(null)
   const baseInputBeforeRecordingRef = useRef('')
 
-  const handleTouchStart = useCallback((e) => {
-    touchStartY.current = e.touches[0].clientY
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    hasTriggeredSnapHaptic.current = false
+    touchStartY.current = clientY
     touchStartTime.current = Date.now()
-    setIsDragging(true)
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
+
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = 'none'
+    }
   }, [])
+
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
+
+    if (deltaY > 0) {
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
+    }
+
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (sheetRef.current) {
+      const y = Math.max(0, currentOffset)
+      sheetRef.current.style.transform = `translate3d(0, ${y}px, 0)`
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
+    const elapsed = Date.now() - touchStartTime.current
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1)
+
+    hasTriggeredSnapHaptic.current = false
+    isDraggingRef.current = false
+    touchStartY.current = 0
+
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        sheetRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        sheetRef.current.style.opacity = '0'
+      }
+      closeQuickLog()
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        sheetRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      snapTimeoutRef.current = setTimeout(() => {
+        dragOffsetRef.current = 0
+        if (sheetRef.current) {
+          sheetRef.current.style.transform = ''
+          sheetRef.current.style.transition = ''
+          sheetRef.current.style.opacity = ''
+        }
+        snapTimeoutRef.current = null
+      }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = ''
+        sheetRef.current.style.transition = ''
+        sheetRef.current.style.opacity = ''
+      }
+    }
+  }, [closeQuickLog])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
 
   const handleTouchMove = useCallback((e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
-    if (deltaY > 0) {
-      setDragOffset(deltaY)
-    } else {
-      setDragOffset(deltaY * 0.15)
-    }
-  }, [])
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
 
   const handleTouchEnd = useCallback(() => {
-    const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1)
-    setIsDragging(false)
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      closeQuickLog()
-    } else {
-      setDragOffset(0)
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
     }
-    touchStartY.current = 0
-  }, [dragOffset, closeQuickLog])
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
 
   // Open / Close animations with clean frame scheduling
   useEffect(() => {
@@ -175,7 +274,7 @@ export default function AiQuickLogModal() {
         setRecordedTransactions([])
         setErrorMessage('')
         setOmissionData(null)
-        setDragOffset(0)
+        dragOffsetRef.current = 0
       }, 200)
     }
 
@@ -436,11 +535,12 @@ export default function AiQuickLogModal() {
 
     const clampedText = cleanText ? String(cleanText).slice(0, 4000) : ''
 
-    // 2. Fast Path Routing (Online-First):
-    // When offline, parse casual transactions instantly in 0ms locally without calling remote AI.
-    // When online, skip local fast-path pre-parsing, enter 'analyzing' state, and call Gemini AI!
+    // 2. Engine Routing:
+    // If offline OR user configured 'fast_nlp' mode: parse casual transactions instantly in 0ms locally.
+    // If online AND 'smart_ai' mode: enter 'analyzing' state and call Gemini AI (with NLP fallback if needed).
+    const shouldUseFastNlp = quickLogEngine === 'fast_nlp' || isOffline
     let preParsedResult = null
-    if (isOffline && !imageToSubmit && clampedText) {
+    if (shouldUseFastNlp && !imageToSubmit && clampedText) {
       const fastResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
       if (fastResult && (fastResult.type === 'transactions' || (Array.isArray(fastResult.transactions) && fastResult.transactions.length > 0))) {
         preParsedResult = fastResult
@@ -461,7 +561,7 @@ export default function AiQuickLogModal() {
             wallets,
             imageData: imageToSubmit,
             scanMode: modeToUse,
-            preferFastNlp: !imageToSubmit,
+            preferFastNlp: quickLogEngine === 'fast_nlp' && !imageToSubmit,
             isQuickLog: true,
           })
         } catch (apiErr) {
@@ -683,14 +783,19 @@ export default function AiQuickLogModal() {
         ref={sheetRef}
         style={{
           boxShadow: 'var(--shadow-card)',
-          transform: isAnimatingIn
-            ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
-            : 'translate3d(0, 100%, 0)',
-          transition: isDragging
-            ? 'none'
+          transform: isDismissedByDrag
+            ? 'translate3d(0, 100%, 0)'
             : isAnimatingIn
-            ? 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out'
+            ? 'translate3d(0, 0, 0)'
+            : 'translate3d(0, 100%, 0)',
+          transition: isDismissedByDrag
+            ? 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+            : isAnimatingIn
+            ? 'transform 260ms cubic-bezier(0.2, 1.15, 0.32, 1), opacity 200ms ease-out'
             : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
+          opacity: isDismissedByDrag ? 0 : undefined,
+          willChange: 'transform',
+          contain: 'paint layout',
         }}
         className={`absolute left-0 right-0 bottom-0 w-full ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
       >
@@ -700,6 +805,7 @@ export default function AiQuickLogModal() {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
+          onMouseDown={handleMouseDown}
           className={`shrink-0 ${modalMode === 'receipt' ? 'px-4 py-2.5' : 'p-4 pb-3'} border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl cursor-grab active:cursor-grabbing touch-none select-none`}
         >
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />

@@ -200,7 +200,6 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                       {formatCurrency(
                         Math.abs(Number(latestTx?.amount || 0)),
                         latestTx?.currency || defaultCurrency,
-                        locale,
                       )}
                     </p>
                     {String(latestTx?.currency || defaultCurrency) !== String(defaultCurrency) ? (
@@ -209,7 +208,6 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
                         {formatCurrency(
                           convertCurrency(toSafeNumber(latestTx?.amount), latestTx?.currency || defaultCurrency, defaultCurrency, rates),
                           defaultCurrency,
-                          locale,
                         )}
                       </p>
                     ) : null}
@@ -219,20 +217,20 @@ export const DashboardRecentTx = memo(function DashboardRecentTx({
             </div>
           )
         })() : isDbLoading ? (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 animate-pulse">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 ft-skeleton-enter">
             <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <div className="h-8 w-8 shrink-0 rounded-lg bg-[var(--border)]/70" />
+                <div className="h-8 w-8 shrink-0 rounded-lg ft-skeleton" />
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="h-3 w-28 rounded bg-[var(--border)]/80" />
-                  <div className="h-2 w-36 rounded bg-[var(--border)]/50" />
+                  <div className="h-3 w-28 rounded ft-skeleton" />
+                  <div className="h-2 w-36 rounded ft-skeleton" />
                 </div>
               </div>
-              <div className="h-6 w-14 rounded-lg bg-[var(--border)]/60" />
+              <div className="h-6 w-14 rounded-lg ft-skeleton" />
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 transition-colors hover:border-[var(--border-strong)]">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 p-2.5 transition-colors hover:border-[var(--border-strong)]">
             <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-2xs">

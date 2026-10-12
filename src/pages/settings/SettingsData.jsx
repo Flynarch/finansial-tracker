@@ -58,12 +58,16 @@ export default function SettingsData() {
       setBusyAction('export')
       const payload = await exportAllDataAsJson()
       const filename = `fintrack-backup-${format(new Date(), 'yyyyMMdd-HHmm')}.json`
-      downloadTextFile(
+      const res = await downloadTextFile(
         filename,
         JSON.stringify(payload, null, 2),
         'application/json;charset=utf-8;',
       )
-      setStatusMessage(t('settings.backup.exportSuccess', 'Data cadangan berhasil diunduh (JSON).'))
+      if (res !== false) {
+        setStatusMessage(t('settings.backup.exportSuccess', 'Data cadangan berhasil diunduh (JSON).'))
+      } else {
+        setStatusMessage(t('common.error.saveFailed', 'Gagal mengekspor data cadangan.'))
+      }
     } catch (err){
       console.warn('[SettingsData]', err)
       setStatusMessage(t('common.error.saveFailed', 'Gagal mengekspor data cadangan.'))
@@ -78,13 +82,20 @@ export default function SettingsData() {
     if (!selectedFile) return
     try {
       setBusyAction('import')
-      const text = await selectedFile.text()
+      const text = typeof selectedFile.text === 'function'
+        ? await selectedFile.text()
+        : await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsText(selectedFile)
+          })
       const parsed = JSON.parse(text)
       await importAllDataFromJsonPayload(parsed)
       setStatusMessage(t('settings.backup.importSuccess', 'Data berhasil dipulihkan.'))
     } catch (err){
       console.warn('[SettingsData]', err)
-      setStatusMessage(t('settings.backup.importInvalid', 'File cadangan tidak valid.'))
+      setStatusMessage(err?.message || t('settings.backup.importInvalid', 'File cadangan tidak valid.'))
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
       setBusyAction(null)
@@ -368,7 +379,7 @@ export default function SettingsData() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json"
+            accept=".json,application/json,text/plain"
             onChange={handleImportJson}
             className="hidden"
           />

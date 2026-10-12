@@ -162,21 +162,37 @@ function formatParsedNotification(parsed, timestamp, notifId = null, fallbackRef
   }
 }
 
+let inFlightSyncPromise = null
+
 /**
  * Ingests all queued mutations from Android SharedPreferences into Dexie IndexedDB.
+ * Guarded by an in-flight promise mutex to prevent concurrent runs on app resume.
  */
 export async function syncNotificationQueue(options = {}) {
+  if (inFlightSyncPromise) {
+    return inFlightSyncPromise
+  }
+  inFlightSyncPromise = _syncNotificationQueueInternal(options).finally(() => {
+    inFlightSyncPromise = null
+  })
+  return inFlightSyncPromise
+}
+
+async function _syncNotificationQueueInternal(options = {}) {
   const { defaultWalletId, defaultCurrency = 'IDR', notificationAutoApprove = false } = options
 
-  if (!Capacitor.isNativePlatform()) {
+  if (!Capacitor.isNativePlatform() && !options.force && !options.mockMutations) {
     return { syncedCount: 0, skippedDuplicates: 0 }
   }
 
   try {
-    const res = await (FinTrackNotificationPlugin.getQueuedMutations
-      ? FinTrackNotificationPlugin.getQueuedMutations()
-      : FinTrackNotificationPlugin.drainQueuedMutations())
-    const queuedItems = res?.mutations || []
+    let queuedItems = options.mockMutations || []
+    if (!options.mockMutations) {
+      const res = await (FinTrackNotificationPlugin.getQueuedMutations
+        ? FinTrackNotificationPlugin.getQueuedMutations()
+        : FinTrackNotificationPlugin.drainQueuedMutations())
+      queuedItems = res?.mutations || []
+    }
 
     if (queuedItems.length === 0) {
       return { syncedCount: 0, skippedDuplicates: 0 }
@@ -276,12 +292,39 @@ export async function syncNotificationQueue(options = {}) {
       parsedList.push(parsed)
     }
 
-    // 2. Correlate internal transfers (e.g. BCA to GoPay in <= 120s)
-    const { correlated } = correlateInternalTransfers(parsedList, availableWallets, { notificationAutoApprove })
+    // 2. Correlate internal transfers (e.g. BCA to GoPay in <= 120s, with admin fee tolerance and cross-batch linking)
+    const { correlated, updatedExisting = [] } = correlateInternalTransfers(
+      parsedList,
+      availableWallets,
+      { notificationAutoApprove, recentTransactions }
+    )
 
     // 3. Match individual wallets & prepare insertion payload
     const toInsert = []
     const walletBalanceDeltas = new Map()
+
+    // Process updated existing transactions (from cross-batch transfer correlation)
+    for (const update of updatedExisting) {
+      if (update.sourceNotifId) processedIds.add(update.sourceNotifId)
+      if (Array.isArray(update.sourceNotifIds)) {
+        update.sourceNotifIds.forEach((id) => processedIds.add(id))
+      }
+
+      const changes = { ...update.changes }
+      if (changes.notes && typeof changes.notes === 'string' && changes.notes.trim()) {
+        changes.notes = await encryptField(changes.notes)
+      }
+
+      await db.transactions.update(update.id, changes)
+
+      if (changes.walletId) {
+        walletBalanceDeltas.set(changes.walletId, 0)
+      }
+      if (changes.targetWalletId) {
+        walletBalanceDeltas.set(changes.targetWalletId, 0)
+      }
+      syncedCount++
+    }
 
     for (const item of correlated) {
       if (item.sourceNotifId) processedIds.add(item.sourceNotifId)
@@ -304,7 +347,8 @@ export async function syncNotificationQueue(options = {}) {
           }
           if (item.targetWalletId) {
             const prev = walletBalanceDeltas.get(item.targetWalletId) || 0
-            walletBalanceDeltas.set(item.targetWalletId, prev + item.amount)
+            const incomingAmt = (item.targetAmount != null && item.targetAmount > 0) ? item.targetAmount : item.amount
+            walletBalanceDeltas.set(item.targetWalletId, prev + incomingAmt)
           }
         }
         continue
@@ -352,15 +396,18 @@ export async function syncNotificationQueue(options = {}) {
       syncedCount++
     }
 
+    let insertedIds = []
     if (toInsert.length > 0) {
       for (const tx of toInsert) {
         if (tx.notes && typeof tx.notes === 'string' && tx.notes.trim()) {
           tx.notes = await encryptField(tx.notes)
         }
       }
-      const insertedIds = await db.transactions.bulkAdd(toInsert, { allKeys: true })
+      insertedIds = await db.transactions.bulkAdd(toInsert, { allKeys: true })
+    }
 
-      // Invalidate balance cache so dynamic computeWalletBalance immediately reflects inserted transactions
+    if (toInsert.length > 0 || updatedExisting.length > 0) {
+      // Invalidate balance cache so dynamic computeWalletBalance immediately reflects inserted or updated transactions
       const affectedWalletIds = Array.from(walletBalanceDeltas.keys()).map(Number).filter(Boolean)
       if (affectedWalletIds.length > 0) {
         await invalidateWalletBalance(affectedWalletIds)

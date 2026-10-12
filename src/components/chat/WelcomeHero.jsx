@@ -14,7 +14,7 @@ const WelcomeHero = memo(function WelcomeHero({
   const locale = useSettingsStore(state => state.locale) || 'id';
   const isEn = locale === 'en';
 
-  const title = isEn ? 'FinTrack Finance Assistant' : 'Asisten Finansial FinTrack';
+  const title = isEn ? 'FinTrack AI Assistant' : 'Asisten Finansial FinTrack';
   const subtitle = isEn 
     ? 'Smart offline recording, expense auditing, and financial goal tracking.'
     : 'Pencatatan cerdas offline, audit pengeluaran, dan kalkulasi target finansial.';
@@ -59,26 +59,26 @@ const WelcomeHero = memo(function WelcomeHero({
   ];
 
   return (
-    <div className="flex flex-col items-center gap-5 py-4 px-2 ft-msg-enter">
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] ring-4 ring-[var(--accent)]/10">
+    <div className="flex flex-col items-center gap-3.5 py-2 px-2 ft-msg-enter touch-pan-y">
+      <div className="flex flex-col items-center gap-2.5 py-2 text-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)] ring-4 ring-[var(--accent)]/5 shadow-xs transition-transform duration-200 hover:scale-105">
           <Sparkles size={20} />
         </div>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-black text-[var(--fg)]">{title}</h2>
-          <p className="text-[10.5px] font-medium text-[var(--muted)] max-w-[240px] leading-relaxed mx-auto">
+        <div className="flex flex-col items-center gap-1.5">
+          <h2 className="text-sm sm:text-base font-black tracking-tight text-[var(--fg)]">{title}</h2>
+          <p className="text-[11px] font-medium text-[var(--muted)] max-w-[260px] leading-relaxed mx-auto mt-0.5">
             {subtitle}
           </p>
         </div>
       </div>
 
       {todayExpense > 0 && (
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-[11px] font-bold text-[var(--muted)]">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--field-bg)]/80 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-[var(--muted)] shadow-xs">
           {isEn ? 'Today:' : 'Hari ini:'} {formatCurrency(todayExpense, todayCurrency)} {isEn ? 'spent' : 'keluar'}
         </div>
       )}
 
-      <div className="grid w-full max-w-sm grid-cols-2 gap-2.5">
+      <div className="grid w-full max-w-sm grid-cols-2 gap-2.5 touch-pan-y">
         {intents.map((intent) => {
           const Icon = intent.icon;
           return (
@@ -86,14 +86,14 @@ const WelcomeHero = memo(function WelcomeHero({
               type="button"
               key={intent.id}
               onClick={() => handleSelect(intent.prompt)}
-              className="flex flex-col text-left gap-2 rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] p-3 cursor-pointer active:scale-[0.97] hover:bg-[var(--panel-strong)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="group flex flex-col text-left gap-2.5 rounded-2xl border border-[var(--border)]/70 bg-[var(--field-bg)]/45 p-3.5 cursor-pointer active:scale-[0.97] hover:bg-[var(--field-bg)]/85 hover:border-[var(--accent)]/35 backdrop-blur-xs transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] shadow-xs touch-pan-y select-none"
             >
-              <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${intent.colors}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${intent.colors} transition-transform duration-200 group-hover:scale-105`}>
                 <Icon size={16} strokeWidth={2.5} />
               </div>
-              <div className="flex flex-col gap-0.5 mt-1">
-                <span className="text-xs font-black text-[var(--fg)]">{intent.title}</span>
-                <span className="text-[10.5px] font-medium italic text-[var(--muted)] truncate">
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                <span className="text-xs font-bold tracking-tight text-[var(--fg)]">{intent.title}</span>
+                <span className="text-[10.5px] font-medium text-[var(--muted)] truncate">
                   &quot;{intent.prompt}&quot;
                 </span>
               </div>

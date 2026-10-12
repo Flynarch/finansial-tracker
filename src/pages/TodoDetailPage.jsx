@@ -9,6 +9,7 @@ import CustomDateTimePicker from '../components/ui/CustomDateTimePicker'
 import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal'
 import PageHeader from '../components/ui/PageHeader'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import {
   ArrowLeft,
   ChevronRight,
@@ -459,7 +460,7 @@ export default function TodoDetailPage() {
   }, [editingSubText])
 
   if (todo === undefined) {
-    return <div className="min-h-screen bg-[var(--bg)]" />
+    return <PageSkeleton variant="todo-detail" />
   }
 
   if (todo === null) {
@@ -473,7 +474,7 @@ export default function TodoDetailPage() {
         >
           <ArrowLeft className="h-4.5 w-4.5" />
         </button>
-        <EmptyState title={t('todo.emptyTitle')} description={t('todo.emptyDesc')} />
+        <EmptyState variant="todos" title={t('todo.emptyTitle')} description={t('todo.emptyDesc')} />
       </div>
     )
   }
@@ -684,8 +685,12 @@ export default function TodoDetailPage() {
 
               {/* Subtask Items */}
               {(subTasks || []).length === 0 ? (
-                <div className="py-5 text-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40">
-                  <p className="text-xs font-medium text-[var(--muted)]">{t('todo.subtasksEmpty')}</p>
+                <div className="py-6 px-4 text-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/30 flex flex-col items-center justify-center">
+                  <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)]/50 shadow-2xs">
+                    <CheckSquare className="h-4.5 w-4.5" />
+                  </div>
+                  <p className="text-[13px] font-semibold text-[var(--fg)]">{t('todo.subtasksEmpty')}</p>
+                  <p className="mt-0.5 text-[11.5px] font-medium text-[var(--muted)]">{t('todo.subtasksEmptyHint', 'Pecah tugas utama menjadi langkah-langkah kecil.')}</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-[var(--border)]/40 rounded-xl bg-[var(--field-bg)]/40 px-3">

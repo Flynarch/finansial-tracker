@@ -4,65 +4,56 @@ import { clearCachedDashboardState } from '../hooks/useDashboardData'
 import { scheduleNativeWidgetSync } from './nativeWidgetSync'
 
 export async function exportAllDataAsJson() {
-  const [
-    transactions,
-    investments,
-    investmentOrders,
-    budgets,
-    goals,
-    goalLogs,
-    calendarEvents,
-    recurringTransactions,
-    settings,
-    todos,
-    subTasks,
-    habits,
-    habitLogs,
-    notifications,
-    wallets,
-    loans,
-    loanPayments,
-    ideas,
-    boardLinks,
-    chatMessages,
-  ] = await Promise.all([
-    db.transactions.toArray(),
-    db.investments.toArray(),
-    db.investmentOrders.toArray(),
-    db.budgets.toArray(),
-    db.goals.toArray(),
-    db.goalLogs.toArray(),
-    db.calendarEvents.toArray(),
-    db.recurringTransactions.toArray(),
-    db.settings.toArray(),
-    db.todos.toArray(),
-    db.sub_tasks.toArray(),
-    db.habits.toArray(),
-    db.habitLogs.toArray(),
-    db.notifications.toArray(),
-    db.wallets.toArray(),
-    db.loans.toArray(),
-    db.loanPayments.toArray(),
-    db.ideas.toArray(),
-    db.board_links.toArray(),
-    db.chatMessages ? db.chatMessages.toArray().catch(() => []) : Promise.resolve([]),
-  ])
+  const tableDataMap = {}
+  if (Array.isArray(db.tables)) {
+    for (const table of db.tables) {
+      if (table.name === 'walletBalanceCache') continue
+      try {
+        tableDataMap[table.name] = await table.toArray()
+      } catch (err) {
+        console.warn(`[backup] Error reading table ${table.name}:`, err)
+        tableDataMap[table.name] = []
+      }
+    }
+  }
 
   let expenseCustom = null
   let incomeCustom = null
+  let entityMemory = null
+  let merchantMemory = null
+  let passkeys = null
+  let appPreferences = null
+
   try {
     if (typeof localStorage !== 'undefined') {
       const rawExp = localStorage.getItem('ft_expense_category_custom_v1')
       if (rawExp) expenseCustom = JSON.parse(rawExp)
+
       const rawInc = localStorage.getItem('ft_income_category_custom_v1')
       if (rawInc) incomeCustom = JSON.parse(rawInc)
+
+      const rawEntity = localStorage.getItem('ft_entity_memory_v1')
+      if (rawEntity) entityMemory = JSON.parse(rawEntity)
+
+      const rawMerchant = localStorage.getItem('ft_merchant_memory_v1')
+      if (rawMerchant) merchantMemory = JSON.parse(rawMerchant)
+
+      const rawPasskeys = localStorage.getItem('ft_passkeys_v1')
+      if (rawPasskeys) passkeys = JSON.parse(rawPasskeys)
+
+      appPreferences = {
+        defaultCurrency: localStorage.getItem('ft_default_currency') || 'IDR',
+        todoSortPref: localStorage.getItem('todo_sort_pref') || 'latest',
+        chatBgTexture: localStorage.getItem('ft_chat_bg_texture') || '',
+        networthRange: localStorage.getItem('ft_networth_range') || 'all',
+      }
     }
-  } catch (err){
-      console.warn('[backup]', err)
-    /* ignore */
+  } catch (err) {
+    console.warn('[backup] LocalStorage read warning:', err)
   }
 
-  const sanitizedSettings = (settings || []).map((s) => {
+  const rawSettings = tableDataMap.settings || []
+  const sanitizedSettings = rawSettings.map((s) => {
     const copy = { ...s }
     if (copy.lockSecret) {
       delete copy.lockSecret
@@ -73,36 +64,49 @@ export async function exportAllDataAsJson() {
     return copy
   })
 
+  // Ensure all canonical and aliased table keys exist for maximum backward compatibility
+  const subTasksData = tableDataMap.sub_tasks || []
+  const boardLinksData = tableDataMap.board_links || []
+
+  const data = {
+    ...tableDataMap,
+    transactions: tableDataMap.transactions || [],
+    investments: tableDataMap.investments || [],
+    investmentOrders: tableDataMap.investmentOrders || [],
+    budgets: tableDataMap.budgets || [],
+    goals: tableDataMap.goals || [],
+    goalLogs: tableDataMap.goalLogs || [],
+    calendarEvents: tableDataMap.calendarEvents || [],
+    recurringTransactions: tableDataMap.recurringTransactions || [],
+    settings: sanitizedSettings,
+    todos: tableDataMap.todos || [],
+    sub_tasks: subTasksData,
+    subTasks: subTasksData,
+    habits: tableDataMap.habits || [],
+    habitLogs: tableDataMap.habitLogs || [],
+    ideas: tableDataMap.ideas || [],
+    board_links: boardLinksData,
+    boardLinks: boardLinksData,
+    notifications: tableDataMap.notifications || [],
+    wallets: tableDataMap.wallets || [],
+    loans: tableDataMap.loans || [],
+    loanPayments: tableDataMap.loanPayments || [],
+    chatMessages: tableDataMap.chatMessages || [],
+  }
+
   return {
     exportedAt: new Date().toISOString(),
     app: 'FinTrack',
-    version: 3,
+    version: 4,
     categoryCustomizations: {
       expense: expenseCustom,
       income: incomeCustom,
     },
-    data: {
-      transactions,
-      investments,
-      investmentOrders,
-      budgets,
-      goals,
-      goalLogs,
-      calendarEvents,
-      recurringTransactions,
-      settings: sanitizedSettings,
-      todos,
-      sub_tasks: subTasks,
-      habits,
-      habitLogs,
-      ideas,
-      board_links: boardLinks,
-      notifications,
-      wallets,
-      loans,
-      loanPayments,
-      chatMessages: chatMessages || [],
-    },
+    entityMemory,
+    merchantMemory,
+    passkeys,
+    appPreferences,
+    data,
   }
 }
 
@@ -174,7 +178,13 @@ export async function importAllDataFromJsonPayload(payload) {
     if (Array.isArray(data.recurringTransactions) && data.recurringTransactions.length > 0)
       await db.recurringTransactions.bulkPut(data.recurringTransactions)
     if (Array.isArray(data.todos) && data.todos.length > 0) await db.todos.bulkPut(data.todos)
-    if (Array.isArray(data.sub_tasks) && data.sub_tasks.length > 0) await db.sub_tasks.bulkPut(data.sub_tasks)
+    const subTasksList = Array.isArray(data.sub_tasks) && data.sub_tasks.length > 0
+      ? data.sub_tasks
+      : Array.isArray(data.subTasks) && data.subTasks.length > 0
+      ? data.subTasks
+      : []
+    if (subTasksList.length > 0) await db.sub_tasks.bulkPut(subTasksList)
+
     if (Array.isArray(data.habits) && data.habits.length > 0) {
       const normalizedHabits = data.habits.map((h) => ({
         ...h,
@@ -184,7 +194,14 @@ export async function importAllDataFromJsonPayload(payload) {
     }
     if (Array.isArray(data.habitLogs) && data.habitLogs.length > 0) await db.habitLogs.bulkPut(data.habitLogs)
     if (Array.isArray(data.ideas) && data.ideas.length > 0) await db.ideas.bulkPut(data.ideas)
-    if (Array.isArray(data.board_links) && data.board_links.length > 0) await db.board_links.bulkPut(data.board_links)
+
+    const boardLinksList = Array.isArray(data.board_links) && data.board_links.length > 0
+      ? data.board_links
+      : Array.isArray(data.boardLinks) && data.boardLinks.length > 0
+      ? data.boardLinks
+      : []
+    if (boardLinksList.length > 0) await db.board_links.bulkPut(boardLinksList)
+
     if (Array.isArray(data.notifications) && data.notifications.length > 0) await db.notifications.bulkPut(data.notifications)
     if (Array.isArray(data.wallets) && data.wallets.length > 0) {
       const normalizedWallets = data.wallets.map((w) => ({
@@ -202,6 +219,22 @@ export async function importAllDataFromJsonPayload(payload) {
     }
     if (Array.isArray(data.loanPayments) && data.loanPayments.length > 0) await db.loanPayments.bulkPut(data.loanPayments)
     if (Array.isArray(data.chatMessages) && data.chatMessages.length > 0 && db.chatMessages) await db.chatMessages.bulkPut(data.chatMessages)
+
+    // Dynamically restore any other registered tables in db
+    const handledTables = new Set([
+      'transactions', 'investments', 'investmentOrders', 'budgets', 'goals', 'goalLogs',
+      'calendarEvents', 'recurringTransactions', 'todos', 'sub_tasks', 'habits', 'habitLogs',
+      'ideas', 'board_links', 'notifications', 'wallets', 'loans', 'loanPayments',
+      'chatMessages', 'settings', 'walletBalanceCache'
+    ])
+    for (const tbl of db.tables) {
+      if (!handledTables.has(tbl.name)) {
+        const rows = data[tbl.name]
+        if (Array.isArray(rows) && rows.length > 0) {
+          await tbl.bulkPut(rows)
+        }
+      }
+    }
 
     // Merge settings: preserve active logged-in Google / Email user credentials and device lock
     if (Array.isArray(data.settings) && data.settings.length > 0) {
@@ -237,10 +270,11 @@ export async function importAllDataFromJsonPayload(payload) {
   })
 
   // Apply custom category customizations to localStorage ONLY after Dexie transaction succeeds
-  if (payload.categoryCustomizations?.expense) {
+  const expCustom = payload.categoryCustomizations?.expense || data.categoryCustomizations?.expense
+  if (expCustom) {
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(payload.categoryCustomizations.expense))
+        localStorage.setItem('ft_expense_category_custom_v1', JSON.stringify(expCustom))
       }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ft-expense-category-custom-changed'))
@@ -248,13 +282,14 @@ export async function importAllDataFromJsonPayload(payload) {
       }
     } catch (err){
       console.warn('[backup]', err)
-      /* ignore */
     }
   }
-  if (payload.categoryCustomizations?.income) {
+
+  const incCustom = payload.categoryCustomizations?.income || data.categoryCustomizations?.income
+  if (incCustom) {
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(payload.categoryCustomizations.income))
+        localStorage.setItem('ft_income_category_custom_v1', JSON.stringify(incCustom))
       }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ft-income-category-custom-changed'))
@@ -262,7 +297,65 @@ export async function importAllDataFromJsonPayload(payload) {
       }
     } catch (err){
       console.warn('[backup]', err)
-      /* ignore */
+    }
+  }
+
+  // Restore AI Entity Memory
+  const entityMemory = payload.entityMemory || data.entityMemory
+  if (entityMemory && typeof entityMemory === 'object') {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ft_entity_memory_v1', JSON.stringify(entityMemory))
+      }
+    } catch (err) {
+      console.warn('[backup]', err)
+    }
+  }
+
+  // Restore AI Merchant Memory
+  const merchantMemory = payload.merchantMemory || data.merchantMemory
+  if (merchantMemory && typeof merchantMemory === 'object') {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ft_merchant_memory_v1', JSON.stringify(merchantMemory))
+      }
+    } catch (err) {
+      console.warn('[backup]', err)
+    }
+  }
+
+  // Restore Passkeys
+  const passkeys = payload.passkeys || data.passkeys
+  if (passkeys && Array.isArray(passkeys)) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ft_passkeys_v1', JSON.stringify(passkeys))
+      }
+    } catch (err) {
+      console.warn('[backup]', err)
+    }
+  }
+
+  // Restore App Preferences
+  const appPreferences = payload.appPreferences || data.appPreferences
+  if (appPreferences && typeof appPreferences === 'object') {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (appPreferences.defaultCurrency) {
+          localStorage.setItem('ft_default_currency', appPreferences.defaultCurrency)
+        }
+        if (appPreferences.todoSortPref) {
+          localStorage.setItem('todo_sort_pref', appPreferences.todoSortPref)
+        }
+        if (appPreferences.chatBgTexture !== undefined) {
+          localStorage.setItem('ft_chat_bg_texture', appPreferences.chatBgTexture)
+        }
+        if (appPreferences.networthRange) {
+          localStorage.setItem('ft_networth_range', appPreferences.networthRange)
+        }
+      }
+    } catch (err) {
+      console.warn('[backup]', err)
     }
   }
 

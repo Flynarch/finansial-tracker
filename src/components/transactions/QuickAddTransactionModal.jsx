@@ -126,6 +126,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const liveWallets = useLiveQuery(
     async () => {
+      if (!isOpen) return initialCachedWallets
       const raw = await db.wallets.filter((w) => !w.isArchived).toArray()
       if (!raw || raw.length === 0) return []
       return raw.map((w) => ({
@@ -133,7 +134,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
         currentBalance: w.balance ?? 0,
       }))
     },
-    [],
+    [isOpen],
     initialCachedWallets
   )
 
@@ -254,12 +255,19 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
   const [categoryCustomVersion, setCategoryCustomVersion] = useState(0)
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitLockRef = useRef(false)
   const [categoryError, setCategoryError] = useState(false)
   const [walletError, setWalletError] = useState(false)
   const [amountError, setAmountError] = useState(false)
   const categoryButtonRef = useRef(null)
   const walletButtonRef = useRef(null)
   const [goldAutoPrice, setGoldAutoPrice] = useState(0)
+
+  useEffect(() => {
+    if (!isOpen) {
+      submitLockRef.current = false
+    }
+  }, [isOpen])
 
   const mergedExpenseTree = useMemo(() => {
     void categoryCustomVersion
@@ -340,40 +348,38 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
     }
   }, [])
 
-  const lastNonceRef = useRef(nonce)
-  useEffect(() => {
-    if (isOpen && lastNonceRef.current !== nonce) {
-      lastNonceRef.current = nonce
-      const availableWallets = (wallets?.length > 0 ? wallets : initialCachedWallets).filter((w) => !w.isArchived)
-      const activeWalletId = initialWalletId || defaultWalletId || (availableWallets.length > 0 ? availableWallets[0].id : '')
-      const activeWallet = availableWallets.find((w) => String(w.id) === String(activeWalletId))
-      const activeCurrency = activeWallet?.currency || defaultCurrency
+  const [prevNonce, setPrevNonce] = useState(nonce)
+  if (isOpen && nonce !== prevNonce) {
+    setPrevNonce(nonce)
+    const availableWallets = (wallets?.length > 0 ? wallets : initialCachedWallets).filter((w) => !w.isArchived)
+    const activeWalletId = initialWalletId || defaultWalletId || (availableWallets.length > 0 ? availableWallets[0].id : '')
+    const activeWallet = availableWallets.find((w) => String(w.id) === String(activeWalletId))
+    const activeCurrency = activeWallet?.currency || defaultCurrency
 
-      setTxType('expense')
-      setCategoryError(false)
-      setWalletError(false)
-      setAmountError(false)
-      setSubmitError('')
-      setForm({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        amount: '',
-        category: getDefaultExpenseCategoryPath(),
-        notes: '',
-        currency: activeCurrency,
-        walletId: activeWalletId,
-        targetWalletId: '',
-        targetAmount: '',
-        receiptImage: '',
-      })
-      setPreviewImage(null)
-      setInvestmentForm((p) => ({
-        ...p,
-        walletId: p.walletId || String(activeWalletId),
-      }))
-      setTags([])
-      setTagInput('')
-    }
-  }, [isOpen, nonce, wallets, initialCachedWallets, initialWalletId, defaultWalletId, defaultCurrency])
+    setTxType('expense')
+    setCategoryError(false)
+    setWalletError(false)
+    setAmountError(false)
+    setSubmitError('')
+    setForm({
+      date: format(new Date(), 'yyyy-MM-dd'),
+      amount: '',
+      category: getDefaultExpenseCategoryPath(),
+      notes: '',
+      currency: activeCurrency,
+      walletId: activeWalletId,
+      targetWalletId: '',
+      targetAmount: '',
+      receiptImage: '',
+    })
+    setPreviewImage(null)
+    setInvestmentForm((p) => ({
+      ...p,
+      walletId: p.walletId || String(activeWalletId),
+    }))
+    setTags([])
+    setTagInput('')
+  }
 
   useEffect(() => {
     if (txType !== 'investment') return
@@ -575,7 +581,8 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (isSubmitting) return
+    if (isSubmitting || submitLockRef.current) return
+    submitLockRef.current = true
     setIsSubmitting(true)
     try {
       setSubmitError('')
@@ -857,6 +864,7 @@ function QuickAddTransactionModal({ nonce, isOpen, onClose, initialWalletId }) {
       setSubmitError(err?.message || t('common.error.saveFailed'))
     } finally {
       setIsSubmitting(false)
+      submitLockRef.current = false
     }
   }
 

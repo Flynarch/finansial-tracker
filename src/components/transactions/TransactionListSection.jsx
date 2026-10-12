@@ -7,7 +7,7 @@ import { isTransactionNew } from '../../lib/transactionLastSeen'
 
 export function TransactionListSkeleton() {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden ft-skeleton-enter">
       <div className="min-h-0 flex-1 overflow-y-auto ft-hide-scrollbar px-0.5 space-y-4 pt-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-6">
         {[1, 2].map((groupKey) => (
           <section key={groupKey} className="space-y-2">
@@ -48,7 +48,6 @@ export const TransactionListSection = memo(function TransactionListSection({
   filteredTransactions = [],
   groupedEntriesDetailed = [],
   listScrollRef,
-  showTopFade,
   showBottomFade,
   onScroll,
   onRefresh,
@@ -127,7 +126,7 @@ export const TransactionListSection = memo(function TransactionListSection({
   const visibleGroups = groupedEntriesDetailed.slice(0, visibleGroupCount)
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full ft-content-loaded">
       <PullToRefresh
         onRefresh={onRefresh}
         disabled={!onRefresh}
@@ -145,7 +144,7 @@ export const TransactionListSection = memo(function TransactionListSection({
           {visibleGroups.map((group, idx) => (
             <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
               {/* Date Header Strip */}
-              <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]/95 backdrop-blur-xs">
+              <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]">
                 <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase shrink-0">
                   {group.dateLabel}
                 </span>
@@ -227,12 +226,7 @@ export const TransactionListSection = memo(function TransactionListSection({
       </div>
       </PullToRefresh>
 
-      {/* Top & Bottom Subtle Fade Overlays */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[var(--bg)] to-transparent transition-opacity duration-200 ${
-          showTopFade ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
+      {/* Bottom Subtle Fade Overlay */}
       <div
         className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[var(--bg)] to-transparent transition-opacity duration-200 ${
           showBottomFade ? 'opacity-100' : 'opacity-0'

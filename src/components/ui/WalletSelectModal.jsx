@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -15,6 +15,7 @@ import useTranslation from '../../hooks/useTranslation'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import useBackButton from '../../hooks/useBackButton'
 import MaskedBalance from './MaskedBalance'
+import { triggerHaptic } from '../../lib/haptics'
 
 function formatAbbreviatedBalance(val, currency = 'IDR') {
   const num = Number(val ?? 0)
@@ -191,27 +192,17 @@ export default function WalletSelectModal({
     )
   }, [activeWallets, search])
 
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
+  const dialogRef = useRef(null)
+  const handleBarRef = useRef(null)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+  const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
 
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY
-    touchStartTime.current = Date.now()
-    setIsDragging(true)
-  }
-
-  const handleTouchMove = (e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
-    if (deltaY > 0) {
-      setDragOffset(deltaY)
-    } else {
-      setDragOffset(deltaY * 0.15)
-    }
-  }
+  const [hasEntered, setHasEntered] = useState(false)
 
   const { isMounted, isVisible, closeSheet } = useBottomSheet({
     isOpen,
@@ -219,19 +210,181 @@ export default function WalletSelectModal({
     useBackButton: false,
   })
 
-  useBackButton(onClose, Boolean(isOpen))
-
-  const handleTouchEnd = () => {
-    const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1)
-    setIsDragging(false)
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      closeSheet()
+  const [prevIsVisible, setPrevIsVisible] = useState(isVisible)
+  if (isVisible !== prevIsVisible) {
+    setPrevIsVisible(isVisible)
+    if (!isVisible) {
+      setHasEntered(false)
     } else {
-      setDragOffset(0)
+      setIsDismissedByDrag(false)
     }
-    touchStartY.current = 0
   }
+
+  useEffect(() => {
+    if (!isVisible) return undefined
+    if (dialogRef.current) {
+      dialogRef.current.style.transform = ''
+      dialogRef.current.style.transition = ''
+      dialogRef.current.style.opacity = ''
+    }
+    const timer = setTimeout(() => {
+      setHasEntered(true)
+    }, 260)
+    return () => clearTimeout(timer)
+  }, [isVisible])
+
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
+
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    hasTriggeredSnapHaptic.current = false
+    setHasEntered(true)
+    touchStartY.current = clientY
+    touchStartTime.current = Date.now()
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
+
+    if (dialogRef.current) {
+      dialogRef.current.style.transition = 'none'
+    }
+    if (handleBarRef.current) {
+      handleBarRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
+
+    if (deltaY > 0) {
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
+    }
+
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (dialogRef.current) {
+      const y = Math.max(0, currentOffset)
+      dialogRef.current.style.transform = `translate3d(0, ${y}px, 0)`
+    }
+
+    if (handleBarRef.current) {
+      const y = Math.max(0, currentOffset)
+      const scaleX = Math.min(1.45, Math.max(1, 1 + (y * 0.2) / 48))
+      handleBarRef.current.style.transform = `scale3d(${scaleX}, 1, 1)`
+      if (currentOffset >= 80) {
+        handleBarRef.current.style.backgroundColor = 'var(--accent)'
+      } else {
+        handleBarRef.current.style.backgroundColor = ''
+      }
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
+    const elapsed = Date.now() - touchStartTime.current
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1)
+
+    hasTriggeredSnapHaptic.current = false
+    isDraggingRef.current = false
+    touchStartY.current = 0
+
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        dialogRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        dialogRef.current.style.opacity = '0'
+      }
+      closeSheet()
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        dialogRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease'
+        handleBarRef.current.style.transform = 'scale3d(1, 1, 1)'
+        handleBarRef.current.style.backgroundColor = ''
+      }
+      snapTimeoutRef.current = setTimeout(() => {
+        dragOffsetRef.current = 0
+        if (dialogRef.current) {
+          dialogRef.current.style.transform = ''
+          dialogRef.current.style.transition = ''
+          dialogRef.current.style.opacity = ''
+        }
+        if (handleBarRef.current) {
+          handleBarRef.current.style.transform = ''
+          handleBarRef.current.style.transition = ''
+        }
+        snapTimeoutRef.current = null
+      }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (dialogRef.current) {
+        dialogRef.current.style.transform = ''
+        dialogRef.current.style.transition = ''
+        dialogRef.current.style.opacity = ''
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transform = ''
+        handleBarRef.current.style.transition = ''
+      }
+    }
+  }, [closeSheet])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
+
+  useBackButton(onClose, Boolean(isOpen))
 
   if (!isMounted) return null
 
@@ -248,7 +401,7 @@ export default function WalletSelectModal({
     }`}>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+        className={`fixed inset-0 bg-black/60 cursor-pointer ${
           isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
         }`}
         onClick={closeSheet}
@@ -256,18 +409,23 @@ export default function WalletSelectModal({
 
       {/* Modal Container */}
       <div
+        ref={dialogRef}
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget && e.animationName === 'ft-sheet-slide-up') {
+            setHasEntered(true)
+          }
+        }}
         className={`relative w-full max-w-lg overflow-hidden rounded-t-[2rem] sm:rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-h-[85vh] flex flex-col z-10 transform-gpu ${
-          isDragging ? '' : isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit pointer-events-none'
+          !isVisible
+            ? (isDismissedByDrag ? 'pointer-events-none' : 'ft-sheet-exit pointer-events-none')
+            : hasEntered
+            ? ''
+            : 'ft-sheet-enter'
         }`}
         style={{
           boxShadow: 'var(--shadow-card)',
-          ...(isDragging
-            ? {
-                transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
-                opacity: Math.max(0.4, 1 - dragOffset / 300),
-                transition: 'none',
-              }
-            : {}),
+          willChange: 'transform',
+          contain: 'paint layout',
         }}
       >
         {/* Drag handle for mobile */}
@@ -276,9 +434,13 @@ export default function WalletSelectModal({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          className="flex justify-center pt-2.5 pb-1 sm:hidden cursor-grab active:cursor-grabbing touch-none select-none"
+          onMouseDown={handleMouseDown}
+          className="flex justify-center py-2.5 sm:hidden cursor-grab active:cursor-grabbing touch-none select-none -my-1"
         >
-          <div className="h-1.5 w-12 rounded-full bg-[var(--border-strong)]/60" />
+          <div
+            ref={handleBarRef}
+            className="h-1.5 w-12 rounded-full bg-[var(--border-strong)]/60 transition-colors origin-center"
+          />
         </div>
 
         {/* Modal Header */}
@@ -287,6 +449,7 @@ export default function WalletSelectModal({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
+          onMouseDown={handleMouseDown}
           className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[var(--border)]/60 cursor-grab select-none touch-none"
         >
           <div>
@@ -303,7 +466,11 @@ export default function WalletSelectModal({
           </div>
           <button
             type="button"
-            onClick={closeSheet}
+            onClick={(e) => {
+              e.stopPropagation()
+              closeSheet()
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             className="grid h-8 w-8 place-items-center rounded-full bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
             aria-label={t('common.close', 'Tutup')}
           >

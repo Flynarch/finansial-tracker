@@ -3,6 +3,8 @@ import {
   Wallet,
   ArrowRightLeft,
   ArrowRight,
+  CheckCircle2,
+  FileSpreadsheet,
 } from 'lucide-react'
 import useChatStore from '../../store/useChatStore'
 import useTranslation from '../../hooks/useTranslation'
@@ -33,6 +35,30 @@ const CONFIG = {
       actionKey: 'ai.action.viewWallet',
     },
   },
+  habit: {
+    log_all: {
+      labelKey: 'ai.action.habitsLogged',
+      label: 'Semua Kebiasaan Selesai',
+      descKey: 'ai.action.habitsLoggedDesc',
+      desc: 'Berhasil dicentang untuk hari ini',
+      badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
+      Icon: CheckCircle2,
+      route: '/habits',
+      actionKey: 'ai.action.viewHabits',
+    },
+  },
+  export: {
+    export: {
+      labelKey: 'ai.action.exportSuccess',
+      label: 'Ekspor Data Berhasil',
+      descKey: 'ai.action.exportSuccessDesc',
+      desc: 'Berkas berhasil diekspor',
+      badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
+      Icon: FileSpreadsheet,
+      route: '/settings',
+      actionKey: 'ai.action.viewSettings',
+    },
+  },
 }
 
 export default function ActionSuccessCard({ type = 'todo', action = 'create', title = '', subtitle = '', data = {} }) {
@@ -53,7 +79,7 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
     )
   }
 
-  if (type === 'habit') {
+  if (type === 'habit' && action !== 'log_all') {
     return (
       <HabitCardWidget
         habitId={data?.id}
@@ -75,6 +101,7 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
         priority={data?.priority}
         subTasks={data?.subTasks}
         action={action}
+        completed={Boolean(data?.completed || action === 'done' || action === 'complete')}
       />
     )
   }
@@ -107,10 +134,12 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
   if (type === 'loan') {
     return (
       <LoanCardWidget
+        loanId={data?.id}
         title={data?.title || title}
         personName={data?.personName}
         loanType={data?.type || data?.loanType}
         amount={data?.amount}
+        remainingAmount={data?.remainingAmount}
         dueDate={data?.dueDate}
         currency={data?.currency}
         action={action}
@@ -132,7 +161,18 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
     )
   }
 
-  const cfg = CONFIG[type]?.[action] || CONFIG.wallet?.create
+  const fallbackCfg = {
+    labelKey: 'ai.action.success',
+    label: 'Tindakan Berhasil',
+    descKey: 'ai.action.processed',
+    desc: 'Berhasil diproses',
+    badgeClass: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-500',
+    Icon: CheckCircle2,
+    route: null,
+    actionKey: null,
+  }
+
+  const cfg = CONFIG[type]?.[action] || fallbackCfg
   const IconComp = cfg.Icon
 
   const label = t(cfg.labelKey, cfg.label || 'Tindakan Berhasil')
@@ -147,12 +187,12 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
   }
 
   return (
-    <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-sm overflow-hidden my-1 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="relative rounded-2xl border border-[var(--border)]/70 bg-[var(--panel-strong)]/85 backdrop-blur-md shadow-sm overflow-hidden my-1 ft-msg-enter">
       {/* Top accent bar */}
       <div className="h-1 w-full bg-[var(--accent)]/30" />
 
       {/* Header Banner */}
-      <div className="p-3 flex items-center justify-between border-b border-[var(--border)]/50">
+      <div className="p-3 flex items-center justify-between border-b border-[var(--border)]/40">
         <div className="flex items-center gap-2.5">
           <div className={`p-1.5 rounded-xl border flex items-center justify-center shadow-2xs ${cfg.badgeClass}`}>
             <IconComp size={15} strokeWidth={2.5} />
@@ -174,7 +214,7 @@ export default function ActionSuccessCard({ type = 'todo', action = 'create', ti
           <button
             type="button"
             onClick={handleActionClick}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--border-strong)] hover:bg-[var(--panel)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--field-bg)]/60 border border-[var(--border)]/60 px-3 py-1.5 text-[11px] font-bold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--field-bg)] transition active:scale-95 shrink-0 shadow-2xs cursor-pointer"
           >
             <span>{actionText}</span>
             <ArrowRight size={12} strokeWidth={2.5} />

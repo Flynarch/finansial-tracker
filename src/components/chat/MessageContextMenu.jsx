@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react'
-import { Copy, DollarSign, Pencil, Trash2 } from 'lucide-react'
+import { Copy, DollarSign, Pencil, Trash2, RotateCcw, Reply } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { triggerHaptic } from '../../lib/haptics'
 import useBottomSheet from '../../hooks/useBottomSheet'
@@ -12,10 +12,13 @@ const MessageContextMenu = memo(function MessageContextMenu({
   messageContent = '',
   messageType,
   messageData = null,
+  messageId = null,
   onCopyText,
   onCopyAmount,
   onEditTransaction,
   onDeleteMessage,
+  onRegenerate,
+  onQuoteMessage,
 }) {
   const locale = useSettingsStore((s) => s.locale)
   const defaultCurrency = useSettingsStore((s) => s.defaultCurrency || 'IDR')
@@ -80,6 +83,32 @@ const MessageContextMenu = memo(function MessageContextMenu({
               {locale === 'en' ? 'Copy Text' : 'Salin Teks'}
             </span>
           </button>
+
+          {messageType === 'ai' && onRegenerate && (
+            <button 
+              type="button"
+              className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
+              onClick={() => handleAction(onRegenerate, messageId)}
+            >
+              <RotateCcw size={18} className="text-[var(--accent)]" />
+              <span className="text-sm font-bold text-[var(--accent)]">
+                {locale === 'en' ? 'Regenerate Response' : 'Buat Ulang Tanggapan'}
+              </span>
+            </button>
+          )}
+
+          {messageType === 'user' && onQuoteMessage && (
+            <button 
+              type="button"
+              className="w-full flex items-center text-left gap-3 px-4 py-3 active:bg-[var(--field-bg)] hover:bg-[var(--field-bg)]/50 transition cursor-pointer focus:outline-none focus-visible:bg-[var(--field-bg)]"
+              onClick={() => handleAction(onQuoteMessage, messageContent)}
+            >
+              <Reply size={18} className="text-[var(--muted)]" />
+              <span className="text-sm font-bold text-[var(--fg)]">
+                {locale === 'en' ? 'Quote / Edit Message' : 'Kutip / Edit Pesan'}
+              </span>
+            </button>
+          )}
 
           {hasAmount && (
             <button 

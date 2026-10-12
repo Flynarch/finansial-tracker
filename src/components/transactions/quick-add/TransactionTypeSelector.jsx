@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import useTranslation from '../../../hooks/useTranslation'
 import { hapticSelection } from '../../../lib/haptics'
 
@@ -7,7 +8,7 @@ const TYPES = [
   { key: 'transfer', labelKey: 'tx.transfer', fallback: 'Transfer' },
 ]
 
-export default function TransactionTypeSelector({ txType, onSelectType }) {
+const TransactionTypeSelector = memo(function TransactionTypeSelector({ txType, onSelectType }) {
   const { t } = useTranslation()
   const activeIndex = TYPES.findIndex((item) => item.key === txType)
   const typeIndex = activeIndex >= 0 ? activeIndex : 0
@@ -51,4 +52,6 @@ export default function TransactionTypeSelector({ txType, onSelectType }) {
       })}
     </div>
   )
-}
+})
+
+export default TransactionTypeSelector

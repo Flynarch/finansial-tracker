@@ -1,5 +1,7 @@
 import { format } from 'date-fns'
 import Decimal from 'decimal.js-light'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { getDecryptedNoteSync } from './fieldEncryption'
 export { getCachedCurrencyRates } from './api'
 
@@ -30,7 +32,9 @@ const _fmtCache = new Map()
 
 export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID', options = {}) {
   const cleanCurrency = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'IDR'
-  const cleanLocale = typeof locale === 'string' && locale.trim() ? locale.trim() : 'id-ID'
+  // When currency is IDR, enforce consistent 'Rp' prefix and standard Indonesian number grouping across all locales
+  const effectiveLocale = cleanCurrency === 'IDR' ? 'id-ID' : (typeof locale === 'string' && locale.trim() ? locale.trim() : 'id-ID')
+  const cleanLocale = effectiveLocale
   const numeric = Number(amount || 0)
   const maxFractionDigits = options?.maxFractionDigits
   const minFractionDigits = options?.minFractionDigits
@@ -50,6 +54,7 @@ export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID', optio
       fmt = new Intl.NumberFormat(cleanLocale, {
         style: 'currency',
         currency: cleanCurrency,
+        currencyDisplay: cleanCurrency === 'IDR' ? 'narrowSymbol' : 'symbol',
         minimumFractionDigits: minDigits,
         maximumFractionDigits: Math.max(minDigits, maxDigits),
       })
@@ -58,6 +63,7 @@ export function formatCurrency(amount, currency = 'IDR', locale = 'id-ID', optio
       fmt = new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
+        currencyDisplay: 'narrowSymbol',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       })
@@ -310,14 +316,81 @@ export function toTransactionsCsv(rows) {
   return [header.join(','), ...body].join('\n')
 }
 
-export function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-8;') {
+export async function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-8;') {
+  if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()) {
+    try {
+      const bytes = new TextEncoder().encode(content)
+      let binary = ''
+      const len = bytes.byteLength
+      const chunkSize = 8192
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = bytes.subarray(i, Math.min(i + chunkSize, len))
+        binary += String.fromCharCode.apply(null, chunk)
+      }
+      const base64Data = btoa(binary)
+
+      await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      })
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ft-show-toast', {
+            detail: {
+              title: 'File Berhasil Disimpan',
+              message: `File tersimpan di folder Dokumen: ${filename}`,
+              type: 'success',
+            },
+          })
+        )
+      }
+      return true
+    } catch (fsErr) {
+      console.warn('[downloadTextFile] Native filesystem write failed, falling back to Share/Web:', fsErr)
+    }
+  }
+
   const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(url)
+
+  if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
+    try {
+      const file = new File([blob], filename, { type: mimeType })
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: filename,
+          files: [file],
+        })
+        return true
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return true
+      console.warn('[downloadTextFile] Web Share API failed, falling back to anchor click:', err)
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url)
+      } catch {
+        /* ignore */
+      }
+    }, 3000)
+    return true
+  }
+
+  return false
 }
 
 export const LOAN_CATEGORIES = Object.freeze([

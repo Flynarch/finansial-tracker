@@ -20,6 +20,17 @@ describe('utils - formatCurrency & formatCompactCurrency', () => {
     expect(formatted).toContain('50.000')
   })
 
+  it('consistently formats IDR with Rp prefix regardless of locale', () => {
+    const formattedEn = formatCurrency(50000, 'IDR', 'en')
+    const formattedEnUS = formatCurrency(50000, 'IDR', 'en-US')
+    const formattedDefault = formatCurrency(50000, 'IDR')
+    expect(formattedEn).toContain('Rp')
+    expect(formattedEn).not.toContain('IDR')
+    expect(formattedEnUS).toContain('Rp')
+    expect(formattedEnUS).not.toContain('IDR')
+    expect(formattedDefault).toContain('Rp')
+  })
+
   it('formats USD with 2 decimals', () => {
     const formatted = formatCurrency(12.5, 'USD', 'en-US')
     expect(formatted).toContain('12.50')

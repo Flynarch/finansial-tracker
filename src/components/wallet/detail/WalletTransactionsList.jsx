@@ -411,7 +411,7 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
             <>
               {visibleGroups.map((group, idx) => (
                 <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
-                  <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)]/95 backdrop-blur-xs rounded-lg">
+                  <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)] rounded-lg">
                     <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">{group.dateLabel}</span>
                     {group.dailySummaryText ? (
                       <span className={`text-[11px] font-black tabular-nums ${group.isPositive ? 'text-[var(--status-income)]' : 'text-[var(--muted)]'}`}>

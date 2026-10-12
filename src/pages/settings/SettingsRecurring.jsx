@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
@@ -16,6 +17,7 @@ import {
 import CustomDatePicker from '../../components/ui/CustomDatePicker'
 import Modal from '../../components/ui/Modal'
 import ConfirmDeleteModal from '../../components/ui/ConfirmDeleteModal'
+import EmptyState from '../../components/ui/EmptyState'
 import WalletSelectModal, { WalletSelectTrigger } from '../../components/ui/WalletSelectModal'
 import CategoryPickerModal from '../../components/transactions/CategoryPickerModal'
 import { db } from '../../lib/db'
@@ -40,6 +42,26 @@ import { SettingsSection, SettingsSegmentControl } from './settingsComponents'
 
 export default function SettingsRecurring() {
   const { t, locale } = useTranslation()
+
+  const formatDueDate = (dateStr) => {
+    if (!dateStr) return '-'
+    try {
+      const parts = String(dateStr).split('-')
+      if (parts.length === 3) {
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+        if (!isNaN(d.getTime())) {
+          return format(d, 'd MMM yyyy', { locale: locale === 'id' ? idLocale : enLocale })
+        }
+      }
+      const parsed = new Date(dateStr)
+      if (!isNaN(parsed.getTime())) {
+        return format(parsed, 'd MMM yyyy', { locale: locale === 'id' ? idLocale : enLocale })
+      }
+      return dateStr
+    } catch {
+      return dateStr
+    }
+  }
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const defaultWalletId = useSettingsStore((state) => state.defaultWalletId)
   const recurringTransactions = useLiveQuery(() => db.recurringTransactions.toArray(), [], [])
@@ -385,7 +407,7 @@ export default function SettingsRecurring() {
                   category: val === 'expense' ? 'tagihan/listrik' : 'gaji/gaji_bulanan',
                 }))
               }
-              ariaLabel="Tipe Transaksi"
+              ariaLabel={t('settings.recurring.field.type', 'Tipe Transaksi')}
             />
           </div>
 
@@ -428,7 +450,7 @@ export default function SettingsRecurring() {
 
             <div>
               <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-                Kategori
+                {t('settings.recurring.field.category', 'Kategori')}
               </label>
               <button
                 type="button"
@@ -443,13 +465,15 @@ export default function SettingsRecurring() {
                       : formatIncomeCategory(recurringForm.category, locale)}
                   </span>
                 </div>
-                <span className="text-[11px] font-bold text-[var(--accent)] shrink-0">Ubah ›</span>
+                <span className="text-[11px] font-bold text-[var(--accent)] shrink-0">
+                  {t('settings.recurring.changeCategory', 'Ubah')} ›
+                </span>
               </button>
             </div>
 
             <div>
               <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-                Dompet / Akun *
+                {t('settings.recurring.field.wallet', 'Dompet / Akun')} *
               </label>
               <WalletSelectTrigger
                 wallet={selectedWallet}
@@ -466,7 +490,7 @@ export default function SettingsRecurring() {
                 options={frequencyOptions}
                 value={recurringForm.frequency}
                 onChange={(val) => setRecurringForm((prev) => ({ ...prev, frequency: val }))}
-                ariaLabel="Frekuensi"
+                ariaLabel={t('settings.recurring.field.frequency', 'Frekuensi')}
               />
             </div>
 
@@ -477,7 +501,7 @@ export default function SettingsRecurring() {
               <CustomDatePicker
                 value={recurringForm.nextDate}
                 onChange={(val) => setRecurringForm((prev) => ({ ...prev, nextDate: val }))}
-                title={'Pilih Tanggal'}
+                title={t('calendar.selectDate', 'Pilih Tanggal')}
               />
             </div>
           </div>
@@ -532,15 +556,12 @@ export default function SettingsRecurring() {
         )}
       >
         {recurringTransactions.length === 0 ? (
-          <div className="ft-settings-cell py-10 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-[var(--field-bg)] text-[var(--muted)] border border-[var(--border)] mb-3 shadow-2xs">
-              <Layers className="h-7 w-7" />
-            </div>
-            <p className="text-base font-black text-[var(--fg)]">{t('settings.recurring.empty', 'Belum Ada Transaksi Berulang')}</p>
-            <p className="mt-1 text-xs font-semibold text-[var(--muted)] max-w-xs mx-auto">
-              {t('settings.recurring.emptyDesc', 'Semua jadwal tagihan bulanan atau pemasukan berkala Anda akan tercatat di sini.')}
-            </p>
-          </div>
+          <EmptyState
+            variant="transactions"
+            icon={<Layers className="h-7 w-7" />}
+            title={t('settings.recurring.empty', 'Belum Ada Transaksi Berulang')}
+            description={t('settings.recurring.emptyDesc', 'Semua jadwal tagihan bulanan atau pemasukan berkala Anda akan tercatat di sini.')}
+          />
         ) : (
           <div className="space-y-3">
             {recurringTransactions.map((item) => {
@@ -551,7 +572,7 @@ export default function SettingsRecurring() {
               return (
                 <div
                   key={item.id}
-                  className={`p-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] space-y-3 transition-all ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] space-y-3 transition-all ${
                     isEnabled ? 'opacity-100 shadow-2xs' : 'opacity-60 bg-[var(--field-bg)]/50'
                   }`}
                 >
@@ -573,15 +594,16 @@ export default function SettingsRecurring() {
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="text-sm font-extrabold text-[var(--fg)] leading-tight truncate">
-                            {item.title}
-                          </h4>
+                        <h4 className="text-sm font-black text-[var(--fg)] leading-tight truncate">
+                          {item.title}
+                        </h4>
+
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
                           <span className="inline-flex items-center rounded-md bg-[var(--field-bg)] px-1.5 py-0.5 border border-[var(--border)] text-[10px] font-bold uppercase text-[var(--muted)]">
                             {recurringFrequencyLabel(item.frequency)}
                           </span>
                           {item.autoExecute !== false ? (
-                            <span className="inline-flex items-center rounded-md bg-[var(--status-transfer-soft)] border border-[var(--status-transfer)]/30 px-1.5 py-0.5 text-[9px] font-extrabold text-[var(--status-transfer)] uppercase">
+                            <span className="inline-flex items-center rounded-md bg-[var(--status-transfer-soft)] border border-[var(--status-transfer)]/30 px-1.5 py-0.5 text-[9px] font-black text-[var(--status-transfer)] uppercase">
                               Auto-Debit
                             </span>
                           ) : (
@@ -596,19 +618,27 @@ export default function SettingsRecurring() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] mt-1 truncate">
+                        <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] mt-1.5 min-w-0">
                           {itemWallet && (
-                            <span className="font-bold text-[var(--fg)]/80 truncate">
+                            <span className="font-bold text-[var(--fg)] shrink-0 max-w-[120px] truncate">
                               {itemWallet.name}
                             </span>
                           )}
                           {item.category && (
                             <>
-                              <span>•</span>
-                              <span className="truncate">
+                              <span className="text-[var(--border)] shrink-0">•</span>
+                              <span className="truncate font-medium text-[var(--muted)]">
                                 {isExpense
                                   ? formatExpenseCategory(item.category, locale)
                                   : formatIncomeCategory(item.category, locale)}
+                              </span>
+                            </>
+                          )}
+                          {item.subcategory && (
+                            <>
+                              <span className="text-[var(--border)] shrink-0">•</span>
+                              <span className="truncate text-[var(--muted)]">
+                                {item.subcategory}
                               </span>
                             </>
                           )}
@@ -616,7 +646,7 @@ export default function SettingsRecurring() {
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 pt-0.5">
                       <span
                         className={`text-sm sm:text-base font-black font-mono tracking-tight block ${
                           isExpense ? 'text-[var(--status-expense)]' : 'text-[var(--status-income)]'
@@ -629,19 +659,24 @@ export default function SettingsRecurring() {
                   </div>
 
                   {/* Bottom Row: Next Date info + Actions */}
-                  <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[var(--border)]/60 text-xs">
-                    <div className="flex items-center gap-1.5 text-[var(--muted)] text-[11px] font-medium min-w-0 truncate">
-                      <span className="truncate">{t('settings.recurring.dueDatePrefix', 'Jatuh tempo')}: <strong className="font-bold text-[var(--fg)]">{item.nextDate}</strong></span>
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-[var(--border)]/60 text-xs">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] min-w-0">
+                      <span className="shrink-0 text-[11px] sm:text-xs">
+                        {t('settings.recurring.dueDatePrefix', 'Jatuh tempo')}:
+                      </span>
+                      <strong className="font-bold text-[var(--fg)] text-xs sm:text-xs whitespace-nowrap">
+                        {formatDueDate(item.nextDate)}
+                      </strong>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                       {isEnabled && (
                         <button
                           type="button"
                           disabled={loggingId === item.id}
                           onClick={(e) => handleLogNow(item, e)}
-                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50"
-                          title={t('settings.recurring.logNow', 'Catat Sekarang')}
+                          className="inline-flex items-center gap-1 h-7.5 sm:h-8 px-2 sm:px-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title={t('settings.recurring.logNowTooltip', 'Catat sekarang')}
                         >
                           <Check className="h-3.5 w-3.5" />
                           <span className="text-[10px] font-bold">{t('settings.recurring.logNow', 'Catat')}</span>
@@ -651,7 +686,7 @@ export default function SettingsRecurring() {
                       <button
                         type="button"
                         onClick={(e) => handleToggleEnabled(item, e)}
-                        className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+                        className={`inline-flex items-center gap-1 h-7.5 sm:h-8 px-2 sm:px-2.5 rounded-xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
                           isEnabled
                             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                             : 'border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)]'
@@ -665,7 +700,7 @@ export default function SettingsRecurring() {
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(item)}
-                        className="h-8 w-8 grid place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
+                        className="h-7.5 w-7.5 sm:h-8 sm:w-8 grid place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
                         title={t('common.edit', 'Ubah')}
                       >
                         <Edit2 className="h-3.5 w-3.5" />
@@ -674,7 +709,7 @@ export default function SettingsRecurring() {
                       <button
                         type="button"
                         onClick={() => setDeletingItem(item)}
-                        className="h-8 w-8 grid place-items-center rounded-xl text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer"
+                        className="h-7.5 w-7.5 sm:h-8 sm:w-8 grid place-items-center rounded-xl text-[var(--muted)] hover:text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer"
                         title={t('settings.delete', 'Hapus')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -751,7 +786,7 @@ export default function SettingsRecurring() {
         <form onSubmit={handleSaveEdit} className="space-y-3.5 pt-1">
           <div>
             <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              Nama Transaksi *
+              {t('settings.recurring.field.title', 'Nama Transaksi')} *
             </label>
             <input
               type="text"
@@ -764,7 +799,7 @@ export default function SettingsRecurring() {
 
           <div>
             <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              Nominal *
+              {t('settings.recurring.field.amount', 'Nominal')} *
             </label>
             <input
               type="text"
@@ -784,7 +819,7 @@ export default function SettingsRecurring() {
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-                Kategori
+                {t('settings.recurring.field.category', 'Kategori')}
               </label>
               <button
                 type="button"
@@ -801,7 +836,7 @@ export default function SettingsRecurring() {
 
             <div>
               <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-                Dompet / Akun
+                {t('settings.recurring.field.wallet', 'Dompet / Akun')}
               </label>
               <WalletSelectTrigger
                 wallet={selectedEditWallet}
@@ -813,13 +848,13 @@ export default function SettingsRecurring() {
 
           <div>
             <label className="mb-1 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              Frekuensi
+              {t('settings.recurring.field.frequency', 'Frekuensi')}
             </label>
             <SettingsSegmentControl
               options={frequencyOptions}
               value={editForm.frequency}
               onChange={(val) => setEditForm((prev) => ({ ...prev, frequency: val }))}
-              ariaLabel={t('settings.recurring.frequency', 'Frekuensi')}
+              ariaLabel={t('settings.recurring.field.frequency', 'Frekuensi')}
             />
           </div>
 

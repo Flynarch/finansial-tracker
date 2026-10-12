@@ -17,16 +17,16 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   if (isDbLoading) {
     return (
       <section className="ft-stagger-in" style={{ '--stagger': 5 }}>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm animate-pulse space-y-3">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm ft-skeleton-enter ft-skeleton-card space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-xl bg-[var(--border)]/60" />
+              <div className="h-8 w-8 rounded-xl ft-skeleton" />
               <div className="space-y-1">
-                <div className="h-3.5 w-24 rounded bg-[var(--border)]/70" />
-                <div className="h-2.5 w-32 rounded bg-[var(--border)]/40" />
+                <div className="h-3.5 w-24 rounded ft-skeleton" />
+                <div className="h-2.5 w-32 rounded ft-skeleton" />
               </div>
             </div>
-            <div className="h-7 w-20 rounded-xl bg-[var(--border)]/60" />
+            <div className="h-7 w-20 rounded-xl ft-skeleton" />
           </div>
         </div>
       </section>
@@ -48,7 +48,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
   const isNetNegative = netPosition < 0
 
   return (
-    <section className="ft-stagger-in" style={{ '--stagger': 5 }}>
+    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 5 }}>
       <div
         onClick={() => navigate('/loans')}
         className="group rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm hover:border-[var(--border-strong)] transition-all cursor-pointer active:scale-[0.995] space-y-3"
@@ -174,7 +174,7 @@ export const DashboardLoanWidget = memo(function DashboardLoanWidget({
             )}
           </>
         ) : (
-          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 p-3 text-center transition-colors hover:border-[var(--border-strong)]">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--field-bg)]/40 p-3 text-center transition-colors hover:border-[var(--border-strong)]">
             <p className="text-xs font-bold text-[var(--fg)] truncate">
               {t('loans.emptyTitle', 'Belum Ada Catatan Pinjaman')}
             </p>

@@ -147,7 +147,7 @@
 }
 
 .ft-sheet-enter {
-  animation: ft-sheet-slide-up 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ft-sheet-slide-up 260ms cubic-bezier(0.2, 1.15, 0.32, 1) both;
   will-change: transform;
 }
 
@@ -459,6 +459,54 @@
   animation: ft-msg-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* AI reasoning step slide-fade animation */
+@keyframes ft-reasoning-step {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ft-reasoning-step-enter {
+  animation: ft-reasoning-step 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* AI reasoning card subtle ambient border glow */
+@keyframes ft-reasoning-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px var(--accent), 0 0 14px -3px var(--accent);
+  }
+}
+
+.ft-reasoning-card {
+  animation: ft-reasoning-glow 2.8s ease-in-out infinite;
+}
+
+/* Smooth regenerate / streaming text reveal */
+@keyframes ft-regenerate-fade {
+  0% {
+    opacity: 0.15;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.ft-regenerate-enter {
+  animation: ft-regenerate-fade 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Expandable section grid animation for smooth height transition */
 .ft-expand {
   display: grid;
@@ -657,6 +705,9 @@
   .ft-backdrop-exit,
   .ft-page-transition,
   .ft-page-crossfade,
+  .ft-content-loaded,
+  .ft-skeleton-enter,
+  .ft-skeleton-leaving,
   .ft-fade-up,
   .ft-todo-card-enter,
   .ft-page-enter > *,
@@ -736,9 +787,56 @@
 @keyframes ft-page-fade-in {
   from {
     opacity: 0;
+    transform: translate3d(0, 6px, 0);
   }
   to {
     opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ft-skeleton-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ft-content-fade-in {
+  from {
+    opacity: 0.2;
+    transform: scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ft-skeleton-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.ft-skeleton-leaving {
+  animation: ft-skeleton-fade-out 220ms ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ft-toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
   }
 }
 
@@ -857,5 +955,35 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* AI Chat Editorial & Stream Animation */
+@keyframes ft-stream-fade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ft-stream-fade {
+  animation: ft-stream-fade 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ft-ai-editorial-flow {
+  line-height: 1.68;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.ft-ai-editorial-flow p {
+  margin-bottom: 0.65rem;
+}
+
+.ft-ai-editorial-flow p:last-child {
+  margin-bottom: 0;
 }
 

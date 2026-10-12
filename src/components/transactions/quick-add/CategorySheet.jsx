@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import CategoryIcon from '../../ui/CategoryIcon'
 import Button from '../../ui/Button'
@@ -17,6 +17,7 @@ import {
   setIncomeCategoryColor,
 } from '../../../lib/incomeCategories'
 import { cascadeDeleteSubcategory } from '../../../lib/categoryCleanup'
+import ConfirmDeleteModal from '../../ui/ConfirmDeleteModal'
 
 const COLOR_TONES = ['amber', 'emerald', 'sky', 'indigo', 'purple', 'rose', 'teal', 'slate', 'orange', 'pink', 'yellow']
 
@@ -40,12 +41,176 @@ export default function CategorySheet({
   const [editMode, setEditMode] = useState(false)
   const [newSubName, setNewSubName] = useState('')
   const [newParentName, setNewParentName] = useState('')
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
+  const [deleteSubTarget, setDeleteSubTarget] = useState(null)
+  const sheetRef = useRef(null)
+  const handleBarRef = useRef(null)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+  const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      setIsDismissedByDrag(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
 
   useBackButton(onClose, Boolean(isOpen))
+
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    hasTriggeredSnapHaptic.current = false
+    touchStartY.current = clientY
+    touchStartTime.current = Date.now()
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
+
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = 'none'
+    }
+    if (handleBarRef.current) {
+      handleBarRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
+
+    if (deltaY > 0) {
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
+    }
+
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (sheetRef.current) {
+      const y = Math.max(0, currentOffset)
+      sheetRef.current.style.transform = `translate3d(0, ${y}px, 0)`
+    }
+
+    if (handleBarRef.current) {
+      const y = Math.max(0, currentOffset)
+      const scaleX = Math.min(1.45, Math.max(1, 1 + (y * 0.2) / 44))
+      handleBarRef.current.style.transform = `scale3d(${scaleX}, 1, 1)`
+      if (currentOffset >= 80) {
+        handleBarRef.current.style.backgroundColor = 'var(--accent)'
+      } else {
+        handleBarRef.current.style.backgroundColor = ''
+      }
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
+    const elapsed = Date.now() - touchStartTime.current
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1)
+
+    hasTriggeredSnapHaptic.current = false
+    isDraggingRef.current = false
+    touchStartY.current = 0
+
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        sheetRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        sheetRef.current.style.opacity = '0'
+      }
+      onClose()
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        sheetRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease'
+        handleBarRef.current.style.transform = 'scale3d(1, 1, 1)'
+        handleBarRef.current.style.backgroundColor = ''
+      }
+      snapTimeoutRef.current = setTimeout(() => {
+        dragOffsetRef.current = 0
+        if (sheetRef.current) {
+          sheetRef.current.style.transform = ''
+          sheetRef.current.style.transition = ''
+          sheetRef.current.style.opacity = ''
+        }
+        if (handleBarRef.current) {
+          handleBarRef.current.style.transform = ''
+          handleBarRef.current.style.transition = ''
+        }
+        snapTimeoutRef.current = null
+      }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = ''
+        sheetRef.current.style.transition = ''
+        sheetRef.current.style.opacity = ''
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transform = ''
+        handleBarRef.current.style.transition = ''
+      }
+    }
+  }, [onClose])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
 
   if (!isOpen) return null
 
@@ -67,8 +232,10 @@ export default function CategorySheet({
     onCategoryCustomChanged?.()
   }
 
-  const handleRemoveSub = async (parentId, childId) => {
-    await cascadeDeleteSubcategory(parentId, childId, txType)
+  const handleConfirmDeleteSub = async () => {
+    if (!deleteSubTarget) return
+    await cascadeDeleteSubcategory(deleteSubTarget.parentId, deleteSubTarget.childId, txType)
+    setDeleteSubTarget(null)
     onCategoryCustomChanged?.()
   }
 
@@ -78,39 +245,11 @@ export default function CategorySheet({
     onCategoryCustomChanged?.()
   }
 
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY
-    touchStartTime.current = Date.now()
-    setIsDragging(true)
-  }
-
-  const handleTouchMove = (e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
-    if (deltaY > 0) {
-      setDragOffset(deltaY)
-    } else {
-      setDragOffset(deltaY * 0.15)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1)
-    setIsDragging(false)
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      onClose()
-    }
-    setDragOffset(0)
-    touchStartY.current = 0
-  }
-
   return createPortal(
     <div className="fixed inset-0 z-[100] flex flex-col justify-end pointer-events-auto" role="presentation">
       <button
         type="button"
-        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-240 ease-out ${
+        className={`absolute inset-0 bg-black/60 transition-opacity duration-240 ease-out ${
           isEnter ? 'opacity-100' : 'opacity-0'
         }`}
         aria-label={t('addTx.closeSheet', 'Tutup')}
@@ -120,15 +259,19 @@ export default function CategorySheet({
         }}
       />
       <div
+        ref={sheetRef}
         className="relative flex max-h-[min(88vh,36rem)] w-full flex-col rounded-t-3xl border-t border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu will-change-transform"
         style={{
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-          transform: isEnter
-            ? `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`
-            : 'translate3d(0, 100%, 0)',
-          transition: isDragging
-            ? 'none'
+          transform: isDismissedByDrag
+            ? 'translate3d(0, 100%, 0)'
+            : (isEnter ? 'translate3d(0, 0, 0)' : 'translate3d(0, 100%, 0)'),
+          transition: isDismissedByDrag
+            ? 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
             : 'transform 240ms cubic-bezier(0.32, 0.72, 0, 1)',
+          opacity: isDismissedByDrag ? 0 : undefined,
+          willChange: 'transform',
+          contain: 'paint layout',
         }}
       >
         <div
@@ -136,15 +279,20 @@ export default function CategorySheet({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          className="mx-auto mt-2 h-6 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+          onMouseDown={handleMouseDown}
+          className="mx-auto mt-1 h-7 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
         >
-          <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)]/60" />
+          <div
+            ref={handleBarRef}
+            className="h-1.5 w-11 rounded-full bg-[var(--border-strong)]/60 transition-colors origin-center"
+          />
         </div>
         <div
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
+          onMouseDown={handleMouseDown}
           className="flex items-center justify-between gap-2 border-b border-[var(--border)]/70 px-4 py-2.5 cursor-grab select-none touch-none"
         >
           <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--fg)]">
@@ -301,9 +449,15 @@ export default function CategorySheet({
                       </span>
                       <button
                         type="button"
-                        className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-500/10"
+                        className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-500/10 transition active:scale-90 cursor-pointer"
                         aria-label={t('common.delete', 'Hapus')}
-                        onClick={() => handleRemoveSub(activeParent.id, child.id)}
+                        onClick={() =>
+                          setDeleteSubTarget({
+                            parentId: activeParent.id,
+                            childId: child.id,
+                            childName: child.names?.[lang] || child.id,
+                          })
+                        }
                       >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6" strokeLinecap="round" />
@@ -376,6 +530,20 @@ export default function CategorySheet({
           )}
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteSubTarget)}
+        onClose={() => setDeleteSubTarget(null)}
+        onConfirm={handleConfirmDeleteSub}
+        title={t('settings.deleteSubcategory', 'Hapus Subkategori')}
+        message={t(
+          'settings.deleteSubConfirm',
+          `Apakah Anda yakin ingin menghapus subkategori "${deleteSubTarget?.childName}"? Riwayat transaksi akan dialihkan ke kategori umum.`,
+          { name: deleteSubTarget?.childName },
+        )}
+        confirmText={t('common.delete', 'Hapus')}
+        zIndex="z-[110]"
+      />
     </div>,
     document.body
   )

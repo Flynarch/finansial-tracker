@@ -496,9 +496,13 @@ export default function SettingsNotifications() {
                   <span>{t('notif.syncNow', 'Sinkronkan Notifikasi Sekarang')}</span>
                 </button>
 
-                {syncFeedback && (
-                  <span className="text-xs font-bold text-emerald-500 animate-fadeIn truncate">
-                    {syncFeedback}
+                {syncFeedback?.text && (
+                  <span
+                    className={`text-xs font-bold animate-fadeIn truncate ${
+                      syncFeedback.isError ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-500'
+                    }`}
+                  >
+                    {syncFeedback.text}
                   </span>
                 )}
               </div>

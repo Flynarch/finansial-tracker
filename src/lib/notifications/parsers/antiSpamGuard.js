@@ -109,10 +109,21 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     'butuh dana',
   ]
 
-  const hasStrongFinancialIndicator = /(?:berhasil|sukses|total\s+bayar|pembayaran\s+sebesar|transfer\s+berhasil|transaksi\s+berhasil|trsf\s+e-banking|kamu\s+menerima|uang\s+masuk|menerima\s+transfer|pembayaran\s+rp)/i.test(combined)
-  const receiptTolerantPromoWords = ['promo', 'diskon', 'voucher', 'kupon']
+  const hasStrongFinancialIndicator = /(?:berhasil|sukses|total\s+bayar|pembayaran\s+sebesar|transfer\s+berhasil|transaksi\s+berhasil|trsf\s+e-banking|kamu\s+menerima|uang\s+masuk|menerima\s+transfer|pembayaran\s+rp|top\s*up|isi\s+saldo|saldo\s*.*bertambah)/i.test(combined)
+  const receiptTolerantPromoWords = [
+    'promo',
+    'diskon',
+    'voucher',
+    'kupon',
+    'dapatkan',
+    'bonus',
+    'bonus ',
+    'bonus saldo',
+    'koin',
+    'poin reward',
+  ]
   const effectivePromoBlacklist = hasStrongFinancialIndicator
-    ? promoBlacklist.filter((b) => !receiptTolerantPromoWords.includes(b))
+    ? promoBlacklist.filter((b) => !receiptTolerantPromoWords.some((w) => b === w || b.startsWith(w)))
     : promoBlacklist
 
   if (effectivePromoBlacklist.some((b) => combined.includes(b))) {
@@ -254,7 +265,12 @@ export function isFinancialMutation(title = '', text = '', packageName = '') {
     'uang kembali',
     'pengembalian saldo',
   ]
-  return receiptKeywords.some((w) => combined.includes(w)) || /\bcr\b/i.test(combined)
+  return (
+    receiptKeywords.some((w) => combined.includes(w)) ||
+    /\bcr\b/i.test(combined) ||
+    /saldo\s*.*bertambah/i.test(combined) ||
+    /(?:top\s*up|isi\s+saldo)/i.test(combined)
+  )
 }
 
 /**

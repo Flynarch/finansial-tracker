@@ -20,31 +20,31 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
     return (
       <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
         <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[128px] flex flex-col justify-between">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs ft-skeleton-enter ft-skeleton-card space-y-3 min-h-[128px] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
-                <div className="h-3.5 w-16 rounded bg-[var(--border)]/60" />
+                <div className="h-7 w-7 rounded-xl ft-skeleton" />
+                <div className="h-3.5 w-16 rounded ft-skeleton" />
               </div>
-              <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
+              <div className="h-3.5 w-3.5 rounded ft-skeleton" />
             </div>
             <div className="space-y-1">
-              <div className="h-5 w-20 rounded bg-[var(--border)]/70" />
+              <div className="h-5 w-20 rounded ft-skeleton" />
             </div>
-            <div className="h-2 w-full rounded-full bg-[var(--border)]/40" />
+            <div className="h-2 w-full rounded-full ft-skeleton" />
           </div>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs animate-pulse space-y-3 min-h-[128px] flex flex-col justify-between">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs ft-skeleton-enter ft-skeleton-card space-y-3 min-h-[128px] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-xl bg-[var(--border)]/60" />
-                <div className="h-3.5 w-16 rounded bg-[var(--border)]/60" />
+                <div className="h-7 w-7 rounded-xl ft-skeleton" />
+                <div className="h-3.5 w-16 rounded ft-skeleton" />
               </div>
-              <div className="h-3.5 w-3.5 rounded bg-[var(--border)]/40" />
+              <div className="h-3.5 w-3.5 rounded ft-skeleton" />
             </div>
             <div className="space-y-1">
-              <div className="h-5 w-20 rounded bg-[var(--border)]/70" />
+              <div className="h-5 w-20 rounded ft-skeleton" />
             </div>
-            <div className="h-2 w-full rounded-full bg-[var(--border)]/40" />
+            <div className="h-2 w-full rounded-full ft-skeleton" />
           </div>
         </div>
       </section>
@@ -96,7 +96,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
   const hasGoals = goalRows.length > 0
 
   return (
-    <section className="ft-stagger-in" style={{ '--stagger': 4 }}>
+    <section className="ft-stagger-in ft-content-loaded" style={{ '--stagger': 4 }}>
       <div className="grid grid-cols-2 gap-2.5">
         {/* Bento Card 1: Anggaran */}
         <div
@@ -118,7 +118,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
             {/* Top Row: Icon + Title on left, Chevron on right */}
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="grid h-7 w-7 place-items-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-indigo-500/12 text-indigo-500 border border-indigo-500/20 shrink-0">
                   <PieChart className="h-3.5 w-3.5" />
                 </div>
                 <p className="text-xs font-black text-[var(--fg)] tracking-tight truncate">
@@ -164,7 +164,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                         ? 'bg-[var(--status-expense)]'
                         : budgetPct >= 80
                         ? 'bg-[var(--warning)]'
-                        : 'bg-[var(--accent)]'
+                        : 'bg-indigo-500'
                     }`}
                     style={{ width: `${Math.min(100, Math.max(budgetPct, totalBudgetSpent > 0 ? 4 : 0))}%` }}
                   />
@@ -197,12 +197,14 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                 <div className="h-1.5 w-full rounded-full bg-[var(--field-bg)] border border-dashed border-[var(--border)]" />
 
                 {/* Sub-row below bar */}
-                <div className="flex items-center justify-between text-[10px] font-bold text-[var(--accent)] tabular-nums">
+                <div className="flex items-center justify-between text-[10px] font-bold text-indigo-500 tabular-nums">
                   <span className="flex items-center gap-1">
                     <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                     {t('budget.createQuick', 'Buat Anggaran')}
                   </span>
-                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">0 Kategori</span>
+                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">
+                    {t('budget.zeroCategories', locale === 'en' ? '0 Categories' : '0 Kategori')}
+                  </span>
                 </div>
               </>
             )}
@@ -294,7 +296,9 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
                     <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                     {t('savings.createQuick', 'Mulai Menabung')}
                   </span>
-                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">0 Target</span>
+                  <span className="text-[9.5px] font-semibold text-[var(--muted-2)]">
+                    {t('savings.zeroGoals', locale === 'en' ? '0 Goals' : '0 Target')}
+                  </span>
                 </div>
               </>
             )}

@@ -83,6 +83,11 @@ public class FinTrackNotificationService extends NotificationListenerService {
         Notification notification = sbn.getNotification();
         if (notification == null) return;
 
+        // Ignore notification group summaries to prevent duplicate callbacks
+        if ((notification.flags & Notification.FLAG_GROUP_SUMMARY) != 0) {
+            return;
+        }
+
         Bundle extras = notification.extras;
         if (extras == null) return;
 

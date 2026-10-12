@@ -16,70 +16,12 @@ import {
 import useSettingsStore from '../../store/useSettingsStore'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
-
-function getVisibleElement(selector) {
-  if (typeof document === 'undefined' || !selector) return null
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-
-  if (selector === '[data-tour="ai-chat-btn"]') {
-    if (isMobile) {
-      const mobilePill = document.querySelector('.ft-ai-bar, button[data-tour="ai-chat-btn"].ft-ai-bar')
-      if (mobilePill) return mobilePill
-    } else {
-      const desktopBtn = document.querySelector('nav [data-tour="ai-chat-btn"], header [data-tour="ai-chat-btn"]')
-      if (desktopBtn) return desktopBtn
-    }
-  }
-
-  const elements = Array.from(document.querySelectorAll(selector))
-  if (elements.length === 0) return null
-
-  return (
-    elements.find((el) => {
-      const rect = el.getBoundingClientRect()
-      const style = window.getComputedStyle(el)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }) ||
-    elements[0] ||
-    null
-  )
-}
-
-function smoothScrollTo(targetY, duration = 900) {
-  if (typeof window === 'undefined') return
-  const startY = window.scrollY || window.pageYOffset
-  const diff = targetY - startY
-  if (Math.abs(diff) < 2) return
-
-  const startTime = performance.now()
-  const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5)
-
-  const step = (currentTime) => {
-    const elapsed = currentTime - startTime
-    const progress = Math.min(1, elapsed / duration)
-    const eased = easeOutQuint(progress)
-    window.scrollTo(0, startY + diff * eased)
-    if (progress < 1) {
-      requestAnimationFrame(step)
-    }
-  }
-
-  requestAnimationFrame(step)
-}
-
-/** Generate Driver.js-style evenodd SVG path with rounded rectangle cutout */
-function buildCutoutSvgPath(rect, vw, vh) {
-  if (!rect) return `M0,0 H${vw} V${vh} H0 Z`
-  const { left: x, top: y, width: w, height: h, radius: rawR } = rect
-  const r = Math.max(0, Math.min(rawR || 20, w / 2, h / 2))
-
-  return `M0,0 H${vw} V${vh} H0 Z M${x + r},${y} h${w - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${h - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - 2 * r} a${r},${r} 0 0 1 -${r},-${r} v-${h - 2 * r} a${r},${r} 0 0 1 ${r},-${r} Z`
-}
+import {
+  getVisibleElement,
+  isFixedElement,
+  smoothScrollTo,
+  buildCutoutSvgPath,
+} from './spotlightTourUtils'
 
 export default function SpotlightTour() {
   const { t } = useTranslation()
@@ -99,7 +41,8 @@ export default function SpotlightTour() {
     arrowTop: 80,
   })
 
-  const rafTrackingId = useRef(null)
+  const isProgrammaticScrollRef = useRef(false)
+  const cancelScrollRef = useRef(null)
   const targetElementRef = useRef(null)
 
   const tourSteps = useMemo(
@@ -180,173 +123,225 @@ export default function SpotlightTour() {
 
   const currentStep = tourSteps[currentStepIndex] || tourSteps[0]
 
-  // Calculate & update target bounding box and popover position with guaranteed zero-overlap
+  // Calculate & update target bounding box and popover position with guaranteed zero-overlap and viewport boundary clamping
+  const updatePositions = useCallback(
+    (el, customTop = null) => {
+      if (!isSpotlightTourActive || !currentStep || !el) return
+
+      targetElementRef.current = el
+      const rect = el.getBoundingClientRect()
+
+      let top = customTop !== null ? customTop : rect.top
+      let left = rect.left
+      let width = rect.width
+      let height = rect.height
+
+      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+
+      // For bottom-nav step on mobile, include the central FAB button bounds if present
+      if (currentStep.id === 'bottom-nav' && !isDesktop) {
+        const fabEl = getVisibleElement('[data-tour="quick-add-btn"]')
+        if (fabEl) {
+          const fabRect = fabEl.getBoundingClientRect()
+          const fabDiff = fabRect.top - rect.top
+          const effectiveFabTop = top + fabDiff
+
+          const combinedTop = Math.min(top, effectiveFabTop)
+          const combinedBottom = Math.max(top + height, effectiveFabTop + fabRect.height)
+          const combinedLeft = Math.min(left, fabRect.left)
+          const combinedRight = Math.max(left + width, fabRect.right)
+
+          top = combinedTop
+          left = combinedLeft
+          width = combinedRight - combinedLeft
+          height = combinedBottom - combinedTop
+        }
+      }
+
+      const pad = currentStep.padding ?? 6
+      const roundedRadius = currentStep.radius ?? 20
+
+      // Viewport dimensions
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+
+      // Viewport-clamped dimensions to prevent any off-screen overspill
+      const rawLeft = left - pad
+      const rawTop = top - pad
+      const rawWidth = width + pad * 2
+      const rawHeight = height + pad * 2
+
+      const clampedLeft = Math.max(0, rawLeft)
+      const clampedTop = Math.max(0, rawTop)
+      const clampedWidth = Math.max(10, Math.min(rawWidth, vw - clampedLeft))
+      const clampedHeight = Math.max(10, Math.min(rawHeight, vh - clampedTop))
+
+      const roundedRect = {
+        top: clampedTop,
+        left: clampedLeft,
+        width: clampedWidth,
+        height: clampedHeight,
+        right: clampedLeft + clampedWidth,
+        bottom: clampedTop + clampedHeight,
+        radius: Math.min(roundedRadius, clampedWidth / 2, clampedHeight / 2),
+      }
+
+      setTargetRect(roundedRect)
+
+      // Calculate tooltip popover position
+      const cardWidth = Math.min(360, vw - 24)
+      const estimatedCardHeight = 185
+
+      let popoverLeft = roundedRect.left + roundedRect.width / 2 - cardWidth / 2
+      popoverLeft = Math.max(12, Math.min(popoverLeft, vw - cardWidth - 12))
+
+      let popoverTop
+      let placement
+      let arrowTop = 60
+
+      // Desktop sidebar step positioning (placed to the right of the sidebar)
+      if (currentStep.id === 'bottom-nav' && isDesktop && roundedRect.left <= 40 && roundedRect.width < 320) {
+        placement = 'right'
+        popoverLeft = Math.min(vw - cardWidth - 20, roundedRect.right + 18)
+        popoverTop = Math.max(70, Math.min(vh - estimatedCardHeight - 30, vh / 2 - estimatedCardHeight / 2))
+        arrowTop = Math.max(24, Math.min(estimatedCardHeight / 2, estimatedCardHeight - 24))
+      } else {
+        const spaceBelow = vh - roundedRect.bottom - 16
+        const spaceAbove = roundedRect.top - 16
+
+        if (currentStep.preferredPlacement === 'top' || (spaceAbove >= estimatedCardHeight && spaceBelow < estimatedCardHeight)) {
+          placement = 'top'
+          popoverTop = Math.max(12, roundedRect.top - estimatedCardHeight - 14)
+        } else {
+          placement = 'bottom'
+          popoverTop = Math.min(vh - estimatedCardHeight - 12, roundedRect.bottom + 14)
+        }
+      }
+
+      const targetCenterX = roundedRect.left + roundedRect.width / 2
+      const arrowLeft = Math.max(24, Math.min(targetCenterX - popoverLeft, cardWidth - 24))
+
+      setPopoverPos({
+        top: popoverTop,
+        left: popoverLeft,
+        width: cardWidth,
+        placement,
+        arrowLeft,
+        arrowTop,
+      })
+    },
+    [isSpotlightTourActive, currentStep],
+  )
+
   const computePositions = useCallback(() => {
     if (!isSpotlightTourActive || !currentStep) return
-
     const el = getVisibleElement(currentStep.target)
-    targetElementRef.current = el
-
     if (!el) {
       setTargetRect(null)
       return
     }
+    updatePositions(el, null)
+  }, [isSpotlightTourActive, currentStep, updatePositions])
 
-    const rect = el.getBoundingClientRect()
-    let top = rect.top
-    let left = rect.left
-    let width = rect.width
-    let height = rect.height
-
-    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
-
-    // For bottom-nav step on mobile, include the central FAB button bounds if present
-    if (currentStep.id === 'bottom-nav' && !isDesktop) {
-      const fabEl = getVisibleElement('[data-tour="quick-add-btn"]')
-      if (fabEl) {
-        const fabRect = fabEl.getBoundingClientRect()
-        const combinedTop = Math.min(rect.top, fabRect.top)
-        const combinedBottom = Math.max(rect.bottom, fabRect.bottom)
-        const combinedLeft = Math.min(rect.left, fabRect.left)
-        const combinedRight = Math.max(rect.right, fabRect.right)
-
-        top = combinedTop
-        left = combinedLeft
-        width = combinedRight - combinedLeft
-        height = combinedBottom - combinedTop
-      }
-    }
-
-    const pad = currentStep.padding ?? 6
-    const roundedRadius = currentStep.radius ?? 20
-
-    const roundedRect = {
-      top: Math.max(0, top - pad),
-      left: Math.max(0, left - pad),
-      width: width + pad * 2,
-      height: height + pad * 2,
-      right: left + width + pad,
-      bottom: top + height + pad,
-      radius: roundedRadius,
-    }
-
-    setTargetRect(roundedRect)
-
-    // Viewport dimensions
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
-    const cardWidth = Math.min(360, vw - 24)
-    const estimatedCardHeight = 185
-
-    let popoverLeft = roundedRect.left + roundedRect.width / 2 - cardWidth / 2
-    popoverLeft = Math.max(12, Math.min(popoverLeft, vw - cardWidth - 12))
-
-    let popoverTop
-    let placement
-    let arrowTop = 60
-
-    // Desktop sidebar step positioning (placed to the right of the sidebar)
-    if (currentStep.id === 'bottom-nav' && isDesktop && roundedRect.left <= 40 && roundedRect.width < 320) {
-      placement = 'right'
-      popoverLeft = Math.min(vw - cardWidth - 20, roundedRect.right + 18)
-      popoverTop = Math.max(70, Math.min(vh - estimatedCardHeight - 30, vh / 2 - estimatedCardHeight / 2))
-      arrowTop = Math.max(24, Math.min(estimatedCardHeight / 2, estimatedCardHeight - 24))
-    } else {
-      const spaceBelow = vh - roundedRect.bottom - 16
-      const spaceAbove = roundedRect.top - 16
-
-      if (currentStep.preferredPlacement === 'top' || (spaceAbove >= estimatedCardHeight && spaceBelow < estimatedCardHeight)) {
-        placement = 'top'
-        popoverTop = Math.max(12, roundedRect.top - estimatedCardHeight - 14)
-      } else {
-        placement = 'bottom'
-        popoverTop = Math.min(vh - estimatedCardHeight - 12, roundedRect.bottom + 14)
-      }
-    }
-
-    const targetCenterX = roundedRect.left + roundedRect.width / 2
-    const arrowLeft = Math.max(24, Math.min(targetCenterX - popoverLeft, cardWidth - 24))
-
-    setPopoverPos({
-      top: popoverTop,
-      left: popoverLeft,
-      width: cardWidth,
-      placement,
-      arrowLeft,
-      arrowTop,
-    })
-  }, [isSpotlightTourActive, currentStep])
-
-  // Continuous tracking loop (RAF) for 320ms during step transitions and smooth scroll
-  const startTrackingLoop = useCallback(
-    (durationMs = 320) => {
-      if (rafTrackingId.current) {
-        cancelAnimationFrame(rafTrackingId.current)
-      }
-      const startTime = performance.now()
-
-      const tick = (now) => {
-        computePositions()
-        if (now - startTime < durationMs) {
-          rafTrackingId.current = requestAnimationFrame(tick)
-        } else {
-          computePositions()
-          rafTrackingId.current = null
-        }
-      }
-
-      rafTrackingId.current = requestAnimationFrame(tick)
-    },
-    [computePositions],
-  )
-
-  // Step changes: Eased smooth scroll to optimal position
+  // Step changes: Eased smooth scroll and predictive resting positioning with zero overshoot
   useEffect(() => {
-    if (!isSpotlightTourActive) return
+    if (!isSpotlightTourActive || !currentStep) return
 
     // Ensure user is on /dashboard during the tour
     if (location.pathname !== '/dashboard') {
       navigate('/dashboard')
     }
 
-    const el = getVisibleElement(currentStep?.target)
-    if (el) {
-      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+    if (cancelScrollRef.current) {
+      cancelScrollRef.current()
+      cancelScrollRef.current = null
+    }
+
+    const applyStep = (el) => {
+      if (!el) {
+        setTargetRect(null)
+        return
+      }
+
+      const currentScrollY = window.scrollY || window.pageYOffset || 0
       const elRect = el.getBoundingClientRect()
-      const elDocTop = elRect.top + (window.scrollY || window.pageYOffset)
+      const elDocTop = elRect.top + currentScrollY
 
-      let targetScrollY = 0
+      const isFixed = isFixedElement(el) || currentStep.id === 'ai-chat-btn' || currentStep.id === 'bottom-nav'
 
-      if (currentStep.id === 'hero-carousel') {
-        targetScrollY = 0
-      } else if (currentStep.id === 'networth-chart' || currentStep.id === 'pulse-bento') {
-        targetScrollY = Math.max(0, elDocTop - 68)
-      } else if (currentStep.id === 'ai-chat-btn' || currentStep.id === 'bottom-nav') {
-        if (!isDesktop) {
-          targetScrollY = Math.min(
-            Math.max(0, elDocTop - 280),
-            document.documentElement.scrollHeight - window.innerHeight,
-          )
+      let targetScrollY = currentScrollY
+
+      if (!isFixed) {
+        const maxScrollY =
+          typeof document !== 'undefined'
+            ? Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+            : 0
+
+        if (currentStep.id === 'hero-carousel') {
+          targetScrollY = 0
+        } else {
+          targetScrollY = Math.min(Math.max(0, elDocTop - 68), maxScrollY)
         }
       }
 
-      smoothScrollTo(targetScrollY, 900)
-    }
+      // Projected resting top for the target element when scroll finishes
+      const projectedTop = isFixed ? elRect.top : elDocTop - targetScrollY
 
-    startTrackingLoop(950)
+      // Position the highlight box directly at resting coordinates so CSS transition glides once cleanly
+      updatePositions(el, projectedTop)
 
-    return () => {
-      if (rafTrackingId.current) {
-        cancelAnimationFrame(rafTrackingId.current)
+      const diff = Math.abs(targetScrollY - currentScrollY)
+      if (diff > 2) {
+        isProgrammaticScrollRef.current = true
+        cancelScrollRef.current = smoothScrollTo(targetScrollY, 380, () => {
+          isProgrammaticScrollRef.current = false
+          cancelScrollRef.current = null
+          // Final calibration check for sub-pixel accuracy
+          computePositions()
+        })
+      } else {
+        isProgrammaticScrollRef.current = false
       }
     }
-  }, [isSpotlightTourActive, currentStepIndex, location.pathname, navigate, currentStep, startTrackingLoop])
 
-  // Resize and passive scroll listeners
+    let el = getVisibleElement(currentStep.target)
+    let retryTimer = null
+
+    if (el) {
+      applyStep(el)
+    } else {
+      // Small deferred retry in case target element is rendering
+      retryTimer = setTimeout(() => {
+        el = getVisibleElement(currentStep.target)
+        applyStep(el)
+      }, 50)
+    }
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer)
+      if (cancelScrollRef.current) {
+        cancelScrollRef.current()
+        cancelScrollRef.current = null
+      }
+      isProgrammaticScrollRef.current = false
+    }
+  }, [
+    isSpotlightTourActive,
+    currentStepIndex,
+    location.pathname,
+    navigate,
+    currentStep,
+    computePositions,
+    updatePositions,
+  ])
+
+  // Resize and passive scroll listeners (ignores programmatic scroll ticks)
   useEffect(() => {
     if (!isSpotlightTourActive) return undefined
 
     const handleScrollOrResize = () => {
+      // Prevent transition fighting and overshooting while programmatic smooth scroll is running
+      if (isProgrammaticScrollRef.current) return
       computePositions()
     }
 
@@ -355,7 +350,10 @@ export default function SpotlightTour() {
 
     let resizeObserver = null
     if (typeof ResizeObserver !== 'undefined' && targetElementRef.current) {
-      resizeObserver = new ResizeObserver(() => computePositions())
+      resizeObserver = new ResizeObserver(() => {
+        if (isProgrammaticScrollRef.current) return
+        computePositions()
+      })
       resizeObserver.observe(targetElementRef.current)
     }
 
@@ -429,7 +427,7 @@ export default function SpotlightTour() {
           d={svgPath}
           fill="rgba(5, 8, 18, 0.72)"
           fillRule="evenodd"
-          className="transition-[d] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="transition-[d] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
 
@@ -443,7 +441,7 @@ export default function SpotlightTour() {
             handleNext()
           }}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleNext()}
-          className="pointer-events-auto absolute transition-[top,left,width,height,border-radius] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer focus:outline-none"
+          className="pointer-events-auto absolute transition-[top,left,width,height,border-radius] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer focus:outline-none"
           style={{
             top: targetRect.top,
             left: targetRect.left,
@@ -458,7 +456,7 @@ export default function SpotlightTour() {
 
       {/* Floating Tooltip Card */}
       <div
-        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border-strong)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-[top,left,width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
+        className="absolute z-10 flex flex-col rounded-3xl border border-[var(--border-strong)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-2xl transition-[top,left,width] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
         style={{
           top: popoverPos.top,
           left: popoverPos.left,
@@ -469,19 +467,19 @@ export default function SpotlightTour() {
         {/* Dynamic Directional Pointer Arrow (Caret) */}
         {popoverPos.placement === 'bottom' && (
           <div
-            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -top-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-t border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'top' && (
           <div
-            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -bottom-2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-[var(--border)] bg-[var(--panel-strong)] transition-[left] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ left: popoverPos.arrowLeft }}
           />
         )}
         {popoverPos.placement === 'right' && (
           <div
-            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[top] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
+            className="absolute -left-2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-[var(--border)] bg-[var(--panel-strong)] transition-[top] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs"
             style={{ top: popoverPos.arrowTop }}
           />
         )}

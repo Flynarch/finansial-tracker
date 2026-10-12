@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useState, useMemo } from 'react'
+import { memo, useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -7,6 +7,7 @@ import { X, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, Wallet, GitC
 import { formatCurrency } from '../../lib/utils'
 import { formatExpenseCategory } from '../../lib/expenseCategories'
 import HabitHeatmapWidget from '../habits/HabitHeatmapWidget'
+import EmptyState from '../ui/EmptyState'
 import { ProgressBar } from './DashboardStatComponents'
 import { getCompactItems } from '../../hooks/useDashboardData'
 import { formatGrowthPercentage } from '../../hooks/dashboard/dashboardStats'
@@ -56,10 +57,46 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
   useBackButton(onCloseZoom, Boolean(zoomedChart))
 
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
+  const dialogRef = useRef(null)
+  const handleBarRef = useRef(null)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+  const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
+
+  const [hasEntered, setHasEntered] = useState(false)
+
+  const [prevZoomVisible, setPrevZoomVisible] = useState(zoomVisible)
+  if (zoomVisible !== prevZoomVisible) {
+    setPrevZoomVisible(zoomVisible)
+    if (!zoomVisible) {
+      setHasEntered(false)
+    } else {
+      setIsDismissedByDrag(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!zoomVisible) return undefined
+    if (dialogRef.current) {
+      dialogRef.current.style.transform = ''
+      dialogRef.current.style.transition = ''
+      dialogRef.current.style.opacity = ''
+    }
+    const timer = setTimeout(() => {
+      setHasEntered(true)
+    }, 260)
+    return () => clearTimeout(timer)
+  }, [zoomVisible])
+
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const handleTapOutside = (event) => {
@@ -112,34 +149,150 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
     netWorthGrowth && (netWorthGrowth.net !== 0 || Math.abs(netWorthGrowth.pct) >= 0.05)
   )
 
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    hasTriggeredSnapHaptic.current = false
+    setHasEntered(true)
+    touchStartY.current = clientY
     touchStartTime.current = Date.now()
-    setIsDragging(true)
-  }
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
 
-  const handleTouchMove = (e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
+    if (dialogRef.current) {
+      dialogRef.current.style.transition = 'none'
+    }
+    if (handleBarRef.current) {
+      handleBarRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
+
     if (deltaY > 0) {
-      setDragOffset(deltaY)
-    } else {
-      setDragOffset(deltaY * 0.15)
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
     }
-  }
 
-  const handleTouchEnd = () => {
-    const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1)
-    setIsDragging(false)
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      onCloseZoom()
-    } else {
-      setDragOffset(0)
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (dialogRef.current) {
+      const y = Math.max(0, currentOffset)
+      dialogRef.current.style.transform = `translate3d(0, ${y}px, 0)`
     }
+
+    if (handleBarRef.current) {
+      const y = Math.max(0, currentOffset)
+      const scaleX = Math.min(1.45, Math.max(1, 1 + (y * 0.2) / 44))
+      handleBarRef.current.style.transform = `scale3d(${scaleX}, 1, 1)`
+      if (currentOffset >= 80) {
+        handleBarRef.current.style.backgroundColor = 'var(--accent)'
+      } else {
+        handleBarRef.current.style.backgroundColor = ''
+      }
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
+    const elapsed = Date.now() - touchStartTime.current
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1)
+
+    hasTriggeredSnapHaptic.current = false
+    isDraggingRef.current = false
     touchStartY.current = 0
-  }
+
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        dialogRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        dialogRef.current.style.opacity = '0'
+      }
+      onCloseZoom()
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        dialogRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease'
+        handleBarRef.current.style.transform = 'scale3d(1, 1, 1)'
+        handleBarRef.current.style.backgroundColor = ''
+      }
+      snapTimeoutRef.current = setTimeout(() => {
+        dragOffsetRef.current = 0
+        if (dialogRef.current) {
+          dialogRef.current.style.transform = ''
+          dialogRef.current.style.transition = ''
+          dialogRef.current.style.opacity = ''
+        }
+        if (handleBarRef.current) {
+          handleBarRef.current.style.transform = ''
+          handleBarRef.current.style.transition = ''
+        }
+        snapTimeoutRef.current = null
+      }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (dialogRef.current) {
+        dialogRef.current.style.transform = ''
+        dialogRef.current.style.transition = ''
+        dialogRef.current.style.opacity = ''
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transform = ''
+        handleBarRef.current.style.transition = ''
+      }
+    }
+  }, [onCloseZoom])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
 
   return createPortal(
     <div
@@ -150,7 +303,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
       <button
         type="button"
         onClick={onCloseZoom}
-        className={`absolute inset-0 bg-black/60 backdrop-blur-xs cursor-pointer ${
+        className={`absolute inset-0 bg-black/60 cursor-pointer ${
           zoomVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
         }`}
         aria-label={t('dashboard.zoom.close')}
@@ -158,18 +311,23 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl sm:px-3 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div
+          ref={dialogRef}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && e.animationName === 'ft-sheet-slide-up') {
+              setHasEntered(true)
+            }
+          }}
           className={`origin-bottom rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[min(90dvh,48rem)] overflow-y-auto transform-gpu ft-hide-scrollbar ${
-            isDragging ? '' : zoomVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
+            !zoomVisible
+              ? (isDismissedByDrag ? '' : 'ft-sheet-exit')
+              : hasEntered
+              ? ''
+              : 'ft-sheet-enter'
           }`}
           style={{
             boxShadow: 'var(--shadow)',
-            ...(isDragging
-              ? {
-                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
-                  transition: 'none',
-                  opacity: Math.max(0.4, 1 - dragOffset / 300),
-                }
-              : {}),
+            willChange: 'transform',
+            contain: 'paint layout',
           }}
         >
           {/* Top Tactile Handle */}
@@ -178,9 +336,13 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
-            className="mx-auto -mt-1 mb-2.5 pt-1.5 pb-1.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+            onMouseDown={handleMouseDown}
+            className="mx-auto -mt-1 mb-2.5 py-2.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none -my-1"
           >
-            <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)]" />
+            <div
+              ref={handleBarRef}
+              className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)] origin-center"
+            />
           </div>
 
           {zoomedChart === 'habits' ? (
@@ -202,7 +364,12 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                 </div>
                 <button
                   type="button"
-                  onClick={onCloseZoom}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCloseZoom()
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
                 >
                   <X className="h-4 w-4" strokeWidth={2.5} />
@@ -304,9 +471,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.savings.empty')}</p>
-                  </div>
+                  <EmptyState
+                    variant="savings"
+                    title={t('dashboard.savings.empty')}
+                    className="py-6"
+                  />
                 )}
               </div>
             </>
@@ -361,9 +530,11 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-4 text-center">
-                    <p className="text-xs font-semibold text-[var(--fg)]">{t('dashboard.budget.empty')}</p>
-                  </div>
+                  <EmptyState
+                    variant="budget"
+                    title={t('dashboard.budget.empty')}
+                    className="py-6"
+                  />
                 )}
               </div>
             </>
@@ -520,7 +691,7 @@ export const DashboardZoomOverlay = memo(function DashboardZoomOverlay({
 
               {/* — Chart Area — */}
               {isZoomNetWorthEmpty ? (
-                <div className="h-56 w-full rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-4 text-center select-none">
+                <div className="h-56 w-full rounded-2xl border border-[var(--border)] bg-[var(--field-bg)]/40 relative overflow-hidden flex flex-col items-center justify-center p-4 text-center select-none">
                   {/* Subtle background curved wave SVG */}
                   <svg className="absolute inset-0 h-full w-full opacity-10 pointer-events-none stroke-[var(--accent)] fill-none" viewBox="0 0 300 100" preserveAspectRatio="none">
                     <path d="M 0,80 Q 75,30 150,70 T 300,40" strokeWidth="2.5" strokeDasharray="6 6" />

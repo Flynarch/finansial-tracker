@@ -1,11 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
-  Tag,
   TrendingDown,
   TrendingUp,
   RotateCcw,
   CheckCircle2,
-  FolderOpen,
   Plus,
   Pencil,
   Sparkles,
@@ -48,10 +46,11 @@ import {
 import CategoryIcon from '../../components/ui/CategoryIcon'
 import useTranslation from '../../hooks/useTranslation'
 import {
-  SettingsSection,
   SettingsSegmentControl,
   SettingsSearchInput,
 } from './settingsComponents'
+import { CategoryFeedList } from '../../components/settings/categories/CategoryFeedList'
+import { SettingsCategoriesSkeleton } from '../../components/settings/categories/SettingsCategoriesSkeleton'
 
 const COLOR_TONES = [
   { id: 'emerald', bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/30', ring: 'ring-emerald-500', name: 'Hijau' },
@@ -79,6 +78,8 @@ export default function SettingsCategories() {
   const [statusMessage, setStatusMessage] = useState('')
   const [confirmResetType, setConfirmResetType] = useState(null)
   const [customVersion, setCustomVersion] = useState(0)
+  const [expandedCatIds, setExpandedCatIds] = useState(() => new Set())
+  const [isTabSwitching, setIsTabSwitching] = useState(false)
 
   // Modals state
   // 1. Add Parent Category Modal
@@ -88,6 +89,7 @@ export default function SettingsCategories() {
   const [parentIcon, setParentIcon] = useState('food')
   const [parentTone, setParentTone] = useState('emerald')
   const [isParentIconManuallySet, setIsParentIconManuallySet] = useState(false)
+  const [showAddEnglishField, setShowAddEnglishField] = useState(false)
 
   // 2. Edit Parent Category Modal
   const [editParentModal, setEditParentModal] = useState(null)
@@ -95,6 +97,7 @@ export default function SettingsCategories() {
   const [editParentNameEn, setEditParentNameEn] = useState('')
   const [editParentIcon, setEditParentIcon] = useState('food')
   const [editParentTone, setEditParentTone] = useState('emerald')
+  const [showEditEnglishField, setShowEditEnglishField] = useState(false)
 
   // 3. Add Subcategory Modal
   const [addSubModal, setAddSubModal] = useState({ isOpen: false, parentId: null, parentName: '', parentIcon: 'food' })
@@ -171,6 +174,38 @@ export default function SettingsCategories() {
     })
   }, [currentTree, searchQuery, locale])
 
+  // Accordion Expand/Collapse Handlers
+  const toggleExpandCategory = useCallback((id) => {
+    setExpandedCatIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const expandAllCategories = useCallback(() => {
+    setExpandedCatIds(new Set(filteredTree.map((c) => c.id)))
+  }, [filteredTree])
+
+  const collapseAllCategories = useCallback(() => {
+    setExpandedCatIds(new Set())
+  }, [])
+
+  // Smooth Tab Switching
+  const handleTabChange = useCallback(
+    (val) => {
+      if (val === activeTab) return
+      setIsTabSwitching(true)
+      setActiveTab(val)
+      setTimeout(() => setIsTabSwitching(false), 120)
+    },
+    [activeTab],
+  )
+
   // Real-time auto-icon generator when user types parent category name
   const handleParentNameChange = (value) => {
     setParentNameId(value)
@@ -190,6 +225,7 @@ export default function SettingsCategories() {
     const nextTone = COLOR_TONES[currentListLength % COLOR_TONES.length]?.id || (activeTab === 'income' ? 'emerald' : 'indigo')
     setParentTone(nextTone)
     setIsParentIconManuallySet(false)
+    setShowAddEnglishField(false)
     setAddParentModal(true)
   }
 
@@ -231,7 +267,7 @@ export default function SettingsCategories() {
   }
 
   // Open Edit Parent Category Modal
-  const openEditParent = (cat) => {
+  const openEditParent = useCallback((cat) => {
     const isCustom = String(cat.id).startsWith('p_') || String(cat.id).startsWith('ip_')
     const currentIcon = cat.icon || resolveTransactionIconKey(activeTab, cat.id, cat.icon)
     const currentTone = cat.color || (activeTab === 'income' ? 'emerald' : 'sky')
@@ -248,7 +284,31 @@ export default function SettingsCategories() {
     setEditParentNameEn(cat.names?.en || cat.names?.id || cat.id)
     setEditParentIcon(currentIcon)
     setEditParentTone(currentTone)
-  }
+    setShowEditEnglishField(Boolean(cat.names?.en && cat.names?.en !== (cat.names?.id || cat.id)))
+  }, [activeTab])
+
+  // Swipe delete parent category handler
+  const handleDeleteParentSwipe = useCallback(
+    (cat) => {
+      const catName = cat.names?.[locale] || cat.names?.id || cat.id
+      const isCustom = String(cat.id).startsWith('p_') || String(cat.id).startsWith('ip_')
+      if (isCustom) {
+        setDeleteParentTarget({
+          parentId: cat.id,
+          parentName: catName,
+        })
+      } else {
+        setStatusMessage(
+          t(
+            'settings.builtinCannotDelete',
+            'Kategori bawaan tidak dapat dihapus, namun nama, warna, dan ikon dapat diubah.',
+          ),
+        )
+        setTimeout(() => setStatusMessage(''), 4000)
+      }
+    },
+    [locale, t],
+  )
 
   // Submit Edit Parent Category
   const handleSaveEditParent = (e) => {
@@ -274,6 +334,19 @@ export default function SettingsCategories() {
     setStatusMessage(t('settings.catUpdatedSuccess', 'Kategori berhasil diperbarui.'))
     setTimeout(() => setStatusMessage(''), 4000)
   }
+
+  // Open Add Subcategory Modal
+  const openAddSub = useCallback((cat) => {
+    if (!cat) return
+    setSubNameId('')
+    setSubNameEn('')
+    setAddSubModal({
+      isOpen: true,
+      parentId: cat.id,
+      parentName: cat.names?.[locale] || cat.names?.id || cat.id,
+      parentIcon: cat.icon || cat.id,
+    })
+  }, [locale])
 
   // Handle Add Subcategory
   const handleAddSubcategory = (e) => {
@@ -314,7 +387,7 @@ export default function SettingsCategories() {
   }
 
   // Open Edit Subcategory Modal
-  const openEditSub = (parentId, sub, parentName) => {
+  const openEditSub = useCallback((parentId, sub, parentName) => {
     setEditSubModal({
       parentId,
       childId: sub.id,
@@ -324,7 +397,7 @@ export default function SettingsCategories() {
     })
     setEditSubNameId(sub.names?.id || sub.id)
     setEditSubNameEn(sub.names?.en || sub.names?.id || sub.id)
-  }
+  }, [])
 
   // Submit Edit Subcategory
   const handleSaveEditSub = (e) => {
@@ -425,160 +498,78 @@ export default function SettingsCategories() {
         </div>
       ) : null}
 
-      {/* Header Overview Card */}
-      <div className="mb-5 rounded-3xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:p-5 shadow-card space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="grid h-11 w-11 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-2xl bg-[var(--badge-bg)] text-[var(--badge-icon)] border border-[var(--badge-border)] shadow-2xs">
-            <Tag className="h-5 w-5 sm:h-6 sm:w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm sm:text-base font-black text-[var(--fg)] leading-tight truncate">
-              {t('settings.categoriesTitle', 'Kategori Transaksi')}
-            </h3>
-            <p className="text-[11px] sm:text-xs font-medium text-[var(--muted)] mt-0.5 truncate">
-              {t('settings.categoriesSummary', {
-                expense: expenseTree.length,
-                income: incomeTree.length,
-              })}
-            </p>
-          </div>
-        </div>
+      {/* Top Segment & Action Bar */}
+      <div className="mb-4 space-y-3">
+        {/* Segment Tab Switcher */}
+        <SettingsSegmentControl
+          options={tabOptions}
+          value={activeTab}
+          onChange={handleTabChange}
+          ariaLabel={t('settings.typeCategories', 'Tipe Kategori')}
+        />
 
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+        {/* Search & Actions Bar */}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <SettingsSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder={t('settings.searchCategoriesPlaceholder', {
+                type: activeTab === 'expense' ? t('common.expense', 'pengeluaran') : t('common.income', 'pemasukan'),
+              })}
+            />
+          </div>
+
           <button
             type="button"
             onClick={openAddParent}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-[var(--fg)] px-3.5 py-2.5 text-xs font-extrabold text-[var(--bg)] shadow-xs transition hover:opacity-90 active:scale-95 cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-[var(--accent)] px-3.5 text-xs font-black text-white shadow-xs transition hover:brightness-110 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
             title={t('settings.addCategory', 'Tambah Kategori')}
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            <span>{t('settings.category', 'Kategori')}</span>
+            <span className="hidden xs:inline">{t('settings.category', 'Kategori')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setConfirmResetType(activeTab)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3.5 py-2.5 text-xs font-extrabold text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            className="grid h-11 w-11 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
             title={t('settings.resetDefault', 'Reset ke Bawaan')}
+            aria-label={t('settings.resetDefault', 'Reset ke Bawaan')}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>{t('settings.resetDefault', 'Reset')}</span>
+            <RotateCcw className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Segment Tab Switcher */}
-      <div className="mb-4">
-        <SettingsSegmentControl
-          options={tabOptions}
-          value={activeTab}
-          onChange={(val) => setActiveTab(val)}
-          ariaLabel={t('settings.typeCategories', 'Tipe Kategori')}
+      {/* Main Categories Feed */}
+      {isTabSwitching ? (
+        <SettingsCategoriesSkeleton />
+      ) : (
+        <CategoryFeedList
+          categories={filteredTree}
+          activeTab={activeTab}
+          locale={locale}
+          t={t}
+          searchQuery={searchQuery}
+          expandedCatIds={expandedCatIds}
+          onToggleExpand={toggleExpandCategory}
+          onExpandAll={expandAllCategories}
+          onCollapseAll={collapseAllCategories}
+          onEditParent={openEditParent}
+          onDeleteParent={handleDeleteParentSwipe}
+          onAddSub={openAddSub}
+          onEditSub={(parentId, sub, parentName) => openEditSub(parentId, sub, parentName)}
+          onDeleteSub={(parentId, sub) =>
+            setDeleteSubTarget({
+              parentId,
+              childId: sub.id,
+              childName: sub.names?.[locale] || sub.names?.id || sub.id,
+            })
+          }
+          onClearSearch={() => setSearchQuery('')}
         />
-      </div>
-
-      {/* Search Bar */}
-      <div className="mb-5">
-        <SettingsSearchInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder={t('settings.searchCategoriesPlaceholder', {
-            type: activeTab === 'expense' ? t('common.expense', 'pengeluaran') : t('common.income', 'pemasukan'),
-          })}
-        />
-      </div>
-
-      {/* Main Categories Section */}
-      <SettingsSection
-        title={activeTab === 'expense' ? t('settings.expenseCategories', 'Kategori Pengeluaran') : t('settings.incomeCategories', 'Kategori Pemasukan')}
-        description={t('settings.categoriesDesc', 'Kelola daftar kategori dan subkategori sesuai kebiasaan finansial Anda')}
-      >
-        {filteredTree.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-8 text-center">
-            <FolderOpen className="mx-auto h-8 w-8 text-[var(--muted)]/50 mb-2" />
-            <p className="text-xs font-bold text-[var(--muted)]">
-              {t('settings.noCategoriesFound', 'Tidak ada kategori yang cocok dengan pencarian')}
-            </p>
-          </div>
-        ) : (
-          filteredTree.map((cat) => {
-            const catName = cat.names?.[locale] || cat.names?.id || cat.id
-            const iconKey = cat.icon || resolveTransactionIconKey(activeTab, cat.id, cat.icon)
-            const toneClass = getCategoryToneClass(cat.color || (activeTab === 'income' ? 'emerald' : 'sky'))
-
-            return (
-              <div
-                key={cat.id}
-                className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-card hover:border-[var(--border-strong)] transition-all"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${toneClass} shadow-2xs transition-transform active:scale-95`}>
-                      <CategoryIcon icon={iconKey} className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[15px] font-extrabold text-[var(--fg)] truncate leading-tight">
-                          {catName}
-                        </span>
-                        {String(cat.id).startsWith('p_') || String(cat.id).startsWith('ip_') ? (
-                          <span className="rounded-md bg-[var(--accent)]/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--accent)]">
-                            Kustom
-                          </span>
-                        ) : null}
-                      </div>
-                      <span className="text-[11px] font-medium text-[var(--muted)]">
-                        {cat.children?.length || 0} {t('settings.subcategoriesCount', 'subkategori')}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openEditParent(cat)}
-                      className="grid h-8 w-8 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
-                      title={t('common.edit', 'Edit Kategori')}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddSubModal({ isOpen: true, parentId: cat.id, parentName: catName, parentIcon: iconKey })}
-                      className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-2.5 h-8 text-xs font-bold text-[var(--fg)] hover:bg-[var(--panel)] transition active:scale-95 cursor-pointer shadow-2xs"
-                      title={t('settings.addSubcategory', 'Tambah Subkategori')}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>{t('settings.sub', 'Sub')}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Subcategories tags */}
-                {cat.children && cat.children.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-[var(--border)]/40">
-                    {cat.children.map((sub) => {
-                      const subName = sub.names?.[locale] || sub.names?.id || sub.id
-                      return (
-                        <button
-                          key={sub.id}
-                          type="button"
-                          onClick={() => openEditSub(cat.id, sub, catName)}
-                          className="group inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--panel-strong)] transition-all active:scale-95 cursor-pointer shadow-2xs"
-                          title={t('common.edit', 'Edit Subkategori')}
-                        >
-                          <span className="truncate max-w-[150px]">{subName}</span>
-                          <Pencil className="h-2.5 w-2.5 text-[var(--muted-2)] group-hover:text-[var(--accent)] transition-colors shrink-0" />
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            )
-          })
-        )}
-      </SettingsSection>
+      )}
 
       {/* ── MODAL 1: Add Parent Category ── */}
       <Modal
@@ -586,7 +577,7 @@ export default function SettingsCategories() {
         onClose={() => setAddParentModal(false)}
         title={activeTab === 'expense' ? t('settings.addExpenseCategoryTitle', 'Tambah Kategori Pengeluaran') : t('settings.addIncomeCategoryTitle', 'Tambah Kategori Pemasukan')}
       >
-        <form onSubmit={handleAddParentCategory} className="space-y-4 pt-1">
+        <form onSubmit={handleAddParentCategory} className="space-y-4 pt-1 max-h-[75vh] overflow-y-auto pr-0.5">
           {/* Live Dynamic Icon Preview */}
           <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]">
             <div className="relative group">
@@ -632,38 +623,49 @@ export default function SettingsCategories() {
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              {t('settings.catNameEn', 'Nama Kategori (English - Opsional)')}
-            </label>
-            <input
-              type="text"
-              value={parentNameEn}
-              onChange={(e) => setParentNameEn(e.target.value)}
-              placeholder={t('settings.catPlaceholderEn', 'Example: Coffee, Fuel, Gym, Freelance')}
-              className="ft-settings-field-compact font-semibold h-12"
-            />
-          </div>
+          {showAddEnglishField || parentNameEn ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+                {t('settings.catNameEn', 'Nama Kategori (English - Opsional)')}
+              </label>
+              <input
+                type="text"
+                value={parentNameEn}
+                onChange={(e) => setParentNameEn(e.target.value)}
+                placeholder={t('settings.catPlaceholderEn', 'Example: Coffee, Fuel, Gym, Freelance')}
+                className="ft-settings-field-compact font-semibold h-12"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAddEnglishField(true)}
+              className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer py-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{t('settings.addEnglishNameOptional', 'Tambah Nama Bahasa Inggris (Opsional)')}</span>
+            </button>
+          )}
 
           {/* Color Tone Swatches */}
           <div>
             <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
               {t('settings.iconToneColor', 'Warna / Tone Ikon')}
             </label>
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+            <div className="grid grid-cols-8 gap-1.5 sm:gap-2">
               {COLOR_TONES.map((tone) => (
                 <button
                   key={tone.id}
                   type="button"
                   onClick={() => setParentTone(tone.id)}
-                  className={`h-10 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
+                  className={`h-9 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
                     parentTone === tone.id ? 'ring-2 ' + tone.ring + ' scale-105 shadow-sm' : 'opacity-70 hover:opacity-100'
                   }`}
                   title={t('colors.' + tone.id, tone.name)}
                 >
-                  <div className={`h-4 w-4 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
+                  <div className={`h-3.5 w-3.5 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
                   {parentTone === tone.id && (
-                    <Check size={12} className="absolute text-white stroke-[3]" />
+                    <Check size={11} className="absolute text-white stroke-[3]" />
                   )}
                 </button>
               ))}
@@ -695,7 +697,7 @@ export default function SettingsCategories() {
         onClose={() => setEditParentModal(null)}
         title={t('settings.editCategoryTitle', 'Edit Kategori Utama')}
       >
-        <form onSubmit={handleSaveEditParent} className="space-y-4 pt-1">
+        <form onSubmit={handleSaveEditParent} className="space-y-4 pt-1 max-h-[75vh] overflow-y-auto pr-0.5">
           {/* Live Icon & Change Trigger */}
           <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]">
             <div className="relative group">
@@ -734,37 +736,48 @@ export default function SettingsCategories() {
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
-              {t('settings.catNameEn', 'Nama Kategori (English - Opsional)')}
-            </label>
-            <input
-              type="text"
-              value={editParentNameEn}
-              onChange={(e) => setEditParentNameEn(e.target.value)}
-              className="ft-settings-field-compact font-semibold h-12"
-            />
-          </div>
+          {showEditEnglishField || editParentNameEn ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+                {t('settings.catNameEn', 'Nama Kategori (English - Opsional)')}
+              </label>
+              <input
+                type="text"
+                value={editParentNameEn}
+                onChange={(e) => setEditParentNameEn(e.target.value)}
+                className="ft-settings-field-compact font-semibold h-12"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowEditEnglishField(true)}
+              className="text-xs font-bold text-[var(--muted)] hover:text-[var(--fg)] inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer py-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{t('settings.addEnglishNameOptional', 'Tambah Nama Bahasa Inggris (Opsional)')}</span>
+            </button>
+          )}
 
           {/* Color Tone Swatches */}
           <div>
             <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[var(--muted)]">
               {t('settings.iconToneColor', 'Warna / Tone Ikon')}
             </label>
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+            <div className="grid grid-cols-8 gap-1.5 sm:gap-2">
               {COLOR_TONES.map((tone) => (
                 <button
                   key={tone.id}
                   type="button"
                   onClick={() => setEditParentTone(tone.id)}
-                  className={`h-10 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
+                  className={`h-9 rounded-xl ${tone.bg} ${tone.border} flex items-center justify-center transition active:scale-95 cursor-pointer relative ${
                     editParentTone === tone.id ? 'ring-2 ' + tone.ring + ' scale-105 shadow-sm' : 'opacity-70 hover:opacity-100'
                   }`}
                   title={t('colors.' + tone.id, tone.name)}
                 >
-                  <div className={`h-4 w-4 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
+                  <div className={`h-3.5 w-3.5 rounded-full ${tone.text.replace('text-', 'bg-')}`} />
                   {editParentTone === tone.id && (
-                    <Check size={12} className="absolute text-white stroke-[3]" />
+                    <Check size={11} className="absolute text-white stroke-[3]" />
                   )}
                 </button>
               ))}
@@ -775,12 +788,14 @@ export default function SettingsCategories() {
             <div className="pt-2 border-t border-[var(--border)]">
               <button
                 type="button"
-                onClick={() =>
-                  setDeleteParentTarget({
+                onClick={() => {
+                  const target = {
                     parentId: editParentModal.id,
                     parentName: editParentNameId,
-                  })
-                }
+                  }
+                  setEditParentModal(null)
+                  setDeleteParentTarget(target)
+                }}
                 className="w-full py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500/20 active:scale-[0.98] transition cursor-pointer"
               >
                 {t('settings.deleteCustomCategory', 'Hapus Kategori Kustom Ini')}
@@ -811,7 +826,11 @@ export default function SettingsCategories() {
       <Modal
         isOpen={addSubModal.isOpen}
         onClose={() => setAddSubModal({ isOpen: false, parentId: null, parentName: '', parentIcon: 'food' })}
-        title={t('settings.addSubcategoryTitle', { name: addSubModal.parentName }, `Tambah Subkategori (${addSubModal.parentName})`)}
+        title={
+          addSubModal.parentName
+            ? `${t('settings.addSubcategoryTitle', 'Tambah Subkategori')} (${addSubModal.parentName})`
+            : t('settings.addSubcategoryTitle', 'Tambah Subkategori')
+        }
       >
         <form onSubmit={handleAddSubcategory} className="space-y-4 pt-1">
           <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--field-bg)] border border-[var(--border)]">
@@ -913,13 +932,15 @@ export default function SettingsCategories() {
           <div className="pt-2 border-t border-[var(--border)]">
             <button
               type="button"
-              onClick={() =>
-                setDeleteSubTarget({
+              onClick={() => {
+                const target = {
                   parentId: editSubModal.parentId,
                   childId: editSubModal.childId,
                   childName: editSubNameId,
-                })
-              }
+                }
+                setEditSubModal(null)
+                setDeleteSubTarget(target)
+              }}
               className="w-full py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500/20 active:scale-[0.98] transition cursor-pointer"
             >
               {t('settings.deleteSubcategoryThis', 'Hapus Subkategori Ini')}
@@ -1001,8 +1022,8 @@ export default function SettingsCategories() {
         title={t('settings.deleteSubcategory', 'Hapus Subkategori')}
         message={t(
           'settings.deleteSubConfirm',
-          { name: deleteSubTarget?.childName },
           `Apakah Anda yakin ingin menghapus subkategori "${deleteSubTarget?.childName}"? Riwayat transaksi akan dialihkan ke kategori umum.`,
+          { name: deleteSubTarget?.childName },
         )}
         confirmText={t('common.delete', 'Hapus')}
       />
@@ -1015,8 +1036,8 @@ export default function SettingsCategories() {
         title={t('settings.deleteParentCategory', 'Hapus Kategori Utama')}
         message={t(
           'settings.deleteParentConfirm',
-          { name: deleteParentTarget?.parentName },
           `Apakah Anda yakin ingin menghapus kategori "${deleteParentTarget?.parentName}" beserta subkategorinya?`,
+          { name: deleteParentTarget?.parentName },
         )}
         confirmText={t('common.delete', 'Hapus')}
       />

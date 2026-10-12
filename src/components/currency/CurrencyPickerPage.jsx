@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { ChevronLeft, Search, Check, Globe } from 'lucide-react'
 import { CURRENCIES, POPULAR_CURRENCY_CODES, getCurrencyName, getCurrencyCountry } from '../../data/currencies'
 import CurrencyFlag from './CurrencyFlag'
+import EmptyState from '../ui/EmptyState'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
 
@@ -99,11 +100,12 @@ export default function CurrencyPickerPage({ selectedCurrency = 'IDR', onSelect,
       {/* ── Currency List Section ────────────────────────────────────────── */}
       <div className="flex-1 px-4 sm:px-6 py-4 pb-28 max-w-2xl mx-auto w-full space-y-2">
         {filteredCurrencies.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-8 text-center mt-4">
-            <p className="text-xs font-bold text-[var(--muted)]">
-              {t('settings.noCurrencyFound', 'Tidak ada mata uang yang cocok')}
-            </p>
-          </div>
+          <EmptyState
+            variant="search"
+            title={t('settings.noCurrencyFound', 'Tidak ada mata uang yang cocok')}
+            description={t('settings.noCurrencyFoundDesc', 'Coba cari dengan kode mata uang atau nama negara lain.')}
+            className="mt-4"
+          />
         ) : (
           filteredCurrencies.map((c) => {
             const isSelected = selectedCurrency === c.code

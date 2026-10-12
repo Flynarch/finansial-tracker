@@ -27,6 +27,8 @@ import { warmupDecryptionCache } from '../lib/fieldEncryption'
 import { format } from 'date-fns'
 
 import ToastBanner from '../components/ui/ToastBanner'
+import SkeletonTransition from '../components/ui/SkeletonTransition'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import { TransactionListSection } from '../components/transactions/TransactionListSection'
 import TransactionHeaderActions from '../components/transactions/TransactionHeaderActions'
 import TransactionModalsManager from '../components/transactions/TransactionModalsManager'
@@ -131,7 +133,6 @@ function Transactions() {
     setHasOpenedStatementImport(true)
   }
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
   const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false)
   const [isSplitBillOpen, setIsSplitBillOpen] = useState(false)
@@ -294,9 +295,7 @@ function Transactions() {
     scrollRafRef.current = window.requestAnimationFrame(() => {
       scrollRafRef.current = null
       const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
-      const nextTop = el.scrollTop > 2
       const nextBottom = maxScrollTop - el.scrollTop > 2
-      setShowTopFade((prev) => (prev !== nextTop ? nextTop : prev))
       setShowBottomFade((prev) => (prev !== nextBottom ? nextBottom : prev))
     })
   }, [swipedTransactionId, isSwipingId, setSwipedTransactionId, setIsSwipingId])
@@ -322,11 +321,16 @@ function Transactions() {
 
   return (
     <div className="h-full flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div
-        className={`ft-motion-page flex h-full flex-1 min-h-0 flex-col gap-2 overflow-hidden transform-gpu ${
-          isEntering ? 'opacity-100' : 'opacity-0'
-        }`}
+      <SkeletonTransition
+        isLoading={isInitialLoading}
+        skeleton={<PageSkeleton variant="transactions" />}
+        className="h-full flex-1 flex flex-col min-h-0 overflow-hidden"
       >
+        <div
+          className={`ft-motion-page flex h-full flex-1 min-h-0 flex-col gap-2 overflow-hidden transform-gpu ${
+            isEntering ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
         {apiError ? <ToastBanner message={apiError} tone={apiErrorTone} /> : null}
 
         {/* Top Bar Header */}
@@ -385,7 +389,6 @@ function Transactions() {
               filteredTransactions={filteredTransactions}
               groupedEntriesDetailed={groupedEntriesDetailed}
               listScrollRef={listScrollRef}
-              showTopFade={showTopFade}
               showBottomFade={showBottomFade}
               onScroll={handleScroll}
               onRefresh={handleRefresh}
@@ -419,7 +422,8 @@ function Transactions() {
             />
           </>
         )}
-      </div>
+        </div>
+      </SkeletonTransition>
 
       {/* Transaction Modals, BottomSheets, and Overlays */}
       <TransactionModalsManager

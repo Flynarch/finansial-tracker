@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeWalletBalance } from '../lib/db'
 import { Wallet as WalletIcon } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
+import PageSkeleton from '../components/ui/PageSkeleton'
 import ToastBanner from '../components/ui/ToastBanner'
 import WalletDetailHero from '../components/wallet/detail/WalletDetailHero'
 import WalletTransactionsList from '../components/wallet/detail/WalletTransactionsList'
@@ -140,7 +141,7 @@ export default function WalletDetailPage() {
   }, [])
 
   // 9. Early Loading & 404 Returns
-  if (wallet === undefined) return <div className="min-h-screen bg-[var(--bg)]" />
+  if (wallet === undefined) return <PageSkeleton variant="wallet-detail" />
 
   if (wallet === null) {
     return (

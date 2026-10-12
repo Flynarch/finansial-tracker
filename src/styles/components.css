@@ -797,6 +797,11 @@
   animation: ft-shimmer 2s ease-out forwards;
 }
 
+.ft-chat-ai--regenerating {
+  animation: ft-shimmer 1.5s ease-in-out infinite;
+  border-color: var(--accent);
+}
+
 
 .ft-chat-caret {
   display: inline-block;
@@ -1457,8 +1462,18 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 
 .ft-page-crossfade,
 .ft-page-transition {
-  animation: ft-page-fade-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity;
+  animation: ft-page-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+.ft-skeleton-enter {
+  animation: ft-skeleton-fade-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+.ft-content-loaded {
+  animation: ft-content-fade-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
 }
 
 /* GPU acceleration helper */

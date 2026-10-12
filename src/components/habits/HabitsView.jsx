@@ -3,9 +3,10 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
-import { Clock, Pause, ChevronDown } from 'lucide-react'
+import { Clock, Pause, ChevronDown, Plus } from 'lucide-react'
 import Modal from '../ui/Modal'
 import ConfirmDeleteModal from '../ui/ConfirmDeleteModal'
+import EmptyState from '../ui/EmptyState'
 import HabitStatsModal from './HabitStatsModal'
 import HabitColorPicker from './HabitColorPicker'
 import MiniHabitHeatmap from './MiniHabitHeatmap'
@@ -371,9 +372,9 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
 
   if (!habits) {
     return (
-      <div className="space-y-3 animate-pulse ft-tab-fade">
-        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
-        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)]" />
+      <div className="space-y-3 ft-skeleton-enter ft-tab-fade">
+        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)] ft-skeleton-card" />
+        <div className="h-20 w-full rounded-2xl bg-[var(--panel-strong)] border border-[var(--border)] ft-skeleton-card" />
       </div>
     )
   }
@@ -423,7 +424,7 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ft-content-loaded">
       <div className="flex items-center justify-between">
         <h2 className="text-[15px] font-bold tracking-tight text-[var(--fg)]">
           {t('habits.todayTitle', 'Habit Hari Ini')}
@@ -434,24 +435,33 @@ export default function HabitsView({ addOpen: controlledAddOpen, onAddOpenChange
       {habits.length > 0 && <MiniHabitHeatmap habits={habits} />}
 
       {habits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-[color-mix(in_srgb,var(--field-bg)_30%,transparent)] rounded-2xl border border-[var(--border)] shadow-xs">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--panel-strong)] shadow-sm">
-            <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-              <path d="M3 3v5h5"></path>
-            </svg>
-          </div>
-          <h3 className="text-[15px] font-bold text-[var(--fg)] mb-1">{t('habits.emptyTitle', 'Belum Ada Kebiasaan')}</h3>
-          <p className="text-[13px] font-medium text-[var(--muted)] max-w-[220px] leading-relaxed">
-            {t('habits.emptyDesc', 'Mulai bangun rutinitas baikmu hari ini.')}
-          </p>
-        </div>
+        <EmptyState
+          variant="habits"
+          title={t('habits.emptyTitle', 'Belum Ada Kebiasaan')}
+          description={t('habits.emptyDesc', 'Mulai bangun rutinitas baikmu hari ini.')}
+          action={
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-1.5 min-h-[44px] rounded-2xl bg-[var(--accent)] px-5 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              <span>{t('habits.addHabit', 'Tambah Kebiasaan')}</span>
+            </button>
+          }
+        />
       ) : (
         <>
           {todayHabits.length > 0 ? renderHabitList(todayHabits) : (
-            <div className="p-4 text-center rounded-2xl border border-dashed border-[var(--border)]">
-              <p className="text-[13px] font-medium text-[var(--muted)]">
+            <div className="flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)]/60 shadow-2xs">
+              <div className="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--field-bg)] text-[var(--muted)]">
+                <Clock className="h-5 w-5" />
+              </div>
+              <p className="text-[13.5px] font-semibold text-[var(--fg)]">
                 {t('habits.noScheduledToday', 'Tidak ada habit yang dijadwalkan hari ini.')}
+              </p>
+              <p className="mt-0.5 text-[12px] font-medium text-[var(--muted)] max-w-[260px]">
+                {t('habits.noScheduledTodayDesc', 'Semua kebiasaan Anda dijadwalkan pada hari lain atau sudah selesai.')}
               </p>
             </div>
           )}

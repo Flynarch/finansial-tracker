@@ -52,11 +52,15 @@ export default function SettingsLayout() {
           </div>
         </header>
       ) : null}
-      <Suspense
-        fallback={<PageSkeleton variant={skeletonVariant} />}
-      >
-        <Outlet />
-      </Suspense>
+      <div key={location.pathname} className="ft-page-crossfade">
+        <Suspense
+          fallback={<PageSkeleton variant={skeletonVariant} />}
+        >
+          <div className="ft-content-loaded">
+            <Outlet />
+          </div>
+        </Suspense>
+      </div>
     </div>
   )
 }

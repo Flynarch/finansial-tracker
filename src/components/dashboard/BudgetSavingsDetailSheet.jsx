@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { PieChart, Target, Plus, AlertTriangle, CheckCircle2, ArrowRight, X, ArrowLeft, Check } from 'lucide-react'
@@ -18,12 +18,14 @@ import MonthPicker from '../ui/MonthPicker'
 import CustomDatePicker from '../ui/CustomDatePicker'
 import ToastBanner from '../ui/ToastBanner'
 import Button from '../ui/Button'
+import EmptyState from '../ui/EmptyState'
 import { db } from '../../lib/db'
 import useBottomSheet from '../../hooks/useBottomSheet'
 import useTranslation from '../../hooks/useTranslation'
 import useBackButton from '../../hooks/useBackButton'
 import useSettingsStore from '../../store/useSettingsStore'
 import { getCurrentBudgetMonthKey } from '../../lib/budgetUtils'
+import { triggerHaptic } from '../../lib/haptics'
 
 const BudgetChildCategoryItem = memo(function BudgetChildCategoryItem({
   child,
@@ -132,19 +134,6 @@ export default function BudgetSavingsDetailSheet({
 
   const budgetCycleStartDay = propBudgetCycleStartDay ?? (useSettingsStore.getState?.()?.budgetCycleStartDay || 1)
 
-  // Reset view when opening
-  const [prevOpen, setPrevOpen] = useState(isOpen)
-  if (prevOpen !== isOpen) {
-    setPrevOpen(isOpen)
-    if (isOpen) {
-      setSheetView('detail')
-      setBudgetForm((p) => ({
-        ...p,
-        month: getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay),
-      }))
-    }
-  }
-
   // --- Quick Goal Form State ---
   const [goalForm, setGoalForm] = useState({
     name: '',
@@ -169,8 +158,24 @@ export default function BudgetSavingsDetailSheet({
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const budgetLimitRef = useRef(null)
 
-  useBackButton(() => setSheetView('detail'), Boolean(sheetVisible && sheetView !== 'detail' && !isCategoryOpen))
-  useBackButton(() => setIsCategoryOpen(false), Boolean(sheetVisible && isCategoryOpen))
+  // Reset view when opening or switching modes
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevInitialMode, setPrevInitialMode] = useState(initialMode)
+  if (prevOpen !== isOpen || prevInitialMode !== initialMode) {
+    setPrevOpen(isOpen)
+    setPrevInitialMode(initialMode)
+    if (isOpen) {
+      setSheetView('detail')
+      setIsCategoryOpen(false)
+      setBudgetForm((p) => ({
+        ...p,
+        month: getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay),
+      }))
+      setBudgetLimitInput('')
+      setBudgetError('')
+      setGoalError('')
+    }
+  }
 
   const tree = useMemo(() => getMergedExpenseTree(), [])
   const lang = locale === 'en' ? 'en' : 'id'
@@ -272,39 +277,206 @@ export default function BudgetSavingsDetailSheet({
   }
 
   // Touch drag-to-dismiss states
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
+  const dialogRef = useRef(null)
+  const handleBarRef = useRef(null)
+  const dragOffsetRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const [isDismissedByDrag, setIsDismissedByDrag] = useState(false)
   const touchStartY = useRef(0)
   const touchStartTime = useRef(0)
+  const hasTriggeredSnapHaptic = useRef(false)
+  const snapTimeoutRef = useRef(null)
 
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY
+  const [hasEntered, setHasEntered] = useState(false)
+
+  const [prevSheetVisible, setPrevSheetVisible] = useState(sheetVisible)
+  if (sheetVisible !== prevSheetVisible) {
+    setPrevSheetVisible(sheetVisible)
+    if (!sheetVisible) {
+      setHasEntered(false)
+    } else {
+      setIsDismissedByDrag(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!sheetVisible) return undefined
+    if (dialogRef.current) {
+      dialogRef.current.style.transform = ''
+      dialogRef.current.style.transition = ''
+      dialogRef.current.style.opacity = ''
+    }
+    const timer = setTimeout(() => {
+      setHasEntered(true)
+    }, 260)
+    return () => clearTimeout(timer)
+  }, [sheetVisible])
+
+  useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current) clearTimeout(snapTimeoutRef.current)
+    }
+  }, [])
+
+  const handleDragStart = useCallback((clientY) => {
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    hasTriggeredSnapHaptic.current = false
+    setHasEntered(true)
+    touchStartY.current = clientY
     touchStartTime.current = Date.now()
-    setIsDragging(true)
-  }
+    isDraggingRef.current = true
+    dragOffsetRef.current = 0
+    setIsDismissedByDrag(false)
 
-  const handleTouchMove = (e) => {
-    if (!touchStartY.current) return
-    const currentY = e.touches[0].clientY
-    const deltaY = currentY - touchStartY.current
+    if (dialogRef.current) {
+      dialogRef.current.style.transition = 'none'
+    }
+    if (handleBarRef.current) {
+      handleBarRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleDragMove = useCallback((clientY) => {
+    if (!touchStartY.current || !isDraggingRef.current) return
+    const deltaY = clientY - touchStartY.current
+    const currentOffset = deltaY > 0 ? deltaY : deltaY * 0.15
+
     if (deltaY > 0) {
-      setDragOffset(deltaY)
-    } else {
-      setDragOffset(deltaY * 0.15)
+      if (deltaY >= 80 && !hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = true
+        triggerHaptic('light')
+      } else if (deltaY < 80 && hasTriggeredSnapHaptic.current) {
+        hasTriggeredSnapHaptic.current = false
+      }
     }
-  }
 
-  const handleTouchEnd = () => {
-    const elapsed = Date.now() - touchStartTime.current
-    const velocity = dragOffset / (elapsed || 1)
-    setIsDragging(false)
-    if (dragOffset > 80 || (dragOffset > 30 && velocity > 0.45)) {
-      closeSheet()
-    } else {
-      setDragOffset(0)
+    dragOffsetRef.current = currentOffset
+
+    // Direct GPU DOM update without React re-render
+    if (dialogRef.current) {
+      const y = Math.max(0, currentOffset)
+      dialogRef.current.style.transform = `translate3d(0, ${y}px, 0)`
     }
+
+    if (handleBarRef.current) {
+      const y = Math.max(0, currentOffset)
+      const scaleX = Math.min(1.45, Math.max(1, 1 + (y * 0.2) / 44))
+      handleBarRef.current.style.transform = `scale3d(${scaleX}, 1, 1)`
+      if (currentOffset >= 80) {
+        handleBarRef.current.style.backgroundColor = 'var(--accent)'
+      } else {
+        handleBarRef.current.style.backgroundColor = ''
+      }
+    }
+  }, [])
+
+  const handleClose = useCallback(() => {
+    if (snapTimeoutRef.current) {
+      clearTimeout(snapTimeoutRef.current)
+      snapTimeoutRef.current = null
+    }
+    setIsDismissedByDrag(false)
+    setSheetView('detail')
+    setIsCategoryOpen(false)
+    dragOffsetRef.current = 0
+    isDraggingRef.current = false
+    closeSheet()
+  }, [closeSheet])
+
+  const handleDragEnd = useCallback(() => {
+    if (!touchStartY.current && !isDraggingRef.current) return
+    const elapsed = Date.now() - touchStartTime.current
+    const finalOffset = dragOffsetRef.current
+    const velocity = finalOffset / (elapsed || 1)
+
+    hasTriggeredSnapHaptic.current = false
+    isDraggingRef.current = false
     touchStartY.current = 0
-  }
+
+    if (finalOffset > 80 || (finalOffset > 30 && velocity > 0.45)) {
+      setIsDismissedByDrag(true)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in'
+        dialogRef.current.style.transform = 'translate3d(0, 100%, 0)'
+        dialogRef.current.style.opacity = '0'
+      }
+      setSheetView('detail')
+      setIsCategoryOpen(false)
+      closeSheet()
+    } else if (finalOffset !== 0) {
+      setIsDismissedByDrag(false)
+      if (dialogRef.current) {
+        dialogRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)'
+        dialogRef.current.style.transform = 'translate3d(0, 0, 0)'
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transition = 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease'
+        handleBarRef.current.style.transform = 'scale3d(1, 1, 1)'
+        handleBarRef.current.style.backgroundColor = ''
+      }
+      snapTimeoutRef.current = setTimeout(() => {
+        dragOffsetRef.current = 0
+        if (dialogRef.current) {
+          dialogRef.current.style.transform = ''
+          dialogRef.current.style.transition = ''
+          dialogRef.current.style.opacity = ''
+        }
+        if (handleBarRef.current) {
+          handleBarRef.current.style.transform = ''
+          handleBarRef.current.style.transition = ''
+        }
+        snapTimeoutRef.current = null
+      }, 200)
+    } else {
+      setIsDismissedByDrag(false)
+      dragOffsetRef.current = 0
+      if (dialogRef.current) {
+        dialogRef.current.style.transform = ''
+        dialogRef.current.style.transition = ''
+        dialogRef.current.style.opacity = ''
+      }
+      if (handleBarRef.current) {
+        handleBarRef.current.style.transform = ''
+        handleBarRef.current.style.transition = ''
+      }
+    }
+  }, [closeSheet])
+
+  const handleTouchStart = useCallback((e) => {
+    handleDragStart(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    handleDragMove(e.touches?.[0]?.clientY ?? 0)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientY)
+
+    const onMouseMove = (ev) => {
+      handleDragMove(ev.clientY)
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [handleDragStart, handleDragMove, handleDragEnd])
 
   const isBudget = initialMode === 'budget'
 
@@ -378,6 +550,18 @@ export default function BudgetSavingsDetailSheet({
     }
   }, [budgetGoalSummary, defaultCurrency, rates])
 
+  const handleBackFromForm = useCallback(() => {
+    const hasItems = isBudget ? Boolean(budgetCalc?.count) : Boolean(goalCalc?.count)
+    if (hasItems) {
+      setSheetView('detail')
+    } else {
+      handleClose()
+    }
+  }, [isBudget, budgetCalc, goalCalc, handleClose])
+
+  useBackButton(handleBackFromForm, Boolean(sheetVisible && sheetView !== 'detail' && !isCategoryOpen))
+  useBackButton(() => setIsCategoryOpen(false), Boolean(sheetVisible && isCategoryOpen))
+
   if (!isMounted || typeof document === 'undefined') return null
 
   return createPortal(
@@ -388,27 +572,32 @@ export default function BudgetSavingsDetailSheet({
     >
       <button
         type="button"
-        className={`absolute inset-0 bg-black/65 backdrop-blur-xs cursor-pointer ${
+        className={`absolute inset-0 bg-black/65 cursor-pointer ${
           sheetVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
         }`}
-        onClick={closeSheet}
+        onClick={handleClose}
         aria-label={t('common.close', 'Tutup')}
       />
 
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full sm:max-w-lg sm:px-4 sm:pb-6">
         <div
+          ref={dialogRef}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && e.animationName === 'ft-sheet-slide-up') {
+              setHasEntered(true)
+            }
+          }}
           className={`max-h-[min(88dvh,44rem)] overflow-y-auto w-full rounded-t-[32px] sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl transform-gpu ft-hide-scrollbar ${
-            isDragging ? '' : sheetVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
+            !sheetVisible
+              ? (isDismissedByDrag ? '' : 'ft-sheet-exit')
+              : hasEntered
+              ? ''
+              : 'ft-sheet-enter'
           }`}
           style={{
             boxShadow: 'var(--shadow-card)',
-            ...(isDragging
-              ? {
-                  transform: `translate3d(0, ${Math.max(0, dragOffset)}px, 0)`,
-                  transition: 'none',
-                  opacity: Math.max(0.4, 1 - dragOffset / 300),
-                }
-              : {}),
+            willChange: 'transform',
+            contain: 'paint layout',
           }}
         >
           <div
@@ -416,23 +605,21 @@ export default function BudgetSavingsDetailSheet({
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
-            className="mx-auto -mt-2 mb-3 pt-2 pb-1.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+            onMouseDown={handleMouseDown}
+            className="mx-auto -mt-2 mb-3 py-2.5 w-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none -my-1"
           >
-            <div className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)]" />
+            <div
+              ref={handleBarRef}
+              className="h-1.5 w-11 rounded-full bg-[var(--border-strong)] transition-colors hover:bg-[var(--muted)] origin-center"
+            />
           </div>
 
-          <div
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-            className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5 cursor-grab select-none touch-none"
-          >
+          <div className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3.5 select-none">
             <div className="flex items-center gap-2.5 min-w-0">
               {sheetView !== 'detail' ? (
                 <button
                   type="button"
-                  onClick={() => setSheetView('detail')}
+                  onClick={handleBackFromForm}
                   className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--field-bg)] text-[var(--fg)] hover:bg-[var(--border)] transition-colors cursor-pointer shrink-0"
                   aria-label={t('common.back', 'Kembali')}
                 >
@@ -442,7 +629,7 @@ export default function BudgetSavingsDetailSheet({
                 <div
                   className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl border ${
                     isBudget
-                      ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/25'
+                      ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/25'
                       : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
                   }`}
                 >
@@ -490,7 +677,7 @@ export default function BudgetSavingsDetailSheet({
 
               <button
                 type="button"
-                onClick={closeSheet}
+                onClick={handleClose}
                 className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--field-bg)] transition-colors cursor-pointer"
                 aria-label={t('common.close', 'Tutup')}
               >
@@ -524,7 +711,7 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                  : 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
+                                  : 'bg-indigo-500/15 text-indigo-500 border-indigo-500/30'
                               }`}
                             >
                               {budgetCalc.overallPct}% {t('dashboard.usedPct', 'Terpakai')}
@@ -552,7 +739,7 @@ export default function BudgetSavingsDetailSheet({
                                   ? 'bg-rose-500'
                                   : budgetCalc.overallPct >= 80
                                   ? 'bg-amber-500'
-                                  : 'bg-[var(--accent)]'
+                                  : 'bg-indigo-500'
                               }`}
                               style={{ width: `${Math.min(100, Math.max(budgetCalc.overallPct, 3))}%` }}
                             />
@@ -643,18 +830,21 @@ export default function BudgetSavingsDetailSheet({
                         </button>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                        <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.noBudgetYet', 'Belum Ada Anggaran')}</p>
-                        <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.noBudgetDesc', 'Atur batas pengeluaran untuk mengendalikan keuangan bulananmu.')}</p>
-                        <button
-                          type="button"
-                          onClick={() => setSheetView('create-budget')}
-                          className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
-                        >
-                          <Plus size={14} strokeWidth={2.5} />
-                          {t('dashboard.createBudgetNow', 'Buat Anggaran Sekarang')}
-                        </button>
-                      </div>
+                      <EmptyState
+                        variant="budget"
+                        title={t('dashboard.noBudgetYet', 'Belum Ada Anggaran')}
+                        description={t('dashboard.noBudgetDesc', 'Atur batas pengeluaran untuk mengendalikan keuangan bulananmu.')}
+                        action={
+                          <button
+                            type="button"
+                            onClick={() => setSheetView('create-budget')}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
+                          >
+                            <Plus size={14} strokeWidth={2.5} />
+                            {t('dashboard.createBudgetNow', 'Buat Anggaran Sekarang')}
+                          </button>
+                        }
+                      />
                     )}
                   </div>
                 ) : (
@@ -743,18 +933,21 @@ export default function BudgetSavingsDetailSheet({
                         </button>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--field-bg)] p-6 text-center">
-                        <p className="text-sm font-bold text-[var(--fg)]">{t('dashboard.noGoalsYet', 'Belum Ada Target Tabungan')}</p>
-                        <p className="mt-1 text-xs text-[var(--muted)]">{t('dashboard.noGoalsDesc', 'Pasang impian finansialmu dan mulai menabung sekarang.')}</p>
-                        <button
-                          type="button"
-                          onClick={() => setSheetView('create-goal')}
-                          className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
-                        >
-                          <Plus size={14} strokeWidth={2.5} />
-                          {t('dashboard.addGoalNow', 'Tambah Target Sekarang')}
-                        </button>
-                      </div>
+                      <EmptyState
+                        variant="savings"
+                        title={t('dashboard.noGoalsYet', 'Belum Ada Target Tabungan')}
+                        description={t('dashboard.noGoalsDesc', 'Pasang impian finansialmu dan mulai menabung sekarang.')}
+                        action={
+                          <button
+                            type="button"
+                            onClick={() => setSheetView('create-goal')}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--fg)] text-[var(--bg)] px-4 py-2 text-xs font-bold transition active:scale-95 cursor-pointer"
+                          >
+                            <Plus size={14} strokeWidth={2.5} />
+                            {t('dashboard.addGoalNow', 'Tambah Target Sekarang')}
+                          </button>
+                        }
+                      />
                     )}
                   </div>
                 )}
@@ -864,7 +1057,7 @@ export default function BudgetSavingsDetailSheet({
                         type="button"
                         variant="secondary"
                         className="!py-2 !px-4 text-xs active:scale-95 transition-all cursor-pointer"
-                        onClick={() => setSheetView('detail')}
+                        onClick={handleBackFromForm}
                       >
                         {t('common.cancel', 'Batal')}
                       </Button>
@@ -985,7 +1178,7 @@ export default function BudgetSavingsDetailSheet({
                         type="button"
                         variant="secondary"
                         className="!py-2 !px-4 text-xs active:scale-95 transition-all cursor-pointer"
-                        onClick={() => setSheetView('detail')}
+                        onClick={handleBackFromForm}
                       >
                         {t('common.cancel', 'Batal')}
                       </Button>

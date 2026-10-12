@@ -63,6 +63,7 @@ function App() {
             <Route path="/wallet/:id" element={<WalletDetailPage />} />
             <Route path="/todos/:id" element={<TodoDetailPage />} />
             <Route path="/recurring" element={<Navigate to="/settings/recurring" replace />} />
+            <Route path="/notifications" element={<Navigate to="/settings/notifications" replace />} />
             <Route path="/ai-chat" element={<AiFinanceChat />} />
             <Route path="/chat" element={<Navigate to="/ai-chat" replace />} />
             <Route path="/ai-finance" element={<Navigate to="/ai-chat" replace />} />

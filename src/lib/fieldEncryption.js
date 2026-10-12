@@ -150,38 +150,49 @@ export async function encryptField(value, passphrase = null) {
   if (passphrase) {
     const cryptoObj = globalThis.crypto || (typeof window !== 'undefined' ? window.crypto : null)
     if (!cryptoObj?.subtle) {
-      throw new Error('Web Crypto API tidak didukung di lingkungan ini.')
+      console.warn('[fieldEncryption] Web Crypto API subtle tidak didukung; mempertahankan teks asli.')
+      return strVal
     }
-    const enc = new TextEncoder()
-    const keyMaterial = await cryptoObj.subtle.importKey(
-      'raw',
-      enc.encode(passphrase),
-      { name: 'PBKDF2' },
-      false,
-      ['deriveKey']
-    )
-    const key = await cryptoObj.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: enc.encode('fintrack_field_salt_v1'),
-        iterations: 50000,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt']
-    )
-    const iv = cryptoObj.getRandomValues(new Uint8Array(12))
-    const encryptedBuf = await cryptoObj.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      enc.encode(strVal)
-    )
-    ciphertext = `${ENCRYPTED_PREFIX}${bufferToHex(iv)}:${bufferToHex(encryptedBuf)}`
+    try {
+      const enc = new TextEncoder()
+      const keyMaterial = await cryptoObj.subtle.importKey(
+        'raw',
+        enc.encode(passphrase),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      )
+      const key = await cryptoObj.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: enc.encode('fintrack_field_salt_v1'),
+          iterations: 50000,
+          hash: 'SHA-256',
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt']
+      )
+      const iv = cryptoObj.getRandomValues(new Uint8Array(12))
+      const encryptedBuf = await cryptoObj.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        enc.encode(strVal)
+      )
+      ciphertext = `${ENCRYPTED_PREFIX}${bufferToHex(iv)}:${bufferToHex(encryptedBuf)}`
+    } catch (err) {
+      console.warn('[fieldEncryption] Gagal enkripsi passphrase, fallback ke teks asli:', err?.message)
+      return strVal
+    }
   } else {
     // Otherwise delegate to standard device-backed encryption
-    ciphertext = await encryptSecret(strVal)
+    try {
+      ciphertext = await encryptSecret(strVal)
+    } catch (err) {
+      console.warn('[fieldEncryption] Fallback teks asli karena kegagalan enkripsi:', err?.message)
+      return strVal
+    }
   }
 
   if (ciphertext) {

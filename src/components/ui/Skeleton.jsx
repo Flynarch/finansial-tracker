@@ -11,7 +11,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`ft-skeleton shrink-0 !rounded-full border border-[var(--border)]/40 ${className || 'h-10 w-10'}`}
+        className={`ft-skeleton ft-skeleton-enter shrink-0 !rounded-full border border-[var(--border)]/40 ${className || 'h-10 w-10'}`}
         {...rest}
       />
     )
@@ -21,7 +21,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`ft-skeleton !rounded-full border border-[var(--border)]/40 ${className || 'h-7 w-20'}`}
+        className={`ft-skeleton ft-skeleton-enter !rounded-full border border-[var(--border)]/40 ${className || 'h-7 w-20'}`}
         {...rest}
       />
     )
@@ -31,7 +31,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`ft-skeleton !rounded-lg ${className || 'h-3.5 w-full'}`}
+        className={`ft-skeleton ft-skeleton-enter !rounded-lg ${className || 'h-3.5 w-full'}`}
         {...rest}
       />
     )
@@ -41,7 +41,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`ft-skeleton-card p-4 sm:p-5 space-y-4 ${className}`}
+        className={`ft-skeleton-card ft-skeleton-enter p-4 sm:p-5 space-y-4 ${className}`}
         style={{ minHeight: '130px' }}
         {...rest}
       >
@@ -68,7 +68,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`flex items-center justify-between p-3 sm:p-3.5 gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] ${className}`}
+        className={`flex items-center justify-between p-3 sm:p-3.5 gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] ft-skeleton-enter ${className}`}
         {...rest}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -87,7 +87,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
     return (
       <div
         aria-hidden="true"
-        className={`ft-skeleton-card p-4 sm:p-5 space-y-3 ${className}`}
+        className={`ft-skeleton-card ft-skeleton-enter p-4 sm:p-5 space-y-3 ${className}`}
         style={{ minHeight: '180px' }}
         {...rest}
       >
@@ -111,7 +111,7 @@ function Skeleton({ variant = 'text', className = '', lines = 1, ...rest }) {
 
   // Default: text lines
   return (
-    <div aria-hidden="true" className={`space-y-2.5 ${className}`} {...rest}>
+    <div aria-hidden="true" className={`space-y-2.5 ft-skeleton-enter ${className}`} {...rest}>
       {Array.from({ length: lines }, (_, i) => (
         <div
           key={i}

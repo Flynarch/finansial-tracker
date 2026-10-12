@@ -7,6 +7,8 @@
  * @param {'dashboard'|'transactions'|'calendar'|'budget'|'reports'|'loans'|'savings'|'savings-detail'|'todo'|'todo-detail'|'profile'|'wallet-detail'|'settings'|'chat'|'add-account'|'generic'} [props.variant='generic']
  */
 
+import { SettingsCategoriesSkeleton as ModernSettingsCategoriesSkeleton } from '../settings/categories/SettingsCategoriesSkeleton'
+
 /* ── Shared primitives ──────────────────────────────────────────────── */
 
 export function SkeletonBar({ className = '' }) {
@@ -83,75 +85,133 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-4">
       {/* Wallet Carousel Hero Card */}
-      <SkeletonCard className="!p-5 space-y-4" style={{ minHeight: '175px' }}>
+      <div className="ft-hero-card ft-skeleton-card !p-5 space-y-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)]">
+        {/* Top row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <SkeletonCircle className="h-6 w-6" />
-            <SkeletonBar className="h-3.5 w-24 !rounded-md" />
+            <SkeletonBar className="h-3 w-24 !rounded-md" />
+            <SkeletonCircle className="h-5 w-5" />
+            <div className="flex gap-1 ml-1">
+              <span className="h-1.5 w-3.5 rounded-full ft-skeleton block" />
+              <span className="h-1.5 w-1.5 rounded-full ft-skeleton block" />
+            </div>
           </div>
-          <SkeletonBar className="h-6 w-20 !rounded-full" />
+          <SkeletonBar className="h-5 w-20 !rounded-full" />
         </div>
-        <div className="space-y-1.5">
-          <SkeletonBar className="h-3 w-16 !rounded-md" />
-          <SkeletonBar className="h-8.5 w-52 !rounded-xl" />
+        {/* Main balance */}
+        <div className="py-1">
+          <SkeletonBar className="h-8.5 w-48 !rounded-xl" />
         </div>
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div className="space-y-1.5 rounded-xl border border-[var(--border)]/40 p-2.5 bg-[var(--panel)]">
-            <SkeletonBar className="h-2.5 w-16 !rounded-md" />
-            <SkeletonBar className="h-4 w-28 !rounded-lg" />
+        {/* Dual stat pills: Income and Expense */}
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)] p-3">
+            <div className="h-8 w-8 shrink-0 rounded-xl ft-skeleton" />
+            <div className="space-y-1 min-w-0 flex-1">
+              <SkeletonBar className="h-2.5 w-16 !rounded-md" />
+              <SkeletonBar className="h-4 w-20 !rounded-lg" />
+            </div>
           </div>
-          <div className="space-y-1.5 rounded-xl border border-[var(--border)]/40 p-2.5 bg-[var(--panel)]">
-            <SkeletonBar className="h-2.5 w-16 !rounded-md" />
-            <SkeletonBar className="h-4 w-28 !rounded-lg" />
+          <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--border)]/60 bg-[var(--field-bg)] p-3">
+            <div className="h-8 w-8 shrink-0 rounded-xl ft-skeleton" />
+            <div className="space-y-1 min-w-0 flex-1">
+              <SkeletonBar className="h-2.5 w-16 !rounded-md" />
+              <SkeletonBar className="h-4 w-20 !rounded-lg" />
+            </div>
           </div>
         </div>
-      </SkeletonCard>
-
-      {/* Quick Actions Row */}
-      <div className="grid grid-cols-4 gap-2">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex flex-col items-center gap-1.5 p-2 rounded-2xl border border-[var(--border)]/40 bg-[var(--panel-strong)] shadow-2xs">
-            <SkeletonCircle className="h-10 w-10" />
-            <SkeletonBar className="h-2.5 w-12 !rounded-md" />
-          </div>
-        ))}
       </div>
 
-      {/* Recent Transactions Card */}
-      <SkeletonCard className="!p-3.5 space-y-2">
-        <div className="flex items-center justify-between px-1 pb-1">
-          <SkeletonBar className="h-4 w-36 !rounded-lg" />
-          <SkeletonBar className="h-3 w-16 !rounded-md" />
-        </div>
-        <div className="space-y-1 divide-y divide-[var(--border)]/40">
-          {[1, 2, 3].map((i) => (
-            <SkeletonListItem key={i} />
-          ))}
-        </div>
-      </SkeletonCard>
-
-      {/* Net Worth Chart Placeholder */}
-      <SkeletonCard className="space-y-3">
+      {/* Recent Transactions Card (Single Highlighted Item mirroring DashboardRecentTx.jsx) */}
+      <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
-          <SkeletonBar className="h-4 w-32 !rounded-lg" />
-          <SkeletonBar className="h-6 w-24 !rounded-full" />
+          <SkeletonBar className="h-4 w-36 !rounded-lg" />
+          <SkeletonBar className="h-3 w-20 !rounded-md" />
         </div>
-        <SkeletonBar className="h-7 w-40 !rounded-lg" />
-        <div className="h-24 w-full rounded-2xl ft-skeleton border border-[var(--border)]/40" />
-      </SkeletonCard>
+        <div className="space-y-2">
+          <SkeletonBar className="h-2.5 w-28 !rounded-md" />
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <SkeletonBar className="h-3.5 w-32 !rounded-lg" />
+                <SkeletonBar className="h-2.5 w-24 !rounded-md" />
+              </div>
+            </div>
+            <SkeletonBar className="h-4.5 w-24 shrink-0 !rounded-lg" />
+          </div>
+        </div>
+      </div>
 
-      {/* Bento Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <SkeletonCard className="space-y-3" style={{ minHeight: '100px' }}>
-          <SkeletonBar className="h-3 w-20 !rounded-md" />
-          <SkeletonBar className="h-5 w-24 !rounded-lg" />
+      {/* Net Worth Chart Card */}
+      <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <SkeletonBar className="h-4 w-24 !rounded-lg" />
+          <SkeletonBar className="h-5 w-20 !rounded-full" />
+        </div>
+        <SkeletonBar className="h-7 w-36 !rounded-xl" />
+        <div className="h-20 w-full rounded-xl ft-skeleton border border-[var(--border)]/40" />
+      </div>
+
+      {/* Habit Consistency Heatmap Card */}
+      <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <div className="space-y-1">
+            <SkeletonBar className="h-3.5 w-32 !rounded-md" />
+            <SkeletonBar className="h-2.5 w-20 !rounded-md" />
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <SkeletonBar className="h-5 w-10 !rounded-md" />
+            <SkeletonBar className="h-2 w-14 !rounded-md" />
+          </div>
+        </div>
+        <div className="h-8 w-full rounded-xl ft-skeleton" />
+      </div>
+
+      {/* Bento Grid: Anggaran & Target Tabungan (Mirroring DashboardPulseBento.jsx) */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs space-y-3 min-h-[128px] flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-xl ft-skeleton" />
+              <SkeletonBar className="h-3.5 w-16 !rounded-md" />
+            </div>
+            <SkeletonBar className="h-3.5 w-3.5 !rounded-md" />
+          </div>
+          <div className="space-y-1">
+            <SkeletonBar className="h-5 w-20 !rounded-md" />
+            <SkeletonBar className="h-2.5 w-24 !rounded-md" />
+          </div>
           <div className="h-2 w-full rounded-full ft-skeleton" />
-        </SkeletonCard>
-        <SkeletonCard className="space-y-3" style={{ minHeight: '100px' }}>
-          <SkeletonBar className="h-3 w-20 !rounded-md" />
-          <SkeletonBar className="h-5 w-24 !rounded-lg" />
+        </div>
+        <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3.5 shadow-xs space-y-3 min-h-[128px] flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-xl ft-skeleton" />
+              <SkeletonBar className="h-3.5 w-16 !rounded-md" />
+            </div>
+            <SkeletonBar className="h-3.5 w-3.5 !rounded-md" />
+          </div>
+          <div className="space-y-1">
+            <SkeletonBar className="h-5 w-20 !rounded-md" />
+            <SkeletonBar className="h-2.5 w-24 !rounded-md" />
+          </div>
           <div className="h-2 w-full rounded-full ft-skeleton" />
-        </SkeletonCard>
+        </div>
+      </div>
+
+      {/* Loans & Debts Card (Mirroring DashboardLoanWidget.jsx) */}
+      <div className="ft-skeleton-card rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl ft-skeleton" />
+            <div className="space-y-1">
+              <SkeletonBar className="h-3.5 w-24 !rounded-md" />
+              <SkeletonBar className="h-2.5 w-32 !rounded-md" />
+            </div>
+          </div>
+          <SkeletonBar className="h-7 w-20 !rounded-xl" />
+        </div>
+        <div className="h-16 w-full rounded-xl ft-skeleton border border-[var(--border)]/40" />
       </div>
     </div>
   )
@@ -163,13 +223,15 @@ function TransactionsSkeleton() {
   return (
     <div className="space-y-4">
       <SkeletonPageHeader />
-      {/* Search Bar */}
-      <div className="h-11 w-full rounded-2xl ft-skeleton border border-[var(--border)]/50" />
-      {/* Filter Chips */}
-      <div className="flex gap-2">
-        {[1, 2, 3, 4].map((i) => (
-          <SkeletonBar key={i} className="h-7.5 w-18 !rounded-full" />
-        ))}
+      {/* 2-Segmented View Tabs */}
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)]">
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
+      </div>
+      {/* Search Bar + Filter Trigger */}
+      <div className="flex items-center gap-2">
+        <div className="h-11 flex-1 rounded-2xl ft-skeleton border border-[var(--border)]/50" />
+        <div className="h-11 w-11 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/50" />
       </div>
       {/* Transaction Groups */}
       <SkeletonDateGroup items={3} />
@@ -184,11 +246,14 @@ function CalendarSkeleton() {
   return (
     <div className="space-y-4">
       <SkeletonPageHeader />
-      {/* Month navigation */}
-      <div className="flex items-center justify-between px-2">
-        <SkeletonCircle className="h-8 w-8" />
-        <SkeletonBar className="h-5 w-32 !rounded-lg" />
-        <SkeletonCircle className="h-8 w-8" />
+      {/* Toolbar Container */}
+      <div className="mb-4 flex items-center justify-between rounded-2xl bg-[var(--field-bg)] px-3 py-2.5 shadow-sm border border-[var(--border)]">
+        <div className="flex items-center gap-1.5">
+          <div className="h-11 w-11 rounded-xl ft-skeleton" />
+          <div className="h-11 w-20 rounded-xl ft-skeleton" />
+          <div className="h-11 w-11 rounded-xl ft-skeleton" />
+        </div>
+        <SkeletonBar className="h-5 w-28 !rounded-lg" />
       </div>
       {/* Day-of-week headers */}
       <div className="grid grid-cols-7 gap-1 px-1">
@@ -222,36 +287,45 @@ function CalendarSkeleton() {
 function BudgetSkeleton() {
   return (
     <div className="space-y-4">
-      <SkeletonPageHeader />
-      {/* Month selector */}
-      <div className="flex items-center justify-center gap-3">
-        <SkeletonCircle className="h-8 w-8" />
-        <SkeletonBar className="h-5 w-28 !rounded-lg" />
-        <SkeletonCircle className="h-8 w-8" />
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonBar className="h-6.5 w-36 !rounded-xl" />
+        <SkeletonBar className="h-10 w-24 !rounded-2xl" />
       </div>
       {/* Summary card */}
-      <SkeletonCard className="space-y-3 !p-5">
-        <div className="flex items-center justify-between">
-          <SkeletonBar className="h-3.5 w-24 !rounded-md" />
-          <SkeletonBar className="h-3 w-20 !rounded-md" />
-        </div>
-        <SkeletonBar className="h-7 w-36 !rounded-lg" />
-        <div className="h-2.5 w-full rounded-full ft-skeleton" />
-      </SkeletonCard>
-      {/* Budget items */}
-      {[1, 2, 3, 4].map((i) => (
-        <SkeletonCard key={i} className="!p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
-            <div className="flex-1 space-y-1.5">
-              <SkeletonBar className="h-3.5 w-28 !rounded-lg" />
-              <SkeletonBar className="h-2.5 w-36 !rounded-md" />
-            </div>
-            <SkeletonBar className="h-4.5 w-20 shrink-0 !rounded-lg" />
+      <SkeletonCard className="space-y-3.5 !p-5 sm:!p-6">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <SkeletonBar className="h-3 w-24 !rounded-md" />
+            <SkeletonBar className="h-5 w-12 !rounded-full" />
           </div>
-          <div className="h-2 w-full rounded-full ft-skeleton" />
-        </SkeletonCard>
-      ))}
+          <SkeletonBar className="h-8 w-28 !rounded-xl" />
+        </div>
+        <SkeletonBar className="h-6 w-36 !rounded-xl" />
+        <div className="space-y-1 pt-1">
+          <SkeletonBar className="h-8 w-44 !rounded-xl" />
+        </div>
+        <div className="h-3 w-full rounded-full ft-skeleton" />
+      </SkeletonCard>
+      {/* Section Header */}
+      <div className="flex items-center justify-between px-1 pt-2">
+        <SkeletonBar className="h-3 w-28 !rounded-md" />
+      </div>
+      {/* Budget items in responsive grid */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <SkeletonCard key={i} className="!p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
+              <div className="flex-1 space-y-1.5">
+                <SkeletonBar className="h-3.5 w-28 !rounded-lg" />
+                <SkeletonBar className="h-2.5 w-36 !rounded-md" />
+              </div>
+              <SkeletonBar className="h-4.5 w-16 shrink-0 !rounded-lg" />
+            </div>
+            <div className="h-2 w-full rounded-full ft-skeleton" />
+          </SkeletonCard>
+        ))}
+      </div>
     </div>
   )
 }
@@ -272,6 +346,17 @@ function ReportsSkeleton() {
           </SkeletonCard>
         ))}
       </div>
+      {/* Smart Insights Strip */}
+      <SkeletonCard className="flex items-center justify-between !p-3.5">
+        <div className="flex items-center gap-3">
+          <SkeletonCircle className="h-8 w-8" />
+          <div className="space-y-1">
+            <SkeletonBar className="h-3.5 w-36 !rounded-md" />
+            <SkeletonBar className="h-2.5 w-24 !rounded-md" />
+          </div>
+        </div>
+        <SkeletonBar className="h-6 w-16 !rounded-full" />
+      </SkeletonCard>
       {/* Chart area */}
       <SkeletonCard className="space-y-3">
         <div className="flex items-center justify-between">
@@ -300,6 +385,14 @@ function ReportsSkeleton() {
           ))}
         </div>
       </SkeletonCard>
+      {/* Net Worth Chart Placeholder */}
+      <SkeletonCard className="space-y-3">
+        <div className="flex items-center justify-between">
+          <SkeletonBar className="h-4 w-36 !rounded-lg" />
+          <SkeletonBar className="h-6 w-20 !rounded-full" />
+        </div>
+        <div className="h-36 w-full rounded-2xl ft-skeleton border border-[var(--border)]/40" />
+      </SkeletonCard>
     </div>
   )
 }
@@ -309,25 +402,41 @@ function ReportsSkeleton() {
 function LoansSkeleton() {
   return (
     <div className="space-y-4">
-      <SkeletonPageHeader />
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <SkeletonCard className="space-y-2.5" style={{ minHeight: '84px' }}>
-          <SkeletonBar className="h-3 w-16 !rounded-md" />
-          <SkeletonBar className="h-6 w-24 !rounded-lg" />
-        </SkeletonCard>
-        <SkeletonCard className="space-y-2.5" style={{ minHeight: '84px' }}>
-          <SkeletonBar className="h-3 w-16 !rounded-md" />
-          <SkeletonBar className="h-6 w-24 !rounded-lg" />
-        </SkeletonCard>
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonBar className="h-6.5 w-36 !rounded-xl" />
+        <SkeletonBar className="h-10 w-24 !rounded-2xl" />
       </div>
-      {/* Tab chips */}
-      <div className="flex gap-2">
-        <SkeletonBar className="h-8 w-20 !rounded-full" />
-        <SkeletonBar className="h-8 w-20 !rounded-full" />
-        <SkeletonBar className="h-8 w-24 !rounded-full" />
+      {/* Divided Summary Card */}
+      <SkeletonCard className="space-y-3.5 !p-5">
+        <div className="grid grid-cols-2 divide-x divide-[var(--border)]/60">
+          <div className="space-y-1.5">
+            <SkeletonBar className="h-2.5 w-16 !rounded-md" />
+            <SkeletonBar className="h-6 w-24 !rounded-lg" />
+          </div>
+          <div className="space-y-1.5 pl-4">
+            <SkeletonBar className="h-2.5 w-16 !rounded-md" />
+            <SkeletonBar className="h-6 w-24 !rounded-lg" />
+          </div>
+        </div>
+        <div className="h-2 w-full rounded-full ft-skeleton" />
+        <div className="pt-2 border-t border-dashed border-[var(--border)]/40 flex items-center justify-between">
+          <SkeletonBar className="h-3 w-20 !rounded-md" />
+          <SkeletonBar className="h-4 w-24 !rounded-lg" />
+        </div>
+      </SkeletonCard>
+      {/* Primary Type Tab Switcher (2 Segmented Tabs) */}
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[var(--field-bg)] p-1 border border-[var(--border)]">
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
       </div>
-      {/* Loan items */}
+      {/* Secondary Status Filter Chips */}
+      <div className="flex gap-2 overflow-hidden">
+        <SkeletonBar className="h-7 w-16 !rounded-full shrink-0" />
+        <SkeletonBar className="h-7 w-16 !rounded-full shrink-0" />
+        <SkeletonBar className="h-7 w-20 !rounded-full shrink-0" />
+        <SkeletonBar className="h-7 w-16 !rounded-full shrink-0" />
+      </div>
+      {/* Loan Items */}
       {[1, 2, 3].map((i) => (
         <SkeletonCard key={i} className="!p-4 space-y-3">
           <div className="flex items-center gap-3">
@@ -350,19 +459,37 @@ function LoansSkeleton() {
 function SavingsSkeleton() {
   return (
     <div className="space-y-4">
-      <SkeletonPageHeader />
-      {/* Summary hero */}
-      <SkeletonCard className="space-y-3 !p-5">
-        <SkeletonBar className="h-3 w-24 !rounded-md" />
-        <SkeletonBar className="h-8.5 w-44 !rounded-xl" />
-        <div className="flex gap-4 pt-1">
-          <SkeletonBar className="h-3 w-24 !rounded-md" />
-          <SkeletonBar className="h-3 w-24 !rounded-md" />
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonBar className="h-6.5 w-36 !rounded-xl" />
+        <div className="flex items-center gap-2">
+          <SkeletonCircle className="h-10 w-10 !rounded-2xl" />
+          <SkeletonBar className="h-10 w-24 !rounded-2xl" />
         </div>
+      </div>
+      {/* Summary hero */}
+      <SkeletonCard className="space-y-3.5 !p-5">
+        <div className="flex items-center justify-between">
+          <SkeletonBar className="h-3 w-24 !rounded-md" />
+          <SkeletonBar className="h-5 w-12 !rounded-full" />
+        </div>
+        <div className="flex items-baseline gap-2 pt-0.5">
+          <SkeletonBar className="h-8.5 w-40 !rounded-xl" />
+          <SkeletonBar className="h-5 w-24 !rounded-lg" />
+        </div>
+        <div className="pt-2 border-t border-[var(--border)]/40 flex items-center justify-between">
+          <SkeletonBar className="h-3 w-24 !rounded-md" />
+          <SkeletonBar className="h-4 w-16 !rounded-full" />
+        </div>
+        {/* Full-width Progress Bar */}
+        <div className="h-3 w-full rounded-full ft-skeleton" />
       </SkeletonCard>
+      {/* Section Header */}
+      <div className="flex items-center justify-between px-1 pt-1">
+        <SkeletonBar className="h-3 w-36 !rounded-md" />
+      </div>
       {/* Goal cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <SkeletonCard key={i} className="!p-4 space-y-3.5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
@@ -417,12 +544,22 @@ function SavingsDetailSkeleton() {
 function TodoSkeleton() {
   return (
     <div className="space-y-4">
-      <SkeletonPageHeader />
+      {/* Header with Title + Right Action Button */}
+      <div className="flex items-center justify-between mb-2">
+        <SkeletonBar className="h-7 w-28 !rounded-xl" />
+        <SkeletonBar className="h-11 w-24 !rounded-2xl" />
+      </div>
+      {/* 2-Segmented Control: Tugas vs Kebiasaan */}
+      <div className="grid grid-cols-2 gap-1 rounded-[1rem] bg-[var(--field-bg)] p-1 border border-[var(--border)]">
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
+        <SkeletonBar className="h-9 w-full !rounded-xl" />
+      </div>
       {/* Filter tabs */}
       <div className="flex gap-2">
-        <SkeletonBar className="h-8 w-18 !rounded-full" />
-        <SkeletonBar className="h-8 w-18 !rounded-full" />
-        <SkeletonBar className="h-8 w-22 !rounded-full" />
+        <SkeletonBar className="h-8 w-16 !rounded-full" />
+        <SkeletonBar className="h-8 w-16 !rounded-full" />
+        <SkeletonBar className="h-8 w-20 !rounded-full" />
+        <SkeletonBar className="h-8 w-16 !rounded-full" />
       </div>
       {/* Todo card grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -483,32 +620,75 @@ function TodoDetailSkeleton() {
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-5">
-      {/* Avatar & User Info */}
-      <div className="flex flex-col items-center gap-3 pt-2">
-        <SkeletonCircle className="h-20 w-20" />
-        <SkeletonBar className="h-5 w-32 !rounded-lg" />
-        <SkeletonBar className="h-3 w-44 !rounded-md" />
+    <div className="space-y-4">
+      {/* Page Header */}
+      <div className="pt-2 px-1 mb-0">
+        <SkeletonBar className="h-7 w-28 !rounded-xl" />
       </div>
-      {/* Menu sections */}
-      <SkeletonCard className="!p-0 divide-y divide-[var(--border)]/40 overflow-hidden">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex items-center gap-3.5 p-3.5">
-            <div className="h-9 w-9 shrink-0 rounded-xl ft-skeleton border border-[var(--border)]/50" />
-            <SkeletonBar className="h-3.5 flex-1 max-w-[150px] !rounded-lg" />
-            <SkeletonBar className="h-3 w-4 shrink-0 ml-auto !rounded-md" />
-          </div>
-        ))}
-      </SkeletonCard>
-      <SkeletonCard className="!p-0 divide-y divide-[var(--border)]/40 overflow-hidden">
+
+      {/* Hero Profile Card */}
+      <div className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] p-5 pb-8 pt-8 shadow-[var(--shadow-card)] flex flex-col items-center">
+        {/* Avatar circle 88px with camera badge */}
+        <div className="relative mb-4">
+          <SkeletonCircle className="h-[88px] w-[88px]" />
+          <div className="absolute bottom-0 right-0 h-8 w-8 rounded-full ft-skeleton border-2 border-[var(--panel-strong)]" />
+        </div>
+        {/* Display Name bar + pencil icon */}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <SkeletonBar className="h-6 w-36 !rounded-xl" />
+          <SkeletonCircle className="h-6 w-6" />
+        </div>
+        {/* Account status badge pill */}
+        <SkeletonBar className="h-6 w-44 !rounded-full" />
+      </div>
+
+      {/* 3-Column Stats Row (Transaksi, Anggaran, Tabungan) */}
+      <div className="flex gap-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-3.5 p-3.5">
-            <div className="h-9 w-9 shrink-0 rounded-xl ft-skeleton border border-[var(--border)]/50" />
-            <SkeletonBar className="h-3.5 flex-1 max-w-[150px] !rounded-lg" />
-            <SkeletonBar className="h-3 w-4 shrink-0 ml-auto !rounded-md" />
+          <div
+            key={i}
+            className="flex-1 overflow-hidden rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] p-4 shadow-[var(--shadow-card)] space-y-2.5"
+          >
+            <div className="h-8 w-8 rounded-[0.6rem] ft-skeleton" />
+            <SkeletonBar className="h-6 w-10 !rounded-lg" />
+            <SkeletonBar className="h-2.5 w-16 !rounded-md" />
           </div>
         ))}
-      </SkeletonCard>
+      </div>
+
+      {/* Account & Preferences Button Card */}
+      <div className="flex items-center gap-4 rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--border)_80%,transparent)] bg-[var(--panel-strong)] px-5 py-4 shadow-[var(--shadow-card)]">
+        <div className="h-11 w-11 shrink-0 rounded-[var(--radius-md)] ft-skeleton" />
+        <div className="flex-1 space-y-1.5 min-w-0">
+          <SkeletonBar className="h-4 w-36 !rounded-lg" />
+          <SkeletonBar className="h-3 w-52 !rounded-md" />
+        </div>
+        <SkeletonBar className="h-4 w-4 shrink-0 !rounded-md" />
+      </div>
+
+      {/* Shortcuts Section (6 Rows) */}
+      <div className="space-y-2.5">
+        <SkeletonBar className="h-3 w-28 !rounded-md px-0.5" />
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--panel-strong)] shadow-[var(--shadow-card)] divide-y divide-[color-mix(in_srgb,var(--border)_65%,transparent)]">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4">
+              <div className="h-10 w-10 shrink-0 rounded-xl ft-skeleton" />
+              <div className="flex-1 space-y-1 min-w-0">
+                <SkeletonBar className="h-4 w-28 !rounded-lg" />
+                <SkeletonBar className="h-2.5 w-40 !rounded-md" />
+              </div>
+              <SkeletonBar className="h-4 w-4 shrink-0 !rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Version Footer */}
+      <div className="flex items-center justify-center gap-3 pt-6 pb-2">
+        <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
+        <SkeletonBar className="h-3 w-28 !rounded-md" />
+        <div className="h-px flex-1 bg-[color-mix(in_srgb,var(--border)_50%,transparent)]" />
+      </div>
     </div>
   )
 }
@@ -735,7 +915,7 @@ function SettingsSecuritySkeleton() {
   )
 }
 
-function SettingsCategoriesSkeleton() {
+export function SettingsCategoriesSkeleton() {
   return (
     <div className="space-y-5">
       {/* Header Overview Card */}
@@ -1224,17 +1404,67 @@ function ChatSkeleton() {
 
 function AddAccountSkeleton() {
   return (
-    <div className="space-y-4">
-      <SkeletonBackHeader />
-      <SkeletonCard className="space-y-4 !p-5">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="space-y-2">
-            <SkeletonBar className="h-3 w-20 !rounded-md" />
-            <div className="h-12 w-full rounded-2xl ft-skeleton border border-[var(--border)]/50" />
-          </div>
+    <div className="flex flex-col min-h-screen bg-[var(--bg)] space-y-4 max-w-2xl mx-auto w-full px-4 sm:px-6 pt-1">
+      {/* Top Header */}
+      <div className="flex items-center gap-3 py-2">
+        <div className="h-10 w-10 shrink-0 rounded-2xl ft-skeleton border border-[var(--border)]/60" />
+        <SkeletonBar className="h-5.5 w-44 !rounded-xl" />
+      </div>
+
+      {/* Search Input Placeholder */}
+      <div className="h-11 w-full rounded-2xl ft-skeleton border border-[var(--border)]/50" />
+
+      {/* Category Pills Placeholder */}
+      <div className="flex items-center gap-2 overflow-hidden pb-1">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <SkeletonBar key={i} className="h-8 w-20 shrink-0 !rounded-full" />
         ))}
+      </div>
+
+      {/* Content List: Section 1 */}
+      <div className="space-y-2.5 pt-2">
+        <SkeletonBar className="h-3 w-36 !rounded-md" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3.5 sm:gap-4 px-4 py-3.5 sm:px-5 sm:py-4 rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_75%,transparent)] bg-[var(--panel-strong)] shadow-2xs"
+            >
+              <SkeletonCircle className="h-11 w-11" />
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <SkeletonBar className="h-4 w-32 !rounded-lg" />
+                <SkeletonBar className="h-2.5 w-20 !rounded-md" />
+              </div>
+              <SkeletonCircle className="h-5 w-5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content List: Section 2 */}
+      <div className="space-y-2.5 pt-2">
+        <SkeletonBar className="h-3 w-40 !rounded-md" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3.5 sm:gap-4 px-4 py-3.5 sm:px-5 sm:py-4 rounded-[1.25rem] border border-[color-mix(in_srgb,var(--border)_75%,transparent)] bg-[var(--panel-strong)] shadow-2xs"
+            >
+              <SkeletonCircle className="h-11 w-11" />
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <SkeletonBar className="h-4 w-28 !rounded-lg" />
+                <SkeletonBar className="h-2.5 w-24 !rounded-md" />
+              </div>
+              <SkeletonCircle className="h-5 w-5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Action Button Placeholder */}
+      <div className="pt-2">
         <SkeletonBar className="h-12 w-full !rounded-2xl" />
-      </SkeletonCard>
+      </div>
     </div>
   )
 }
@@ -1278,7 +1508,7 @@ const VARIANT_MAP = {
   settings: SettingsHomeSkeleton,
   'settings-home': SettingsHomeSkeleton,
   'settings-security': SettingsSecuritySkeleton,
-  'settings-categories': SettingsCategoriesSkeleton,
+  'settings-categories': ModernSettingsCategoriesSkeleton,
   'settings-recurring': SettingsRecurringSkeleton,
   'settings-currency': SettingsCurrencySkeleton,
   'settings-notifications': SettingsNotificationsSkeleton,
@@ -1297,7 +1527,7 @@ export default function PageSkeleton({ variant = 'generic' }) {
     <div
       role="status"
       aria-busy="true"
-      className="w-full animate-in fade-in duration-200"
+      className="w-full ft-skeleton-enter"
     >
       <Component />
     </div>

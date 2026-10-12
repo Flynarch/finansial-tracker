@@ -41,8 +41,8 @@ function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 sm:backdrop-blur-xs ${
-        isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit pointer-events-none'
+      className={`fixed inset-0 ${zIndex} flex items-end sm:items-center justify-center p-0 sm:p-6 ${
+        isVisible ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
       onWheel={(event) => event.target === event.currentTarget && event.preventDefault()}
       onTouchMove={(event) => event.target === event.currentTarget && event.preventDefault()}
@@ -52,11 +52,23 @@ function Modal({
         }
       }}
     >
+      {/* Sibling 1: Isolated Backdrop (animates only opacity without nesting or rasterizing child sheet) */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        className={`fixed inset-0 bg-black/60 sm:backdrop-blur-xs cursor-pointer ${
+          isVisible ? 'ft-backdrop-enter' : 'ft-backdrop-exit'
+        }`}
+        onClick={closeSheet}
+      />
+
+      {/* Sibling 2: Isolated Modal Sheet Dialog (animates transform smoothly on GPU) */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : t('common.modal', 'Modal')}
-        className={`flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu ${
+        className={`relative z-10 flex flex-col w-full ${maxWidth} ${maxHeight} overflow-hidden rounded-t-[32px] rounded-b-none sm:rounded-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl transform-gpu will-change-transform ${
           isVisible ? 'ft-sheet-enter' : 'ft-sheet-exit'
         } ${className}`}
         style={{

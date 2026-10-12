@@ -89,14 +89,14 @@ export default function AiFinanceChat() {
     }
   }, [todayStr, defaultCurrency]) || 0
 
-  const [showTexturePicker, setShowTexturePicker] = useState(false)
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [contextMenuMsg, setContextMenuMsg] = useState(null)
   const [editingTransaction, setEditingTransaction] = useState(null)
   const [editFormData, setEditFormData] = useState(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
-  const textureDropdownRef = useRef(null)
+  const optionsMenuRef = useRef(null)
   const longPressTimerRef = useRef(null)
 
   useEffect(() => {
@@ -112,11 +112,11 @@ export default function AiFinanceChat() {
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (textureDropdownRef.current && !textureDropdownRef.current.contains(event.target)) {
-        setShowTexturePicker(false)
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target)) {
+        setShowOptionsMenu(false)
       }
     }
-    if (showTexturePicker) {
+    if (showOptionsMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('touchstart', handleClickOutside)
       return () => {
@@ -125,7 +125,7 @@ export default function AiFinanceChat() {
       }
     }
     return undefined
-  }, [showTexturePicker])
+  }, [showOptionsMenu])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -173,6 +173,7 @@ export default function AiFinanceChat() {
   const {
     isLoading,
     handleSend,
+    handleRegenerate,
   } = useChatEngine({
     locale,
     defaultCurrency,
@@ -193,6 +194,7 @@ export default function AiFinanceChat() {
     messagesEndRef,
     showScrollFAB,
     unreadCount,
+    isScrolled,
     handleScroll,
     scrollToBottom,
   } = useChatScroll({
@@ -229,6 +231,12 @@ export default function AiFinanceChat() {
     isLoading,
     onInitialPrompt: handleInitialPrompt,
   })
+
+  const visibleMessages = useMemo(() => messages.filter((m) => m.type !== 'hidden'), [messages])
+  const isOnlyWelcome = visibleMessages.length <= 1 && (visibleMessages.length === 0 || visibleMessages[0]?.type === 'welcome')
+  const hasMessages = visibleMessages.some((m) => m.type !== 'welcome' && (m.role === 'user' || m.role === 'ai'))
+  const isUserTyping = Boolean(inputValue && inputValue.trim().length > 0)
+  const hasActiveChat = !isOnlyWelcome || isUserTyping || isScrolled
 
   const {
     handleConfirmDelete,
@@ -348,7 +356,7 @@ export default function AiFinanceChat() {
     setEditFormData(null)
   }, Boolean(editingTransaction))
   useBackButton(() => setContextMenuMsg(null), Boolean(contextMenuMsg))
-  useBackButton(() => setShowTexturePicker(false), Boolean(showTexturePicker))
+  useBackButton(() => setShowOptionsMenu(false), Boolean(showOptionsMenu))
   useBackButton(() => setShowClearConfirm(false), Boolean(showClearConfirm))
   useBackButton(() => setShowMediaSourcePicker(false), Boolean(showMediaSourcePicker))
   useBackButton(() => {
@@ -412,11 +420,14 @@ export default function AiFinanceChat() {
         onBack={() => (window.history.length > 1 ? navigate(-1) : navigate('/dashboard'))}
         isOnline={isOnline}
         locale={locale}
-        showTexturePicker={showTexturePicker}
-        setShowTexturePicker={setShowTexturePicker}
+        hasActiveChat={hasActiveChat}
+        hasMessages={hasMessages}
+        isScrolled={isScrolled}
+        showOptionsMenu={showOptionsMenu}
+        setShowOptionsMenu={setShowOptionsMenu}
+        optionsMenuRef={optionsMenuRef}
         backgroundTexture={backgroundTexture}
         setBackgroundTexture={setBackgroundTexture}
-        textureDropdownRef={textureDropdownRef}
         onOpenClearConfirm={() => setShowClearConfirm(true)}
       />
 
@@ -488,6 +499,7 @@ export default function AiFinanceChat() {
       <ChatMessageList
         messages={messages}
         isLoading={isLoading}
+        isOnline={isOnline}
         locale={locale}
         defaultCurrency={defaultCurrency}
         todayExpense={todayExpense}
@@ -495,6 +507,7 @@ export default function AiFinanceChat() {
         messagesEndRef={messagesEndRef}
         onScroll={handleScroll}
         onSend={handleSend}
+        onRegenerate={handleRegenerate}
         onStagePrompt={handleStagePrompt}
         onMsgTouchStart={handleMsgTouchStart}
         onMsgTouchMove={handleMsgTouchMove}
@@ -534,6 +547,9 @@ export default function AiFinanceChat() {
         messageContent={contextMenuMsg?.content || ''}
         messageType={contextMenuMsg?.role === 'user' ? 'user' : contextMenuMsg?.type === 'success' ? 'transaction' : 'ai'}
         messageData={contextMenuMsg?.data}
+        messageId={contextMenuMsg?.id}
+        onRegenerate={handleRegenerate}
+        onQuoteMessage={handleStagePrompt}
         onCopyText={async (text) => {
           let textToCopy = text || contextMenuMsg?.content || ''
           if (!textToCopy && contextMenuMsg?.type === 'success' && contextMenuMsg?.data) {

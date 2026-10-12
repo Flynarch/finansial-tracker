@@ -55,7 +55,7 @@ export async function handleLoanAction(result, {
         },
       },
     })
-  } else if (result.action === 'pay') {
+  } else if (result.action === 'pay' || result.action === 'payment') {
     const allLoans = await db.loans.toArray()
     const { filterTerm, matched } = findMatchingLoanForAction(allLoans, result, { includePaid: false })
 
@@ -84,19 +84,23 @@ export async function handleLoanAction(result, {
       } else {
         const payWalletId = matchedActiveWallet.id
         await recordPayment(matched.id, result.amount, getLocalDateString(), 'Dicatat via AI Assistant', payWalletId, result.currency)
+        const updatedLoan = await db.loans.get(matched.id)
+        const isFullyPaid = !updatedLoan || updatedLoan.status === 'paid' || (Number(updatedLoan.remainingAmount) || 0) <= 0
         newMsgs.push({
           id: Date.now() + 4,
           role: 'ai',
           type: 'action_success',
           data: {
             type: 'loan',
-            action: 'pay',
+            action: isFullyPaid ? 'pay' : 'payment',
             title: matched.title,
             data: {
+              id: matched.id,
               title: matched.title,
               personName: matched.personName,
               loanType: matched.type,
               amount: Number(result.amount) || 0,
+              remainingAmount: updatedLoan ? Number(updatedLoan.remainingAmount) : 0,
               dueDate: matched.dueDate,
               currency: result.currency || matchedActiveWallet.currency || matched.currency || defaultCurrency,
             },
@@ -158,10 +162,12 @@ export async function handleLoanAction(result, {
             title: matched.title,
             subtitle: 'Pinjaman berhasil dilunasi',
             data: {
+              id: matched.id,
               title: matched.title,
               personName: matched.personName,
               loanType: matched.type,
               amount: remaining,
+              remainingAmount: 0,
               currency: matchedActiveWallet.currency || matched.currency || defaultCurrency,
             },
           },
