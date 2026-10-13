@@ -83,7 +83,7 @@ export const DashboardPulseBento = memo(function DashboardPulseBento({
   const hasBudgets = budgetRows.length > 0
 
   // 2. Goals Stats
-  const goalRows = budgetGoalSummary?.goalRows || []
+  const goalRows = budgetGoalSummary?.activeGoalRows || budgetGoalSummary?.goalRows || []
   const totalGoalCurrent = goalRows.reduce(
     (sum, r) => sum + convertCurrency(r.current || 0, r.currency || defaultCurrency, defaultCurrency, rates),
     0

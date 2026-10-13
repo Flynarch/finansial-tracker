@@ -173,8 +173,8 @@ describe('Subsystem Audit Bug Fixes Suite', () => {
     })
   })
 
-  describe('3. budgetGoalSlice excludes archived and completed goals', () => {
-    it('filters out archived and completed goals from goalRows', () => {
+  describe('3. budgetGoalSlice excludes archived and completed goals in activeGoalRows', () => {
+    it('filters out archived and completed goals from activeGoalRows while retaining goalRows', () => {
       const goals = [
         { id: 1, name: 'Dana Darurat', currentAmount: 500000, targetAmount: 1000000, isArchived: false, isCompleted: false },
         { id: 2, name: 'Beli Laptop', currentAmount: 10000000, targetAmount: 10000000, isArchived: false, isCompleted: true },
@@ -194,8 +194,9 @@ describe('Subsystem Audit Bug Fixes Suite', () => {
         defaultCurrency: 'IDR',
       })
 
-      expect(summary.goalRows).toHaveLength(2)
-      expect(summary.goalRows.map((g) => g.id)).toEqual([1, 6])
+      expect(summary.activeGoalRows).toHaveLength(2)
+      expect(summary.activeGoalRows.map((g) => g.id)).toEqual([1, 6])
+      expect(summary.goalRows).toHaveLength(6)
     })
   })
 

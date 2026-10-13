@@ -61,7 +61,7 @@ export function calculateBudgetGoalSummary({
       }
     })
 
-  const goalRows = safeGoals.filter((g) => !g.isArchived && !g.isCompleted).map((g) => {
+  const goalRows = safeGoals.map((g) => {
     const current = toSafeNumber(g.currentAmount)
     const target = toSafeNumber(g.targetAmount)
     const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
@@ -73,8 +73,11 @@ export function calculateBudgetGoalSummary({
     }
   })
 
+  const activeGoalRows = goalRows.filter((g) => !g.isArchived && !g.isCompleted)
+
   return {
     budgetRows,
     goalRows,
+    activeGoalRows,
   }
 }
