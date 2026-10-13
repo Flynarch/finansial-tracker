@@ -328,9 +328,7 @@ export function applyMigrations(db) {
     loanPayments: '++id, loanId, amount, date, notes, transactionId, createdAt',
   })
 
-  // Version 18: added wallet balance cache table, compound indexes, and splitBillId for Split Bill feature
-  db.version(18).stores({
-    transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, isSplit, *tags, [date+type], [walletId+date], createdAt',
+  const COMMON_STORES_V18 = {
     investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
     investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
     budgets: '++id, category, limit, month',
@@ -351,107 +349,37 @@ export function applyMigrations(db) {
     loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
     loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
     walletBalanceCache: 'walletId',
+  }
+
+  // Version 18: added wallet balance cache table, compound indexes, and splitBillId for Split Bill feature
+  db.version(18).stores({
+    transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, isSplit, *tags, [date+type], [walletId+date], createdAt',
+    ...COMMON_STORES_V18,
   })
 
   // Version 19: added splitBillId index to transactions table for Split Bill parent transaction lookup
   db.version(19).stores({
     transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, isSplit, *tags, splitBillId, [date+type], [walletId+date], createdAt',
-    investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
-    investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
-    budgets: '++id, category, limit, month',
-    goals: '++id, name, targetAmount, currentAmount, deadline, currency',
-    calendarEvents: '++id, date, title, type, color',
-    recurringTransactions:
-      '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
-    settings: 'key',
-    todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
-    sub_tasks: '++id, todoId, label, checked',
-    habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
-    habitLogs: '++id, habitId, date',
-    ideas: '++id, type, content, color, x, y, createdAt',
-    board_links: '++id, sourceId, targetId',
-    notifications: '++id, type, title, message, read, relatedId, createdAt',
-    goalLogs: '++id, goalId, amount, date',
-    wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
-    loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
-    loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
-    walletBalanceCache: 'walletId',
+    ...COMMON_STORES_V18,
   })
 
   // Version 20: added goalId index to transactions table for optimized savings goal transactions lookup
   db.version(20).stores({
     transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, goalId, isSplit, *tags, splitBillId, [date+type], [walletId+date], createdAt',
-    investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
-    investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
-    budgets: '++id, category, limit, month',
-    goals: '++id, name, targetAmount, currentAmount, deadline, currency',
-    calendarEvents: '++id, date, title, type, color',
-    recurringTransactions:
-      '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
-    settings: 'key',
-    todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
-    sub_tasks: '++id, todoId, label, checked',
-    habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
-    habitLogs: '++id, habitId, date',
-    ideas: '++id, type, content, color, x, y, createdAt',
-    board_links: '++id, sourceId, targetId',
-    notifications: '++id, type, title, message, read, relatedId, createdAt',
-    goalLogs: '++id, goalId, amount, date',
-    wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
-    loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
-    loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
-    walletBalanceCache: 'walletId',
+    ...COMMON_STORES_V18,
   })
 
   // Version 21: added chatMessages table for AI chat lifecycle retention and local history
   db.version(21).stores({
     transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, goalId, isSplit, *tags, splitBillId, [date+type], [walletId+date], createdAt',
-    investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
-    investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
-    budgets: '++id, category, limit, month',
-    goals: '++id, name, targetAmount, currentAmount, deadline, currency',
-    calendarEvents: '++id, date, title, type, color',
-    recurringTransactions:
-      '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
-    settings: 'key',
-    todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
-    sub_tasks: '++id, todoId, label, checked',
-    habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
-    habitLogs: '++id, habitId, date',
-    ideas: '++id, type, content, color, x, y, createdAt',
-    board_links: '++id, sourceId, targetId',
-    notifications: '++id, type, title, message, read, relatedId, createdAt',
-    goalLogs: '++id, goalId, amount, date',
-    wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
-    loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
-    loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
-    walletBalanceCache: 'walletId',
+    ...COMMON_STORES_V18,
     chatMessages: '++id, timestamp, role',
   })
 
   // Version 22: added deletedAt index to transactions table for ledger soft-delete support
   db.version(22).stores({
     transactions: '++id, date, type, category, amount, currency, notes, walletId, targetWalletId, loanId, goalId, isSplit, *tags, splitBillId, deletedAt, [date+type], [walletId+date], createdAt',
-    investments: '++id, name, type, quantity, purchasePrice, purchaseCurrency',
-    investmentOrders: '++id, date, createdAt, name, type, quantity, unitPrice, totalAmount, currency, fundingSource',
-    budgets: '++id, category, limit, month',
-    goals: '++id, name, targetAmount, currentAmount, deadline, currency',
-    calendarEvents: '++id, date, title, type, color',
-    recurringTransactions:
-      '++id, title, type, category, amount, currency, notes, frequency, nextDate, enabled, walletId, targetWalletId',
-    settings: 'key',
-    todos: '++id, title, category, dueDate, priority, completed, reminderTime, createdAt',
-    sub_tasks: '++id, todoId, label, checked',
-    habits: '++id, title, color, category, frequencyType, frequencyValue, reminderEnabled, reminderTime, notes, createdAt',
-    habitLogs: '++id, habitId, date',
-    ideas: '++id, type, content, color, x, y, createdAt',
-    board_links: '++id, sourceId, targetId',
-    notifications: '++id, type, title, message, read, relatedId, createdAt',
-    goalLogs: '++id, goalId, amount, date',
-    wallets: '++id, name, institutionType, logoUrl, currency, balance, isArchived, createdAt',
-    loans: '++id, type, personName, title, totalAmount, remainingAmount, currency, dueDate, startDate, status, notes, walletId, initialTransactionId, paymentTransactionIds, interestRate, tenorMonths, monthlyPayment, splitBillId, createdAt',
-    loanPayments: '++id, loanId, amount, date, notes, transactionId, [loanId+date], createdAt',
-    walletBalanceCache: 'walletId',
+    ...COMMON_STORES_V18,
     chatMessages: '++id, timestamp, role',
   }).upgrade(async (trans) => {
     try {

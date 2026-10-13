@@ -265,8 +265,11 @@ function Budget() {
   useEffect(() => {
     if (location.state?.openAdd && !handledOpenAddRef.current) {
       handledOpenAddRef.current = true
-      openAdd()
-      navigate(location.pathname, { replace: true, state: null })
+      const timer = window.setTimeout(() => {
+        openAdd()
+        navigate(location.pathname, { replace: true, state: null })
+      }, 0)
+      return () => window.clearTimeout(timer)
     } else if (!location.state?.openAdd) {
       handledOpenAddRef.current = false
     }

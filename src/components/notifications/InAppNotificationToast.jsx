@@ -190,21 +190,29 @@ export default function InAppNotificationToast() {
   useEffect(() => {
     if (!recentNotifications || recentNotifications.length === 0) return
 
+    const timers = []
     for (const notif of recentNotifications) {
       const notifId = notif.id || notif.createdAt
       if (processedIdsRef.current.has(notifId)) continue
 
       processedIdsRef.current.add(notifId)
-      enqueueToast({
-        id: notifId,
-        title: notif.title || t('notifications.defaultTitle', 'Notifikasi Baru'),
-        message: notif.message || '',
-        type: notif.type,
-        route: notif.route,
-        relatedId: notif.relatedId,
-        action: notif.action,
-        duration: notif.duration,
-      })
+      const timer = window.setTimeout(() => {
+        enqueueToast({
+          id: notifId,
+          title: notif.title || t('notifications.defaultTitle', 'Notifikasi Baru'),
+          message: notif.message || '',
+          type: notif.type,
+          route: notif.route,
+          relatedId: notif.relatedId,
+          action: notif.action,
+          duration: notif.duration,
+        })
+      }, 0)
+      timers.push(timer)
+    }
+
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t))
     }
   }, [recentNotifications, enqueueToast, t])
 

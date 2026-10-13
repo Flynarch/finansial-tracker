@@ -289,6 +289,40 @@ export function buildRevenueSeries({
   })
 }
 
+function attachMonthlyPrevSeries({ currentSeries, prevMonths, startBalancePrev, safeTx }) {
+  const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
+  safeTx.forEach((tx) => {
+    const m = String(tx?.date || '').slice(0, 7)
+    if (prevMonthlyNetMap.has(m)) {
+      const amount = tx.convertedAmount || 0
+      const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
+      prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
+    }
+  })
+
+  let running = startBalancePrev
+  const prevRunningArray = prevMonths.map((m) => {
+    running += prevMonthlyNetMap.get(m) || 0
+    return { month: m, value: running }
+  })
+
+  return currentSeries.map((item, idx) => {
+    const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
+    let prevLabel = ''
+    if (prevData?.month) {
+      const dateObj = new Date(`${prevData.month}-01T12:00:00`)
+      if (!isNaN(dateObj.getTime())) {
+        prevLabel = format(dateObj, 'MMM yyyy')
+      }
+    }
+    return {
+      ...item,
+      prevValue: prevData?.value ?? startBalancePrev,
+      prevLabel,
+    }
+  })
+}
+
 export function buildPreviousPeriodRevenueSeries({
   rangeId,
   currentSeries = [],
@@ -408,38 +442,8 @@ export function buildPreviousPeriodRevenueSeries({
       netLoanPosition,
       totalSavings,
     })
-    const startBalancePrev = computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) + recYtd.portfolioValue + recYtd.netLoanPosition + recYtd.totalSavings
-    const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
-    safeTx.forEach((tx) => {
-      const m = String(tx?.date || '').slice(0, 7)
-      if (prevMonthlyNetMap.has(m)) {
-        const amount = tx.convertedAmount || 0
-        const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
-        prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
-      }
-    })
-
-    let running = startBalancePrev
-    const prevRunningArray = prevMonths.map((m) => {
-      running += prevMonthlyNetMap.get(m) || 0
-      return { month: m, value: running }
-    })
-
-    return currentSeries.map((item, idx) => {
-      const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
-      let prevLabel = ''
-      if (prevData?.month) {
-        const dateObj = new Date(`${prevData.month}-01T12:00:00`)
-        if (!isNaN(dateObj.getTime())) {
-          prevLabel = format(dateObj, 'MMM yyyy')
-        }
-      }
-      return {
-        ...item,
-        prevValue: prevData?.value ?? startBalancePrev,
-        prevLabel,
-      }
-    })
+    const startBalancePrev = (prevMonths[0] ? computeCashBalanceBeforeDate(`${prevMonths[0]}-01`) : 0) + recYtd.portfolioValue + recYtd.netLoanPosition + recYtd.totalSavings
+    return attachMonthlyPrevSeries({ currentSeries, prevMonths, startBalancePrev, safeTx })
   }
 
   if (rangeId === '1y' || rangeId === 'all') {
@@ -459,37 +463,7 @@ export function buildPreviousPeriodRevenueSeries({
       totalSavings,
     })
     const startBalancePrev = (firstMonth ? computeCashBalanceBeforeDate(`${firstMonth}-01`) : 0) + recAll.portfolioValue + recAll.netLoanPosition + recAll.totalSavings
-    const prevMonthlyNetMap = new Map(prevMonths.map((m) => [m, 0]))
-    safeTx.forEach((tx) => {
-      const m = String(tx?.date || '').slice(0, 7)
-      if (prevMonthlyNetMap.has(m)) {
-        const amount = tx.convertedAmount || 0
-        const signed = tx.type === 'income' ? amount : tx.type === 'expense' ? -amount : 0
-        prevMonthlyNetMap.set(m, prevMonthlyNetMap.get(m) + signed)
-      }
-    })
-
-    let running = startBalancePrev
-    const prevRunningArray = prevMonths.map((m) => {
-      running += prevMonthlyNetMap.get(m) || 0
-      return { month: m, value: running }
-    })
-
-    return currentSeries.map((item, idx) => {
-      const prevData = prevRunningArray[idx] || prevRunningArray[prevRunningArray.length - 1]
-      let prevLabel = ''
-      if (prevData?.month) {
-        const dateObj = new Date(`${prevData.month}-01T12:00:00`)
-        if (!isNaN(dateObj.getTime())) {
-          prevLabel = format(dateObj, 'MMM yyyy')
-        }
-      }
-      return {
-        ...item,
-        prevValue: prevData?.value ?? startBalancePrev,
-        prevLabel,
-      }
-    })
+    return attachMonthlyPrevSeries({ currentSeries, prevMonths, startBalancePrev, safeTx })
   }
 
   return currentSeries

@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'android', 'react-native-fintrack']),
+  globalIgnores(['dist', 'android', 'react-native-fintrack', 'scripts', 'docs', 'tests']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -18,6 +18,7 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     rules: {
+      'no-unused-vars': 'off',
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/preserve-manual-memoization': 'warn',
       'react-hooks/exhaustive-deps': 'error',

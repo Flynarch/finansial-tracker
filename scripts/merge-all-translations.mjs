@@ -8,7 +8,7 @@ const currentEn = { ...enModule.default };
 const allMissing = JSON.parse(fs.readFileSync('./scripts/all-missing-keys.json', 'utf8'));
 
 // Full comprehensive mappings
-const explicitTranslations = {
+export const explicitTranslations = {
   // Auth
   'auth.sendResetLink': { id: 'Kirim Tautan Reset Sandi', en: 'Send Password Reset Link' },
   'auth.backToSignIn': { id: 'Kembali ke Halaman Masuk', en: 'Back to Sign In' },

@@ -212,6 +212,220 @@ export async function syncNativeWidgetData({
   }
 }
 
+async function readWidgetConfig(walletListForConfig) {
+  let configWalletId = null
+  let configRange = null
+  let configWalletName = ''
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('fintrack_wallet_list', JSON.stringify(walletListForConfig))
+    }
+    const nativeCfg = await FinTrackNotificationPlugin.getWidgetConfig().catch(() => null)
+    if (nativeCfg) {
+      if (nativeCfg.walletId && nativeCfg.walletId !== '-1') {
+        configWalletId = Number(nativeCfg.walletId)
+      }
+      if (nativeCfg.range && ['7d', '30d', 'month'].includes(nativeCfg.range)) {
+        configRange = nativeCfg.range
+      }
+      if (nativeCfg.walletName) {
+        configWalletName = nativeCfg.walletName
+      }
+    }
+    if (!configWalletId && typeof localStorage !== 'undefined') {
+      const cfgWalletId = localStorage.getItem('widget_config_wallet_id')
+      if (cfgWalletId && cfgWalletId !== '-1') {
+        configWalletId = Number(cfgWalletId)
+      }
+      const cfgRange = localStorage.getItem('widget_config_range')
+      if (cfgRange && ['7d', '30d', 'month'].includes(cfgRange)) {
+        configRange = cfgRange
+      }
+      const cfgName = localStorage.getItem('widget_config_wallet_name')
+      if (cfgName) {
+        configWalletName = cfgName
+      }
+    }
+  } catch { /* ignore */ }
+  return { configWalletId, configRange, configWalletName }
+}
+
+function computeMonthExpensesAndIncome({ allTxs, budgetPeriod, configWalletId, defaultCurrency, activeRates, isEn }) {
+  let monthIncome = 0
+  let monthExpense = 0
+  const categoryExpenseMap = {}
+
+  for (const tx of allTxs) {
+    if (!tx?.date || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
+    if (configWalletId && Number(tx.walletId) !== configWalletId) continue
+
+    const txCurrency = tx.currency || defaultCurrency
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      for (const item of tx.splitItems) {
+        const itemTx = {
+          ...tx,
+          ...item,
+          category: item.category || tx.category,
+          amount: item.amount,
+          type: item.type || tx.type,
+          currency: item.currency || txCurrency,
+          isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+          isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
+        }
+        if (isExcludeAnalyticsTx(itemTx)) continue
+        const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
+        const itemType = item.type || tx.type
+        if (itemType === 'income') {
+          monthIncome += amt
+        } else if (itemType === 'expense') {
+          monthExpense += amt
+          const catName = itemTx.category || (isEn ? 'Other' : 'Lainnya')
+          categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
+        }
+      }
+    } else {
+      if (isExcludeAnalyticsTx(tx)) continue
+      const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
+      if (tx.type === 'income') {
+        monthIncome += amt
+      } else if (tx.type === 'expense') {
+        monthExpense += amt
+        const catName = tx.category || (isEn ? 'Other' : 'Lainnya')
+        categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
+      }
+    }
+  }
+
+  return { monthIncome, monthExpense, categoryExpenseMap }
+}
+
+function computeSparklineMetrics({ allTxs, now, configWalletId, defaultCurrency, activeRates, widgetRange }) {
+  const sparklinePoints = []
+  const incomeSparklinePoints = []
+  const expenseSparklinePoints = []
+  const sparklineDates = []
+  let sevenDaysIncome = 0
+  let sevenDaysExpense = 0
+  let todayNet = 0
+
+  const dayMetricsMap = new Map()
+  for (const tx of allTxs) {
+    if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || !tx.date) continue
+    if (configWalletId && Number(tx.walletId) !== configWalletId) continue
+    const dateKey = tx.date.slice(0, 10)
+    const txCurrency = tx.currency || defaultCurrency
+
+    if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
+      for (const item of tx.splitItems) {
+        const itemTx = {
+          ...tx,
+          ...item,
+          category: item.category || tx.category,
+          amount: item.amount,
+          type: item.type || tx.type,
+          currency: item.currency || txCurrency,
+          isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
+          isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
+          excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
+        }
+        if (isExcludeAnalyticsTx(itemTx)) continue
+        const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
+        const itemType = item.type || tx.type
+        const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
+        if (itemType === 'income') {
+          current.income += amt
+          current.net += amt
+        } else if (itemType === 'expense') {
+          current.expense += amt
+          current.net -= amt
+        }
+        dayMetricsMap.set(dateKey, current)
+      }
+    } else {
+      if (isExcludeAnalyticsTx(tx)) continue
+      const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
+      const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
+      if (tx.type === 'income') {
+        current.income += amt
+        current.net += amt
+      } else if (tx.type === 'expense') {
+        current.expense += amt
+        current.net -= amt
+      }
+      dayMetricsMap.set(dateKey, current)
+    }
+  }
+
+  const isSevenDays = widgetRange === '7d'
+  const isThirtyDays = widgetRange === '30d'
+  const daysCount = isSevenDays ? 7 : 30
+  let rangeIncome = 0
+  let rangeExpense = 0
+
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const d = subDays(now, i)
+    const dStr = format(d, 'yyyy-MM-dd')
+    sparklineDates.push(format(d, 'd'))
+    const metric = dayMetricsMap.get(dStr) || { income: 0, expense: 0, net: 0 }
+
+    sparklinePoints.push(metric.net)
+    incomeSparklinePoints.push(metric.income)
+    expenseSparklinePoints.push(metric.expense)
+
+    rangeIncome += metric.income
+    rangeExpense += metric.expense
+
+    if (i < 7) {
+      sevenDaysIncome += metric.income
+      sevenDaysExpense += metric.expense
+    }
+    if (i === 0) {
+      todayNet = metric.net
+    }
+  }
+
+  return {
+    sparklinePoints,
+    incomeSparklinePoints,
+    expenseSparklinePoints,
+    sparklineDates,
+    sevenDaysIncome,
+    sevenDaysExpense,
+    rangeIncome,
+    rangeExpense,
+    todayNet,
+    isSevenDays,
+    isThirtyDays,
+  }
+}
+
+function computeTopCategories({ categoryExpenseMap, monthExpense, defaultCurrency, locale, isEn }) {
+  const sortedCats = Object.entries(categoryExpenseMap)
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const defaultPalette = ['#10B981', '#06B6D4', '#F59E0B']
+  const totalExp = monthExpense > 0 ? monthExpense : 1
+  const topCategories = sortedCats.slice(0, 3).map((cat, idx) => ({
+    name: cat.name,
+    amount: cat.amount,
+    percentage: Math.max(5, Math.round((cat.amount / totalExp) * 100)),
+    color: defaultPalette[idx] || '#64748B',
+    amountFormatted: formatCompactCurrency(cat.amount, defaultCurrency, locale, true),
+  }))
+
+  if (topCategories.length === 0) {
+    topCategories.push(
+      { name: isEn ? 'Food' : 'Makan', percentage: 45, color: '#10B981', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
+      { name: isEn ? 'Transport' : 'Transportasi', percentage: 30, color: '#06B6D4', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
+      { name: isEn ? 'Shopping' : 'Belanja', percentage: 25, color: '#F59E0B', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) }
+    )
+  }
+
+  return topCategories
+}
+
 /**
  * Aggregates all ledger balances & current month statistics directly from Dexie DB
  * and triggers an immediate Android home screen widget refresh.
@@ -238,40 +452,7 @@ export async function syncNativeWidgetFromDb() {
       .map((w) => ({ id: String(w.id), name: w.name || 'Wallet', currency: w.currency || 'IDR' }))
 
     // Read widget config for wallet filtering
-    let configWalletId = null
-    let configRange = null
-    let configWalletName = ''
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('fintrack_wallet_list', JSON.stringify(walletListForConfig))
-      }
-      const nativeCfg = await FinTrackNotificationPlugin.getWidgetConfig().catch(() => null)
-      if (nativeCfg) {
-        if (nativeCfg.walletId && nativeCfg.walletId !== '-1') {
-          configWalletId = Number(nativeCfg.walletId)
-        }
-        if (nativeCfg.range && ['7d', '30d', 'month'].includes(nativeCfg.range)) {
-          configRange = nativeCfg.range
-        }
-        if (nativeCfg.walletName) {
-          configWalletName = nativeCfg.walletName
-        }
-      }
-      if (!configWalletId && typeof localStorage !== 'undefined') {
-        const cfgWalletId = localStorage.getItem('widget_config_wallet_id')
-        if (cfgWalletId && cfgWalletId !== '-1') {
-          configWalletId = Number(cfgWalletId)
-        }
-        const cfgRange = localStorage.getItem('widget_config_range')
-        if (cfgRange && ['7d', '30d', 'month'].includes(cfgRange)) {
-          configRange = cfgRange
-        }
-        const cfgName = localStorage.getItem('widget_config_wallet_name')
-        if (cfgName) {
-          configWalletName = cfgName
-        }
-      }
-    } catch { /* ignore */ }
+    const { configWalletId, configRange, configWalletName } = await readWidgetConfig(walletListForConfig)
 
     // Apply wallet filter if configured
     let filteredWallets = computedWallets.filter((w) => !w.isArchived)
@@ -286,162 +467,46 @@ export async function syncNativeWidgetFromDb() {
     const currentMonthKey = getCurrentBudgetMonthKey(new Date(), budgetCycleStartDay)
     const budgetPeriod = getBudgetPeriodDateRange(currentMonthKey, budgetCycleStartDay)
     const periodLabel = isEn ? 'This Month' : 'Bulan Ini'
-    let monthIncome = 0
-    let monthExpense = 0
-    const categoryExpenseMap = {}
 
-    for (const tx of allTxs) {
-      if (!tx?.date || tx.deletedAt || tx.isPendingReview === true || tx.isPendingReview === 1 || tx.date < budgetPeriod.startDate || tx.date > budgetPeriod.endDate) continue
-      if (configWalletId && Number(tx.walletId) !== configWalletId) continue
+    const { monthIncome, monthExpense, categoryExpenseMap } = computeMonthExpensesAndIncome({
+      allTxs,
+      budgetPeriod,
+      configWalletId,
+      defaultCurrency,
+      activeRates,
+      isEn,
+    })
 
-      const txCurrency = tx.currency || defaultCurrency
-      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-        for (const item of tx.splitItems) {
-          const itemTx = {
-            ...tx,
-            ...item,
-            category: item.category || tx.category,
-            amount: item.amount,
-            type: item.type || tx.type,
-            currency: item.currency || txCurrency,
-            isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
-            isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
-            excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
-          }
-          if (isExcludeAnalyticsTx(itemTx)) continue
-          const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
-          const itemType = item.type || tx.type
-          if (itemType === 'income') {
-            monthIncome += amt
-          } else if (itemType === 'expense') {
-            monthExpense += amt
-            const catName = itemTx.category || (isEn ? 'Other' : 'Lainnya')
-            categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
-          }
-        }
-      } else {
-        if (isExcludeAnalyticsTx(tx)) continue
-        const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-        if (tx.type === 'income') {
-          monthIncome += amt
-        } else if (tx.type === 'expense') {
-          monthExpense += amt
-          const catName = tx.category || (isEn ? 'Other' : 'Lainnya')
-          categoryExpenseMap[catName] = (categoryExpenseMap[catName] || 0) + amt
-        }
-      }
-    }
-
-    // Generate 30-day sparkline trend data & cash flow metrics
     const now = new Date()
-    const sparklinePoints = []
-    const incomeSparklinePoints = []
-    const expenseSparklinePoints = []
-    const sparklineDates = []
-    let sevenDaysIncome = 0
-    let sevenDaysExpense = 0
-    let todayNet = 0
-
-    // Pre-index transactions by day for maximum efficiency
-    const dayMetricsMap = new Map()
-    for (const tx of allTxs) {
-      if (!tx || tx.isPendingReview === true || tx.isPendingReview === 1 || !tx.date) continue
-      if (configWalletId && Number(tx.walletId) !== configWalletId) continue
-      const dateKey = tx.date.slice(0, 10)
-      const txCurrency = tx.currency || defaultCurrency
-
-      if (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.length > 0) {
-        for (const item of tx.splitItems) {
-          const itemTx = {
-            ...tx,
-            ...item,
-            category: item.category || tx.category,
-            amount: item.amount,
-            type: item.type || tx.type,
-            currency: item.currency || txCurrency,
-            isExcludeAnalyticsTx: Boolean(item.isExcludeAnalyticsTx),
-            isExcludeFromAnalytics: Boolean(item.isExcludeFromAnalytics || item.excludeFromAnalytics),
-            excludeFromAnalytics: Boolean(item.excludeFromAnalytics || item.isExcludeFromAnalytics),
-          }
-          if (isExcludeAnalyticsTx(itemTx)) continue
-          const amt = convertCurrency(Number(item.amount) || 0, item.currency || txCurrency, defaultCurrency, activeRates)
-          const itemType = item.type || tx.type
-          const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
-          if (itemType === 'income') {
-            current.income += amt
-            current.net += amt
-          } else if (itemType === 'expense') {
-            current.expense += amt
-            current.net -= amt
-          }
-          dayMetricsMap.set(dateKey, current)
-        }
-      } else {
-        if (isExcludeAnalyticsTx(tx)) continue
-        const amt = convertCurrency(Number(tx.amount) || 0, txCurrency, defaultCurrency, activeRates)
-        const current = dayMetricsMap.get(dateKey) || { income: 0, expense: 0, net: 0 }
-        if (tx.type === 'income') {
-          current.income += amt
-          current.net += amt
-        } else if (tx.type === 'expense') {
-          current.expense += amt
-          current.net -= amt
-        }
-        dayMetricsMap.set(dateKey, current)
-      }
-    }
-
     const widgetRange = configRange || settings.widgetRange || '7d'
-    const isSevenDays = widgetRange === '7d'
-    const isThirtyDays = widgetRange === '30d'
-    const daysCount = isSevenDays ? 7 : 30
-    let rangeIncome = 0
-    let rangeExpense = 0
+    const {
+      sparklinePoints,
+      incomeSparklinePoints,
+      expenseSparklinePoints,
+      sparklineDates,
+      sevenDaysIncome,
+      sevenDaysExpense,
+      rangeIncome,
+      rangeExpense,
+      todayNet,
+      isSevenDays,
+      isThirtyDays,
+    } = computeSparklineMetrics({
+      allTxs,
+      now,
+      configWalletId,
+      defaultCurrency,
+      activeRates,
+      widgetRange,
+    })
 
-    for (let i = daysCount - 1; i >= 0; i--) {
-      const d = subDays(now, i)
-      const dStr = format(d, 'yyyy-MM-dd')
-      sparklineDates.push(format(d, 'd'))
-      const metric = dayMetricsMap.get(dStr) || { income: 0, expense: 0, net: 0 }
-
-      sparklinePoints.push(metric.net)
-      incomeSparklinePoints.push(metric.income)
-      expenseSparklinePoints.push(metric.expense)
-
-      rangeIncome += metric.income
-      rangeExpense += metric.expense
-
-      if (i < 7) {
-        sevenDaysIncome += metric.income
-        sevenDaysExpense += metric.expense
-      }
-      if (i === 0) {
-        todayNet = metric.net
-      }
-    }
-
-    // Top 3 categories
-    const sortedCats = Object.entries(categoryExpenseMap)
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => b.amount - a.amount)
-
-    const defaultPalette = ['#10B981', '#06B6D4', '#F59E0B']
-    const totalExp = monthExpense > 0 ? monthExpense : 1
-    const topCategories = sortedCats.slice(0, 3).map((cat, idx) => ({
-      name: cat.name,
-      amount: cat.amount,
-      percentage: Math.max(5, Math.round((cat.amount / totalExp) * 100)),
-      color: defaultPalette[idx] || '#64748B',
-      amountFormatted: formatCompactCurrency(cat.amount, defaultCurrency, locale, true),
-    }))
-
-    if (topCategories.length === 0) {
-      topCategories.push(
-        { name: isEn ? 'Food' : 'Makan', percentage: 45, color: '#10B981', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
-        { name: isEn ? 'Transport' : 'Transportasi', percentage: 30, color: '#06B6D4', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) },
-        { name: isEn ? 'Shopping' : 'Belanja', percentage: 25, color: '#F59E0B', amountFormatted: formatCompactCurrency(0, defaultCurrency, locale, true) }
-      )
-    }
+    const topCategories = computeTopCategories({
+      categoryExpenseMap,
+      monthExpense,
+      defaultCurrency,
+      locale,
+      isEn,
+    })
 
     const effectiveIncome = isSevenDays
       ? sevenDaysIncome

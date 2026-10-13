@@ -394,6 +394,8 @@ export const VirtualKeypad = memo(function VirtualKeypad({
     setPrevRenderOpen(isOpen)
     if (isOpen) {
       setShouldRender(true)
+    } else {
+      setIsEntering(false)
     }
   }
 
@@ -402,7 +404,6 @@ export const VirtualKeypad = memo(function VirtualKeypad({
       const frame = window.requestAnimationFrame(() => setIsEntering(true))
       return () => window.cancelAnimationFrame(frame)
     } else {
-      setIsEntering(false)
       const timer = window.setTimeout(() => setShouldRender(false), 280)
       return () => window.clearTimeout(timer)
     }

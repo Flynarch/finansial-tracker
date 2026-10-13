@@ -18,29 +18,8 @@ import { calculateDirectFinancialHealth } from './financialHealth'
 import { callApiStreamWithFallback } from './client'
 import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
 
-/**
- * Main chat extractor. Routes keyword shortcuts, offline checks, streaming Gemini model fallback,
- * and executes tool calls (record, update, query database, habits, loans, budgets, etc.).
- *
- * @param {string} userMessage - User message or question
- * @param {object} context - Context options
- * @returns {Promise<object>} Chat response object
- */
-export async function parseTransactionFromText(userMessage, context = {}) {
-  const {
-    locale = 'id',
-    defaultCurrency = 'IDR',
-    previousMessages = [],
-    imageData = null,
-    wallets = [],
-    onStream = null,
-    scanMode = 'all',
-    preferFastNlp = false,
-    rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
-  } = context || {}
-
+async function handleDirectTextIntents({ userMessage, locale, defaultCurrency, rates }) {
   const normUserText = String(userMessage || '').toLowerCase()
-
   const trimmedLower = normUserText.trim().replace(/[.!?]+$/, '')
   const isGeneralRecordIntent =
     /^(aku\s+|saya\s+)?(mau|ingin|pengen)?\s*(catat|mencatat|rekam|tambah)\s*(transaksi|pengeluaran|pemasukan)?$/i.test(trimmedLower) ||
@@ -186,6 +165,35 @@ export async function parseTransactionFromText(userMessage, context = {}) {
         chips: ['Buat Habit Harian', 'Tips Membangun Habit', 'Analisis Keuangan']
       }
     }
+  }
+
+  return null
+}
+
+/**
+ * Main chat extractor. Routes keyword shortcuts, offline checks, streaming Gemini model fallback,
+ * and executes tool calls (record, update, query database, habits, loans, budgets, etc.).
+ *
+ * @param {string} userMessage - User message or question
+ * @param {object} context - Context options
+ * @returns {Promise<object>} Chat response object
+ */
+export async function parseTransactionFromText(userMessage, context = {}) {
+  const {
+    locale = 'id',
+    defaultCurrency = 'IDR',
+    previousMessages = [],
+    imageData = null,
+    wallets = [],
+    onStream = null,
+    scanMode = 'all',
+    preferFastNlp = false,
+    rates = getCachedCurrencyRates('USD') || { ...FALLBACK_EXCHANGE_RATES },
+  } = context || {}
+
+  const directIntent = await handleDirectTextIntents({ userMessage, locale, defaultCurrency, rates })
+  if (directIntent) {
+    return directIntent
   }
 
   // Local validation & fast-path NLP:
