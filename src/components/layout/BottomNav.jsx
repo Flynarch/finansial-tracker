@@ -6,6 +6,20 @@ import useSettingsStore from '../../store/useSettingsStore'
 import { navItems } from './navItems'
 import { triggerHaptic } from '../../lib/haptics'
 
+const ROUTE_PRELOADS = {
+  '/dashboard': () => import('../../pages/Dashboard'),
+  '/transactions': () => import('../../pages/Transactions'),
+  '/loans': () => import('../../pages/Loans'),
+  '/todos': () => import('../../pages/TodoList'),
+  '/calendar': () => import('../../pages/Calendar'),
+  '/reports': () => import('../../pages/Reports'),
+  '/profile': () => import('../../pages/Profile'),
+  '/settings': () => import('../../pages/settings/SettingsLayout'),
+  '/budget': () => import('../../pages/Budget'),
+  '/savings': () => import('../../pages/Savings'),
+  '/ai-chat': () => import('../../pages/AiFinanceChat'),
+}
+
 function linkClassName({ isActive }) {
   return `relative z-1 flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center rounded-2xl px-2 py-1 text-[11px] leading-tight transition-colors duration-200 ${
     isActive
@@ -188,7 +202,7 @@ function BottomNav() {
                 className={`pointer-events-none absolute top-1 bottom-1.5 left-1.5 rounded-2xl bg-[var(--panel-strong)] shadow-2xs border border-[var(--border)]/40 ${
                   reduceMotion
                     ? 'transition-opacity duration-150'
-                    : 'transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)]'
+                    : 'transition-[transform,opacity] duration-280 ease-[cubic-bezier(0.16,1,0.3,1)]'
                 }`}
                 style={{
                   width: 'calc((100% - 28px) / 5)',
@@ -204,6 +218,8 @@ function BottomNav() {
                   key={item.path}
                   to={item.path}
                   className={linkClassName}
+                  onPointerDown={() => ROUTE_PRELOADS[item.path]?.()}
+                  onMouseEnter={() => ROUTE_PRELOADS[item.path]?.()}
                   onClick={() => triggerHaptic('light')}
                 >
                   {({ isActive }) => (
@@ -235,6 +251,8 @@ function BottomNav() {
                   key={item.path}
                   to={item.path}
                   className={linkClassName}
+                  onPointerDown={() => ROUTE_PRELOADS[item.path]?.()}
+                  onMouseEnter={() => ROUTE_PRELOADS[item.path]?.()}
                   onClick={() => triggerHaptic('light')}
                 >
                   {({ isActive }) => (

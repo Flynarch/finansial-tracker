@@ -15,7 +15,7 @@ import { buildSystemPrompt } from './promptBuilder'
 import { wrapUserTurn, sanitizeGeminiContents } from './sanitizer'
 import { parseShortTransactionFast } from './fastNlp'
 import { calculateDirectFinancialHealth } from './financialHealth'
-import { callApiStreamWithFallback } from './client'
+import { callApiStreamWithFallback, FAST_TRANSACTION_MODELS, CHAT_ADVISOR_MODELS } from './client'
 import { warmupDecryptionCache, getDecryptedNoteSync, isFieldEncrypted } from '../fieldEncryption'
 
 async function handleDirectTextIntents({ userMessage, locale, defaultCurrency, rates }) {
@@ -228,27 +228,30 @@ export async function parseTransactionFromText(userMessage, context = {}) {
     const now = new Date()
     const today = format(now, 'yyyy-MM-dd')
     const currentTime = format(now, 'HH:mm')
+    const isQuickLog = Boolean(context.isQuickLog || context.preferFastNlp)
     let monthSummary = null
     let recentTxs = []
-    try {
-      monthSummary = await getMonthSummaryForPrompt()
-      const rawTxs = await db.transactions
-        .orderBy('date')
-        .reverse()
-        .limit(40)
-        .toArray()
-      const activeTxs = rawTxs.filter((t) => !t.deletedAt && !t.isPendingReview)
-      activeTxs.sort((a, b) => {
-        const dateDiff = (b.date || '').localeCompare(a.date || '')
-        if (dateDiff !== 0) return dateDiff
-        const timeDiff = (b.time || '').localeCompare(a.time || '')
-        if (timeDiff !== 0) return timeDiff
-        return (b.id || 0) - (a.id || 0)
-      })
-      recentTxs = activeTxs.slice(0, 15)
-      await warmupDecryptionCache(recentTxs)
-    } catch {
-      // Defensive fallback if IndexedDB is unavailable or throws
+    if (!isQuickLog) {
+      try {
+        monthSummary = await getMonthSummaryForPrompt()
+        const rawTxs = await db.transactions
+          .orderBy('date')
+          .reverse()
+          .limit(40)
+          .toArray()
+        const activeTxs = rawTxs.filter((t) => !t.deletedAt && !t.isPendingReview)
+        activeTxs.sort((a, b) => {
+          const dateDiff = (b.date || '').localeCompare(a.date || '')
+          if (dateDiff !== 0) return dateDiff
+          const timeDiff = (b.time || '').localeCompare(a.time || '')
+          if (timeDiff !== 0) return timeDiff
+          return (b.id || 0) - (a.id || 0)
+        })
+        recentTxs = activeTxs.slice(0, 15)
+        await warmupDecryptionCache(recentTxs)
+      } catch {
+        // Defensive fallback if IndexedDB is unavailable or throws
+      }
     }
 
     const sysPrompt = buildSystemPrompt({
@@ -406,12 +409,12 @@ Ekstrak seluruh informasi secara komprehensif, teliti, dan presisi:
   }
 
   const isReceipt = Boolean(imageData)
-  const isQuickLog = Boolean(context.isQuickLog || context.preferFastNlp)
   const toolMode = isReceipt ? 'receipt' : (isQuickLog ? 'quick_log' : 'full')
 
   const callApi = (reqContents, customOptions = {}) => callApiStreamWithFallback(reqContents, {
     sysPrompt,
     tools: customOptions.tools !== undefined ? customOptions.tools : getPrunedTools(toolMode),
+    models: customOptions.models || (isQuickLog ? FAST_TRANSACTION_MODELS : CHAT_ADVISOR_MODELS),
     onStream,
     ...customOptions,
   })

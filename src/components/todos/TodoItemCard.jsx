@@ -59,7 +59,7 @@ export const TodoItemCard = memo(function TodoItemCard({
   const CatIcon = catMeta.icon
 
   return (
-    <li key={todo.id}>
+    <li key={todo.id} className="ft-group-visibility-auto">
       <div className="relative group">
         {/* Progressive Swipe Background */}
         <div className="absolute inset-0 z-0 flex items-center justify-between rounded-2xl px-5 opacity-0 transition-colors duration-200" />

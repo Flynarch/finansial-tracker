@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { getCachedTodoList, getCachedSubTasksList } from '../hooks/dashboard/dashboardCache'
 import { format, isToday, isTomorrow, isBefore, startOfDay, parse, subDays } from 'date-fns'
 import { id as idLocale, enUS as enLocale } from 'date-fns/locale'
 import { Capacitor } from '@capacitor/core'
@@ -153,33 +154,48 @@ export default function TodoDetailPage() {
   useBackButton(() => setDeleteConfirmOpen(false), Boolean(deleteConfirmOpen))
   useBackButton(() => setIsEditing(false), Boolean(isEditing && !categoryOpen && !moreMenuOpen && !deleteConfirmOpen))
 
-  const todo = useLiveQuery(async () => {
-    if (!isValidId) return null
-    try {
-      const item = await db.todos.get(todoId)
-      if (item) return item
-      const all = await db.todos.toArray()
-      return all.find((t) => String(t.id) === String(todoId)) || null
-    } catch (err){
-      console.warn('[TodoDetailPage]', err)
-      return null
-    }
-  }, [todoId, isValidId])
+  const cachedTodo = useMemo(() => {
+    return getCachedTodoList()?.find((t) => Number(t.id) === Number(todoId) || String(t.id) === String(todoId))
+  }, [todoId])
+
+  const cachedSubs = useMemo(() => {
+    return getCachedSubTasksList()?.filter((s) => Number(s.todoId) === Number(todoId) || String(s.todoId) === String(todoId))
+  }, [todoId])
+
+  const todo = useLiveQuery(
+    async () => {
+      if (!isValidId) return null
+      try {
+        const numId = Number(todoId)
+        let item = numId ? await db.todos.get(numId) : null
+        if (!item) item = await db.todos.get(todoId)
+        return item || null
+      } catch (err) {
+        console.warn('[TodoDetailPage]', err)
+        return null
+      }
+    },
+    [todoId, isValidId],
+    cachedTodo || undefined
+  )
 
   const subTasks = useLiveQuery(
     async () => {
       if (!isValidId) return []
       try {
-        const subs = await db.sub_tasks.where('todoId').equals(todoId).sortBy('id')
-        if (subs && subs.length > 0) return subs
-        const all = await db.sub_tasks.toArray()
-        return all.filter((s) => String(s.todoId) === String(todoId)).sort((a, b) => (a.id || 0) - (b.id || 0))
-      } catch (err){
-      console.warn('[TodoDetailPage]', err)
+        const numId = Number(todoId)
+        let subs = numId ? await db.sub_tasks.where('todoId').equals(numId).sortBy('id') : []
+        if (!subs || subs.length === 0) {
+          subs = await db.sub_tasks.where('todoId').equals(String(todoId)).sortBy('id')
+        }
+        return subs || []
+      } catch (err) {
+        console.warn('[TodoDetailPage]', err)
         return []
       }
     },
     [todoId, isValidId],
+    cachedSubs || undefined
   )
 
   useEffect(() => {

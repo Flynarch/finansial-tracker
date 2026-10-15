@@ -34,6 +34,7 @@ import LoanForgiveModal from '../components/loans/LoanForgiveModal'
 import LoanInstallmentModal from '../components/loans/LoanInstallmentModal'
 import { getLoanInstallmentSummary } from '../lib/loanUtils'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
+import { cachedDashboardState } from '../hooks/useDashboardData'
 
 export default function Loans() {
   const { t, locale } = useTranslation()
@@ -73,9 +74,16 @@ export default function Loans() {
     window.scrollTo(0, 0)
   }, [])
 
-  const loans = useLiveQuery(() => db.loans.toArray(), [])
-  const loanPayments = useLiveQuery(() => db.loanPayments.toArray(), [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans || undefined)
+  const loanPayments = useLiveQuery(() => db.loanPayments.toArray(), [], cachedDashboardState.loanPayments || undefined)
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
+
+  useEffect(() => {
+    if (loans) cachedDashboardState.loans = loans
+    if (loanPayments) cachedDashboardState.loanPayments = loanPayments
+    if (wallets) cachedDashboardState.wallets = wallets
+  }, [loans, loanPayments, wallets])
+
   const isDataReady = loans !== undefined && loanPayments !== undefined && wallets !== undefined
   const walletMap = useMemo(() => {
     const map = new Map()
@@ -589,7 +597,7 @@ export default function Loans() {
                 return (
                   <div
                     key={item.id}
-                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] select-none transition-all"
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] select-none transition-all ft-group-visibility-auto"
                   >
                     {/* Progressive Swipe Background (Revealed Action Slot) */}
                     <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-2xl px-5 opacity-0 transition-colors duration-150 w-full" />

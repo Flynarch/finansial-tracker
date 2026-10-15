@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { ArrowLeft, Layers, ChevronRight, PieChart as PieIcon } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -8,7 +9,7 @@ import ChartTooltip from './ChartTooltip'
 import EmptyState from '../ui/EmptyState'
 import { triggerHaptic } from '../../lib/haptics'
 
-export default function ReportDonutSection({
+const ReportDonutSection = memo(function ReportDonutSection({
   donutKind,
   setDonutKind,
   selectedWalletFilter,
@@ -287,4 +288,6 @@ export default function ReportDonutSection({
       )}
     </section>
   )
-}
+})
+
+export default ReportDonutSection

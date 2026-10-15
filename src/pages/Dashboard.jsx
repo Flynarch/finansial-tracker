@@ -38,12 +38,10 @@ export default function Dashboard() {
   const [isPayOpen, setIsPayOpen] = useState(false)
 
   const pendingReviewCount = useLiveQuery(
-    async () => {
-      const items = await db.transactions
+    () =>
+      db.transactions
         .filter((tx) => !tx.deletedAt && (tx.isPendingReview === true || tx.isPendingReview === 1))
-        .toArray()
-      return items.length
-    },
+        .count(),
     [],
     0
   )
@@ -110,7 +108,7 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    scheduleNativeWidgetSync()
+    scheduleNativeWidgetSync(350)
   }, [netWorth, totalWalletBalance, monthIncome, monthExpense, sevenDaysStats, defaultCurrency, currentMonthLabel, miniRevenueSeries, miniRevenueRange, widgetRange, locale, todayStats])
 
   const closeZoom = useCallback(() => {

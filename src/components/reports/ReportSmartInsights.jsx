@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, TrendingDown, TrendingUp, Minus, CalendarClock, Tag, ArrowRight } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -8,7 +8,7 @@ import { formatCurrency, toSafeNumber } from '../../lib/utils'
 import { calculateSpendingTrend } from '../../lib/reportAnalytics'
 import { triggerHaptic } from '../../lib/haptics'
 
-export default function ReportSmartInsights({
+const ReportSmartInsights = memo(function ReportSmartInsights({
   topCategory,
   totalExpense,
   dailyBurnRate,
@@ -239,4 +239,6 @@ export default function ReportSmartInsights({
       </div>
     </section>
   )
-}
+})
+
+export default ReportSmartInsights

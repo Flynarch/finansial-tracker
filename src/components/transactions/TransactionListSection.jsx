@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { format as defaultFormat } from 'date-fns'
 import EmptyState from '../ui/EmptyState'
 import PullToRefresh from '../ui/PullToRefresh'
@@ -103,6 +103,15 @@ export const TransactionListSection = memo(function TransactionListSection({
     }
   }
 
+  const walletMap = useMemo(() => {
+    if (!allWallets || allWallets.length === 0) return null
+    const map = new Map()
+    for (const w of allWallets) {
+      map.set(String(w.id), w)
+    }
+    return map
+  }, [allWallets])
+
   if (isLoading) {
     return <TransactionListSkeleton />
   }
@@ -142,7 +151,7 @@ export const TransactionListSection = memo(function TransactionListSection({
         >
         <div className="min-h-full space-y-3 pt-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-6">
           {visibleGroups.map((group, idx) => (
-            <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
+            <section key={group.dateKey} className="space-y-1.5 ft-group-visibility-auto ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
               {/* Date Header Strip */}
               <div className="sticky top-0 z-20 flex items-center gap-2.5 px-1 py-1.5 bg-[var(--bg)]">
                 <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase shrink-0">
@@ -197,6 +206,7 @@ export const TransactionListSection = memo(function TransactionListSection({
                         convertCurrency={convertCurrency}
                         rates={rates}
                         wallets={allWallets}
+                        walletMap={walletMap}
                         isNew={sessionLastSeenTimestamp ? isTransactionNew(transaction, sessionLastSeenTimestamp) : (newestTransactionId && String(transaction.id) === String(newestTransactionId))}
                         newestTransactionId={newestTransactionId}
                         isBulkMode={isBulkMode}

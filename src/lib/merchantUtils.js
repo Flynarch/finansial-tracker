@@ -252,7 +252,7 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
   if (/\b(tol|e-toll)\b/i.test(norm)) {
     return 'transportasi/tol'
   }
-  if (norm.includes('kai') || norm.includes('kereta') || norm.includes('krl') || norm.includes('mrt') || norm.includes('lrt')) {
+  if (/\b(kai|kereta|krl|mrt|lrt)\b/i.test(norm)) {
     return 'transportasi/kereta'
   }
   if (norm.includes('tiket.com') || norm.includes('traveloka') || norm.includes('bus') || norm.includes('bis')) {
@@ -277,6 +277,9 @@ export function matchCategoryFromDescription(cleanDescription = '', type = 'expe
   }
   if (norm.includes('steam') || norm.includes('playstation') || norm.includes('games') || norm.includes('nintendo')) {
     return 'kultur/games'
+  }
+  if (norm.includes('kondangan') || norm.includes('kado') || norm.includes('hadiah')) {
+    return 'kehidupan_sosial/kondangan'
   }
   if (
     norm.includes('baju') ||

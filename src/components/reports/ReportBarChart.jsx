@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, memo } from 'react'
 import {
   Bar,
   BarChart,
@@ -25,7 +25,7 @@ import {
 } from '../../lib/chartTheme'
 import { triggerHaptic } from '../../lib/haptics'
 
-export default function ReportBarChart({
+const ReportBarChart = memo(function ReportBarChart({
   monthlyIncomeExpense,
   selectedMonthKey = null,
   onSelectMonthKey,
@@ -329,4 +329,6 @@ export default function ReportBarChart({
       )}
     </section>
   )
-}
+})
+
+export default ReportBarChart

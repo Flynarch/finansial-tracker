@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { cachedDashboardState } from '../../hooks/dashboard/dashboardCache'
 import {
   Bell,
   Clock,
@@ -56,15 +57,16 @@ export default function SettingsNotifications() {
   const setNotificationAutoApprove = useSettingsStore((s) => s.setNotificationAutoApprove)
 
   // Wallet list for auto-assignment
-  const wallets = useLiveQuery(() => db.wallets.toArray(), []) || []
-  const activeWallets = wallets.filter((w) => !w.isArchived)
-  const autoWalletId = defaultWalletId ? String(defaultWalletId) : (activeWallets[0]?.id ? String(activeWallets[0].id) : '')
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
+  const activeWallets = useMemo(() => (wallets ? wallets.filter((w) => !w.isArchived) : []), [wallets])
+  const firstActiveWalletId = activeWallets[0]?.id
+  const autoWalletId = defaultWalletId ? String(defaultWalletId) : (firstActiveWalletId ? String(firstActiveWalletId) : '')
 
   useEffect(() => {
-    if (!defaultWalletId && activeWallets[0]?.id) {
-      setDefaultWalletId(activeWallets[0].id)
+    if (!defaultWalletId && firstActiveWalletId) {
+      setDefaultWalletId(firstActiveWalletId)
     }
-  }, [defaultWalletId, activeWallets, setDefaultWalletId])
+  }, [defaultWalletId, firstActiveWalletId, setDefaultWalletId])
 
   // Native Notification Listener State
   const [isListenerGranted, setIsListenerGranted] = useState(false)

@@ -46,8 +46,14 @@ function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false)
 
   const unreadCount = useLiveQuery(async () => {
-    return await db.notifications.filter((n) => !n.read && n.isRead !== 1).count()
-  }, []) ?? 0
+    try {
+      const count = await db.notifications.where('read').equals(false).count()
+      if (count > 0) return count
+      return await db.notifications.filter((n) => !n.read && n.isRead !== 1).count()
+    } catch {
+      return await db.notifications.filter((n) => !n.read && n.isRead !== 1).count()
+    }
+  }, [], 0) ?? 0
 
   return (
     <header className="pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-1 px-4 sm:px-6">

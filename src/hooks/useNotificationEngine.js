@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Capacitor } from '@capacitor/core'
 import { db } from '../lib/db'
 import { format } from 'date-fns'
@@ -7,8 +6,6 @@ import useSettingsStore from '../store/useSettingsStore'
 import { translate } from '../lib/i18n'
 
 export default function useNotificationEngine() {
-  const todos = useLiveQuery(() => db.todos.filter((t) => !t.completed).toArray())
-  const habits = useLiveQuery(() => db.habits.filter((h) => Boolean(h.reminderEnabled) && !h.isPaused).toArray())
   const intervalRef = useRef(null)
 
   useEffect(() => {
@@ -33,7 +30,17 @@ export default function useNotificationEngine() {
         }
       }
 
-      if (todos) {
+      let todos
+      let habits
+      try {
+        todos = await db.todos.filter((t) => !t.completed).toArray()
+        habits = await db.habits.filter((h) => Boolean(h.reminderEnabled) && !h.isPaused).toArray()
+      } catch (err) {
+        console.warn('[useNotificationEngine] DB query failed:', err)
+        return
+      }
+
+      if (todos && todos.length > 0) {
         for (const todo of todos) {
           if (todo.reminderTime === currentTimeStr && todo.dueDate === todayStr) {
             const existing = await db.notifications
@@ -97,14 +104,11 @@ export default function useNotificationEngine() {
       }
     }
 
+    checkReminders()
     intervalRef.current = setInterval(checkReminders, 30000)
-    
-    if (todos || habits) {
-      checkReminders()
-    }
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [todos, habits])
+  }, [])
 }

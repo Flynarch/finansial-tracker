@@ -37,6 +37,15 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
   const activeTransactions = useMemo(() => allTransactions || transactions || [], [allTransactions, transactions])
   const activeWallets = useMemo(() => allWallets || wallets || [], [allWallets, wallets])
 
+  const walletMap = useMemo(() => {
+    if (!activeWallets || activeWallets.length === 0) return null
+    const map = new Map()
+    for (const w of activeWallets) {
+      map.set(String(w.id), w)
+    }
+    return map
+  }, [activeWallets])
+
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -417,7 +426,7 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
           {visibleGroups && visibleGroups.length > 0 ? (
             <>
               {visibleGroups.map((group, idx) => (
-                <section key={group.dateKey} className="space-y-1.5 ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
+                <section key={group.dateKey} className="space-y-1.5 ft-group-visibility-auto ft-stagger-in" style={{ '--stagger': Math.min(idx, 10) }}>
                   <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-1 py-1.5 bg-[var(--panel-strong)] rounded-lg">
                     <span className="text-[11px] font-black tracking-wider text-[var(--muted)] uppercase">{group.dateLabel}</span>
                     {group.dailySummaryText ? (
@@ -453,6 +462,7 @@ export const WalletTransactionsList = memo(function WalletTransactionsList({
                         getSwipeHandlers={getSwipeHandlers}
                         contextWalletId={walletId}
                         wallets={activeWallets}
+                        walletMap={walletMap}
                         isNew={isTransactionNew(tx, sessionLastSeenTimestamp)}
                       />
                     ))}

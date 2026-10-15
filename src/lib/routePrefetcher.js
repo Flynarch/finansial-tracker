@@ -5,11 +5,18 @@
  */
 
 const PREFETCH_MODULES = [
+  () => import('../pages/Transactions'),
+  () => import('../pages/TodoList'),
+  () => import('../pages/Profile'),
   () => import('../pages/Budget'),
   () => import('../pages/Savings'),
   () => import('../pages/Loans'),
   () => import('../pages/Calendar'),
   () => import('../pages/Reports'),
+  () => import('../pages/SavingsDetail'),
+  () => import('../pages/WalletDetailPage'),
+  () => import('../pages/AddAccountPage'),
+  () => import('../pages/TodoDetailPage'),
   () => import('../pages/settings/SettingsLayout'),
   () => import('../pages/settings/SettingsHome'),
   () => import('../pages/settings/SettingsSecurity'),

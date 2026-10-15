@@ -65,6 +65,17 @@ export function normalizeIndonesianNlpText(text) {
   // Replace spending verbs
   t = t.replace(/\b(ngabisin|menghabiskan|keluarin|ngeluarin)\b/gi, 'habisin')
 
+  // Replace common Indonesian WhatsApp/SMS chat abbreviations
+  t = t.replace(/\b(bli)\b/gi, 'beli')
+  t = t.replace(/\b(byr)\b/gi, 'bayar')
+  t = t.replace(/\b(dpt)\b/gi, 'dapat')
+  t = t.replace(/\b(pke|pk)\b/gi, 'pakai')
+  t = t.replace(/\b(bwt|utk)\b/gi, 'buat')
+  t = t.replace(/\b(mkn)\b/gi, 'makan')
+  t = t.replace(/\b(mnm)\b/gi, 'minum')
+  t = t.replace(/\b(sm)\b/gi, 'sama')
+  t = t.replace(/\b(smw|semuany)\b/gi, 'semuanya')
+
   return t
 }
 

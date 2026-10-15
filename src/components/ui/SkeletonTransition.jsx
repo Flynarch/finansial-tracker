@@ -43,7 +43,7 @@ export default function SkeletonTransition({
         setIsTransitioning(false)
         setExitingSkeleton(null)
         timeoutRef.current = null
-      }, 240)
+      }, 180)
     }
 
     return () => {

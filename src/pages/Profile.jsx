@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Camera, Pencil } from 'lucide-react'
@@ -139,6 +139,10 @@ function ShortcutRow({ icon, label, sublabel, onClick }) {
   )
 }
 
+let cachedTxCount = undefined
+let cachedBudgetCount = undefined
+let cachedGoalsCount = undefined
+
 /* ─── main ─── */
 function Profile() {
   const navigate = useNavigate()
@@ -157,13 +161,22 @@ function Profile() {
 
   const txCount = useLiveQuery(
     () => db.transactions.filter((tx) => !tx.deletedAt).count(),
-    []
+    [],
+    cachedTxCount
   )
-  const budgetCount = useLiveQuery(() => db.budgets.count(), [])
+  const budgetCount = useLiveQuery(() => db.budgets.count(), [], cachedBudgetCount)
   const goalsCount = useLiveQuery(
     () => db.goals.filter((g) => !g.isCompleted && !g.isArchived).count(),
-    []
+    [],
+    cachedGoalsCount
   )
+
+  useEffect(() => {
+    if (txCount !== undefined) cachedTxCount = txCount
+    if (budgetCount !== undefined) cachedBudgetCount = budgetCount
+    if (goalsCount !== undefined) cachedGoalsCount = goalsCount
+  }, [txCount, budgetCount, goalsCount])
+
   const isDataReady = txCount !== undefined && budgetCount !== undefined && goalsCount !== undefined
 
   const displayName = profileName || t('profile.userName')

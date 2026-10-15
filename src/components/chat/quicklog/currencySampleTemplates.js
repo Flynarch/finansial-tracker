@@ -1,3 +1,5 @@
+import { getFrequentUserEntities } from '../../../lib/ai/entityMemory'
+
 export const CURRENCY_SAMPLE_TEMPLATES = {
   IDR: {
     id: [
@@ -239,20 +241,88 @@ export const CURRENCY_SAMPLE_TEMPLATES = {
   },
 }
 
+function formatShortAmount(amount, currency = 'IDR') {
+  if (!amount || amount <= 0) return ''
+  if (currency === 'IDR') {
+    if (amount >= 1000000) {
+      const jt = amount / 1000000
+      return `${Number.isInteger(jt) ? jt : jt.toFixed(1)}jt`
+    }
+    if (amount >= 1000) {
+      const rb = amount / 1000
+      return `${Number.isInteger(rb) ? rb : rb.toFixed(1)}rb`
+    }
+    return `${amount}`
+  }
+  if (amount >= 1000) {
+    const k = amount / 1000
+    return `${Number.isInteger(k) ? k : k.toFixed(1)}k ${currency}`
+  }
+  return `${amount} ${currency}`
+}
+
 export function generateSampleChips(userWallets = [], currency = 'IDR', locale = 'id') {
   const walletNames = (userWallets || []).map((w) => w.name).filter(Boolean)
   const currencySet = CURRENCY_SAMPLE_TEMPLATES[currency] || CURRENCY_SAMPLE_TEMPLATES.IDR
-  const baseTitles = currencySet[locale] || currencySet.id || CURRENCY_SAMPLE_TEMPLATES.IDR.id
+  const baseTitles = [...(currencySet[locale] || currencySet.id || CURRENCY_SAMPLE_TEMPLATES.IDR.id)]
 
-  if (walletNames.length === 0) {
-    return baseTitles
+  // 1. Time-of-day reordering
+  const currentHour = new Date().getHours()
+  let timeKeywords
+  if (currentHour >= 5 && currentHour < 11) {
+    // Pagi
+    timeKeywords = ['sarapan', 'breakfast', 'kopi', 'coffee', 'bensin', 'gas', 'saku', 'pocket']
+  } else if (currentHour >= 11 && currentHour < 15) {
+    // Siang
+    timeKeywords = ['siang', 'lunch', 'snack', 'nongkrong', 'hangout']
+  } else {
+    // Sore / Malam
+    timeKeywords = ['malam', 'dinner', 'belanja', 'groceries', 'token', 'wifi', 'pulsa', 'langganan']
   }
 
-  // Cyclically & variedly distribute every wallet across all available chips
-  return baseTitles.map((title, idx) => {
+  const prioritized = []
+  const remaining = []
+  for (const title of baseTitles) {
+    const lower = title.toLowerCase()
+    if (timeKeywords.some((kw) => lower.includes(kw))) {
+      prioritized.push(title)
+    } else {
+      remaining.push(title)
+    }
+  }
+  const orderedTitles = [...prioritized, ...remaining]
+
+  // 2. Distribute wallets across base titles
+  const formattedBaseChips = orderedTitles.map((title, idx) => {
+    if (walletNames.length === 0) return title
     const assignedWallet = walletNames[idx % walletNames.length]
     return `${title} ${assignedWallet}`
   })
+
+  // 3. Entity Memory Integration: Prepend user's top frequent transactions
+  let personalizedChips = []
+  try {
+    const frequentEntities = getFrequentUserEntities(3)
+    if (Array.isArray(frequentEntities) && frequentEntities.length > 0) {
+      personalizedChips = frequentEntities
+        .map((ent) => {
+          if (!ent?.name) return null
+          const cleanName = String(ent.name).trim()
+          if (cleanName.length < 2) return null
+          const amtStr = ent.lastAmount ? formatShortAmount(ent.lastAmount, currency) : ''
+          const entWallet = userWallets.find((w) => String(w.id) === String(ent.walletId))
+          const walletSuffix = entWallet?.name ? ` ${entWallet.name}` : ''
+          return amtStr ? `${cleanName} ${amtStr}${walletSuffix}` : `${cleanName}${walletSuffix}`
+        })
+        .filter(Boolean)
+    }
+  } catch {
+    // Defensive fallback
+  }
+
+  const allChips = [...personalizedChips, ...formattedBaseChips]
+  // Remove duplicates while preserving order
+  return Array.from(new Set(allChips))
 }
 
 export function getInputPlaceholder(defaultCurrency, locale) {

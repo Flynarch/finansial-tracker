@@ -715,7 +715,7 @@ function AppShell() {
             <Suspense
               fallback={<PageSkeleton variant="chat" />}
             >
-              <div className="ft-content-loaded flex-1 min-w-0 flex flex-col h-full w-full">
+              <div className="flex-1 min-w-0 flex flex-col h-full w-full">
                 <ErrorBoundary>
                   <Outlet />
                 </ErrorBoundary>
@@ -742,7 +742,7 @@ function AppShell() {
             }`}
           >
             <div
-              key={location.pathname}
+              key={location.pathname.startsWith('/settings') ? 'settings' : location.pathname}
               className={`ft-page-crossfade ${
                 location.pathname === '/transactions' ? 'h-full flex-1 flex flex-col min-h-0 overflow-hidden' : ''
               }`}
@@ -751,9 +751,9 @@ function AppShell() {
                 fallback={<PageSkeleton variant={getSkeletonVariant(location.pathname)} />}
               >
                 <div
-                  className={`ft-content-loaded ${
+                  className={
                     location.pathname === '/transactions' ? 'h-full flex-1 flex flex-col min-h-0 overflow-hidden' : 'w-full min-h-full'
-                  }`}
+                  }
                 >
                   <ErrorBoundary>
                     <Outlet />

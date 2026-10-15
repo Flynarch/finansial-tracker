@@ -88,4 +88,46 @@ describe('VoiceVisualizer Component & Audio Context Lifecycle', () => {
     expect(mockStopTrack).toHaveBeenCalled()
     expect(window.AudioContext).not.toHaveBeenCalled()
   })
+
+  it('closes AudioContext and stops media tracks when component unmounts after recording started', async () => {
+    let unmountFn
+    await act(async () => {
+      const { unmount } = render(
+        <VoiceVisualizer isRecording={true} onStop={vi.fn()} onCancel={vi.fn()} />
+      )
+      unmountFn = unmount
+    })
+
+    expect(window.AudioContext).toHaveBeenCalled()
+    expect(mockAudioContext.close).not.toHaveBeenCalled()
+
+    await act(async () => {
+      unmountFn()
+    })
+
+    expect(mockStopTrack).toHaveBeenCalled()
+    expect(mockAudioContext.close).toHaveBeenCalled()
+  })
+
+  it('cleans up AudioContext and stops tracks when isRecording transitions from true to false', async () => {
+    let rerenderFn
+    await act(async () => {
+      const { rerender } = render(
+        <VoiceVisualizer isRecording={true} onStop={vi.fn()} onCancel={vi.fn()} />
+      )
+      rerenderFn = rerender
+    })
+
+    expect(window.AudioContext).toHaveBeenCalled()
+    expect(mockAudioContext.close).not.toHaveBeenCalled()
+
+    await act(async () => {
+      rerenderFn(
+        <VoiceVisualizer isRecording={false} onStop={vi.fn()} onCancel={vi.fn()} />
+      )
+    })
+
+    expect(mockStopTrack).toHaveBeenCalled()
+    expect(mockAudioContext.close).toHaveBeenCalled()
+  })
 })

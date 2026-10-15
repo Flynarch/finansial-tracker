@@ -27,6 +27,7 @@ import {
   parseIndonesianAmount,
   extractCurrencyFromText,
   extractMonetaryAmountFromText,
+  applyFinancialModifiers,
 } from './amountRules'
 import {
   parseTransferTransaction,
@@ -39,6 +40,55 @@ export {
   extractCurrencyFromText,
   extractMonetaryAmountFromText,
   parseTransferTransaction,
+}
+
+/**
+ * Determines whether a clause or sentence represents an income or expense transaction.
+ * Guards against income inversion when spending verbs are present (e.g. "beli kado", "order gofood dapet cashback").
+ *
+ * @param {string} text
+ * @param {string} [cleanSubject='']
+ * @returns {'income'|'expense'}
+ */
+export function determineTransactionType(text, cleanSubject = '') {
+  const lowerText = (text || '').toLowerCase()
+  const lowerSub = (cleanSubject || '').toLowerCase()
+
+  // 1. Explicit spending verbs override income keywords (e.g. "beli kado 100k", "order gofood dapet promo 10k")
+  const hasSpendingVerb = /\b(beli|membeli|buat\s+beli|bayar|membayar|buat\s+bayar|order|pesan|pesen|checkout|co|belanja|jajan|habisin|keluarin|ngeluarin|nongkrong|makan|minum)\b/i.test(
+    lowerText
+  )
+  if (hasSpendingVerb) {
+    return 'expense'
+  }
+
+  // 2. Explicit income keywords
+  const isIncomeKeyword =
+    /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|komisi|penjualan|hasil\s+jual|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
+      lowerSub
+    ) ||
+    /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|komisi|penjualan|hasil\s+jual|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
+      lowerText
+    ) ||
+    /\b(dapet|dapat|terima|diterima|masuk|pemasukan|penghasilan)\b/i.test(lowerText)
+
+  // 3. Gift / kado / hadiah / cashback / promo: only income if received (e.g. "dapet kado", "dikasih hadiah")
+  const isGiftOrPromo =
+    /\b(hadiah|kado|cashback|promo)\b/i.test(lowerSub) || /\b(hadiah|kado|cashback|promo)\b/i.test(lowerText)
+  if (isGiftOrPromo) {
+    const isReceived = /\b(dapet|dapat|terima|diterima|dikasih|diberi|menang)\b/i.test(lowerText)
+    const isGiven = /\b(buat|untuk|ke|bagi|kasih|beri)\b/i.test(lowerText)
+    if (isReceived && !isGiven) {
+      return 'income'
+    }
+    return 'expense'
+  }
+
+  if (isIncomeKeyword) {
+    return 'income'
+  }
+
+  return 'expense'
 }
 
 
@@ -78,6 +128,10 @@ export function parseMultiClauseTransactions(
   let previousDateStr = null
 
   const sentenceTimeSlot = extractTimeSlot(normalizedText, ref)
+  const sentenceWalletId = findWalletInText(normalizedText, wallets, defaultWalletId)
+  const sentenceVenueSlot = extractVenueSlot(normalizedText, KNOWN_MERCHANT_SERVICES)
+  const hasUniversalScope = /\b(semuanya|semua|keduanya|dua-duanya|dua\s+duanya|kabeh)\b/i.test(normalizedText)
+  const hasAnyClauseExplicitWallet = rawClauses.some((c) => findWalletInText(c, wallets, null) !== null)
 
   for (const rawClause of rawClauses) {
     const clauseAmt = extractMonetaryAmountFromText(rawClause)
@@ -99,25 +153,30 @@ export function parseMultiClauseTransactions(
     const clauseTimeSlot = extractTimeSlot(rawClause, ref) || sentenceTimeSlot
     const clauseTime = clauseTimeSlot ? clauseTimeSlot.timeStr : currentTime
 
-    // Determine type: income vs expense
-    const isIncome =
-      /\b(dapet|dapat|terima|diterima|uang\s+saku|uang\s+jajan|sangu|gaji|salary|pemasukan|penghasilan|masuk|kiriman|dikasih|bonus|thr|hadiah|kado|cashback|komisi|cuan|hasil\s+jual|penjualan|freelance|proyek|adsense|dividen)\b/i.test(
-        rawClause
-      )
-    const txType = isIncome ? 'income' : 'expense'
-
-    // Match wallet
-    const resolvedWalletId = findWalletInText(rawClause, wallets, defaultWalletId)
+    // Match wallet (prefer clause-specific wallet, fallback to universal scope, sentence-level or default wallet)
+    const clauseWalletId = findWalletInText(rawClause, wallets, null)
+    let resolvedWalletId = defaultWalletId
+    if (clauseWalletId !== null) {
+      resolvedWalletId = clauseWalletId
+    } else if (hasUniversalScope && sentenceWalletId !== undefined) {
+      resolvedWalletId = sentenceWalletId
+    } else if (!hasAnyClauseExplicitWallet && sentenceWalletId !== undefined) {
+      resolvedWalletId = sentenceWalletId
+    }
     const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
     const txCurrency = matchedWallet?.currency || defaultCurrency
 
+    // Determine type: income vs expense
+    const preliminaryType = determineTransactionType(rawClause)
+
     // Semantic slot filling for subject entity and venue
     const cleanNotes = extractCleanSubjectEntity(rawClause, {
-      txType,
+      txType: preliminaryType,
       dateMatchedText,
       walletName: matchedWallet?.name,
     })
-    const venueSlot = extractVenueSlot(rawClause, KNOWN_MERCHANT_SERVICES)
+    const txType = determineTransactionType(rawClause, cleanNotes)
+    const venueSlot = extractVenueSlot(rawClause, KNOWN_MERCHANT_SERVICES) || sentenceVenueSlot
 
     // Determine category and merchant
     let category
@@ -173,6 +232,25 @@ export function parseMultiClauseTransactions(
       text: summary,
       chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
       isInstant: true,
+    }
+  }
+
+  // Handle active typing / dangling trailing clauses:
+  // e.g. "mixue eskrim 10k, bakso" where clause 1 has an amount (10k) but clause 2 is in-progress (no amount yet).
+  // Return completed clause(s) so the trailing incomplete words don't contaminate clause 1 notes.
+  if (clauseDetails.length >= 1 && rawClauses.length >= 2) {
+    const firstClauseAmt = extractMonetaryAmountFromText(rawClauses[0])
+    if (firstClauseAmt > 0) {
+      return {
+        type: 'transactions',
+        action: 'create',
+        transactions: clauseDetails,
+        merchant: clauseDetails[0]?.merchant,
+        currency: defaultCurrency,
+        text: `Berhasil mencatat ${clauseDetails[0]?.notes || 'transaksi'}.`,
+        chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+        isInstant: true,
+      }
     }
   }
 
@@ -364,7 +442,11 @@ export function parseIndonesianFinancialText(
     clean = clean.replace(new RegExp(`\\b${escapeRegExp(dateResult.matchedText)}\\b`, 'gi'), ' ')
   }
   if (timeSlot?.matchedText) {
-    clean = clean.replace(new RegExp(`\\b${escapeRegExp(timeSlot.matchedText)}\\b`, 'gi'), ' ')
+    const isMealCompound = /\bmakan\s+(?:siang|pagi|malam)\b/i.test(clean)
+    const isPagiSiangMalam = /^(?:siang|pagi|malam)$/i.test(timeSlot.matchedText.trim())
+    if (!isMealCompound || !isPagiSiangMalam) {
+      clean = clean.replace(new RegExp(`\\b${escapeRegExp(timeSlot.matchedText)}\\b`, 'gi'), ' ')
+    }
   }
   clean = clean
     .replace(/^(kemarin\s+|tadi\s+pagi\s+|tadi\s+siang\s+|tadi\s+sore\s+|tadi\s+malam\s+|hari\s+ini\s+|semalam\s+|tadi\s+|barusan\s+)/i, '')
@@ -374,14 +456,23 @@ export function parseIndonesianFinancialText(
   if (/[@+\-*/]/.test(clean)) {
     const mathAmt = extractMonetaryAmountFromText(clean)
     if (mathAmt > 0) {
-      const cleanSub = extractCleanSubjectEntity(clean, {
+      const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
+      const cleanMerchant = venueSlot?.venue || undefined
+      let cleanSub = extractCleanSubjectEntity(clean, {
         txType: 'expense',
         dateMatchedText: dateResult?.matchedText,
         timeMatchedText: timeSlot?.matchedText,
+        merchant: cleanMerchant,
       })
+      if (!cleanSub || cleanSub === 'Pengeluaran') {
+        cleanSub = extractCleanSubjectEntity(normalized, {
+          txType: 'expense',
+          dateMatchedText: dateResult?.matchedText,
+          timeMatchedText: timeSlot?.matchedText,
+          merchant: cleanMerchant,
+        })
+      }
       const cleanSubject = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran' ? cleanSub : 'Pengeluaran'
-      const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
-      const cleanMerchant = venueSlot?.venue || undefined
       const detectedCurrency = extractCurrencyFromText(normalized, defaultCurrency)
       let resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)
       if (detectedCurrency && detectedCurrency !== defaultCurrency) {
@@ -393,12 +484,7 @@ export function parseIndonesianFinancialText(
       const matchedWallet = wallets.find((w) => String(w.id) === String(resolvedWalletId))
       const txCurrency = detectedCurrency || matchedWallet?.currency || defaultCurrency
 
-      const isIncome =
-        /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
-          cleanSubject.toLowerCase()
-        ) ||
-        /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
-      const txType = isIncome ? 'income' : 'expense'
+      const txType = determineTransactionType(normalized, cleanSubject)
 
       return {
         type: 'transactions',
@@ -435,7 +521,8 @@ export function parseIndonesianFinancialText(
     const rawTail = (match[3] || '').trim()
 
     if (rawItem && rawItem.length >= 2 && !/\bhabisin\b/i.test(rawItem) && rawItem.split(/\s+/).length <= 4) {
-      const numericAmt = parseIndonesianAmount(rawAmt)
+      const baseAmt = parseIndonesianAmount(rawAmt)
+      const numericAmt = applyFinancialModifiers(baseAmt, rawTail ? `${rawAmt} ${rawTail}` : normalized)
       if (numericAmt > 0) {
         // Extract clean subject entity and venue using semantic slot filler
         const venueSlot = extractVenueSlot(`${rawItem} ${rawTail} ${normalized}`, KNOWN_MERCHANT_SERVICES)
@@ -449,15 +536,23 @@ export function parseIndonesianFinancialText(
           ? cleanSub
           : (rawItem.charAt(0).toUpperCase() + rawItem.slice(1))
 
-        const isIncome =
-          /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
-            cleanSubject.toLowerCase()
-          ) ||
-          /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
-        const txType = isIncome ? 'income' : 'expense'
+        const txType = determineTransactionType(
+          rawTail ? `${rawItem} ${rawTail} ${normalized}` : `${rawItem} ${normalized}`,
+          cleanSubject
+        )
 
-        const { merchant: legacyMerchant, category: legacyCategory } = extractMerchantAndCategory(rawTail ? `${rawItem} ${rawTail}` : rawItem)
-        const finalMerchant = venueSlot?.venue || (txType === 'expense' ? legacyMerchant : undefined)
+        let category
+        let finalMerchant = undefined
+
+        if (txType === 'income') {
+          category = sanitizeCategoryPath(cleanSubject || rawItem, 'income')
+        } else {
+          const { merchant: legacyMerchant, category: legacyCategory } = extractMerchantAndCategory(
+            rawTail ? `${rawItem} ${rawTail}` : rawItem
+          )
+          category = legacyCategory || sanitizeCategoryPath(cleanSubject, 'expense')
+          finalMerchant = venueSlot?.venue || legacyMerchant
+        }
 
         const searchTarget = rawTail ? `${rawTail} ${rawItem} ${normalized}` : `${rawItem} ${normalized}`
         const detectedCurrency = extractCurrencyFromText(`${rawItem} ${rawAmt} ${rawTail} ${normalized}`, defaultCurrency)
@@ -473,7 +568,9 @@ export function parseIndonesianFinancialText(
         const txCurrency = detectedCurrency || matchedWallet?.currency || defaultCurrency
 
         let finalNotes = cleanSubject
-        if (rawTail && !venueSlot && !legacyMerchant) {
+        const isModifierOrWalletOnly =
+          /^(?:diskon|disc|potongan|ppn|pajak|tax|pake|pakai|via|dari|ke|bca|bri|bni|mandiri|jago|dana|gopay|ovo|shopeepay|cash|tunai)\b/i.test(rawTail)
+        if (rawTail && !venueSlot && !finalMerchant && !isModifierOrWalletOnly) {
           finalNotes += rawTail.startsWith('(') ? ` ${rawTail}` : ` (${rawTail})`
         }
 
@@ -484,7 +581,7 @@ export function parseIndonesianFinancialText(
             {
               type: txType,
               amount: numericAmt,
-              category: legacyCategory || sanitizeCategoryPath(cleanSubject, txType),
+              category,
               currency: txCurrency,
               walletId: resolvedWalletId,
               date: resolvedDate,
@@ -506,11 +603,22 @@ export function parseIndonesianFinancialText(
   // 4B. Semantic slot extraction fallback when regex boundary doesn't match clean word order
   const fallbackAmt = extractMonetaryAmountFromText(clean)
   if (fallbackAmt > 0) {
-    const cleanSub = extractCleanSubjectEntity(clean, {
+    const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
+    const cleanMerchant = venueSlot?.venue || undefined
+    let cleanSub = extractCleanSubjectEntity(clean, {
       txType: 'expense',
       dateMatchedText: dateResult?.matchedText,
       timeMatchedText: timeSlot?.matchedText,
+      merchant: cleanMerchant,
     })
+    if (!cleanSub || cleanSub === 'Pengeluaran') {
+      cleanSub = extractCleanSubjectEntity(normalized, {
+        txType: 'expense',
+        dateMatchedText: dateResult?.matchedText,
+        timeMatchedText: timeSlot?.matchedText,
+        merchant: cleanMerchant,
+      })
+    }
     const cleanSubject = typeof cleanSub === 'string' && cleanSub !== 'Pengeluaran' ? cleanSub : ''
     if (
       cleanSubject &&
@@ -518,14 +626,7 @@ export function parseIndonesianFinancialText(
       !MONTH_NAME_REGEX.test(cleanSubject.toLowerCase()) &&
       !/\b(habisin|keluarin)\b/i.test(cleanSubject)
     ) {
-      const venueSlot = extractVenueSlot(normalized, KNOWN_MERCHANT_SERVICES)
-      const isIncome =
-        /\b(gaji|salary|sangu|uang\s+saku|uang\s+jajan|kiriman|bonus|thr|hadiah|kado|cashback|komisi|penjualan|freelance|proyek|adsense|dividen|untung|cuan)\b/i.test(
-          cleanSubject.toLowerCase()
-        ) ||
-        /\b(dapet|dapat|terima|diterima|masuk|pemasukan)\b/i.test(normalized.toLowerCase())
-      const txType = isIncome ? 'income' : 'expense'
-      const cleanMerchant = venueSlot?.venue || undefined
+      const txType = determineTransactionType(normalized, cleanSubject)
 
       const detectedCurrency = extractCurrencyFromText(normalized, defaultCurrency)
       let resolvedWalletId = findWalletInText(normalized, wallets, defaultWalletId)

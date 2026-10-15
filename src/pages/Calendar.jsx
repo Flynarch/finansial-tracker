@@ -1,6 +1,6 @@
 import { format, getDay, parse, startOfWeek, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns'
 import { enUS, id } from 'date-fns/locale'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback, memo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Calendar as ReactBigCalendar, dateFnsLocalizer } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -79,44 +79,55 @@ function Toolbar({ label, onNavigate, t }) {
 }
 
 /* ─── Premium Date Header ─── */
-export function MonthDateHeader({ date, label, selectedDate, indicators, onPick }) {
-  const key = format(date, 'yyyy-MM-dd')
-  const day = indicators.get(key) || { income: 0, expense: 0, transfer: 0, reminder: 0 }
-  const isSelected = sameDate(date, selectedDate)
-  const isToday = sameDate(date, new Date())
-  const showDots = day.income + day.expense + (day.transfer || 0) + day.reminder > 0
+export const MonthDateHeader = memo(
+  function MonthDateHeader({ date, label, selectedDate, isSelected: isSelectedProp, indicators, onPick }) {
+    const key = format(date, 'yyyy-MM-dd')
+    const day = indicators?.get?.(key) || { income: 0, expense: 0, transfer: 0, reminder: 0 }
+    const isSelected = isSelectedProp !== undefined ? Boolean(isSelectedProp) : sameDate(date, selectedDate)
+    const isToday = sameDate(date, new Date())
+    const showDots = day.income + day.expense + (day.transfer || 0) + day.reminder > 0
 
-  return (
-    <button
-      type="button"
-      className="group flex w-full flex-col items-center justify-center gap-1 p-1.5 transition-colors focus:outline-none"
-      onClick={() => onPick(date)}
-      aria-label={`Day ${label}`}
-    >
-      <div
-        className={`flex h-8 w-8 flex-col items-center justify-center rounded-full text-[13px] font-bold transition-all ${
-          isSelected
-            ? 'bg-[var(--accent)] text-[var(--bg)] shadow-md scale-110'
-            : isToday
-              ? 'bg-[color-mix(in_srgb,var(--accent)_20%,transparent)] text-[var(--accent)] ring-1 ring-[var(--accent)]'
-              : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
-        }`}
+    return (
+      <button
+        type="button"
+        className="group flex w-full flex-col items-center justify-center gap-1 p-1.5 transition-colors focus:outline-none"
+        onClick={() => onPick(date)}
+        aria-label={`Day ${label}`}
       >
-        {label}
-      </div>
-      <div className="flex h-1.5 w-full items-center justify-center gap-0.5">
-        {showDots && (
-          <>
-            {day.expense > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-expense)]" />}
-            {day.income > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-income)]" />}
-            {(day.transfer || 0) > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-transfer)]" />}
-            {day.reminder > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]" />}
-          </>
-        )}
-      </div>
-    </button>
-  )
-}
+        <div
+          className={`flex h-8 w-8 flex-col items-center justify-center rounded-full text-[13px] font-bold transition-all ${
+            isSelected
+              ? 'bg-[var(--accent)] text-[var(--bg)] shadow-md scale-110'
+              : isToday
+                ? 'bg-[color-mix(in_srgb,var(--accent)_20%,transparent)] text-[var(--accent)] ring-1 ring-[var(--accent)]'
+                : 'text-[var(--fg)] hover:bg-[var(--field-bg)]'
+          }`}
+        >
+          {label}
+        </div>
+        <div className="flex h-1.5 w-full items-center justify-center gap-0.5">
+          {showDots && (
+            <>
+              {day.expense > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-expense)]" />}
+              {day.income > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-income)]" />}
+              {(day.transfer || 0) > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-transfer)]" />}
+              {day.reminder > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]" />}
+            </>
+          )}
+        </div>
+      </button>
+    )
+  },
+  (prev, next) => {
+    if (prev.label !== next.label) return false
+    if (prev.indicators !== next.indicators) return false
+    if (prev.onPick !== next.onPick) return false
+    const prevSelected = prev.isSelected !== undefined ? prev.isSelected : sameDate(prev.date, prev.selectedDate)
+    const nextSelected = next.isSelected !== undefined ? next.isSelected : sameDate(next.date, next.selectedDate)
+    if (prevSelected !== nextSelected) return false
+    return sameDate(prev.date, next.date)
+  }
+)
 
 function EmptyMonthEvent() {
   return null
@@ -300,8 +311,45 @@ function Calendar() {
   }, [importantEvents, loansData, todos, transactions, t, decryptedTick, calStart, calEnd])
 
   const indicators = useMemo(() => {
-    return computeCalendarIndicators(transactions, importantEvents, loansData, todos, selectedDate)
-  }, [transactions, importantEvents, loansData, todos, selectedDate])
+    return computeCalendarIndicators(transactions, importantEvents, loansData, todos)
+  }, [transactions, importantEvents, loansData, todos])
+
+  const handlePickDate = useCallback((d) => {
+    setSelectedDate(d)
+    setDayTab('items')
+    setIsDayModalOpen(true)
+  }, [])
+
+  const handleSelectSlot = useCallback(({ start }) => {
+    setSelectedDate(start)
+    setDayTab('add')
+    setIsDayModalOpen(true)
+  }, [])
+
+  const handleSelectEvent = useCallback((event) => {
+    setSelectedDate(event.start)
+    setDayTab('items')
+    setIsDayModalOpen(true)
+  }, [])
+
+  const handleNavigate = useCallback((date) => {
+    setSelectedDate(date)
+  }, [])
+
+  const calendarComponents = useMemo(() => ({
+    toolbar: (props) => <Toolbar {...props} t={t} />,
+    month: {
+      event: EmptyMonthEvent,
+      dateHeader: (props) => (
+        <MonthDateHeader
+          {...props}
+          indicators={indicators}
+          isSelected={sameDate(props.date, selectedDate)}
+          onPick={handlePickDate}
+        />
+      ),
+    },
+  }), [t, indicators, selectedDate, handlePickDate])
 
   const dayItems = useMemo(() => {
     const target = toDateOnlyString(selectedDate)
@@ -365,36 +413,11 @@ function Calendar() {
               selectable
               popup={false}
               style={{ height: 480 }}
-              onSelectSlot={({ start }) => {
-                setSelectedDate(start)
-                setDayTab('add')
-                setIsDayModalOpen(true)
-              }}
-              onSelectEvent={(event) => {
-                setSelectedDate(event.start)
-                setDayTab('items')
-                setIsDayModalOpen(true)
-              }}
-              onNavigate={(date) => setSelectedDate(date)}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              onNavigate={handleNavigate}
               eventPropGetter={eventStyleGetter}
-              components={{
-                toolbar: (props) => <Toolbar {...props} t={t} />,
-                month: {
-                  event: EmptyMonthEvent,
-                  dateHeader: (props) => (
-                    <MonthDateHeader
-                      {...props}
-                      indicators={indicators}
-                      selectedDate={selectedDate}
-                      onPick={(d) => {
-                        setSelectedDate(d)
-                        setDayTab('items')
-                        setIsDayModalOpen(true)
-                      }}
-                    />
-                  ),
-                },
-              }}
+              components={calendarComponents}
             />
           </div>
         </div>

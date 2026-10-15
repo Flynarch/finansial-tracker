@@ -12,7 +12,7 @@
 
 Native home screen widgets, intelligent bank SMS ingestion, zero cloud lock-in, and offline-first encrypted storage.
 
-[![Version](https://img.shields.io/badge/Version-v6.3.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.3.0)
+[![Version](https://img.shields.io/badge/Version-v6.4.0-blue.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker/releases/tag/v6.4.0)
 [![Android APK](https://img.shields.io/badge/Android_APK-Capacitor_8-3DDC84.svg?style=flat-square&logo=android&logoColor=white)](https://github.com/Flynarch/finansial-tracker/releases/latest)
 [![Tests](https://img.shields.io/badge/Tests-1%2C748%20Passed%20(120%20Suites)-brightgreen.svg?style=flat-square)](https://github.com/Flynarch/finansial-tracker)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20E2EE-blueviolet.svg?style=flat-square)](SECURITY.md)
@@ -28,7 +28,7 @@ Native home screen widgets, intelligent bank SMS ingestion, zero cloud lock-in, 
 
 FinTrack gives you complete ownership over your personal finances. Built from the ground up as a native Android application, all accounts, ledgers, and transactions live strictly on your device inside an encrypted offline database. No accounts required, no trackers, and zero forced cloud sync.
 
-[Download Latest APK (v6.3.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) &bull; [Hero Showcase](#hero-showcase) &bull; [App Preview](#app-preview) &bull; [Why FinTrack?](#why-fintrack) &bull; [Key Features](#key-features) &bull; [Architecture](#architecture) &bull; [Getting Started](#getting-started) &bull; [Security](SECURITY.md)
+[Download Latest APK (v6.4.0)](https://github.com/Flynarch/finansial-tracker/releases/latest) &bull; [Hero Showcase](#hero-showcase) &bull; [App Preview](#app-preview) &bull; [Why FinTrack?](#why-fintrack) &bull; [Key Features](#key-features) &bull; [Architecture](#architecture) &bull; [Getting Started](#getting-started) &bull; [Security](SECURITY.md)
 
 <br />
 

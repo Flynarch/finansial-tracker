@@ -32,6 +32,7 @@ import {
   isObviousNonTransaction,
 } from './quicklog/currencySampleTemplates'
 import QuickLogInputSection from './quicklog/QuickLogInputSection'
+import QuickLogTransactionCardPreview from './quicklog/QuickLogTransactionCardPreview'
 import QuickLogAnalyzingState, { QuickLogErrorBanner } from './quicklog/QuickLogAnalyzingState'
 
 export default function AiQuickLogModal() {
@@ -83,6 +84,31 @@ export default function AiQuickLogModal() {
   const [errorMessage, setErrorMessage] = useState('')
   const [omissionData, setOmissionData] = useState(null)
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('')
+  const [dismissedPrompt, setDismissedPrompt] = useState('')
+  const [isInputFocused, setIsInputFocused] = useState(false)
+
+  // Live Instant Transaction Preview (0ms feedback as user types)
+  const previewData = useMemo(() => {
+    if (!inputValue || !inputValue.trim() || selectedImage) return null
+    const trimmed = inputValue.trim()
+    if (trimmed.length < 3) return null
+    if (trimmed === dismissedPrompt) return null
+    if (isObviousNonTransaction(trimmed)) return null
+
+    try {
+      const fastResult = parseShortTransactionFast(trimmed, wallets, defaultCurrency)
+      if (
+        fastResult &&
+        !fastResult.error &&
+        (fastResult.type === 'transactions' || fastResult.type === 'transfer' || (Array.isArray(fastResult.transactions) && fastResult.transactions.length > 0))
+      ) {
+        return fastResult
+      }
+    } catch {
+      // Defensive fallback
+    }
+    return null
+  }, [inputValue, selectedImage, wallets, defaultCurrency, dismissedPrompt])
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isAnimatingIn, setIsAnimatingIn] = useState(false)
   const dragOffsetRef = useRef(0)
@@ -108,8 +134,12 @@ export default function AiQuickLogModal() {
     if (isOpen) {
       setShouldRender(true)
       setIsDismissedByDrag(false)
+      setDismissedPrompt('')
+      setIsInputFocused(false)
     } else {
       setIsAnimatingIn(false)
+      setDismissedPrompt('')
+      setIsInputFocused(false)
     }
   }
 
@@ -117,6 +147,7 @@ export default function AiQuickLogModal() {
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
   const recognitionRef = useRef(null)
+  const silenceTimerRef = useRef(null)
   const sheetRef = useRef(null)
   const baseInputBeforeRecordingRef = useRef('')
 
@@ -258,10 +289,19 @@ export default function AiQuickLogModal() {
       })
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop()
+          recognitionRef.current.onresult = null
+          recognitionRef.current.onerror = null
+          recognitionRef.current.onend = null
+          recognitionRef.current.onstart = null
+          if (typeof recognitionRef.current.abort === 'function') {
+            recognitionRef.current.abort()
+          } else {
+            recognitionRef.current.stop()
+          }
         } catch (err){
           console.warn('[AiQuickLogModal]', err)
         }
+        recognitionRef.current = null
       }
       timeoutId = setTimeout(() => {
         setShouldRender(false)
@@ -342,35 +382,74 @@ export default function AiQuickLogModal() {
 
   useEffect(() => {
     return () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop()
+          recognitionRef.current.onresult = null
+          recognitionRef.current.onerror = null
+          recognitionRef.current.onend = null
+          recognitionRef.current.onstart = null
+          if (typeof recognitionRef.current.abort === 'function') {
+            recognitionRef.current.abort()
+          } else {
+            recognitionRef.current.stop()
+          }
         } catch (err){
           console.warn('[AiQuickLogModal]', err)
         }
+        recognitionRef.current = null
       }
     }
   }, [])
 
   // Voice recording toggle
   const handleStopRecording = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop()
+        recognitionRef.current.onresult = null
+        recognitionRef.current.onerror = null
+        recognitionRef.current.onend = null
+        recognitionRef.current.onstart = null
+        if (typeof recognitionRef.current.abort === 'function') {
+          recognitionRef.current.abort()
+        } else {
+          recognitionRef.current.stop()
+        }
       } catch (err){
         console.warn('[AiQuickLogModal]', err)
       }
+      recognitionRef.current = null
     }
     setIsRecording(false)
   }
 
   const handleCancelRecording = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop()
+        recognitionRef.current.onresult = null
+        recognitionRef.current.onerror = null
+        recognitionRef.current.onend = null
+        recognitionRef.current.onstart = null
+        if (typeof recognitionRef.current.abort === 'function') {
+          recognitionRef.current.abort()
+        } else {
+          recognitionRef.current.stop()
+        }
       } catch (err){
         console.warn('[AiQuickLogModal]', err)
       }
+      recognitionRef.current = null
     }
     setIsRecording(false)
     setInputValue(baseInputBeforeRecordingRef.current.trim())
@@ -436,8 +515,24 @@ export default function AiQuickLogModal() {
 
         const fullText = (baseInputBeforeRecordingRef.current + finalTranscript + interimTranscript).trim()
         setInputValue(fullText)
+
+        // Smart Silence Detection: auto-stop after 1.3s of silence following spoken words
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+        if (fullText.length >= 3) {
+          silenceTimerRef.current = setTimeout(() => {
+            triggerHaptic('light')
+            handleStopRecording()
+          }, 1300)
+        }
       }
       recognition.onerror = (event) => {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
         setIsRecording(false)
         if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
           setErrorMessage(
@@ -454,6 +549,10 @@ export default function AiQuickLogModal() {
         }
       }
       recognition.onend = () => {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
         setIsRecording(false)
       }
       recognition.start()
@@ -505,11 +604,12 @@ export default function AiQuickLogModal() {
     textToSubmit = inputValue,
     imageToSubmit = selectedImage,
     modeToUse = scanMode,
-    targetWalletId = null
+    targetWalletId = null,
+    instantParsedResult = null
   ) => {
     handleStopRecording()
     const cleanText = textToSubmit?.trim()
-    if (!cleanText && !imageToSubmit) return
+    if (!cleanText && !imageToSubmit && !instantParsedResult) return
 
     const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
 
@@ -528,7 +628,7 @@ export default function AiQuickLogModal() {
     setOmissionData(null)
 
     // 1. Instant check for obvious non-transaction / questions
-    if (!imageToSubmit && isObviousNonTransaction(cleanText)) {
+    if (!imageToSubmit && !instantParsedResult && isObviousNonTransaction(cleanText)) {
       setModalMode('intent_switch')
       return
     }
@@ -536,11 +636,12 @@ export default function AiQuickLogModal() {
     const clampedText = cleanText ? String(cleanText).slice(0, 4000) : ''
 
     // 2. Engine Routing:
+    // If instantParsedResult provided: save in 0ms!
     // If offline OR user configured 'fast_nlp' mode: parse casual transactions instantly in 0ms locally.
     // If online AND 'smart_ai' mode: enter 'analyzing' state and call Gemini AI (with NLP fallback if needed).
     const shouldUseFastNlp = quickLogEngine === 'fast_nlp' || isOffline
-    let preParsedResult = null
-    if (shouldUseFastNlp && !imageToSubmit && clampedText) {
+    let preParsedResult = instantParsedResult
+    if (!preParsedResult && shouldUseFastNlp && !imageToSubmit && clampedText) {
       const fastResult = parseShortTransactionFast(clampedText, wallets, defaultCurrency)
       if (fastResult && (fastResult.type === 'transactions' || (Array.isArray(fastResult.transactions) && fastResult.transactions.length > 0))) {
         preParsedResult = fastResult
@@ -611,7 +712,7 @@ export default function AiQuickLogModal() {
         for (const tx of transactionsToProcess) {
           const configuredDefaultWalletId = useSettingsStore.getState().defaultWalletId
           const primaryDefaultWalletId = wallets.find((w) => w.id === configuredDefaultWalletId)?.id || (wallets.length > 0 ? wallets[0].id : null)
-          let finalWalletId = targetWalletId || (tx.walletId ? Number(tx.walletId) : primaryDefaultWalletId)
+          let finalWalletId = tx.walletId ? Number(tx.walletId) : (targetWalletId || primaryDefaultWalletId)
           if (finalWalletId !== null && !wallets.find((w) => w.id === finalWalletId)) {
             finalWalletId = primaryDefaultWalletId
           }
@@ -725,6 +826,7 @@ export default function AiQuickLogModal() {
     setRecordedMerchant('')
     setRecordedTransactions([])
     setErrorMessage('')
+    setDismissedPrompt('')
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus()
@@ -742,6 +844,7 @@ export default function AiQuickLogModal() {
     setInputValue(lastSubmittedPrompt)
     setErrorMessage('')
     setOmissionData(null)
+    setDismissedPrompt('')
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus()
@@ -752,6 +855,18 @@ export default function AiQuickLogModal() {
         }
       }
     }, 120)
+  }
+
+  const handleSaveInstant = (txs) => {
+    if (!txs || txs.length === 0) return
+    const customResult = {
+      type: 'transactions',
+      action: 'create',
+      transactions: txs,
+      engine: 'offline_nlp',
+      engineLabel: 'NLP Lokal (0ms)',
+    }
+    handleSubmit(inputValue, null, scanMode, null, customResult)
   }
 
   const handleSwitchToChat = (prompt) => {
@@ -795,10 +910,31 @@ export default function AiQuickLogModal() {
             : 'transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease-in',
           opacity: isDismissedByDrag ? 0 : undefined,
           willChange: 'transform',
-          contain: 'paint layout',
+          contain: 'layout',
         }}
         className={`absolute left-0 right-0 bottom-0 w-full ${modalMode === 'receipt' ? 'max-h-[96dvh]' : 'max-h-[92dvh]'} flex flex-col rounded-t-3xl border-t sm:border border-[var(--border)] bg-[var(--panel-strong)] shadow-2xl max-w-lg mx-auto transform-gpu ft-hide-scrollbar`}
       >
+        {/* Floating Island: Live Transaction Card Preview hovering above sheet roof */}
+        {modalMode === 'input' && previewData && (
+          <div
+            data-quicklog-keep-focus="true"
+            className="absolute bottom-[calc(100%+12px)] left-0 right-0 px-2 sm:px-3 z-30 pointer-events-auto max-h-[38dvh] overflow-y-auto ft-hide-scrollbar transition-all duration-300 ease-out"
+          >
+            <QuickLogTransactionCardPreview
+              previewData={previewData}
+              wallets={wallets}
+              defaultCurrency={defaultCurrency}
+              locale={locale}
+              t={t}
+              onSaveInstant={handleSaveInstant}
+              onDismiss={() => {
+                triggerHaptic('light')
+                setDismissedPrompt(inputValue.trim())
+              }}
+            />
+          </div>
+        )}
+
         {/* Top Drag Handle & Header (Fixed stable dimensions to prevent mobile jumping) */}
         <div
           onTouchStart={handleTouchStart}
@@ -806,7 +942,13 @@ export default function AiQuickLogModal() {
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
           onMouseDown={handleMouseDown}
-          className={`shrink-0 ${modalMode === 'receipt' ? 'px-4 py-2.5' : 'p-4 pb-3'} border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl cursor-grab active:cursor-grabbing touch-none select-none`}
+          className={`shrink-0 ${
+            modalMode === 'receipt'
+              ? 'px-4 py-2.5'
+              : isInputFocused
+              ? 'px-4 py-2 pb-2'
+              : 'p-4 pb-3'
+          } border-b border-[var(--border)]/50 bg-[var(--panel-strong)] rounded-t-3xl cursor-grab active:cursor-grabbing touch-none select-none transition-all duration-300 ease-out`}
         >
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-[var(--border-strong)]/40" />
           <div className="flex items-center justify-between">
@@ -852,7 +994,15 @@ export default function AiQuickLogModal() {
         </div>
 
         {/* Modal Body Container */}
-        <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${modalMode === 'receipt' ? 'p-2.5 sm:p-3.5' : 'p-4'} pb-[calc(1rem+env(safe-area-inset-bottom))] ft-hide-scrollbar`}>
+        <div
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${
+            modalMode === 'receipt'
+              ? 'p-2.5 sm:p-3.5'
+              : isInputFocused
+              ? 'p-3 pt-2'
+              : 'p-4'
+          } pb-[calc(1rem+env(safe-area-inset-bottom))] ft-hide-scrollbar transition-all duration-300 ease-out`}
+        >
           {/* Error Banner across modes */}
           <QuickLogErrorBanner errorMessage={errorMessage} />
 
@@ -875,8 +1025,11 @@ export default function AiQuickLogModal() {
               handleSubmit={handleSubmit}
               sampleChips={sampleChips}
               wallets={wallets}
+              defaultCurrency={defaultCurrency}
               omissionData={omissionData}
               setOmissionData={setOmissionData}
+              isInputFocused={isInputFocused}
+              setIsInputFocused={setIsInputFocused}
             />
           )}
 

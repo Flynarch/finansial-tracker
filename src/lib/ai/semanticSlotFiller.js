@@ -244,18 +244,39 @@ export function extractTimeSlot(text, referenceDate = new Date()) {
   }
 
   // 5. Colloquial daily period expressions when no specific number was spoken:
-  // "tadi sore" -> 17:00, "tadi siang" -> 12:30, "tadi pagi" -> 07:30, "semalam/tadi malam" -> 20:00
-  if (/\b(tadi\s+sore|sore\s+hari|pas\s+sore)\b/i.test(lower)) {
-    return { timeStr: '17:00', matchedText: 'tadi sore' }
+  // "tadi sore", "kemarin sore", "sore hari" -> 17:00
+  // "tadi malam", "kemarin malam", "semalam" -> 20:00
+  // "tadi pagi", "kemarin pagi", "senin pagi" -> 07:30
+  // "tadi siang", "kemarin siang", "siang hari" -> 12:30
+  // "subuh" -> 05:00
+  // Prayer times: maghrib (18:15), isya (19:30), dzuhur (12:15), ashar (15:30)
+  const prayerMatch = lower.match(
+    /\b(?:(?:pas|sehabis|habis|waktu|saat|menjelang)\s+)?(maghrib|magrib|isya|dzuhur|zuhur|dhuhur|ashar|ashr|subuh)\b/i
+  )
+  if (prayerMatch) {
+    const p = prayerMatch[1].toLowerCase()
+    if (p === 'maghrib' || p === 'magrib') return { timeStr: '18:15', matchedText: prayerMatch[0] }
+    if (p === 'isya') return { timeStr: '19:30', matchedText: prayerMatch[0] }
+    if (p === 'dzuhur' || p === 'zuhur' || p === 'dhuhur') return { timeStr: '12:15', matchedText: prayerMatch[0] }
+    if (p === 'ashar' || p === 'ashr') return { timeStr: '15:30', matchedText: prayerMatch[0] }
+    if (p === 'subuh') return { timeStr: '05:00', matchedText: prayerMatch[0] }
   }
-  if (/\b(tadi\s+siang|siang\s+hari|pas\s+siang)\b/i.test(lower)) {
-    return { timeStr: '12:30', matchedText: 'tadi siang' }
+
+  const soreMatch = lower.match(/\b(?:(?:tadi|kemarin|besok|hari\s+ini|pas|senin|selasa|rabu|kamis|jumat|sabtu|minggu)\s+)?sore(?:\s+hari)?\b/i)
+  if (soreMatch) {
+    return { timeStr: '17:00', matchedText: soreMatch[0] }
   }
-  if (/\b(tadi\s+pagi|pagi\s+hari|pas\s+pagi)\b/i.test(lower)) {
-    return { timeStr: '07:30', matchedText: 'tadi pagi' }
+  const malamMatch = lower.match(/(?<!makan\s+)\b(?:(?:tadi|kemarin|besok|hari\s+ini|pas|senin|selasa|rabu|kamis|jumat|sabtu|minggu)\s+)?(?:malam(?:\s+hari)?|semalam)\b/i)
+  if (malamMatch) {
+    return { timeStr: '20:00', matchedText: malamMatch[0] }
   }
-  if (/\b(tadi\s+malam|semalam|malam\s+hari|pas\s+malam)\b/i.test(lower)) {
-    return { timeStr: '20:00', matchedText: 'tadi malam' }
+  const pagiMatch = lower.match(/(?<!makan\s+)\b(?:(?:tadi|kemarin|besok|hari\s+ini|pas|senin|selasa|rabu|kamis|jumat|sabtu|minggu)\s+)?pagi(?:\s+hari)?\b/i)
+  if (pagiMatch) {
+    return { timeStr: '07:30', matchedText: pagiMatch[0] }
+  }
+  const siangMatch = lower.match(/(?<!makan\s+)\b(?:(?:tadi|kemarin|besok|hari\s+ini|pas|senin|selasa|rabu|kamis|jumat|sabtu|minggu)\s+)?siang(?:\s+hari)?\b/i)
+  if (siangMatch) {
+    return { timeStr: '12:30', matchedText: siangMatch[0] }
   }
   if (/\b(subuh)\b/i.test(lower)) {
     return { timeStr: '05:00', matchedText: 'subuh' }
@@ -293,7 +314,7 @@ export function extractVenueSlot(text, knownMerchants = []) {
 
   // 2. Prepositional venue anchor: "di [X]", "outlet [X]", "cabang [X]"
   const venueMatch = text.match(
-    /\b(?:di|outlet|cabang|toko)\s+([a-zA-Z&'.-]+(?:\s+[a-zA-Z&'.-]+)?)/i
+    /\b(?:di|outlet|cabang|toko)\s+([a-zA-Z&'.-]+(?:\s+[a-zA-Z&'.-]+){0,3})/i
   )
 
   if (venueMatch && venueMatch[1]) {
@@ -439,9 +460,13 @@ export function extractCleanSubjectEntity(rawText, options = {}) {
 
   let text = normalizeSlangText(rawText)
 
-  // 1. Strip explicit time slot string if provided
+  // 1. Strip explicit time slot string if provided (protect compound meals like "makan siang")
   if (options.timeMatchedText) {
-    text = text.replace(new RegExp(`\\b${escapeRegExp(options.timeMatchedText)}\\b`, 'gi'), ' ')
+    const isMealCompound = /\bmakan\s+(?:siang|pagi|malam)\b/i.test(text)
+    const isPagiSiangMalam = /^(?:siang|pagi|malam)$/i.test(options.timeMatchedText.trim())
+    if (!isMealCompound || !isPagiSiangMalam) {
+      text = text.replace(new RegExp(`\\b${escapeRegExp(options.timeMatchedText)}\\b`, 'gi'), ' ')
+    }
   }
 
   // 2. Strip explicit date slot string if provided
@@ -460,13 +485,15 @@ export function extractCleanSubjectEntity(rawText, options = {}) {
   text = text.replace(/(?:(?:jam|pukul)\s+)?\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/gi, ' ')
   text = text.replace(/(?:(?:jam|pukul)\s+\d{1,2}(?:\s*(?:pagi|siang|sore|malam))?)\b/gi, ' ')
 
-  // 4. Strip relative time markers while protecting compound meals like "makan siang", "makan malam", "makan pagi"
+  // 4. Strip relative time markers and prayer times while protecting compound meals like "makan siang", "makan malam", "makan pagi"
   text = text.replace(/\b(kemarin\s+lusa|kemarin|semalam|hari\s+ini|tadi\s+malam|tadi\s+pagi|tadi\s+siang|tadi\s+sore|tadi|barusan|pas|waktu|saat|sekarang|habis|baru\s+saja)\b/gi, ' ')
   text = text.replace(/(?<!makan\s+)\b(sore|siang|pagi|malam)\b(?!\s+(?:siang|pagi|malam))/gi, ' ')
+  text = text.replace(/\b(?:pas|waktu|saat)?\s*(?:maghrib|magrib|isya|dzuhur|zuhur|dhuhur|ashar|ashr|subuh)\b/gi, ' ')
 
-  // 5. Strip venue mentions (e.g. "di starbucks", "outlet kulo")
+  // 5. Strip venue mentions ONLY when explicitly anchored by prepositions (e.g. "di starbucks", "outlet kulo")
+  // Digital products / brands like "paketan telkomsel", "pulsa indosat", "token pln" preserve their brand.
   if (options.merchant) {
-    text = text.replace(new RegExp(`(?:di|ke|outlet|cabang|toko)?\\s*\\b${escapeRegExp(options.merchant)}\\b`, 'gi'), ' ')
+    text = text.replace(new RegExp(`\\b(?:di|ke|outlet|cabang|toko)\\s+${escapeRegExp(options.merchant)}\\b`, 'gi'), ' ')
   }
   text = text.replace(/\b(?:di|outlet|cabang|toko)\s+[a-zA-Z0-9&'.-]+(?:\s+[a-zA-Z0-9&'.-]+)?\b/gi, ' ')
 
@@ -476,18 +503,25 @@ export function extractCleanSubjectEntity(rawText, options = {}) {
     text = text.replace(new RegExp(`\\b${escapeRegExp(qtySlot.matchedText)}(?:\\b|\\s|$)`, 'gi'), ' ')
   }
 
-  // 6.5. Strip arithmetic and multiplier expressions: "35k + 5k", "120k / 4", "2 @ 25k"
-  text = text.replace(/\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta)?\s*([+\-*/])\s*\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta)?\b/gi, ' ')
+  // 6.5. Strip arithmetic and multiplier expressions: "35k + 5k", "120k / 4", "18k + 7k + 5k", "25rb * 2", "2 @ 25k"
+  text = text.replace(/(?:rp\.?\s*)?\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta)?(?:\s*[+\-*/×÷]\s*(?:rp\.?\s*)?\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta)?)+\b/gi, ' ')
   text = text.replace(/\b\d+\s*@\s*\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta)?\b/gi, ' ')
 
-  // 7. Strip amounts and currency markers (20k, 50rb, 100000, rp 50000, ceban, goceng, etc.)
+  // 7. Strip amounts, slang nominals, and currency markers (20k, 50rb, 100000, rp 50000, goban, ceban, goceng, etc.)
   text = text.replace(/\brp\.?\s*/gi, ' ')
   text = text.replace(/[$€£¥]\s*/g, ' ')
   text = text.replace(/\b(?:usd|eur|sgd|myr|gbp|jpy)\b/gi, ' ')
-  text = text.replace(/\b(ceban|goceng|gocap|seceng|noceng|cenggo|nocenggo|cepek|pekgo|sejeti)\b/gi, ' ')
+  text = text.replace(/\b(seceng\s+go|secenggo|ceban|goceng|gocap|goban|seceng|noceng|cenggo|nocenggo|cepek|pekgo|gopit|gotia|sejeti)\b/gi, ' ')
   text = text.replace(/\b\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|jt|juta|m|perak)\b/gi, ' ')
   text = text.replace(/\b\d{4,}(?:[.,]\d+)?\b/g, ' ')
   text = text.replace(/[@+\-*/]\s*/g, ' ')
+
+  // 7.5. Strip discount, tax, surcharge, and cashback expressions
+  text = text.replace(/\b(?:diskon|disc|potongan)\s*(?:sebesar\s*)?(?:\d+(?:[.,]\d+)?\s*%|\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|rebu|rebo|rbu|jt|juta)?)\b/gi, ' ')
+  text = text.replace(/\b(?:(?:plus\s+)?pajak|ppn|tax|pb1)\s*(?:\d+(?:[.,]\d+)?\s*%)\b/gi, ' ')
+  text = text.replace(/\b(?:(?:dapet\s+)?cashback)\s*(?:sebesar\s*)?(?:rp\.?\s*)?(?:\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|rebu|rebo|rbu|jt|juta)?)\b/gi, ' ')
+  text = text.replace(/\b(?:(?:plus\s+|tambah\s+|\+\s*)?(?:ongkir|ongkos\s+kirim|biaya\s+kirim|service|layanan|biaya\s+layanan))\s*(?:sebesar\s*)?(?:rp\.?\s*)?(?:\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|rebu|rebo|rbu|jt|juta)?)\b/gi, ' ')
+  text = text.replace(/\b(?:diskon|disc|potongan|ppn|pajak|tax|pb1|cashback|promo|voucher)\b/gi, ' ')
 
   // 8. Strip wallet & payment method mentions
   if (options.walletName) {
@@ -511,7 +545,8 @@ export function extractCleanSubjectEntity(rawText, options = {}) {
     }
   }
 
-  // 11. Strip conversational fillers, interjections, and personal pronouns
+  // 11. Strip conversational fillers, universal scope modifiers, and personal pronouns
+  text = text.replace(/\b(?:semuanya|semua|keduanya|dua-duanya|dua\s+duanya|kabeh|masing-masing)\b/gi, ' ')
   text = text.replace(/\b(?:oh\s+iya|oh\s+ya|tadi\s+tuh|jadi\s+tuh|lah\s+ya)\b/gi, ' ')
   text = text.replace(/\b(?:oh|iya|nah|eh|dong|sih|tuh|kan|lah|deh|kok|nih|terus|gitu)\b/gi, ' ')
   text = text.replace(/\b(?:aku|saya|gue|gw|lu|lo|kamu|dia|kita|kami)\b/gi, ' ')

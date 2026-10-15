@@ -1,8 +1,9 @@
-import { format, subDays, addDays } from 'date-fns'
+import { format, subDays, addDays, subMonths } from 'date-fns'
 import {
   DAY_DEFINITIONS,
   MONTH_DEFINITIONS,
 } from './lexicon'
+import { parseSpelledOutIndonesianNumber } from './spelledOutNumbers'
 
 /**
  * Calculates the past calendar date for a day of week relative to reference date.
@@ -124,9 +125,113 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
     }
   }
 
-  // 3. Day of week name (senin, selasa, rabu, kamis, jumat, sabtu, minggu)
+  // 3. Relative Day/Week/Month: dynamic past
+  // Dynamic weeks ago: "seminggu lalu", "1 minggu lalu", "2 minggu lalu", "dua minggu lalu"
+  const weeksAgoMatch = lower.match(/\b(?:(?:(\d+|satu|dua|tiga|empat)\s+minggu\s+lalu)|seminggu\s+lalu)\b/i)
+  if (weeksAgoMatch) {
+    const rawVal = weeksAgoMatch[1]
+    const n = rawVal ? (parseSpelledOutIndonesianNumber(rawVal) || parseInt(rawVal, 10) || 1) : 1
+    return {
+      dateStr: format(subDays(ref, n * 7), 'yyyy-MM-dd'),
+      matchedText: weeksAgoMatch[0].trim(),
+    }
+  }
+
+  // Dynamic months ago: "sebulan lalu", "1 bulan lalu", "N bulan lalu"
+  const monthsAgoMatch = lower.match(/\b(?:(?:(\d+|satu|dua|tiga)\s+bulan\s+lalu)|sebulan\s+lalu)\b/i)
+  if (monthsAgoMatch) {
+    const rawVal = monthsAgoMatch[1]
+    const n = rawVal ? (parseSpelledOutIndonesianNumber(rawVal) || parseInt(rawVal, 10) || 1) : 1
+    return {
+      dateStr: format(subMonths(ref, n), 'yyyy-MM-dd'),
+      matchedText: monthsAgoMatch[0].trim(),
+    }
+  }
+
+  // Dynamic days ago: "kemarin lusa", "kemarin dulu", "2 hari lalu", "3 hari lalu", "tiga hari lalu", "N hari lalu"
+  const daysAgoMatch = lower.match(/\b(?:kemarin\s+lusa|kemarin\s+dulu|kemaren\s+dulu|(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+hari\s+lalu)\b/i)
+  if (daysAgoMatch) {
+    const rawVal = daysAgoMatch[1]
+    let n = 2
+    if (rawVal) {
+      n = parseSpelledOutIndonesianNumber(rawVal) || parseInt(rawVal, 10) || 2
+    }
+    return {
+      dateStr: format(subDays(ref, n), 'yyyy-MM-dd'),
+      matchedText: daysAgoMatch[0].trim(),
+    }
+  }
+
+  // 3.5 Standalone kemarin, semalam, tadi malam
+  if (/\b(kemarin|semalam|tadi\s+malam)\b/i.test(lower)) {
+    const match = lower.match(/\b(kemarin|semalam|tadi\s+malam)\b/i)
+    return {
+      dateStr: format(subDays(ref, 1), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'kemarin',
+    }
+  }
+
+  // 3.6 Dynamic future: "seminggu lagi", "N minggu lagi"
+  const weeksAheadMatch = lower.match(/\b(?:(?:(\d+|satu|dua|tiga)\s+minggu\s+lagi)|seminggu\s+lagi)\b/i)
+  if (weeksAheadMatch) {
+    const rawVal = weeksAheadMatch[1]
+    const n = rawVal ? (parseSpelledOutIndonesianNumber(rawVal) || parseInt(rawVal, 10) || 1) : 1
+    return {
+      dateStr: format(addDays(ref, n * 7), 'yyyy-MM-dd'),
+      matchedText: weeksAheadMatch[0].trim(),
+    }
+  }
+
+  // Dynamic days ahead: "besok lusa", "lusa", "N hari lagi"
+  const daysAheadMatch = lower.match(/\b(?:besok\s+lusa|\blusa\b|(\d+|satu|dua|tiga|empat|lima|enam|tujuh)\s+hari\s+lagi)\b/i)
+  if (daysAheadMatch) {
+    const rawVal = daysAheadMatch[1]
+    let n = 2
+    if (rawVal) {
+      n = parseSpelledOutIndonesianNumber(rawVal) || parseInt(rawVal, 10) || 2
+    }
+    return {
+      dateStr: format(addDays(ref, n), 'yyyy-MM-dd'),
+      matchedText: daysAheadMatch[0].trim(),
+    }
+  }
+
+  // 3.7 Standalone besok, bsk, besok pagi/siang/sore/malam
+  if (/\b(besok|bsk)\b/i.test(lower)) {
+    const match = lower.match(/\b(besok|bsk)(?:\s+(?:pagi|siang|sore|malam))?\b/i)
+    return {
+      dateStr: format(addDays(ref, 1), 'yyyy-MM-dd'),
+      matchedText: match ? match[0] : 'besok',
+    }
+  }
+
+  // 4. Day of week name (senin, selasa, rabu, kamis, jumat, sabtu, minggu)
   for (const def of DAY_DEFINITIONS) {
+    if (def.canonical === 'minggu' && /\b(?:\d+|satu|dua|tiga|empat|lima|se)\s*minggu\b/i.test(lower)) {
+      continue
+    }
     if (def.regex.test(lower)) {
+      const hasFutureQualifier =
+        new RegExp(`${def.canonical}\\s+(?:depan|nanti|besok)|(?:minggu\\s+depan)\\s+(?:hari\\s+)?${def.canonical}`, 'i').test(lower)
+
+      if (hasFutureQualifier) {
+        const currentDay = ref.getDay()
+        const targetDay = def.dayIndex
+        let diff = targetDay - currentDay
+        if (diff <= 0) {
+          diff += 7
+        }
+        const futureDate = addDays(ref, diff)
+        const futureMatch = lower.match(
+          new RegExp(`(?:(?:minggu\\s+depan)\\s+(?:hari\\s+)?)?${def.regex.source}(?:\\s+(?:depan|nanti|besok))?`, 'i')
+        )
+        return {
+          dateStr: format(futureDate, 'yyyy-MM-dd'),
+          matchedText: futureMatch ? futureMatch[0] : `${def.canonical} depan`,
+          dayIndex: def.dayIndex,
+        }
+      }
+
       const hasPastWeekQualifier =
         new RegExp(`${def.canonical}\\s+(?:lalu|minggu\\s+lalu)|(?:minggu\\s+lalu)\\s+(?:hari\\s+)?${def.canonical}`, 'i').test(lower)
       const hasKemarinQualifier =
@@ -142,42 +247,6 @@ export function extractDateFromPhrase(phrase, referenceDate = new Date()) {
         matchedText: dayWordMatch ? dayWordMatch[0] : def.canonical,
         dayIndex: def.dayIndex,
       }
-    }
-  }
-
-  // 4. Relative Day: kemarin lusa, 2 hari lalu
-  if (/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i.test(lower)) {
-    const match = lower.match(/\b(kemarin\s+lusa|2\s+hari\s+lalu)\b/i)
-    return {
-      dateStr: format(subDays(ref, 2), 'yyyy-MM-dd'),
-      matchedText: match ? match[0] : 'kemarin lusa',
-    }
-  }
-
-  // 5. Standalone kemarin, semalam, tadi malam
-  if (/\b(kemarin|semalam|tadi\s+malam)\b/i.test(lower)) {
-    const match = lower.match(/\b(kemarin|semalam|tadi\s+malam)\b/i)
-    return {
-      dateStr: format(subDays(ref, 1), 'yyyy-MM-dd'),
-      matchedText: match ? match[0] : 'kemarin',
-    }
-  }
-
-  // 5.5. Relative Future: besok lusa, lusa, 2 hari lagi
-  if (/\b(besok\s+lusa|\blusa\b|2\s+hari\s+lagi)\b/i.test(lower)) {
-    const match = lower.match(/\b(besok\s+lusa|\blusa\b|2\s+hari\s+lagi)\b/i)
-    return {
-      dateStr: format(addDays(ref, 2), 'yyyy-MM-dd'),
-      matchedText: match ? match[0] : 'lusa',
-    }
-  }
-
-  // 5.6. Standalone besok, bsk, besok pagi/siang/sore/malam
-  if (/\b(besok|bsk)\b/i.test(lower)) {
-    const match = lower.match(/\b(besok|bsk)(?:\s+(?:pagi|siang|sore|malam))?\b/i)
-    return {
-      dateStr: format(addDays(ref, 1), 'yyyy-MM-dd'),
-      matchedText: match ? match[0] : 'besok',
     }
   }
 

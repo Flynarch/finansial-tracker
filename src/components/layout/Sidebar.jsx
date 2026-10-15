@@ -31,6 +31,19 @@ function linkClassName({ isActive }) {
   }`
 }
 
+const ROUTE_PRELOADS = {
+  '/dashboard': () => import('../../pages/Dashboard'),
+  '/transactions': () => import('../../pages/Transactions'),
+  '/loans': () => import('../../pages/Loans'),
+  '/budget': () => import('../../pages/Budget'),
+  '/savings': () => import('../../pages/Savings'),
+  '/todos': () => import('../../pages/TodoList'),
+  '/calendar': () => import('../../pages/Calendar'),
+  '/reports': () => import('../../pages/Reports'),
+  '/profile': () => import('../../pages/Profile'),
+  '/settings': () => import('../../pages/settings/SettingsLayout'),
+}
+
 function Sidebar() {
   const { t } = useTranslation()
 
@@ -40,7 +53,13 @@ function Sidebar() {
         {navItems.map((item) => {
           const Icon = ICON_MAP[item.icon] || LayoutDashboard
           return (
-            <NavLink key={item.path} to={item.path} className={linkClassName}>
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={linkClassName}
+              onPointerDown={() => ROUTE_PRELOADS[item.path]?.()}
+              onMouseEnter={() => ROUTE_PRELOADS[item.path]?.()}
+            >
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--field-bg)] text-[var(--fg)] shadow-2xs">
                 <Icon className="h-4 w-4" strokeWidth={2.2} />
               </div>

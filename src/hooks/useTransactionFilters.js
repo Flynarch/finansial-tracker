@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { getDecryptedNoteSync, isFieldEncrypted } from '../lib/fieldEncryption'
+import { parseTransactionSearchQuery, matchesTransactionAmount } from '../lib/transactionSearchParser'
 
 export const ALL_TYPES = ['income', 'expense', 'transfer']
 
@@ -24,7 +25,11 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
   const activeCategories = filters?.categories
   const isAllCategories = !activeCategories || (Array.isArray(activeCategories) && usedCategoriesCount > 0 && activeCategories.length === usedCategoriesCount)
 
-  const searchLower = (filters?.search || '').toLowerCase().trim()
+  const rawSearch = (filters?.search || '').trim()
+  const parsedSearch = rawSearch ? parseTransactionSearchQuery(rawSearch) : null
+  const searchLower = parsedSearch ? parsedSearch.textQuery.toLowerCase() : ''
+  const amountCondition = parsedSearch ? parsedSearch.amountCondition : null
+  const rawSearchLower = rawSearch.toLowerCase()
   const startDate = filters?.startDate
   const endDate = filters?.endDate
   const activeTag = filters?.tag
@@ -32,24 +37,54 @@ export function computeFilteredTransactions(transactions, filters, userWalletsCo
   return (transactions || [])
     .filter((item) => {
       if (item?.isPendingReview === true || item?.isPendingReview === 1) return false
-      if (searchLower) {
+      if (rawSearch) {
         const tagsStr = Array.isArray(item.tags) ? item.tags.join(' ') : ''
         const rawNote = item.notes
         const plainNote = isFieldEncrypted(rawNote) ? getDecryptedNoteSync(rawNote) : rawNote
         const itemNoteText = isFieldEncrypted(plainNote) ? '' : (plainNote ?? '')
         let searchTarget = `${itemNoteText} ${item.category ?? ''} ${item.subcategory ?? ''} ${tagsStr} ${item.rawText ?? ''}`
+        
+        let splitItemsMatchesBoth = false
+
         if (item.isSplit && Array.isArray(item.splitItems)) {
           const splitText = item.splitItems
             .map((si) => {
               const rawSi = si?.notes
               const plainSi = isFieldEncrypted(rawSi) ? getDecryptedNoteSync(rawSi) : rawSi
               const safeSi = isFieldEncrypted(plainSi) ? '' : (plainSi || '')
-              return `${si?.category || ''} ${si?.subcategory || ''} ${safeSi}`
+              const siText = `${si?.category || ''} ${si?.subcategory || ''} ${safeSi}`
+              if (searchLower && siText.toLowerCase().includes(searchLower)) {
+                if (amountCondition && matchesTransactionAmount(si, amountCondition)) {
+                  splitItemsMatchesBoth = true
+                }
+              }
+              return siText
             })
             .join(' ')
           searchTarget += ` ${splitText}`
         }
-        if (!searchTarget.toLowerCase().includes(searchLower)) return false
+
+        const targetLower = searchTarget.toLowerCase()
+
+        if (amountCondition) {
+          if (amountCondition.type === 'exact') {
+            const amountMatches = matchesTransactionAmount(item, amountCondition)
+            const textMatches = targetLower.includes(rawSearchLower)
+            if (!amountMatches && !textMatches) return false
+          } else if (searchLower) {
+            const parentMatchesText = targetLower.includes(searchLower)
+            const parentMatchesAmt = matchesTransactionAmount({ amount: item.amount }, amountCondition)
+            const parentMatchesBoth = parentMatchesText && parentMatchesAmt
+
+            if (!parentMatchesBoth && !splitItemsMatchesBoth) {
+              return false
+            }
+          } else if (!matchesTransactionAmount(item, amountCondition)) {
+            return false
+          }
+        } else if (searchLower) {
+          if (!targetLower.includes(searchLower)) return false
+        }
       }
 
       if (activeTag) {

@@ -47,40 +47,90 @@ export function compressImage(fileOrDataUrl, maxDimension = 1024, quality = 0.75
     }
 
     const img = new Image()
+    let objectUrlToRevoke = null
+
+    const cleanup = () => {
+      if (objectUrlToRevoke) {
+        try {
+          URL.revokeObjectURL(objectUrlToRevoke)
+        } catch {
+          // Ignore revocation error if URL already released
+        }
+        objectUrlToRevoke = null
+      }
+      img.onload = null
+      img.onerror = null
+      img.src = ''
+    }
+
     img.onload = () => {
-      const { width, height } = calculateTargetDimensions(img.width, img.height, maxDimension)
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        return resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '')
-      }
+      try {
+        const { width, height } = calculateTargetDimensions(img.width, img.height, maxDimension)
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          cleanup()
+          return resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '')
+        }
 
-      ctx.drawImage(img, 0, 0, width, height)
+        ctx.drawImage(img, 0, 0, width, height)
 
-      // Try webp first, fallback to jpeg
-      let dataUrl = canvas.toDataURL('image/webp', quality)
-      if (!dataUrl.startsWith('data:image/webp')) {
-        dataUrl = canvas.toDataURL('image/jpeg', quality)
+        // Try webp first, fallback to jpeg
+        let dataUrl = canvas.toDataURL('image/webp', quality)
+        if (!dataUrl.startsWith('data:image/webp')) {
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+        }
+
+        // Release canvas backing store and image memory immediately
+        canvas.width = 0
+        canvas.height = 0
+        cleanup()
+
+        resolve(dataUrl)
+      } catch (err) {
+        cleanup()
+        reject(err)
       }
-      resolve(dataUrl)
     }
 
     img.onerror = (err) => {
+      cleanup()
       reject(err)
     }
 
     if (typeof fileOrDataUrl === 'string') {
       img.src = fileOrDataUrl
     } else if (fileOrDataUrl instanceof Blob || fileOrDataUrl instanceof File) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        img.src = e.target.result
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        try {
+          objectUrlToRevoke = URL.createObjectURL(fileOrDataUrl)
+          img.src = objectUrlToRevoke
+        } catch {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            img.src = e.target.result
+          }
+          reader.onerror = (err) => {
+            cleanup()
+            reject(err)
+          }
+          reader.readAsDataURL(fileOrDataUrl)
+        }
+      } else {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          img.src = e.target.result
+        }
+        reader.onerror = (err) => {
+          cleanup()
+          reject(err)
+        }
+        reader.readAsDataURL(fileOrDataUrl)
       }
-      reader.onerror = (err) => reject(err)
-      reader.readAsDataURL(fileOrDataUrl)
     } else {
+      cleanup()
       resolve('')
     }
   })

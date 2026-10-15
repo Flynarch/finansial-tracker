@@ -58,11 +58,19 @@ function Transactions() {
   const clearUnviewedMutations = useSettingsStore((state) => state.clearUnviewedMutations)
 
   // Live queries from Dexie with zero-latency memory cache fallback
-  const transactionsRaw = useLiveQuery(async () => {
-    const list = await db.transactions.orderBy('date').reverse().toArray()
-    return (list || []).filter((tx) => !tx.deletedAt)
-  }, [])
-  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const transactionsRaw = useLiveQuery(
+    async () => {
+      const list = await db.transactions.orderBy('date').reverse().toArray()
+      return (list || []).filter((tx) => !tx.deletedAt)
+    },
+    [],
+    getCachedDashboardTransactions() || undefined
+  )
+  const dbWallets = useLiveQuery(
+    () => db.wallets.toArray(),
+    [],
+    getCachedDashboardWallets() || undefined
+  )
 
   useEffect(() => {
     if (transactionsRaw) {

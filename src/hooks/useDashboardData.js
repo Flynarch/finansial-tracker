@@ -145,6 +145,7 @@ export function useDashboardData() {
   const budgets = useLiveQuery(() => db.budgets.toArray(), [], cachedDashboardState.budgets)
   const goals = useLiveQuery(() => db.goals.toArray(), [], cachedDashboardState.goals)
   const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans)
+  const rawWallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
   const walletsWithBalance = useLiveQuery(
     async () => {
       // Establish active live dependency on transactions & walletBalanceCache
@@ -152,9 +153,9 @@ export function useDashboardData() {
       if (db.walletBalanceCache) {
         await db.walletBalanceCache.limit(1).toArray()
       }
-      const rawWallets = await db.wallets.toArray()
-      if (!rawWallets || rawWallets.length === 0) return []
-      return await getAllWalletBalances(rawWallets, rates)
+      const rawWalletsList = await db.wallets.toArray()
+      if (!rawWalletsList || rawWalletsList.length === 0) return []
+      return await getAllWalletBalances(rawWalletsList, rates)
     },
     [rates],
     cachedDashboardState.walletsWithBalance,
@@ -164,6 +165,7 @@ export function useDashboardData() {
 
   // Keep in-memory cache updated whenever live query results resolve
   useEffect(() => {
+    if (rawWallets) cachedDashboardState.wallets = rawWallets
     if (transactions !== null) cachedDashboardState.transactions = transactions
     if (investments !== null) cachedDashboardState.investments = investments
     if (budgets !== null) cachedDashboardState.budgets = budgets
@@ -172,7 +174,7 @@ export function useDashboardData() {
     if (walletsWithBalance !== null && walletsWithBalance !== undefined) cachedDashboardState.walletsWithBalance = walletsWithBalance
     if (rawHabitLogs !== null && rawHabitLogs !== undefined) cachedDashboardState.rawHabitLogs = rawHabitLogs
     if (rawHabits !== null && rawHabits !== undefined) cachedDashboardState.rawHabits = rawHabits
-  }, [transactions, investments, budgets, goals, loans, walletsWithBalance, rawHabitLogs, rawHabits])
+  }, [rawWallets, transactions, investments, budgets, goals, loans, walletsWithBalance, rawHabitLogs, rawHabits])
 
   const allHabitLogs = useMemo(() => rawHabitLogs || [], [rawHabitLogs])
   const allHabits = useMemo(() => rawHabits || [], [rawHabits])

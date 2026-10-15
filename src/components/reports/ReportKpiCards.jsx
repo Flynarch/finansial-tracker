@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { TrendingUp, TrendingDown, ShieldCheck, AlertTriangle, ArrowUpRight, ArrowDownRight, Scale, Inbox } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -11,7 +11,7 @@ import {
   formatDelta,
 } from '../../lib/reportAnalytics'
 
-export default function ReportKpiCards({
+const ReportKpiCards = memo(function ReportKpiCards({
   thisMonth,
   previousMonth,
   periodSummary,
@@ -264,4 +264,6 @@ export default function ReportKpiCards({
       </div>
     </section>
   )
-}
+})
+
+export default ReportKpiCards

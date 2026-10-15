@@ -2,8 +2,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import { format, subDays } from 'date-fns'
 import { isHabitScheduledOnDate } from '../../lib/habitStats'
+import { cachedDashboardState } from '../../hooks/dashboard/dashboardCache'
 
-export default function MiniHabitHeatmap() {
+export default function MiniHabitHeatmap({ habits: habitsProp, logs: logsProp }) {
   // Generate the last 14 days ending today
   const days = Array.from({ length: 14 }, (_, i) => {
     return format(subDays(new Date(), 13 - i), 'yyyy-MM-dd')
@@ -12,12 +13,18 @@ export default function MiniHabitHeatmap() {
   const startDateStr = days[0]
   const endDateStr = days[days.length - 1]
 
-  const habits = useLiveQuery(() => db.habits.toArray(), []) || []
+  const liveHabits = useLiveQuery(
+    () => (habitsProp ? null : db.habits.toArray()),
+    [habitsProp],
+    cachedDashboardState.rawHabits || undefined
+  )
+  const habits = habitsProp || liveHabits || []
 
-  const logs = useLiveQuery(
-    () => db.habitLogs.where('date').between(startDateStr, endDateStr, true, true).toArray(),
-    [startDateStr, endDateStr]
-  ) || []
+  const liveLogs = useLiveQuery(
+    () => (logsProp ? null : db.habitLogs.where('date').between(startDateStr, endDateStr, true, true).toArray()),
+    [logsProp, startDateStr, endDateStr]
+  )
+  const logs = logsProp || liveLogs || []
 
   const map = new Map()
   if (logs) {

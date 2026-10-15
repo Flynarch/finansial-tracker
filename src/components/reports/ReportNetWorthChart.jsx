@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Landmark } from 'lucide-react'
 import useTranslation from '../../hooks/useTranslation'
@@ -14,7 +15,7 @@ import {
 import ChartTooltip from './ChartTooltip'
 import EmptyState from '../ui/EmptyState'
 
-export default function ReportNetWorthChart({
+const ReportNetWorthChart = memo(function ReportNetWorthChart({
   netWorthTrend = [],
   totalCash = 0,
   investmentValue = 0,
@@ -110,4 +111,6 @@ export default function ReportNetWorthChart({
       )}
     </section>
   )
-}
+})
+
+export default ReportNetWorthChart

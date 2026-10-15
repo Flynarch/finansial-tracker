@@ -1436,17 +1436,17 @@ html:not([data-theme="light"]) .ft-wallet-mini:hover {
 
 .ft-page-crossfade,
 .ft-page-transition {
-  animation: ft-page-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform;
+  animation: ft-page-fade-in 140ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
 }
 
 .ft-skeleton-enter {
-  animation: ft-skeleton-fade-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ft-skeleton-fade-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: opacity, transform;
 }
 
 .ft-content-loaded {
-  animation: ft-content-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ft-content-fade-in 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: opacity, transform;
 }
 

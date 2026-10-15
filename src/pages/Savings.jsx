@@ -27,6 +27,7 @@ import {
   FALLBACK_EXCHANGE_RATES,
 } from '../lib/utils'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
+import { cachedDashboardState } from '../hooks/useDashboardData'
 
 function Savings() {
   const { locale, t } = useTranslation()
@@ -60,23 +61,36 @@ function Savings() {
     window.scrollTo(0, 0)
   }, [])
 
-  const goals = useLiveQuery(async () => {
-    try {
-      return await db.goals.toArray()
-    } catch (err){
-      console.warn('[Savings]', err)
-      return []
-    }
-  }, [])
+  const goals = useLiveQuery(
+    async () => {
+      try {
+        return await db.goals.toArray()
+      } catch (err) {
+        console.warn('[Savings]', err)
+        return []
+      }
+    },
+    [],
+    cachedDashboardState.goals || undefined
+  )
 
-  const wallets = useLiveQuery(async () => {
-    try {
-      return await db.wallets.toArray()
-    } catch (err){
-      console.warn('[Savings]', err)
-      return []
-    }
-  }, [])
+  const wallets = useLiveQuery(
+    async () => {
+      try {
+        return await db.wallets.toArray()
+      } catch (err) {
+        console.warn('[Savings]', err)
+        return []
+      }
+    },
+    [],
+    cachedDashboardState.wallets || undefined
+  )
+
+  useEffect(() => {
+    if (goals) cachedDashboardState.goals = goals
+    if (wallets) cachedDashboardState.wallets = wallets
+  }, [goals, wallets])
 
   const isDataReady = goals !== undefined && wallets !== undefined
 
@@ -415,7 +429,7 @@ function Savings() {
                   <div
                     key={g.id}
                     onClick={() => navigate(`/savings/${g.id}`)}
-                    className="relative overflow-visible rounded-2xl border transition-all duration-200 border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)] cursor-pointer ft-spring-press"
+                    className="relative overflow-visible rounded-2xl border transition-all duration-200 border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-[var(--panel-strong)] shadow-2xs hover:border-[var(--border-strong)] cursor-pointer ft-spring-press ft-group-visibility-auto"
                   >
                     <div className="relative z-10 p-4 sm:p-5 flex flex-col justify-between h-full space-y-4">
                       {/* Top Part: Icon, Name + Percentage next to name, Amount & 3-dots Menu */}

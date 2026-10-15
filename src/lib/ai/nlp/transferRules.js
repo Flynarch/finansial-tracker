@@ -4,7 +4,10 @@ import useSettingsStore from '../../../store/useSettingsStore'
 import { extractTimeSlot } from '../semanticSlotFiller'
 import { findWalletInText } from './tokenizer'
 import { extractDateFromPhrase } from './dateRules'
-import { extractMonetaryAmountFromText } from './amountRules'
+import {
+  extractMonetaryAmountFromText,
+  parseIndonesianAmount,
+} from './amountRules'
 
 /**
  * Intelligent heuristic parser for Indonesian balance transfers, top-ups, and cash withdrawals.
@@ -55,15 +58,16 @@ export function parseTransferTransaction(
     }
   }
 
-  if (wallets.length < 2) {
+  if (wallets.length === 0) {
     return {
       error: true,
-      message: 'Transfer saldo membutuhkan minimal 2 dompet aktif. Silakan buat dompet tujuan terlebih dahulu.',
+      message: 'Silakan buat dompet terlebih dahulu sebelum mencatat transaksi.',
     }
   }
 
   let sourceWalletId = null
   let targetWalletId = null
+  let rawRecipient = null
 
   if (isTarikTunai) {
     // Tarik tunai: target is physical cash
@@ -127,26 +131,101 @@ export function parseTransferTransaction(
     if (dariKeMatch) {
       sourceWalletId = findWalletInText(dariKeMatch[1], wallets, null)
       targetWalletId = findWalletInText(dariKeMatch[2], wallets, null)
+      if (!targetWalletId) rawRecipient = dariKeMatch[2]
     } else if (keDariMatch) {
       targetWalletId = findWalletInText(keDariMatch[1], wallets, null)
       sourceWalletId = findWalletInText(keDariMatch[2], wallets, null)
+      if (!targetWalletId) rawRecipient = keDariMatch[1]
     } else {
-      const keOnlyMatch = lower.match(/\bke\s+([a-zA-Z0-9_\s-]+)/i)
+      const keOnlyMatch =
+        lower.match(
+          /\bke\s+([a-zA-Z0-9_\s-]+?)(?:\s+(?:pakai|pake|dari|lewat|via|menggunakan|sebesar|sejumlah|\d|biaya|admin|karena|buat|untuk)|$)/i
+        ) || lower.match(/\bke\s+([a-zA-Z0-9_\s-]+)/i)
       if (keOnlyMatch) {
         targetWalletId = findWalletInText(keOnlyMatch[1], wallets, null)
+        if (!targetWalletId) rawRecipient = keOnlyMatch[1]
       }
-      const dariOnlyMatch = lower.match(/\bdari\s+([a-zA-Z0-9_\s-]+)/i)
+      const dariOnlyMatch = lower.match(/\b(?:dari|pakai|pake|lewat|via|menggunakan)\s+([a-zA-Z0-9_\s-]+)/i)
       if (dariOnlyMatch) {
         sourceWalletId = findWalletInText(dariOnlyMatch[1], wallets, null)
       }
-      if (!sourceWalletId || !targetWalletId) {
+      if (!rawRecipient && (!sourceWalletId || !targetWalletId)) {
         const simpleKeMatch =
           lower.match(/([a-zA-Z0-9_\s-]+?)\s+ke\s+([a-zA-Z0-9_\s-]+?)(?:\s+(?:sebesar|sejumlah|\d)|$)/i) ||
           lower.match(/([a-zA-Z0-9_-]+)\s+ke\s+([a-zA-Z0-9_-]+)/i)
         if (simpleKeMatch) {
           sourceWalletId = sourceWalletId || findWalletInText(simpleKeMatch[1], wallets, null)
-          targetWalletId = targetWalletId || findWalletInText(simpleKeMatch[2], wallets, null)
+          const targetCandidate = findWalletInText(simpleKeMatch[2], wallets, null)
+          if (targetCandidate) {
+            targetWalletId = targetWalletId || targetCandidate
+          } else if (!rawRecipient) {
+            rawRecipient = simpleKeMatch[2]
+          }
         }
+      }
+    }
+
+    // Check if user is transferring to a 3rd party recipient (person or entity outside user's wallets)
+    const cleanRecipient = (rawRecipient || '')
+      .replace(/^(?:rekening|rek|akun|nomor|no\s*rek)\s+/i, '')
+      .replace(/\s+(?:sebesar|sejumlah|\d.*)$/i, '')
+      .trim()
+
+    if (cleanRecipient && cleanRecipient.length >= 2 && !targetWalletId) {
+      if (!sourceWalletId && wallets.length > 0) {
+        const configured = wallets.find((w) => w.id === defaultWalletId)
+        sourceWalletId = configured ? configured.id : wallets[0].id
+      }
+      const adminFeeMatch = lower.match(
+        /\b(?:(?:biaya\s+)?admin|fee)\s*(?:sebesar\s*)?(?:rp\.?\s*)?(\d+(?:[.,]\d+)?\s*(?:k|rb|ribu|rebu|rebo|rbu)?)\b/i
+      )
+      let adminFee = 0
+      if (adminFeeMatch && adminFeeMatch[1]) {
+        adminFee = parseIndonesianAmount(adminFeeMatch[1])
+      }
+
+      const titleRecipient = cleanRecipient.charAt(0).toUpperCase() + cleanRecipient.slice(1)
+      const totalAmt = amt + adminFee
+      const sourceWallet = wallets.find((w) => String(w.id) === String(sourceWalletId)) || wallets[0]
+      const txCurrency = sourceWallet?.currency || defaultCurrency
+      const srcName = sourceWallet?.name || 'Dompet'
+      const dateResult = extractDateFromPhrase(normalizedText, ref)
+      const resolvedDate = dateResult ? dateResult.dateStr : todayStr
+      const noteText =
+        adminFee > 0
+          ? `Transfer ke ${titleRecipient} (biaya admin: ${formatCurrency(adminFee, txCurrency)})`
+          : `Transfer ke ${titleRecipient}`
+
+      return {
+        type: 'transactions',
+        action: 'create',
+        amount: totalAmt,
+        transactions: [
+          {
+            type: 'expense',
+            amount: totalAmt,
+            category: 'transfer/keluar',
+            currency: txCurrency,
+            walletId: sourceWallet?.id || defaultWalletId,
+            date: resolvedDate,
+            time: resolvedTime,
+            merchant: titleRecipient,
+            notes: noteText,
+          },
+        ],
+        merchant: titleRecipient,
+        currency: txCurrency,
+        text: `Berhasil mencatat pengeluaran transfer ke ${titleRecipient} sebesar ${formatCurrency(totalAmt, txCurrency)} dari ${srcName}.`,
+        chips: ['Catat transaksi lain', 'Lihat riwayat', 'Analisis keuangan'],
+        isInstant: true,
+      }
+    }
+
+    // Otherwise, this is an internal transfer between user's own wallets
+    if (wallets.length < 2) {
+      return {
+        error: true,
+        message: 'Transfer saldo membutuhkan minimal 2 dompet aktif. Silakan buat dompet tujuan terlebih dahulu.',
       }
     }
 

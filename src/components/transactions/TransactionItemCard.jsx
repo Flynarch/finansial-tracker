@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { format as defaultFormat } from 'date-fns'
 import { formatCurrency as defaultFormatCurrency, convertCurrency as defaultConvertCurrency } from '../../lib/utils'
 import {
@@ -35,16 +35,30 @@ export const TransactionItemCard = memo(function TransactionItemCard({
   rates = {},
   contextWalletId,
   wallets: walletsProp,
+  walletMap: walletMapProp,
   isNew: isNewProp,
   newestTransactionId,
   isBulkMode,
   isSelected,
   onToggleSelect,
 }) {
-  const wallets = walletsProp && walletsProp.length > 0 ? walletsProp : []
+  const wallets = walletsProp || []
+
+  const walletMap = useMemo(() => {
+    if (walletMapProp) return walletMapProp
+    if (!walletsProp || walletsProp.length === 0) return null
+    const map = new Map()
+    for (const w of walletsProp) {
+      map.set(String(w.id), w)
+    }
+    return map
+  }, [walletMapProp, walletsProp])
 
   const getWalletName = (id) => {
     if (!id) return 'Wallet'
+    if (walletMap) {
+      return walletMap.get(String(id))?.name || 'Wallet'
+    }
     const found = wallets?.find((w) => String(w.id) === String(id))
     return found?.name || 'Wallet'
   }
@@ -210,7 +224,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
             {/* Micro-Avatar Wallet Badge */}
             {(() => {
               if (isContextWalletMatch) return null
-              const walletObj = wallets?.find((w) => String(w.id) === String(transaction.walletId))
+              const walletObj = walletMap ? walletMap.get(String(transaction.walletId)) : wallets?.find((w) => String(w.id) === String(transaction.walletId))
               if (!walletObj) return null
               const isCash = walletObj.customIcon === 'dollar' || walletObj.customIcon === 'cash' || String(walletObj.name || '').toLowerCase().includes('cash') || String(walletObj.name || '').toLowerCase().includes('uang tunai')
               const logo = getWalletLogoUrl(walletObj)
@@ -375,6 +389,7 @@ export const TransactionItemCard = memo(function TransactionItemCard({
     prevProps.rates === nextProps.rates &&
     prevProps.contextWalletId === nextProps.contextWalletId &&
     prevProps.wallets === nextProps.wallets &&
+    prevProps.walletMap === nextProps.walletMap &&
     prevProps.onViewDetail === nextProps.onViewDetail &&
     prevProps.onPreviewReceipt === nextProps.onPreviewReceipt &&
     prevProps.onDelete === nextProps.onDelete

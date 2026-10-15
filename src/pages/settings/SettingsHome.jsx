@@ -70,12 +70,12 @@ export default function SettingsHome() {
       }
     }
 
-    const onScroll = () => {
-      sessionStorage.setItem('ft_settings_scroll_pos', String(window.scrollY || 0))
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      try {
+        sessionStorage.setItem('ft_settings_scroll_pos', String(window.scrollY || 0))
+      } catch {
+        /* ignore storage quota/security errors */
+      }
     }
   }, [])
 

@@ -65,6 +65,10 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
         await performScan(base64Data, file.type)
       }
       reader.readAsDataURL(file)
+    } finally {
+      if (e.target) {
+        e.target.value = ''
+      }
     }
   }
 
@@ -144,6 +148,8 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
     setScanResult(null)
     setErrorMsg('')
     setIsScanning(false)
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (fileInputRef.current) fileInputRef.current.value = ''
     onClose()
   }
 
@@ -152,6 +158,8 @@ export default function ReceiptScannerModal({ isOpen, onClose, onApplyReceipt, e
     setScanResult(null)
     setErrorMsg('')
     setIsScanning(false)
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   return (

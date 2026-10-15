@@ -28,6 +28,13 @@ import {
   NOTIFICATION_LARGE_ICON,
 } from '../lib/smartNotifications'
 
+import {
+  getCachedTodoList,
+  getCachedSubTasksList,
+  setCachedTodoList,
+  setCachedSubTasksList,
+} from '../hooks/dashboard/dashboardCache'
+
 const TODO_SORT_PREF_KEY = 'todo_sort_pref'
 const TODO_NOTIF_PERMISSION_KEY = 'todo_notif_permission_asked_v1'
 
@@ -95,8 +102,22 @@ function TodoList() {
     return window.localStorage.getItem(TODO_NOTIF_PERMISSION_KEY) === '1'
   })
 
-  const todos = useLiveQuery(() => db.todos.orderBy('createdAt').reverse().toArray(), [])
-  const allSubTasks = useLiveQuery(() => db.sub_tasks.toArray(), [])
+  const todos = useLiveQuery(
+    () => db.todos.orderBy('createdAt').reverse().toArray(),
+    [],
+    getCachedTodoList() || undefined
+  )
+  const allSubTasks = useLiveQuery(
+    () => db.sub_tasks.toArray(),
+    [],
+    getCachedSubTasksList() || undefined
+  )
+
+  useEffect(() => {
+    if (todos) setCachedTodoList(todos)
+    if (allSubTasks) setCachedSubTasksList(allSubTasks)
+  }, [todos, allSubTasks])
+
   const isDataReady = Array.isArray(todos) && Array.isArray(allSubTasks)
 
   const subProgressByTodo = useMemo(() => {
@@ -374,6 +395,10 @@ function TodoList() {
     setDeleteConfirmOpen(true)
   }, [])
 
+  const handleOpenDetail = useCallback((id) => {
+    navigate(`/todos/${id}`)
+  }, [navigate])
+
   const removeTodo = async () => {
     if (!deleteTodoId) return
     const id = Number(deleteTodoId)
@@ -610,7 +635,7 @@ function TodoList() {
                     ignoreNextClickRef={ignoreNextClickRef}
                     rafIdRef={rafIdRef}
                     toggleCardComplete={toggleCardComplete}
-                    openDetail={(id) => navigate(`/todos/${id}`)}
+                    openDetail={handleOpenDetail}
                     onDeleteTodoFromCard={onDeleteTodoFromCard}
                     dueStatus={dueStatus}
                     dueBadgeClass={dueBadgeClass}

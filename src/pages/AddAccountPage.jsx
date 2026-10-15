@@ -9,6 +9,7 @@ import MoneyBagIcon from '../components/ui/MoneyBagIcon'
 import PageHeader from '../components/ui/PageHeader'
 import PageSkeleton from '../components/ui/PageSkeleton'
 import useTranslation from '../hooks/useTranslation'
+import { cachedDashboardState } from '../hooks/dashboard/dashboardCache'
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -66,7 +67,7 @@ function CircularInstitutionLogo({ inst }) {
 export default function AddAccountPage({ isOnboarding, onBack, onSuccess }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const wallets = useLiveQuery(() => db.wallets.toArray())
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
 
   const tabs = useMemo(
     () => [

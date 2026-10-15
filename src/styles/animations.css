@@ -265,6 +265,11 @@
   contain-intrinsic-size: auto 68px;
 }
 
+.ft-group-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
 .ft-gpu-layer {
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -315,16 +320,16 @@
 @keyframes ft-page-slide-up {
   0% {
     opacity: 0;
-    transform: translate3d(0, 24px, 0) scale(0.985);
+    transform: translate3d(0, 8px, 0);
   }
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .ft-page-enter {
-  animation: ft-page-slide-up 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ft-page-slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
@@ -739,6 +744,7 @@
 :root[data-motion="reduce"] .ft-skeleton-leaving,
 :root[data-motion="reduce"] .ft-fade-up,
 :root[data-motion="reduce"] .ft-todo-card-enter,
+:root[data-motion="reduce"] .ft-page-enter,
 :root[data-motion="reduce"] .ft-page-enter > *,
 :root[data-motion="reduce"] .ft-skeleton::after,
 :root[data-motion="reduce"] .ft-empty-state-icon,
@@ -815,18 +821,16 @@
 @keyframes ft-page-fade-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 6px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes ft-skeleton-fade-in {
   from {
     opacity: 0;
-    transform: scale(0.996);
+    transform: scale(0.998);
   }
   to {
     opacity: 1;
@@ -836,8 +840,8 @@
 
 @keyframes ft-content-fade-in {
   from {
-    opacity: 0.85;
-    transform: scale(0.998);
+    opacity: 0.88;
+    transform: scale(0.999);
   }
   to {
     opacity: 1;
@@ -855,7 +859,7 @@
 }
 
 .ft-skeleton-leaving {
-  animation: ft-skeleton-fade-out 220ms ease-out forwards;
+  animation: ft-skeleton-fade-out 180ms ease-out forwards;
   pointer-events: none;
 }
 

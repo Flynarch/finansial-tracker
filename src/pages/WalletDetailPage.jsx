@@ -16,6 +16,7 @@ import useBackButton from '../hooks/useBackButton'
 import { fetchCurrencyRates, getCachedCurrencyRates } from '../lib/api'
 import { FALLBACK_EXCHANGE_RATES } from '../lib/utils'
 import { getLastSeenTxTimestamp, updateLastSeenTxTimestamp } from '../lib/transactionLastSeen'
+import { cachedDashboardState } from '../hooks/dashboard/dashboardCache'
 
 export default function WalletDetailPage() {
   const { id } = useParams()
@@ -41,20 +42,27 @@ export default function WalletDetailPage() {
   useBackButton(() => setIsActionMenuOpen(false), Boolean(isActionMenuOpen))
 
   // 4. Dexie Live Queries
-  const wallet = useLiveQuery(async () => {
-    if (!walletId || isNaN(walletId)) return null
-    try {
-      const item = await db.wallets.get(walletId)
-      if (item) return item
-      const all = await db.wallets.toArray()
-      return all.find((w) => String(w.id) === String(walletId)) || null
-    } catch (err) {
-      console.error('[WalletDetailPage:getWallet]', err)
-      return null
-    }
+  const cachedWallet = useMemo(() => {
+    return cachedDashboardState.wallets?.find((w) => Number(w.id) === walletId || String(w.id) === String(walletId))
   }, [walletId])
 
-  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [])
+  const wallet = useLiveQuery(
+    async () => {
+      if (!walletId || isNaN(walletId)) return null
+      try {
+        let item = await db.wallets.get(walletId)
+        if (!item) item = await db.wallets.get(String(walletId))
+        return item || null
+      } catch (err) {
+        console.error('[WalletDetailPage:getWallet]', err)
+        return null
+      }
+    },
+    [walletId],
+    cachedWallet || undefined
+  )
+
+  const dbWallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
   const allWallets = useMemo(() => dbWallets || [], [dbWallets])
 
   const allTransactions = useLiveQuery(async () => {

@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { invalidateWalletBalance } from '../lib/balanceEngine'
 import { encryptField } from '../lib/fieldEncryption'
-import { clearCachedDashboardState } from '../hooks/dashboard/dashboardCache'
+import { clearCachedDashboardState, cachedDashboardState } from '../hooks/dashboard/dashboardCache'
 import useTranslation from '../hooks/useTranslation'
 import useSettingsStore from '../store/useSettingsStore'
 import Modal from '../components/ui/Modal'
@@ -58,18 +58,25 @@ export default function SavingsDetail() {
   const defaultCurrency = useSettingsStore((state) => state.defaultCurrency)
   const profileName = useSettingsStore((state) => state.profileName)
 
-  const goal = useLiveQuery(async () => {
-    if (!goalId || Number.isNaN(goalId)) return null
-    try {
-      const item = await db.goals.get(goalId)
-      if (item) return item
-      const all = await db.goals.toArray()
-      return all.find((g) => String(g.id) === String(goalId)) || null
-    } catch (err){
-      console.warn('[SavingsDetail]', err)
-      return null
-    }
+  const cachedGoal = useMemo(() => {
+    return cachedDashboardState.goals?.find((g) => Number(g.id) === goalId || String(g.id) === String(goalId))
   }, [goalId])
+
+  const goal = useLiveQuery(
+    async () => {
+      if (!goalId || Number.isNaN(goalId)) return null
+      try {
+        let item = await db.goals.get(goalId)
+        if (!item) item = await db.goals.get(String(goalId))
+        return item || null
+      } catch (err) {
+        console.warn('[SavingsDetail]', err)
+        return null
+      }
+    },
+    [goalId],
+    cachedGoal || undefined
+  )
 
   const logs = useLiveQuery(async () => {
     if (!goalId || Number.isNaN(goalId)) return []
@@ -106,14 +113,18 @@ export default function SavingsDetail() {
     window.scrollTo(0, 0)
   }, [])
 
-  const wallets = useLiveQuery(async () => {
-    try {
-      return await db.wallets.toArray()
-    } catch (err){
-      console.warn('[SavingsDetail]', err)
-      return []
-    }
-  }, [], [])
+  const wallets = useLiveQuery(
+    async () => {
+      try {
+        return await db.wallets.toArray()
+      } catch (err) {
+        console.warn('[SavingsDetail]', err)
+        return []
+      }
+    },
+    [],
+    cachedDashboardState.wallets || []
+  )
   const [selectedWalletId, setSelectedWalletId] = useState('')
   const selectedWallet = useMemo(
     () => (wallets || []).find((w) => String(w.id) === String(selectedWalletId)),

@@ -125,24 +125,39 @@ export function groupTransactionsDetailed(
       }
     }
 
-    const sortedItems = [...items].sort((a, b) => {
-      const timeKeyA = getIntradaySortKey(a)
-      const timeKeyB = getIntradaySortKey(b)
-      if (timeKeyA && timeKeyB && timeKeyA !== timeKeyB) {
-        return timeKeyB.localeCompare(timeKeyA)
+    const itemsWithKeys = items.map((item) => {
+      let score = -1
+      if (item?.time && typeof item.time === 'string' && item.time.trim()) {
+        const trimmed = item.time.trim()
+        if (trimmed.length >= 4) {
+          const hh = parseInt(trimmed.slice(0, 2), 10) || 0
+          const mm = parseInt(trimmed.slice(3, 5), 10) || 0
+          score = hh * 60 + mm
+        }
+      } else {
+        const ts = getTxSafeTimestamp(item)
+        if (ts > 0) {
+          const d = new Date(ts)
+          score = d.getHours() * 60 + d.getMinutes()
+        }
       }
-      if (timeKeyA && !timeKeyB) return -1
-      if (!timeKeyA && timeKeyB) return 1
-      const tsA = getTxSafeTimestamp(a)
-      const tsB = getTxSafeTimestamp(b)
-      if (tsA !== tsB) return tsB - tsA
-      const numA = Number(a.id)
-      const numB = Number(b.id)
-      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
-        return numB - numA
+      return {
+        item,
+        score,
+        ts: getTxSafeTimestamp(item),
+        idNum: Number(item?.id) || 0,
+        idStr: String(item?.id || ''),
       }
-      return String(b.id || '').localeCompare(String(a.id || ''))
     })
+
+    itemsWithKeys.sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score
+      if (a.ts !== b.ts) return b.ts - a.ts
+      if (a.idNum && b.idNum && a.idNum !== b.idNum) return b.idNum - a.idNum
+      return b.idStr.localeCompare(a.idStr)
+    })
+
+    const sortedItems = itemsWithKeys.map((k) => k.item)
 
     const net = totalIncome - totalExpense
     let dailySummaryText = ''

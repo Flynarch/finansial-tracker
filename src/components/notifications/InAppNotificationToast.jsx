@@ -85,7 +85,7 @@ export default function InAppNotificationToast() {
 
   // Listen to new unread database notifications without dropping items in batch
   const recentNotifications = useLiveQuery(async () => {
-    const items = await db.notifications.toArray()
+    const items = await db.notifications.orderBy('id').reverse().limit(10).toArray()
     if (!items || items.length === 0) return []
     const now = Date.now()
     return items

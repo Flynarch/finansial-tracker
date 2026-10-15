@@ -25,6 +25,7 @@ import SkeletonTransition from '../components/ui/SkeletonTransition'
 import PageSkeleton from '../components/ui/PageSkeleton'
 import useTransactionStore from '../store/useTransactionStore'
 import useBackButton from '../hooks/useBackButton'
+import { cachedDashboardState } from '../hooks/useDashboardData'
 
 export default function Reports() {
   const { t, locale } = useTranslation()
@@ -106,14 +107,21 @@ export default function Reports() {
         .toArray()
       return (list || []).filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1)
     },
-    [startDate, endDate]
+    [startDate, endDate],
+    cachedDashboardState.transactions || undefined
   )
-  const investments = useLiveQuery(() => db.investments.toArray(), [])
-  const wallets = useLiveQuery(() => db.wallets.toArray(), [])
-  const loans = useLiveQuery(() => db.loans.toArray(), [])
-  const savings = useLiveQuery(() => db.goals.toArray(), [])
+  const investments = useLiveQuery(() => db.investments.toArray(), [], cachedDashboardState.investments || undefined)
+  const wallets = useLiveQuery(() => db.wallets.toArray(), [], cachedDashboardState.wallets || undefined)
+  const loans = useLiveQuery(() => db.loans.toArray(), [], cachedDashboardState.loans || undefined)
+  const savings = useLiveQuery(() => db.goals.toArray(), [], cachedDashboardState.goals || undefined)
 
-  const isDataReady = transactions !== undefined && wallets !== undefined && loans !== undefined && investments !== undefined && savings !== undefined
+  useEffect(() => {
+    if (investments) cachedDashboardState.investments = investments
+    if (wallets) cachedDashboardState.wallets = wallets
+    if (loans) cachedDashboardState.loans = loans
+    if (savings) cachedDashboardState.goals = savings
+  }, [investments, wallets, loans, savings])
+
   const computedWallets = useLiveQuery(
     async () => {
       const rawWallets = await db.wallets.toArray()
@@ -121,12 +129,24 @@ export default function Reports() {
       return await getAllWalletBalances(rawWallets, rates)
     },
     [rates],
-    []
+    cachedDashboardState.walletsWithBalance || undefined
   )
-  const txCount = useLiveQuery(
-    () => db.transactions.filter((tx) => !tx.deletedAt && tx.isPendingReview !== true && tx.isPendingReview !== 1).count(),
+
+  const isDataReady =
+    transactions !== undefined &&
+    wallets !== undefined &&
+    loans !== undefined &&
+    investments !== undefined &&
+    savings !== undefined &&
+    computedWallets !== undefined
+
+  const hasAnyTransactions = useLiveQuery(
+    async () => {
+      const first = await db.transactions.filter((tx) => !tx.deletedAt).first()
+      return Boolean(first)
+    },
     [],
-    0
+    true
   )
 
   const validTransactions = useMemo(() => {
@@ -508,7 +528,7 @@ export default function Reports() {
     [incomeByCategory]
   )
 
-  const hasAnyTransactionsEver = (txCount || 0) > 0
+  const hasAnyTransactionsEver = (transactions && transactions.length > 0) || Boolean(hasAnyTransactions)
 
   return (
     <div className="min-h-full pb-32 sm:pb-24">

@@ -36,10 +36,13 @@ export const cachedDashboardState = {
   budgets: null,
   goals: null,
   loans: null,
+  loanPayments: null,
   wallets: null,
   walletsWithBalance: null,
   rawHabitLogs: null,
   rawHabits: null,
+  todos: null,
+  subTasks: null,
 }
 
 export function clearCachedDashboardState() {
@@ -48,10 +51,13 @@ export function clearCachedDashboardState() {
   cachedDashboardState.budgets = null
   cachedDashboardState.goals = null
   cachedDashboardState.loans = null
+  cachedDashboardState.loanPayments = null
   cachedDashboardState.wallets = null
   cachedDashboardState.walletsWithBalance = null
   cachedDashboardState.rawHabitLogs = null
   cachedDashboardState.rawHabits = null
+  cachedDashboardState.todos = null
+  cachedDashboardState.subTasks = null
 }
 
 export function getCachedDashboardTransactions() {
@@ -63,9 +69,25 @@ export function setCachedDashboardTransactions(transactions) {
 }
 
 export function getCachedDashboardWallets() {
-  return cachedDashboardState.wallets
+  return cachedDashboardState.wallets || cachedDashboardState.walletsWithBalance
 }
 
 export function setCachedDashboardWallets(wallets) {
   cachedDashboardState.wallets = wallets
+}
+
+export function getCachedTodoList() {
+  return cachedDashboardState.todos
+}
+
+export function setCachedTodoList(todos) {
+  cachedDashboardState.todos = todos
+}
+
+export function getCachedSubTasksList() {
+  return cachedDashboardState.subTasks
+}
+
+export function setCachedSubTasksList(subTasks) {
+  cachedDashboardState.subTasks = subTasks
 }

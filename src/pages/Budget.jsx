@@ -23,8 +23,10 @@ import PageHeader from '../components/ui/PageHeader'
 import AnimatedCounter from '../components/ui/AnimatedCounter'
 import { Plus, AlertCircle, CheckCircle2, AlertTriangle, Copy, AlertOctagon, Edit2, Calendar } from 'lucide-react'
 import { isExcludeAnalyticsTx, convertCurrency } from '../lib/utils'
-import { clearCachedDashboardState } from '../hooks/useDashboardData'
+import { clearCachedDashboardState, cachedDashboardState } from '../hooks/useDashboardData'
 import { scheduleNativeWidgetSync } from '../lib/nativeWidgetSync'
+
+let cachedMonthExpenseTxs = null
 
 function Budget() {
   const { locale, t } = useTranslation()
@@ -67,14 +69,24 @@ function Budget() {
   }, [setEditingId])
   const { setSwipedId, getSwipeHandlers } = useSwipeAction()
 
-  const budgets = useLiveQuery(async () => {
-    try {
-      return await db.budgets.toArray()
-    } catch (err){
-      console.warn('[Budget]', err)
-      return []
+  const budgets = useLiveQuery(
+    async () => {
+      try {
+        return await db.budgets.toArray()
+      } catch (err) {
+        console.warn('[Budget]', err)
+        return []
+      }
+    },
+    [],
+    cachedDashboardState.budgets || undefined
+  )
+
+  useEffect(() => {
+    if (budgets) {
+      cachedDashboardState.budgets = budgets
     }
-  }, [])
+  }, [budgets])
 
   const monthBudgets = useMemo(() => (budgets ?? []).filter((b) => b.month === month), [budgets, month])
 
@@ -95,8 +107,15 @@ function Budget() {
           (tx.type === 'expense' || (tx.isSplit && Array.isArray(tx.splitItems) && tx.splitItems.some((si) => (si.type || tx.type) === 'expense')))
         )
         .toArray(),
-    [budgetPeriod.startDate, budgetPeriod.endDate]
+    [budgetPeriod.startDate, budgetPeriod.endDate],
+    cachedMonthExpenseTxs || undefined
   )
+
+  useEffect(() => {
+    if (monthExpenseTxs) {
+      cachedMonthExpenseTxs = monthExpenseTxs
+    }
+  }, [monthExpenseTxs])
 
   const isDataReady = budgets !== undefined && monthExpenseTxs !== undefined
 
@@ -478,7 +497,7 @@ function Budget() {
                 return (
                   <div
                     key={b.id}
-                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] shadow-2xs select-none touch-pan-y"
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--field-bg)] shadow-2xs select-none touch-pan-y ft-group-visibility-auto"
                   >
                     {/* Progressive Swipe Background (Revealed Action Slot) */}
                     <div className="absolute inset-y-0 right-0 z-0 flex items-center justify-end rounded-r-2xl px-5 opacity-0 transition-colors duration-150 w-full" />

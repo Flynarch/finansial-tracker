@@ -31,10 +31,10 @@ const INCOME_KEYWORD_RULES = [
 
 const EXPENSE_KEYWORD_RULES = [
   // Food & Beverage
-  { match: ['kopi', 'coffee', 'cafe', 'kafe', 'starbucks', 'janji jiwa', 'kenangan', 'starling', 'teh', 'matcha', 'greentea', 'green tea', 'taro', 'red velvet', 'thai tea', 'earl grey', 'boba', 'cappuccino', 'latte'], target: 'makanan/kopi' },
-  { match: ['sarapan', 'breakfast', 'bubur', 'lontong', 'nasi uduk', 'roti bakar'], target: 'makanan/sarapan' },
-  { match: ['malam', 'dinner', 'nasgor', 'pecel lele', 'sate', 'martabak', 'angkringan'], target: 'makanan/makan_malam' },
-  { match: ['jajan', 'snack', 'cemilan', 'seblak', 'cilok', 'siomay', 'batagor', 'gorengan', 'es krim', 'donat', 'croissant', 'pastry'], target: 'makanan/jajan' },
+  { match: ['kopi', 'coffee', 'cafe', 'kafe', 'starbucks', 'janji jiwa', 'kenangan', 'starling', 'teh', 'matcha', 'greentea', 'green tea', 'taro', 'red velvet', 'thai tea', 'earl grey', 'boba', 'cappuccino', 'latte', 'ngopi', 'es teh'], target: 'makanan/kopi' },
+  { match: ['sarapan', 'breakfast', 'bubur', 'lontong', 'nasi uduk', 'roti bakar', 'makan pagi', 'sarap'], target: 'makanan/sarapan' },
+  { match: ['malam', 'malem', 'dinner', 'nasgor', 'pecel lele', 'sate', 'martabak', 'angkringan', 'makan malam', 'makan malem'], target: 'makanan/makan_malam' },
+  { match: ['jajan', 'snack', 'cemilan', 'seblak', 'cilok', 'siomay', 'batagor', 'gorengan', 'eskrim', 'es krim', 'ice cream', 'icecream', 'gelato', 'sundae', 'donat', 'croissant', 'pastry'], target: 'makanan/jajan' },
   { match: ['minum', 'drink', 'jus', 'air mineral', 'galon', 'aqua'], target: 'makanan/minuman' },
   { match: ['resto', 'restoran', 'dining', 'makan luar', 'ayce', 'all you can eat', 'gofood', 'go food', 'grabfood', 'grab food', 'shopeefood', 'shopee food'], target: 'makanan/makan_diluar' },
   {
@@ -61,7 +61,7 @@ const EXPENSE_KEYWORD_RULES = [
   { match: ['gojek', 'grab', 'ojol', 'maxim', 'goride', 'gocar', 'grabcar', 'indrive'], target: 'transportasi/ojol' },
   { match: ['parkir', 'parking', 'karcis parkir'], target: 'transportasi/parkir' },
   { regex: /\b(tol|e-toll|etoll|kartu tol)\b/i, target: 'transportasi/tol' },
-  { match: ['kereta', 'krl', 'mrt', 'lrt', 'kai', 'commuter'], target: 'transportasi/kereta' },
+  { regex: /\b(kereta|krl|mrt|lrt|kai|commuter)\b/i, target: 'transportasi/kereta' },
   { regex: /\b(bis|bus|transjakarta|tj|damri)\b/i, target: 'transportasi/bis' },
   { match: ['taksi', 'taxi', 'bluebird'], target: 'transportasi/taksi' },
   { match: ['servis', 'bengkel', 'ganti oli', 'tambal ban', 'cuci motor', 'cuci mobil'], target: 'transportasi/servis_kendaraan' },
@@ -114,7 +114,7 @@ const EXPENSE_KEYWORD_RULES = [
   { match: ['hobi', 'badminton', 'futsal', 'sepeda', 'tenis', 'golf'], target: 'kehidupan_sosial/hobi' },
   { match: ['kencan', 'date', 'dating', 'jalan sama doi'], target: 'kehidupan_sosial/kencan' },
   { match: ['sedekah', 'zakat', 'infaq', 'donasi', 'amal'], target: 'kehidupan_sosial/amal_donasi' },
-  { match: ['kondangan', 'hadiah nikah', 'amplop'], target: 'kehidupan_sosial/kondangan' },
+  { match: ['kondangan', 'hadiah nikah', 'amplop', 'kado', 'hadiah', 'gift'], target: 'kehidupan_sosial/kondangan' },
   {
     test: (lower) => lower.includes('iuran') || lower.includes('iuran rt') || /\bkas\b/i.test(lower),
     target: 'kehidupan_sosial/iuran',

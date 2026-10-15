@@ -30,8 +30,18 @@ export default function CategoryPickerModal({ isOpen, onClose, txType = 'expense
   const lang = locale === 'en' ? 'en' : 'id'
 
   const [categoryVersion, setCategoryVersion] = useState(0)
-  const [expenseParentId, setExpenseParentId] = useState(null)
-  const [incomeParentId, setIncomeParentId] = useState(null)
+  const [expenseParentId, setExpenseParentId] = useState(() => {
+    if (isOpen && txType === 'expense' && selectedCategory) {
+      return String(selectedCategory).split('/')[0] || null
+    }
+    return null
+  })
+  const [incomeParentId, setIncomeParentId] = useState(() => {
+    if (isOpen && txType === 'income' && selectedCategory) {
+      return String(selectedCategory).split('/')[0] || null
+    }
+    return null
+  })
   const [editMode, setEditMode] = useState(false)
   const [newSubName, setNewSubName] = useState('')
   const [renameParentVal, setRenameParentVal] = useState('')

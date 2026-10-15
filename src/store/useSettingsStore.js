@@ -26,6 +26,8 @@ function getInitialTheme() {
   return 'light'
 }
 
+export const DEFAULT_SEARCH_QUICK_CHIPS = ['< 50rb', '50rb - 200rb', '> 100rb', '> 500rb']
+
 const useSettingsStore = create((set, get) => ({
   theme: getInitialTheme(),
   locale: detectSystemLocale(),
@@ -58,6 +60,7 @@ const useSettingsStore = create((set, get) => ({
   emailVerified: false,
   emailVerificationDismissed: false,
   hideBalance: typeof window !== 'undefined' ? window.localStorage.getItem('ft_hide_balance') === '1' : false,
+  searchQuickChips: DEFAULT_SEARCH_QUICK_CHIPS,
   isUnlocked: true,
   isLoaded: false,
   unviewedMutationsCount: 0,
@@ -97,7 +100,19 @@ const useSettingsStore = create((set, get) => ({
       widgetRange: next.widgetRange === 'month' ? 'month' : '7d',
       notificationAutoApprove: Boolean(next.notificationAutoApprove),
       hideBalance: Boolean(next.hideBalance),
+      searchQuickChips: Array.isArray(next.searchQuickChips) && next.searchQuickChips.length > 0
+        ? next.searchQuickChips
+        : DEFAULT_SEARCH_QUICK_CHIPS,
     })
+  },
+  setSearchQuickChips: (chips) => {
+    const next = Array.isArray(chips) && chips.length > 0 ? chips : DEFAULT_SEARCH_QUICK_CHIPS
+    set({ searchQuickChips: next })
+    get().persist({ searchQuickChips: next }).catch((err) => console.error('[useSettingsStore:setSearchQuickChips]', err))
+  },
+  resetSearchQuickChips: () => {
+    set({ searchQuickChips: DEFAULT_SEARCH_QUICK_CHIPS })
+    get().persist({ searchQuickChips: DEFAULT_SEARCH_QUICK_CHIPS }).catch((err) => console.error('[useSettingsStore:resetSearchQuickChips]', err))
   },
   toggleHideBalance: () => {
     const next = !get().hideBalance
@@ -343,6 +358,7 @@ const useSettingsStore = create((set, get) => ({
         locale: detectedLocale,
         hasCompletedOnboarding: oldOnboardingSeen,
         hasCompletedSpotlightTour: oldOnboardingSeen,
+        searchQuickChips: DEFAULT_SEARCH_QUICK_CHIPS,
       })
       return
     }
@@ -417,6 +433,9 @@ const useSettingsStore = create((set, get) => ({
       hideBalance: record.hideBalance !== undefined
         ? Boolean(record.hideBalance)
         : (typeof window !== 'undefined' ? window.localStorage?.getItem?.('ft_hide_balance') === '1' : false),
+      searchQuickChips: Array.isArray(record.searchQuickChips) && record.searchQuickChips.length > 0
+        ? record.searchQuickChips
+        : DEFAULT_SEARCH_QUICK_CHIPS,
       isUnlocked: !securityEnabled,
       isLoaded: true,
     })
