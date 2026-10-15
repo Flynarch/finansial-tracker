@@ -101,12 +101,20 @@ export default function WalletCarousel({
   const handleScroll = () => {
     if (!scrollRef.current || !hasRestoredScroll.current) return
     const container = scrollRef.current
-    const slideWidth = container.clientWidth
-    if (!slideWidth) return
-
     const scrollLeft = container.scrollLeft
-    const slideCount = container.children?.length || 2
-    const closestIndex = Math.min(slideCount - 1, Math.max(0, Math.round(scrollLeft / slideWidth)))
+    const slides = container.children
+    if (!slides || slides.length === 0) return
+
+    let closestIndex = 0
+    let minDistance = Infinity
+
+    for (let i = 0; i < slides.length; i++) {
+      const dist = Math.abs(slides[i].offsetLeft - scrollLeft)
+      if (dist < minDistance) {
+        minDistance = dist
+        closestIndex = i
+      }
+    }
 
     if (closestIndex !== activeSlideRef.current) {
       activeSlideRef.current = closestIndex
